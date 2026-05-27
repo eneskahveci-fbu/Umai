@@ -4,20 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
   BookOpen,
-  Download,
   Globe,
   Image as ImageIcon,
-  Menu,
-  Mic,
-  MicOff,
   Paperclip,
+  PanelLeft,
+  Settings,
   Square,
   VenetianMask,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { STYLE_LABELS } from "@/lib/constants";
 import { MessageBubble } from "./MessageBubble";
-import { SelectorBar } from "./SelectorBar";
 
 const SUGGESTIONS = [
   { icon: "🧑‍💻", text: "Python'da bir CLI argüman ayrıştırıcı yaz" },
@@ -39,9 +35,9 @@ export function ChatView() {
   const streaming = useStore((s) => s.streaming);
   const config = useStore((s) => s.config);
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
+  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const pendingInput = useStore((s) => s.pendingInput);
   const setPendingInput = useStore((s) => s.setPendingInput);
-  const exportChat = useStore((s) => s.exportChat);
   const followUpSuggestions = useStore((s) => s.followUpSuggestions);
   const setFollowUpSuggestions = useStore((s) => s.setFollowUpSuggestions);
 
@@ -332,56 +328,69 @@ export function ChatView() {
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Üst bar */}
-      <div className="min-h-14 shrink-0 flex items-center gap-3 px-4 py-2.5 border-b border-line/80 bg-surface/50 backdrop-blur-sm flex-wrap">
-        <button onClick={() => setSidebarOpen(true)} className="md:hidden text-muted">
-          <Menu size={20} />
+      <div className="h-14 shrink-0 flex items-center gap-3 px-4 border-b border-line/60 bg-surface/60 backdrop-blur-sm">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          title="Yan panel (Ctrl+B)"
+          className="w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors shrink-0"
+        >
+          <PanelLeft size={17} />
         </button>
-        <SelectorBar />
-        {incognito && (
-          <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-purple/15 text-purple border border-purple/40">
-            <VenetianMask size={12} /> Gizli
-          </span>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          {/* Stil */}
-          <select
-            value={config.style}
-            onChange={(e) =>
-              useStore.getState().saveConfig({
-                ...config,
-                style: e.target.value as typeof config.style,
-              })
-            }
-            className="bare-select text-[11px]"
-            title="Yanıt stili"
-          >
-            {Object.entries(STYLE_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v.label}
-              </option>
-            ))}
-          </select>
-          {/* Token göstergesi */}
+
+        <div className="flex-1 min-w-0">
+          {config.models.length > 0 ? (
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors group max-w-full"
+              title="Ayarlar"
+            >
+              <span className="w-2 h-2 rounded-full bg-green shrink-0" />
+              <span className="truncate font-medium text-ink">
+                {config.models.find((m) => m.id === config.activeModelId)?.label ||
+                  config.models.find((m) => m.id === config.activeModelId)?.model ||
+                  "Model seç"}
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-brand/40 text-brand hover:bg-brand/10 transition-colors"
+            >
+              + Model ekle
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          {incognito && (
+            <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-purple/10 text-purple border border-purple/30">
+              <VenetianMask size={11} /> Gizli
+            </span>
+          )}
+          {/* Token çubuğu */}
           {messages.length > 0 && (
-            <div className="flex items-center gap-1.5" title={`~${tokenEst} token / ${config.maxContext}`}>
-              <div className="w-16 h-1.5 rounded-full bg-line overflow-hidden">
+            <div
+              className="flex items-center gap-1.5 px-2"
+              title={`~${tokenEst} token / ${config.maxContext}`}
+            >
+              <div className="w-14 h-1 rounded-full bg-line overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-brand transition-all"
+                  className={`h-full rounded-full transition-all ${
+                    tokenPct > 80 ? "bg-red" : tokenPct > 60 ? "bg-yellow" : "bg-brand"
+                  }`}
                   style={{ width: `${tokenPct}%` }}
                 />
               </div>
-              <span className="text-[10px] text-muted font-mono">{Math.round(tokenPct)}%</span>
+              <span className="text-[10px] text-muted/60 font-mono tabular-nums">{Math.round(tokenPct)}%</span>
             </div>
           )}
-          {current && current.messages.length > 0 && (
-            <button
-              onClick={() => exportChat(current.id)}
-              title="Sohbeti indir"
-              className="text-muted hover:text-ink p-1 rounded-lg hover:bg-bgsoft"
-            >
-              <Download size={14} />
-            </button>
-          )}
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
+            title="Ayarlar"
+          >
+            <Settings size={15} />
+          </button>
         </div>
       </div>
 
