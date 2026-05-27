@@ -8,6 +8,17 @@ import { Check, Copy, Pencil, RefreshCw, X } from "lucide-react";
 import type { ChatMessage } from "@/lib/types";
 import { CodeBlock } from "./CodeBlock";
 
+function ActionBtn({ onClick, icon, label }: { onClick: () => void; icon: React.ReactNode; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1.5 text-[11px] text-muted hover:text-ink px-2.5 py-1.5 rounded-lg hover:bg-bgsoft transition-colors"
+    >
+      {icon} {label}
+    </button>
+  );
+}
+
 export function MessageBubble({
   message,
   index,
@@ -51,10 +62,10 @@ export function MessageBubble({
   };
 
   return (
-    <div className="group/msg flex gap-3 py-4">
+    <div className="group/msg flex gap-3.5 py-5">
       <div
-        className={`shrink-0 w-8 h-8 rounded-lg grid place-items-center text-sm font-bold ${
-          isUser ? "bg-blue text-[#04203f]" : "brand-gradient text-white"
+        className={`shrink-0 w-8 h-8 rounded-xl grid place-items-center text-sm font-bold shadow-sm ${
+          isUser ? "bg-blue/90 text-white" : "brand-gradient text-white"
         }`}
       >
         {isUser ? "S" : "✦"}
@@ -66,7 +77,7 @@ export function MessageBubble({
             key={i}
             src={img}
             alt=""
-            className="max-w-[300px] max-h-[200px] object-cover rounded-lg border border-line mb-2"
+            className="max-w-[320px] max-h-[220px] object-contain rounded-xl border border-line mb-3"
           />
         ))}
 
@@ -83,20 +94,20 @@ export function MessageBubble({
               <div className="flex gap-2">
                 <button
                   onClick={submitEdit}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-brand text-white font-semibold"
+                  className="text-xs px-3.5 py-1.5 rounded-lg bg-brand text-white font-semibold hover:bg-branddim transition-colors"
                 >
                   Gönder
                 </button>
                 <button
                   onClick={() => setEditing(false)}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-line text-muted"
+                  className="text-xs px-3 py-1.5 rounded-lg border border-line text-muted hover:text-ink transition-colors"
                 >
-                  <X size={12} />
+                  İptal
                 </button>
               </div>
             </div>
           ) : (
-            <div className="whitespace-pre-wrap leading-relaxed">
+            <div className="whitespace-pre-wrap leading-relaxed text-[15px]">
               {message.content}
             </div>
           )
@@ -116,36 +127,13 @@ export function MessageBubble({
 
         {/* Eylem butonları */}
         {message.content && !editing && (
-          <div className="flex items-center gap-1 mt-2 opacity-0 group-hover/msg:opacity-100 transition-opacity">
-            <button
-              onClick={copyMessage}
-              className="flex items-center gap-1 text-xs text-muted hover:text-ink px-2 py-1 rounded-lg hover:bg-bgsoft"
-            >
-              {copied ? (
-                <>
-                  <Check size={12} /> Kopyalandı
-                </>
-              ) : (
-                <>
-                  <Copy size={12} /> Kopyala
-                </>
-              )}
-            </button>
+          <div className="flex items-center gap-0.5 mt-2.5 opacity-0 group-hover/msg:opacity-100 transition-opacity duration-200">
+            <ActionBtn onClick={copyMessage} icon={copied ? <Check size={13} /> : <Copy size={13} />} label={copied ? "Kopyalandı" : "Kopyala"} />
             {isUser && onEdit && (
-              <button
-                onClick={startEdit}
-                className="flex items-center gap-1 text-xs text-muted hover:text-ink px-2 py-1 rounded-lg hover:bg-bgsoft"
-              >
-                <Pencil size={12} /> Düzenle
-              </button>
+              <ActionBtn onClick={startEdit} icon={<Pencil size={13} />} label="Düzenle" />
             )}
             {showRegenerate && onRegenerate && (
-              <button
-                onClick={onRegenerate}
-                className="flex items-center gap-1 text-xs text-muted hover:text-ink px-2 py-1 rounded-lg hover:bg-bgsoft"
-              >
-                <RefreshCw size={12} /> Yeniden oluştur
-              </button>
+              <ActionBtn onClick={onRegenerate} icon={<RefreshCw size={13} />} label="Yeniden" />
             )}
           </div>
         )}

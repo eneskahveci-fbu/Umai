@@ -4,12 +4,26 @@ import { useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { ChatView } from "@/components/ChatView";
 import { CoderView } from "@/components/CoderView";
+import { CompareView } from "@/components/CompareView";
 import { SettingsModal } from "@/components/SettingsModal";
+import { PromptLibrary } from "@/components/PromptLibrary";
+import { CommandPalette } from "@/components/CommandPalette";
 import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ArtifactPanel } from "@/components/ArtifactPanel";
 import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
+
+function MainView({ view }: { view: string }) {
+  switch (view) {
+    case "coder":
+      return <CoderView />;
+    case "compare":
+      return <CompareView />;
+    default:
+      return <ChatView />;
+  }
+}
 
 export default function AppPage() {
   const view = useStore((s) => s.view);
@@ -40,9 +54,11 @@ export default function AppPage() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key === "n") { e.preventDefault(); useStore.getState().newChat(e.shiftKey); }
       if (mod && e.key === ",") { e.preventDefault(); useStore.getState().setSettingsOpen(true); }
+      if (mod && e.key === "k") { e.preventDefault(); useStore.getState().setCommandPaletteOpen(true); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -53,10 +69,12 @@ export default function AppPage() {
       <div className="flex h-screen overflow-hidden">
         <Sidebar />
         <main className="flex-1 min-w-0 flex flex-col">
-          {view === "chat" ? <ChatView /> : <CoderView />}
+          <MainView view={view} />
         </main>
         {artifact && <ArtifactPanel />}
         <SettingsModal />
+        <PromptLibrary />
+        <CommandPalette />
         <ToastContainer />
       </div>
     </ErrorBoundary>

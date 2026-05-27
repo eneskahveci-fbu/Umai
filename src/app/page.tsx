@@ -83,24 +83,25 @@ export default function Home() {
       </nav>
 
       {/* HERO */}
-      <header className="max-w-6xl mx-auto px-6 pt-24 pb-16 text-center">
-        <span className="inline-flex items-center gap-2 text-sm text-muted border border-line bg-surface px-4 py-1.5 rounded-full mb-7">
-          <span className="text-brand">●</span> model bağımsız · Qwen tarzı arayüz
+      <header className="relative max-w-6xl mx-auto px-6 pt-28 pb-20 text-center overflow-hidden">
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgba(124,92,255,0.12),transparent)]" />
+        <span className="inline-flex items-center gap-2 text-sm text-muted border border-line/60 bg-surface/80 backdrop-blur-sm px-4 py-1.5 rounded-full mb-8">
+          <span className="w-2 h-2 rounded-full bg-brand animate-pulse" /> model bağımsız · açık kaynak
         </span>
-        <h1 className="text-5xl sm:text-6xl font-extrabold leading-[1.05] tracking-tight">
+        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-tight">
           Terminalin ve tarayıcın için
           <br />
           <span className="brand-text">AI kod asistanı</span>
         </h1>
-        <p className="text-lg text-muted max-w-2xl mx-auto mt-6">
+        <p className="text-lg text-muted max-w-2xl mx-auto mt-6 leading-relaxed">
           craft.ai; dosyalarını okur, kod yazar, GitHub deponu gezer — hem de
           istediğin modelle. Hugging Face, DeepSeek, OpenRouter ya da kendi
           yerel modelin: hepsi tek bir akışta.
         </p>
-        <div className="flex gap-3 justify-center mt-9 flex-wrap">
+        <div className="flex gap-3 justify-center mt-10 flex-wrap">
           <Link
             href="/app"
-            className="flex items-center gap-2 bg-brand hover:bg-branddim text-white font-semibold px-6 py-3 rounded-xl transition-colors"
+            className="flex items-center gap-2 bg-brand hover:bg-branddim text-white font-semibold px-7 py-3.5 rounded-2xl shadow-lg shadow-brand/20 hover:shadow-brand/30 transition-all duration-200"
           >
             ⚡ Hemen Başla
           </Link>
@@ -108,7 +109,7 @@ export default function Home() {
             href="https://github.com/eneskahveci-sdo/craft-ai"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 border border-line hover:border-brand px-6 py-3 rounded-xl font-semibold transition-colors"
+            className="flex items-center gap-2 border border-line hover:border-brand/50 px-7 py-3.5 rounded-2xl font-semibold transition-all duration-200"
           >
             ★ GitHub&apos;da Gör
           </a>
@@ -121,9 +122,9 @@ export default function Home() {
           {FEATURES.map((f) => (
             <div
               key={f.title}
-              className="rounded-2xl border border-line bg-surface p-6 hover:border-branddim transition-colors"
+              className="group rounded-2xl border border-line bg-surface p-6 hover:border-brand/40 hover:shadow-lg hover:shadow-brand/5 transition-all duration-200"
             >
-              <div className="w-11 h-11 rounded-xl bg-brand/12 text-brand grid place-items-center mb-4">
+              <div className="w-11 h-11 rounded-xl bg-brand/10 text-brand grid place-items-center mb-4 group-hover:bg-brand/15 transition-colors">
                 {f.icon}
               </div>
               <h3 className="font-bold text-lg mb-1.5">{f.title}</h3>
