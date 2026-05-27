@@ -1,11 +1,14 @@
 import { create } from "zustand";
 import type {
+  Artifact,
   Chat,
   ChatMessage,
   Config,
   GitHubAccount,
+  MemoryItem,
   ModelProfile,
   OpenFile,
+  Project,
   RepoState,
   Toast,
   TreeNode,
@@ -72,6 +75,16 @@ interface StoreState {
   setActiveRepo: (repo: string) => void;
   toggleTheme: () => void;
 
+  // projects
+  addProject: (name: string) => void;
+  removeProject: (id: string) => void;
+  updateProject: (id: string, patch: Partial<Project>) => void;
+  setActiveProject: (id: string | null) => void;
+
+  // memory
+  addMemory: (content: string) => void;
+  removeMemory: (id: string) => void;
+
   view: "chat" | "coder";
   setView: (v: "chat" | "coder") => void;
   sidebarOpen: boolean;
@@ -93,9 +106,20 @@ interface StoreState {
   pushMessage: (m: ChatMessage) => void;
   updateLastContent: (content: string) => void;
   popLastMessage: () => void;
+  editMessageAt: (index: number, content: string) => void;
+  truncateAfter: (index: number) => void;
   maybeSetTitle: (text: string) => void;
   persistCurrent: () => Promise<void>;
   exportChat: (id: string) => void;
+  exportChatHtml: (id: string) => void;
+
+  // follow-up
+  followUpSuggestions: string[];
+  setFollowUpSuggestions: (s: string[]) => void;
+
+  // artifact
+  artifact: Artifact | null;
+  setArtifact: (a: Artifact | null) => void;
 
   // toast
   toasts: Toast[];
@@ -130,12 +154,11 @@ export const useStore = create<StoreState>()((set, get) => ({
   addModel: (m) => {
     const model: ModelProfile = { ...m, id: uid() };
     const config = get().config;
-    const next: Config = {
+    get().saveConfig({
       ...config,
       models: [...config.models, model],
       activeModelId: config.activeModelId ?? model.id,
-    };
-    get().saveConfig(next);
+    });
   },
   updateModel: (id, patch) => {
     const config = get().config;
@@ -151,13 +174,10 @@ export const useStore = create<StoreState>()((set, get) => ({
       ...config,
       models,
       activeModelId:
-        config.activeModelId === id
-          ? (models[0]?.id ?? null)
-          : config.activeModelId,
+        config.activeModelId === id ? (models[0]?.id ?? null) : config.activeModelId,
     });
   },
-  setActiveModel: (id) =>
-    get().saveConfig({ ...get().config, activeModelId: id }),
+  setActiveModel: (id) => get().saveConfig({ ...get().config, activeModelId: id }),
   activeModel: () => {
     const { models, activeModelId } = get().config;
     return models.find((m) => m.id === activeModelId) || models[0] || null;
@@ -178,32 +198,68 @@ export const useStore = create<StoreState>()((set, get) => ({
       ...config,
       githubAccounts,
       activeGithubId:
-        config.activeGithubId === id
-          ? (githubAccounts[0]?.id ?? null)
-          : config.activeGithubId,
+        config.activeGithubId === id ? (githubAccounts[0]?.id ?? null) : config.activeGithubId,
     });
   },
-  setActiveGithub: (id) =>
-    get().saveConfig({ ...get().config, activeGithubId: id }),
+  setActiveGithub: (id) => get().saveConfig({ ...get().config, activeGithubId: id }),
   activeGithub: () => {
     const { githubAccounts, activeGithubId } = get().config;
     return githubAccounts.find((a) => a.id === activeGithubId) || null;
   },
   addRepo: (repo) => {
     const config = get().config;
-    const repos = [repo, ...config.repos.filter((r) => r !== repo)].slice(
-      0,
-      12,
-    );
+    const repos = [repo, ...config.repos.filter((r) => r !== repo)].slice(0, 12);
     get().saveConfig({ ...config, repos, activeRepo: repo });
   },
-  setActiveRepo: (repo) =>
-    get().saveConfig({ ...get().config, activeRepo: repo }),
+  setActiveRepo: (repo) => get().saveConfig({ ...get().config, activeRepo: repo }),
   toggleTheme: () => {
+    const config = get().config;
+    get().saveConfig({ ...config, theme: config.theme === "dark" ? "light" : "dark" });
+  },
+
+  /* ─── Projeler ─── */
+  addProject: (name) => {
+    const project: Project = { id: uid(), name, systemPrompt: "", created_at: Date.now() };
     const config = get().config;
     get().saveConfig({
       ...config,
-      theme: config.theme === "dark" ? "light" : "dark",
+      projects: [...config.projects, project],
+      activeProjectId: project.id,
+    });
+  },
+  removeProject: (id) => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      projects: config.projects.filter((p) => p.id !== id),
+      activeProjectId: config.activeProjectId === id ? null : config.activeProjectId,
+    });
+    set((s) => ({
+      chats: s.chats.map((c) => (c.projectId === id ? { ...c, projectId: undefined } : c)),
+    }));
+  },
+  updateProject: (id, patch) => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      projects: config.projects.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    });
+  },
+  setActiveProject: (id) => get().saveConfig({ ...get().config, activeProjectId: id }),
+
+  /* ─── Bellek ─── */
+  addMemory: (content) => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      memories: [...config.memories, { id: uid(), content }],
+    });
+  },
+  removeMemory: (id) => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      memories: config.memories.filter((m) => m.id !== id),
     });
   },
 
@@ -236,6 +292,7 @@ export const useStore = create<StoreState>()((set, get) => ({
               title: r.title,
               messages: r.messages,
               created_at: new Date(r.created_at).getTime(),
+              projectId: r.project_id,
             })),
           });
           return;
@@ -246,22 +303,26 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
 
   newChat: (incognito = false) => {
+    const config = get().config;
     const chat: Chat = {
       id: uid(),
       title: "Yeni sohbet",
       messages: [],
       created_at: Date.now(),
       incognito,
+      projectId: config.activeProjectId ?? undefined,
     };
     set((state) => ({
       chats: [chat, ...state.chats],
       currentId: chat.id,
       incognito,
       view: "chat",
+      followUpSuggestions: [],
     }));
   },
 
-  selectChat: (id) => set({ currentId: id, incognito: false, view: "chat" }),
+  selectChat: (id) =>
+    set({ currentId: id, incognito: false, view: "chat", followUpSuggestions: [] }),
 
   deleteChat: async (id) => {
     const { userId } = get();
@@ -278,11 +339,7 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
 
   renameChat: (id, title) => {
-    set((state) => ({
-      chats: state.chats.map((c) =>
-        c.id === id ? { ...c, title } : c,
-      ),
-    }));
+    set((s) => ({ chats: s.chats.map((c) => (c.id === id ? { ...c, title } : c)) }));
     const { userId } = get();
     if (userId) {
       const sb = createClient();
@@ -298,41 +355,52 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
 
   pushMessage: (m) =>
-    set((state) => ({
-      chats: state.chats.map((c) =>
-        c.id === state.currentId
-          ? { ...c, messages: [...c.messages, m] }
-          : c,
+    set((s) => ({
+      chats: s.chats.map((c) =>
+        c.id === s.currentId ? { ...c, messages: [...c.messages, m] } : c,
       ),
     })),
 
   updateLastContent: (content) =>
-    set((state) => ({
-      chats: state.chats.map((c) => {
-        if (c.id !== state.currentId) return c;
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
         const messages = c.messages.slice();
         if (messages.length) {
-          messages[messages.length - 1] = {
-            ...messages[messages.length - 1],
-            content,
-          };
+          messages[messages.length - 1] = { ...messages[messages.length - 1], content };
         }
         return { ...c, messages };
       }),
     })),
 
   popLastMessage: () =>
-    set((state) => ({
-      chats: state.chats.map((c) => {
-        if (c.id !== state.currentId) return c;
-        return { ...c, messages: c.messages.slice(0, -1) };
+    set((s) => ({
+      chats: s.chats.map((c) =>
+        c.id === s.currentId ? { ...c, messages: c.messages.slice(0, -1) } : c,
+      ),
+    })),
+
+  editMessageAt: (index, content) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const messages = c.messages.slice();
+        if (messages[index]) messages[index] = { ...messages[index], content };
+        return { ...c, messages };
       }),
     })),
 
+  truncateAfter: (index) =>
+    set((s) => ({
+      chats: s.chats.map((c) =>
+        c.id === s.currentId ? { ...c, messages: c.messages.slice(0, index + 1) } : c,
+      ),
+    })),
+
   maybeSetTitle: (text) =>
-    set((state) => ({
-      chats: state.chats.map((c) =>
-        c.id === state.currentId && c.title === "Yeni sohbet"
+    set((s) => ({
+      chats: s.chats.map((c) =>
+        c.id === s.currentId && c.title === "Yeni sohbet"
           ? { ...c, title: text.slice(0, 48) }
           : c,
       ),
@@ -364,26 +432,42 @@ export const useStore = create<StoreState>()((set, get) => ({
     if (!chat) return;
     let md = `# ${chat.title}\n\n`;
     for (const m of chat.messages) {
-      const prefix = m.role === "user" ? "**Kullanıcı:**" : "**Asistan:**";
-      md += `${prefix}\n\n${m.content}\n\n---\n\n`;
+      md += `**${m.role === "user" ? "Kullanıcı" : "Asistan"}:**\n\n${m.content}\n\n---\n\n`;
     }
-    const blob = new Blob([md], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${chat.title.replace(/[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ\s-]/g, "").trim() || "sohbet"}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+    download(md, `${safeName(chat.title)}.md`, "text/markdown");
   },
+
+  exportChatHtml: (id) => {
+    const chat = get().chats.find((c) => c.id === id);
+    if (!chat) return;
+    const msgs = chat.messages
+      .map((m) => {
+        const cls = m.role === "user" ? "user" : "assistant";
+        const label = m.role === "user" ? "Kullanıcı" : "Asistan";
+        const escaped = m.content
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        return `<div class="msg ${cls}"><div class="role">${label}</div><pre>${escaped}</pre></div>`;
+      })
+      .join("\n");
+    const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${chat.title} — craft.ai</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#0e0e13;color:#ececf1;padding:2rem;max-width:800px;margin:auto}.msg{padding:1rem;border-radius:12px;margin-bottom:1rem}.user{background:#1c1c26;border:1px solid #28283a}.assistant{background:#14141b;border:1px solid #28283a}.role{font-size:.75rem;font-weight:700;color:#7c5cff;margin-bottom:.5rem;text-transform:uppercase}pre{white-space:pre-wrap;font-size:.9rem;line-height:1.6}h1{text-align:center;margin-bottom:2rem;background:linear-gradient(120deg,#9d7bff,#c4b1ff);-webkit-background-clip:text;background-clip:text;color:transparent}footer{text-align:center;margin-top:2rem;font-size:.75rem;color:#9a9ab0}</style></head><body><h1>${chat.title}</h1>${msgs}<footer>craft.ai ile oluşturuldu</footer></body></html>`;
+    download(html, `${safeName(chat.title)}.html`, "text/html");
+  },
+
+  followUpSuggestions: [],
+  setFollowUpSuggestions: (s) => set({ followUpSuggestions: s }),
+
+  artifact: null,
+  setArtifact: (a) => set({ artifact: a }),
 
   toasts: [],
   addToast: (message, type = "info") => {
     const toast: Toast = { id: uid(), message, type };
-    set((state) => ({ toasts: [...state.toasts, toast] }));
+    set((s) => ({ toasts: [...s.toasts, toast] }));
     setTimeout(() => get().removeToast(toast.id), 3500);
   },
-  removeToast: (id) =>
-    set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) })),
+  removeToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
   repo: null,
   tree: null,
@@ -395,3 +479,17 @@ export const useStore = create<StoreState>()((set, get) => ({
   pendingInput: null,
   setPendingInput: (s) => set({ pendingInput: s }),
 }));
+
+function safeName(s: string) {
+  return s.replace(/[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ\s-]/g, "").trim() || "sohbet";
+}
+
+function download(content: string, filename: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

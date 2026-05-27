@@ -7,21 +7,19 @@ import { CoderView } from "@/components/CoderView";
 import { SettingsModal } from "@/components/SettingsModal";
 import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ArtifactPanel } from "@/components/ArtifactPanel";
 import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 
 export default function AppPage() {
   const view = useStore((s) => s.view);
+  const artifact = useStore((s) => s.artifact);
   const setUser = useStore((s) => s.setUser);
   const loadChats = useStore((s) => s.loadChats);
 
-  /* Auth */
   useEffect(() => {
     const sb = createClient();
-    if (!sb) {
-      loadChats(null);
-      return;
-    }
+    if (!sb) { loadChats(null); return; }
     sb.auth.getUser().then(({ data }) => {
       const u = data.user;
       setUser(u?.id ?? null, u?.email ?? null);
@@ -35,24 +33,16 @@ export default function AppPage() {
     return () => sub.subscription.unsubscribe();
   }, [setUser, loadChats]);
 
-  /* Tema uygula */
   useEffect(() => {
     const theme = useStore.getState().config.theme;
     document.documentElement.classList.toggle("light", theme === "light");
   }, []);
 
-  /* Klavye kısayolları */
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key === "n") {
-        e.preventDefault();
-        useStore.getState().newChat(e.shiftKey);
-      }
-      if (mod && e.key === ",") {
-        e.preventDefault();
-        useStore.getState().setSettingsOpen(true);
-      }
+      if (mod && e.key === "n") { e.preventDefault(); useStore.getState().newChat(e.shiftKey); }
+      if (mod && e.key === ",") { e.preventDefault(); useStore.getState().setSettingsOpen(true); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -65,6 +55,7 @@ export default function AppPage() {
         <main className="flex-1 min-w-0 flex flex-col">
           {view === "chat" ? <ChatView /> : <CoderView />}
         </main>
+        {artifact && <ArtifactPanel />}
         <SettingsModal />
         <ToastContainer />
       </div>

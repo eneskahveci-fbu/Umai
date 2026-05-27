@@ -3,6 +3,7 @@ export type Role = "user" | "assistant" | "system";
 export interface ChatMessage {
   role: Role;
   content: string;
+  images?: string[];
 }
 
 export interface Chat {
@@ -10,13 +11,12 @@ export interface Chat {
   title: string;
   messages: ChatMessage[];
   created_at: number;
-  /** true ise gizli sohbet: hiçbir yere kaydedilmez, geçmişte görünmez. */
   incognito?: boolean;
+  projectId?: string;
 }
 
 export type Provider = "hf" | "deepseek" | "openrouter" | "custom";
 
-/** Kullanıcının eklediği bir model API'si (ayarlardan birden fazla eklenebilir). */
 export interface ModelProfile {
   id: string;
   label: string;
@@ -26,14 +26,32 @@ export interface ModelProfile {
   apiKey: string;
 }
 
-/** Bağlı bir GitHub hesabı (birden fazla eklenebilir). */
 export interface GitHubAccount {
   id: string;
   username: string;
   token: string;
 }
 
-/** Tüm yapılandırma — localStorage'da saklanır. */
+export type ResponseStyle = "normal" | "concise" | "detailed" | "code" | "formal";
+
+export interface Project {
+  id: string;
+  name: string;
+  systemPrompt: string;
+  created_at: number;
+}
+
+export interface MemoryItem {
+  id: string;
+  content: string;
+}
+
+export interface Artifact {
+  type: "html" | "svg";
+  content: string;
+  title: string;
+}
+
 export interface Config {
   models: ModelProfile[];
   activeModelId: string | null;
@@ -43,12 +61,13 @@ export interface Config {
   activeRepo: string | null;
   systemPrompt: string;
   theme: "dark" | "light";
-}
-
-export interface Toast {
-  id: string;
-  message: string;
-  type: "success" | "error" | "info";
+  style: ResponseStyle;
+  memories: MemoryItem[];
+  projects: Project[];
+  activeProjectId: string | null;
+  followUps: boolean;
+  webSearch: boolean;
+  maxContext: number;
 }
 
 export interface RepoState {
@@ -70,4 +89,10 @@ export interface TreeNode {
 export interface OpenFile {
   path: string;
   content: string;
+}
+
+export interface Toast {
+  id: string;
+  message: string;
+  type: "success" | "error" | "info";
 }
