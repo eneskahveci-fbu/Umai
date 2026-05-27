@@ -224,10 +224,49 @@ html.light .prose-chat :not(pre) > code {
 @keyframes toast-slide {
   from {
     opacity: 0;
-    transform: translateX(24px);
+    transform: translateY(12px) scale(0.96);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0) scale(1);
   }
+}
+
+/* ─── Genel geçişler ─── */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+::selection {
+  background: rgba(124, 92, 255, 0.25);
+}
+
+/* ─── Mesaj ayracı ─── */
+.prose-chat > *:first-child {
+  margin-top: 0;
+}
+
+/* ─── Smooth fade-in ─── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* ─── Modal backdrop ─── */
+@keyframes modal-bg {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-modal-bg {
+  animation: modal-bg 0.15s ease-out;
+}
+
+@keyframes modal-content {
+  from { opacity: 0; transform: scale(0.97) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.animate-modal-content {
+  animation: modal-content 0.2s ease-out;
 }

@@ -20,10 +20,10 @@ import { MessageBubble } from "./MessageBubble";
 import { SelectorBar } from "./SelectorBar";
 
 const SUGGESTIONS = [
-  "Python'da bir CLI argüman ayrıştırıcı yaz",
-  "Bu hatayı açıkla: IndexError: list index out of range",
-  "REST ile GraphQL arasındaki farklar neler?",
-  "Coder sekmesinden bir dosya seçip özetlememi iste",
+  { icon: "🧑‍💻", text: "Python'da bir CLI argüman ayrıştırıcı yaz" },
+  { icon: "🐛", text: "Bu hatayı açıkla: IndexError: list index out of range" },
+  { icon: "⚡", text: "REST ile GraphQL arasındaki farklar neler?" },
+  { icon: "📂", text: "Coder sekmesinden bir dosya seçip özetlememi iste" },
 ];
 
 let currentAbort: AbortController | null = null;
@@ -332,7 +332,7 @@ export function ChatView() {
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Üst bar */}
-      <div className="min-h-14 shrink-0 flex items-center gap-3 px-4 py-2 border-b border-line flex-wrap">
+      <div className="min-h-14 shrink-0 flex items-center gap-3 px-4 py-2.5 border-b border-line/80 bg-surface/50 backdrop-blur-sm flex-wrap">
         <button onClick={() => setSidebarOpen(true)} className="md:hidden text-muted">
           <Menu size={20} />
         </button>
@@ -388,26 +388,27 @@ export function ChatView() {
       {/* Mesajlar */}
       <div className="flex-1 overflow-y-auto">
         {messages.length === 0 ? (
-          <div className="max-w-xl mx-auto px-5 pt-[12vh] text-center">
-            <div className="w-14 h-14 rounded-2xl brand-gradient grid place-items-center text-white text-2xl mx-auto mb-5">
+          <div className="max-w-xl mx-auto px-5 pt-[10vh] text-center">
+            <div className="w-16 h-16 rounded-2xl brand-gradient grid place-items-center text-white text-3xl mx-auto mb-6 shadow-lg shadow-brand/20">
               ◆
             </div>
-            <h2 className="text-2xl font-extrabold">
-              {incognito ? "Gizli Sohbet" : "Merhaba"}
+            <h2 className="text-2xl font-extrabold tracking-tight">
+              {incognito ? "Gizli Sohbet" : "Ne üzerinde çalışalım?"}
             </h2>
-            <p className="text-muted mt-2">
+            <p className="text-muted mt-2.5 text-sm leading-relaxed max-w-sm mx-auto">
               {incognito
-                ? "Bu sohbet hiçbir yere kaydedilmez."
-                : "craft.ai ile kod yaz, açıklat, hata ayıkla."}
+                ? "Bu sohbet hiçbir yere kaydedilmez. Sekmeyi kapattığında silinir."
+                : "Kod yaz, hata ayıkla, mimari öner — veya aşağıdaki önerilerden birini seç."}
             </p>
-            <div className="grid sm:grid-cols-2 gap-2.5 mt-7 text-left">
+            <div className="grid sm:grid-cols-2 gap-2.5 mt-8 text-left">
               {SUGGESTIONS.map((s) => (
                 <button
-                  key={s}
-                  onClick={() => setInput(s)}
-                  className="p-3.5 rounded-xl border border-line bg-surface hover:border-branddim text-sm transition-colors"
+                  key={s.text}
+                  onClick={() => setInput(s.text)}
+                  className="group/sug flex items-start gap-3 p-4 rounded-2xl border border-line bg-surface hover:border-brand/50 hover:bg-surface2 text-sm transition-all duration-200"
                 >
-                  {s}
+                  <span className="text-lg shrink-0 mt-0.5">{s.icon}</span>
+                  <span className="text-muted group-hover/sug:text-ink transition-colors leading-snug">{s.text}</span>
                 </button>
               ))}
             </div>
@@ -463,24 +464,24 @@ export function ChatView() {
 
       {/* Composer */}
       <div
-        className="shrink-0 border-t border-line bg-bg py-4"
+        className="shrink-0 bg-gradient-to-t from-bg via-bg to-transparent pt-2 pb-4"
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleFileDrop}
       >
         <div className="max-w-3xl mx-auto px-5">
           {/* Bekleyen görseller */}
           {pendingImages.length > 0 && (
-            <div className="flex gap-2 mb-2 flex-wrap">
+            <div className="flex gap-2 mb-2.5 flex-wrap">
               {pendingImages.map((img, i) => (
                 <div key={i} className="relative group/img">
                   <img
                     src={img}
                     alt=""
-                    className="w-16 h-16 object-cover rounded-lg border border-line"
+                    className="w-16 h-16 object-cover rounded-xl border border-line shadow-sm"
                   />
                   <button
                     onClick={() => setPendingImages((p) => p.filter((_, j) => j !== i))}
-                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red text-white grid place-items-center text-xs opacity-0 group-hover/img:opacity-100"
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red text-white grid place-items-center text-xs opacity-0 group-hover/img:opacity-100 transition-opacity"
                   >
                     ×
                   </button>
@@ -488,30 +489,39 @@ export function ChatView() {
               ))}
             </div>
           )}
-          <div className="flex items-end gap-2 bg-surface border border-line rounded-2xl px-3 py-2.5 focus-within:border-branddim transition-colors">
-            <button
-              onClick={() => fileRef.current?.click()}
-              title="Dosya ekle"
-              className="shrink-0 text-muted hover:text-ink p-1.5"
-            >
-              <Paperclip size={16} />
-            </button>
-            <button
-              onClick={() => imgRef.current?.click()}
-              title="Görsel ekle"
-              className="shrink-0 text-muted hover:text-ink p-1.5"
-            >
-              <ImageIcon size={16} />
-            </button>
-            <button
-              onClick={() => setSearchOn(!searchOn)}
-              title={searchOn ? "Web arama açık" : "Web arama kapalı"}
-              className={`shrink-0 p-1.5 rounded ${
-                searchOn ? "text-brand" : "text-muted hover:text-ink"
-              }`}
-            >
-              <Globe size={16} />
-            </button>
+          <div className="flex items-end gap-2 bg-surface border border-line rounded-2xl px-3 py-2.5 focus-within:border-brand/50 focus-within:shadow-[0_0_0_3px_rgba(124,92,255,0.08)] transition-all duration-200">
+            <div className="flex items-center gap-0.5 shrink-0">
+              <button
+                onClick={() => fileRef.current?.click()}
+                title="Dosya ekle"
+                className="text-muted hover:text-ink hover:bg-bgsoft p-1.5 rounded-lg transition-colors"
+              >
+                <Paperclip size={16} />
+              </button>
+              <button
+                onClick={() => imgRef.current?.click()}
+                title="Görsel ekle"
+                className="text-muted hover:text-ink hover:bg-bgsoft p-1.5 rounded-lg transition-colors"
+              >
+                <ImageIcon size={16} />
+              </button>
+              <button
+                onClick={() => setSearchOn(!searchOn)}
+                title={searchOn ? "Web arama açık" : "Web arama kapalı"}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  searchOn ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
+                }`}
+              >
+                <Globe size={16} />
+              </button>
+              <button
+                onClick={() => useStore.getState().setPromptLibraryOpen(true)}
+                title="Şablon kütüphanesi"
+                className="text-muted hover:text-ink hover:bg-bgsoft p-1.5 rounded-lg transition-colors"
+              >
+                <BookOpen size={16} />
+              </button>
+            </div>
             <input
               ref={fileRef}
               type="file"
@@ -541,13 +551,13 @@ export function ChatView() {
               onKeyDown={onKeyDown}
               onPaste={handlePaste}
               rows={1}
-              placeholder="Bir mesaj yaz..."
-              className="flex-1 bg-transparent resize-none outline-none text-[15px] leading-relaxed max-h-[200px] py-1.5"
+              placeholder="Mesajınızı yazın..."
+              className="flex-1 bg-transparent resize-none outline-none text-[15px] leading-relaxed max-h-[200px] py-1.5 placeholder:text-muted/50"
             />
             {streaming ? (
               <button
                 onClick={stop}
-                className="shrink-0 w-9 h-9 rounded-xl bg-red/80 hover:bg-red text-white grid place-items-center"
+                className="shrink-0 w-9 h-9 rounded-xl bg-red hover:bg-red/80 text-white grid place-items-center transition-colors"
                 title="Durdur"
               >
                 <Square size={14} />
@@ -556,16 +566,19 @@ export function ChatView() {
               <button
                 onClick={send}
                 disabled={!input.trim() && pendingImages.length === 0}
-                className="shrink-0 w-9 h-9 rounded-xl bg-brand hover:bg-branddim text-white grid place-items-center disabled:opacity-40 disabled:cursor-not-allowed"
+                className="shrink-0 w-9 h-9 rounded-xl bg-brand hover:bg-branddim text-white grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 <ArrowUp size={18} />
               </button>
             )}
           </div>
-          <p className="text-center text-xs text-muted mt-2">
-            {searchOn && <span className="text-brand mr-1">Web arama açık ·</span>}
-            Anahtarların yalnızca senin cihazında saklanır · craft.ai
-          </p>
+          <div className="flex items-center justify-center gap-2 mt-2.5 text-[11px] text-muted/60">
+            {searchOn && <span className="text-brand font-medium">Web arama açık</span>}
+            {searchOn && <span>·</span>}
+            <span>Anahtarların yalnızca senin cihazında saklanır</span>
+            <span>·</span>
+            <span className="font-medium">craft.ai</span>
+          </div>
         </div>
       </div>
     </div>

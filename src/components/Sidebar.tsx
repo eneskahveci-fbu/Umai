@@ -200,8 +200,8 @@ export function Sidebar() {
             <div
               key={c.id}
               onClick={() => selectChat(c.id)}
-              className={`group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer mb-0.5 text-sm ${
-                currentId === c.id ? "bg-bgsoft" : "hover:bg-bgsoft/60"
+              className={`group flex items-center gap-2 px-2.5 py-2.5 rounded-xl cursor-pointer mb-0.5 text-sm transition-colors duration-150 ${
+                currentId === c.id ? "bg-bgsoft border border-line/50" : "hover:bg-bgsoft/60 border border-transparent"
               }`}
             >
               <MessageSquare size={14} className="shrink-0 text-muted" />
