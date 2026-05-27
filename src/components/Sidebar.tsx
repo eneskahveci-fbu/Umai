@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { AuthButton } from "./AuthButton";
 
 export function Sidebar() {
   const view = useStore((s) => s.view);
@@ -116,7 +117,7 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* Alt: ayarlar + dev */}
+      {/* Alt: ayarlar + giriş + dev */}
       <div className="p-3 border-t border-line flex flex-col gap-2">
         <button
           onClick={() => setSettingsOpen(true)}
@@ -124,6 +125,7 @@ export function Sidebar() {
         >
           <Settings size={15} /> Ayarlar
         </button>
+        <AuthButton />
         <DevCredit />
       </div>
     </aside>
