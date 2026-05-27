@@ -2,7 +2,9 @@ name: Deploy to Vercel
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - claude/festive-pasteur-VuZeW
   workflow_dispatch:
 
 jobs:
