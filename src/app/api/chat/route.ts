@@ -53,7 +53,7 @@ export async function POST(req: Request) {
 
   const headers: Record<string, string> = { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` };
   if (body.provider === "openrouter") {
-    headers["HTTP-Referer"] = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://craft-ai.vercel.app";
+    headers["HTTP-Referer"] = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://craft-coder.vercel.app";
     headers["X-Title"] = "craft.ai";
   }
 

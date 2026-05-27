@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     description:
       "İstediğin modelle çalışan AI kod asistanı. Sohbet, GitHub Coder, gizli mod.",
   },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://craft-ai.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://craft-coder.vercel.app"),
 };
 
 export default function RootLayout({

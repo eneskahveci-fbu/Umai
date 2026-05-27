@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       {
         headers: {
           "User-Agent":
-            `Mozilla/5.0 (compatible; craft.ai/1.0; +${process.env.NEXT_PUBLIC_SITE_URL ?? "https://craft-ai.vercel.app"})`,
+            `Mozilla/5.0 (compatible; craft.ai/1.0; +${process.env.NEXT_PUBLIC_SITE_URL ?? "https://craft-coder.vercel.app"})`,
         },
       },
     );
