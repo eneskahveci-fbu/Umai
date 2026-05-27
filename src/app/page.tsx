@@ -175,7 +175,13 @@ export default function Home() {
             </a>
           </div>
 
-          <p className="text-xs text-muted/60 mt-8">© 2026 Enes Kahveci</p>
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 mt-6 text-xs text-muted/70">
+            <Link href="/privacy" className="hover:text-brand">Gizlilik Politikası</Link>
+            <Link href="/terms" className="hover:text-brand">Kullanım Şartları</Link>
+            <Link href="/cookies" className="hover:text-brand">Çerez Politikası</Link>
+            <a href="mailto:eneskahveci.bs@gmail.com" className="hover:text-brand">İletişim</a>
+          </div>
+          <p className="text-xs text-muted/60 mt-4">© 2026 Enes Kahveci · Tüm hakları saklıdır.</p>
         </div>
       </footer>
     </div>

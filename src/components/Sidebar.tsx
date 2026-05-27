@@ -294,6 +294,13 @@ export function DevCredit() {
       <a href="mailto:eneskahveci.bs@gmail.com" className="hover:text-brand">
         eneskahveci.bs@gmail.com
       </a>
+      <div className="flex justify-center gap-3 mt-2 text-[10px] text-muted/60">
+        <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-brand">Gizlilik</a>
+        <span>·</span>
+        <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-brand">Şartlar</a>
+        <span>·</span>
+        <a href="/cookies" target="_blank" rel="noopener noreferrer" className="hover:text-brand">Çerezler</a>
+      </div>
     </div>
   );
 }
