@@ -1,9 +1,13 @@
 "use client";
 
+import { useRef, useState } from "react";
 import {
   Code2,
+  Download,
   MessageSquare,
+  Pencil,
   Plus,
+  Search,
   Settings,
   Trash2,
   VenetianMask,
@@ -20,13 +24,38 @@ export function Sidebar() {
   const newChat = useStore((s) => s.newChat);
   const selectChat = useStore((s) => s.selectChat);
   const deleteChat = useStore((s) => s.deleteChat);
+  const renameChat = useStore((s) => s.renameChat);
+  const exportChat = useStore((s) => s.exportChat);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const sidebarOpen = useStore((s) => s.sidebarOpen);
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
 
+  const [search, setSearch] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const editRef = useRef<HTMLInputElement>(null);
+
   const history = chats
     .filter((c) => !c.incognito)
+    .filter((c) =>
+      search
+        ? c.title.toLowerCase().includes(search.toLowerCase())
+        : true,
+    )
     .sort((a, b) => b.created_at - a.created_at);
+
+  const startRename = (id: string, title: string) => {
+    setEditingId(id);
+    setEditTitle(title);
+    setTimeout(() => editRef.current?.focus(), 50);
+  };
+
+  const commitRename = () => {
+    if (editingId && editTitle.trim()) {
+      renameChat(editingId, editTitle.trim());
+    }
+    setEditingId(null);
+  };
 
   return (
     <aside
@@ -83,15 +112,36 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Geçmiş */}
+      {/* Arama + geçmiş */}
       <div className="flex-1 overflow-y-auto p-3">
+        <div className="relative mb-2">
+          <Search
+            size={14}
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"
+          />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Sohbet ara..."
+            className="w-full bg-bgsoft border border-line rounded-lg pl-8 pr-3 py-1.5 text-xs outline-none focus:border-brand placeholder:text-muted/60"
+          />
+        </div>
+
         <div className="text-[11px] font-bold uppercase tracking-wider text-muted px-2 mb-2">
           Geçmiş Sohbetler
         </div>
         {history.length === 0 ? (
-          <p className="text-xs text-muted px-2 leading-relaxed">
-            Henüz kayıtlı sohbet yok. &quot;Yeni Sohbet&quot; ile başla.
-          </p>
+          <div className="text-center py-8 px-2">
+            <MessageSquare
+              size={28}
+              className="mx-auto mb-2 text-muted/40"
+            />
+            <p className="text-xs text-muted leading-relaxed">
+              {search
+                ? "Aramayla eşleşen sohbet yok."
+                : "Henüz kayıtlı sohbet yok. \"Yeni Sohbet\" ile başla."}
+            </p>
+          </div>
         ) : (
           history.map((c) => (
             <div
@@ -101,17 +151,58 @@ export function Sidebar() {
                 currentId === c.id ? "bg-bgsoft" : "hover:bg-bgsoft/60"
               }`}
             >
-              <MessageSquare size={14} className="shrink-0 text-muted" />
-              <span className="flex-1 truncate">{c.title}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteChat(c.id);
-                }}
-                className="opacity-0 group-hover:opacity-70 hover:!opacity-100 text-muted hover:text-red"
-              >
-                <Trash2 size={14} />
-              </button>
+              <MessageSquare
+                size={14}
+                className="shrink-0 text-muted"
+              />
+              {editingId === c.id ? (
+                <input
+                  ref={editRef}
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onBlur={commitRename}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitRename();
+                    if (e.key === "Escape") setEditingId(null);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-1 bg-transparent border-b border-brand outline-none text-sm min-w-0"
+                />
+              ) : (
+                <span className="flex-1 truncate">{c.title}</span>
+              )}
+              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-70">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startRename(c.id, c.title);
+                  }}
+                  className="hover:!opacity-100 text-muted hover:text-ink p-0.5"
+                  title="Yeniden adlandır"
+                >
+                  <Pencil size={12} />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    exportChat(c.id);
+                  }}
+                  className="hover:!opacity-100 text-muted hover:text-ink p-0.5"
+                  title="Markdown olarak indir"
+                >
+                  <Download size={12} />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteChat(c.id);
+                  }}
+                  className="hover:!opacity-100 text-muted hover:text-red p-0.5"
+                  title="Sil"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
             </div>
           ))
         )}

@@ -1,4 +1,4 @@
-import { SYSTEM_PROMPT } from "@/lib/constants";
+import { DEFAULT_SYSTEM_PROMPT } from "@/lib/constants";
 import type { ChatMessage, Provider } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -10,14 +10,54 @@ interface ChatRequest {
   model?: string;
   apiKey?: string;
   provider?: Provider;
+  systemPrompt?: string;
 }
 
-/**
- * LLM proxy'si. İstemci yerine sunucudan istek atarak CORS sorununu çözer ve
- * istenirse sunucu env anahtarlarını kullanır. Sağlayıcının SSE akışını
- * olduğu gibi istemciye aktarır (stream pass-through).
- */
+/* ─── Rate limiter (in-memory, per instance) ─── */
+const rl = new Map<string, { count: number; reset: number }>();
+const RATE_LIMIT = 30;
+const RATE_WINDOW = 60_000;
+
+function checkRate(ip: string): boolean {
+  const now = Date.now();
+  const e = rl.get(ip);
+  if (!e || now > e.reset) {
+    rl.set(ip, { count: 1, reset: now + RATE_WINDOW });
+    return true;
+  }
+  if (e.count >= RATE_LIMIT) return false;
+  e.count++;
+  return true;
+}
+
+/* ─── Origin kontrolü ─── */
+function checkOrigin(req: Request): boolean {
+  const origin = req.headers.get("origin");
+  if (!origin) return true;
+  const host = req.headers.get("host");
+  if (!host) return true;
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: Request) {
+  /* Origin kontrolü */
+  if (!checkOrigin(req)) {
+    return new Response("Geçersiz origin.", { status: 403 });
+  }
+
+  /* Rate limit */
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!checkRate(ip)) {
+    return new Response("İstek limiti aşıldı. Biraz bekleyin.", {
+      status: 429,
+    });
+  }
+
   let body: ChatRequest;
   try {
     body = await req.json();
@@ -54,8 +94,9 @@ export async function POST(req: Request) {
     headers["X-Title"] = "craft.ai";
   }
 
+  const sysPrompt = body.systemPrompt || DEFAULT_SYSTEM_PROMPT;
   const messages = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: sysPrompt },
     ...body.messages,
   ];
 

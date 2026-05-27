@@ -41,6 +41,14 @@ export interface Config {
   activeGithubId: string | null;
   repos: string[];
   activeRepo: string | null;
+  systemPrompt: string;
+  theme: "dark" | "light";
+}
+
+export interface Toast {
+  id: string;
+  message: string;
+  type: "success" | "error" | "info";
 }
 
 export interface RepoState {

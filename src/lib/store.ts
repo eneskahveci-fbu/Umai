@@ -7,6 +7,7 @@ import type {
   ModelProfile,
   OpenFile,
   RepoState,
+  Toast,
   TreeNode,
 } from "./types";
 import { DEFAULT_CONFIG } from "./constants";
@@ -46,13 +47,16 @@ function saveLocalChats(chats: Chat[]) {
   );
 }
 
+function applyTheme(theme: "dark" | "light") {
+  if (typeof document === "undefined") return;
+  document.documentElement.classList.toggle("light", theme === "light");
+}
+
 interface StoreState {
-  // kimlik
   userId: string | null;
   userEmail: string | null;
   setUser: (id: string | null, email: string | null) => void;
 
-  // yapılandırma (çoklu model + github + repo)
   config: Config;
   saveConfig: (c: Config) => void;
   addModel: (m: Omit<ModelProfile, "id">) => void;
@@ -66,8 +70,8 @@ interface StoreState {
   activeGithub: () => GitHubAccount | null;
   addRepo: (repo: string) => void;
   setActiveRepo: (repo: string) => void;
+  toggleTheme: () => void;
 
-  // arayüz
   view: "chat" | "coder";
   setView: (v: "chat" | "coder") => void;
   sidebarOpen: boolean;
@@ -77,7 +81,6 @@ interface StoreState {
   streaming: boolean;
   setStreaming: (b: boolean) => void;
 
-  // sohbetler
   chats: Chat[];
   currentId: string | null;
   incognito: boolean;
@@ -85,11 +88,19 @@ interface StoreState {
   newChat: (incognito?: boolean) => void;
   selectChat: (id: string) => void;
   deleteChat: (id: string) => Promise<void>;
+  renameChat: (id: string, title: string) => void;
   current: () => Chat | null;
   pushMessage: (m: ChatMessage) => void;
   updateLastContent: (content: string) => void;
+  popLastMessage: () => void;
   maybeSetTitle: (text: string) => void;
   persistCurrent: () => Promise<void>;
+  exportChat: (id: string) => void;
+
+  // toast
+  toasts: Toast[];
+  addToast: (message: string, type?: Toast["type"]) => void;
+  removeToast: (id: string) => void;
 
   // coder
   repo: RepoState | null;
@@ -99,7 +110,6 @@ interface StoreState {
   setTree: (t: TreeNode | null) => void;
   setCurrentFile: (f: OpenFile | null) => void;
 
-  // Coder -> Sohbet köprüsü
   pendingInput: string | null;
   setPendingInput: (s: string | null) => void;
 }
@@ -113,6 +123,7 @@ export const useStore = create<StoreState>()((set, get) => ({
   saveConfig: (c) => {
     if (typeof window !== "undefined") {
       localStorage.setItem(CONFIG_KEY, JSON.stringify(c));
+      applyTheme(c.theme);
     }
     set({ config: c });
   },
@@ -145,7 +156,8 @@ export const useStore = create<StoreState>()((set, get) => ({
           : config.activeModelId,
     });
   },
-  setActiveModel: (id) => get().saveConfig({ ...get().config, activeModelId: id }),
+  setActiveModel: (id) =>
+    get().saveConfig({ ...get().config, activeModelId: id }),
   activeModel: () => {
     const { models, activeModelId } = get().config;
     return models.find((m) => m.id === activeModelId) || models[0] || null;
@@ -179,10 +191,21 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
   addRepo: (repo) => {
     const config = get().config;
-    const repos = [repo, ...config.repos.filter((r) => r !== repo)].slice(0, 12);
+    const repos = [repo, ...config.repos.filter((r) => r !== repo)].slice(
+      0,
+      12,
+    );
     get().saveConfig({ ...config, repos, activeRepo: repo });
   },
-  setActiveRepo: (repo) => get().saveConfig({ ...get().config, activeRepo: repo }),
+  setActiveRepo: (repo) =>
+    get().saveConfig({ ...get().config, activeRepo: repo }),
+  toggleTheme: () => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      theme: config.theme === "dark" ? "light" : "dark",
+    });
+  },
 
   view: "chat",
   setView: (v) => set({ view: v }),
@@ -254,6 +277,21 @@ export const useStore = create<StoreState>()((set, get) => ({
     }
   },
 
+  renameChat: (id, title) => {
+    set((state) => ({
+      chats: state.chats.map((c) =>
+        c.id === id ? { ...c, title } : c,
+      ),
+    }));
+    const { userId } = get();
+    if (userId) {
+      const sb = createClient();
+      if (sb) sb.from("chats").update({ title }).eq("id", id);
+    } else {
+      saveLocalChats(get().chats);
+    }
+  },
+
   current: () => {
     const { chats, currentId } = get();
     return chats.find((c) => c.id === currentId) || null;
@@ -262,7 +300,9 @@ export const useStore = create<StoreState>()((set, get) => ({
   pushMessage: (m) =>
     set((state) => ({
       chats: state.chats.map((c) =>
-        c.id === state.currentId ? { ...c, messages: [...c.messages, m] } : c,
+        c.id === state.currentId
+          ? { ...c, messages: [...c.messages, m] }
+          : c,
       ),
     })),
 
@@ -278,6 +318,14 @@ export const useStore = create<StoreState>()((set, get) => ({
           };
         }
         return { ...c, messages };
+      }),
+    })),
+
+  popLastMessage: () =>
+    set((state) => ({
+      chats: state.chats.map((c) => {
+        if (c.id !== state.currentId) return c;
+        return { ...c, messages: c.messages.slice(0, -1) };
       }),
     })),
 
@@ -310,6 +358,32 @@ export const useStore = create<StoreState>()((set, get) => ({
       saveLocalChats(get().chats);
     }
   },
+
+  exportChat: (id) => {
+    const chat = get().chats.find((c) => c.id === id);
+    if (!chat) return;
+    let md = `# ${chat.title}\n\n`;
+    for (const m of chat.messages) {
+      const prefix = m.role === "user" ? "**Kullanıcı:**" : "**Asistan:**";
+      md += `${prefix}\n\n${m.content}\n\n---\n\n`;
+    }
+    const blob = new Blob([md], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${chat.title.replace(/[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ\s-]/g, "").trim() || "sohbet"}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  toasts: [],
+  addToast: (message, type = "info") => {
+    const toast: Toast = { id: uid(), message, type };
+    set((state) => ({ toasts: [...state.toasts, toast] }));
+    setTimeout(() => get().removeToast(toast.id), 3500);
+  },
+  removeToast: (id) =>
+    set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) })),
 
   repo: null,
   tree: null,

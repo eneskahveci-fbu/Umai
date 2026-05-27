@@ -34,7 +34,14 @@ export const PRESETS: Record<Provider, Preset> = {
   },
 };
 
-/** Başlangıç yapılandırması: hiç model yok, kullanıcı ayarlardan ekler. */
+export const DEFAULT_SYSTEM_PROMPT =
+  "Sen craft.ai, deneyimli bir yazılım geliştirme asistanısın. Kod yazabilir, " +
+  "açıklayabilir, hata ayıklayabilir, mimari önerebilirsin. Kullanıcı sana GitHub " +
+  "deposundan dosya içeriği gösterebilir; bunları dikkate al. Adım adım düşün. " +
+  "Cevapların Türkçe ve markdown formatında olsun; kod bloklarını dilini belirterek yaz.";
+
+export const SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT;
+
 export const DEFAULT_CONFIG: Config = {
   models: [],
   activeModelId: null,
@@ -42,12 +49,8 @@ export const DEFAULT_CONFIG: Config = {
   activeGithubId: null,
   repos: ["eneskahveci-sdo/craft-ai"],
   activeRepo: "eneskahveci-sdo/craft-ai",
+  systemPrompt: DEFAULT_SYSTEM_PROMPT,
+  theme: "dark",
 };
 
 export const DEFAULT_REPO = "eneskahveci-sdo/craft-ai";
-
-export const SYSTEM_PROMPT =
-  "Sen craft.ai, deneyimli bir yazılım geliştirme asistanısın. Kod yazabilir, " +
-  "açıklayabilir, hata ayıklayabilir, mimari önerebilirsin. Kullanıcı sana GitHub " +
-  "deposundan dosya içeriği gösterebilir; bunları dikkate al. Adım adım düşün. " +
-  "Cevapların Türkçe ve markdown formatında olsun; kod bloklarını dilini belirterek yaz.";
