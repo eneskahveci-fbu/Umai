@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import hljs from "highlight.js";
-import { File, FolderGit2, Menu, MessageSquarePlus, RefreshCw } from "lucide-react";
+import hljs from "highlight.js/lib/common";
+import {
+  File,
+  FolderGit2,
+  Menu,
+  MessageSquarePlus,
+  RefreshCw,
+} from "lucide-react";
 import { useStore } from "@/lib/store";
 import { SelectorBar } from "./SelectorBar";
 import {
@@ -12,6 +18,15 @@ import {
   parseRepo,
 } from "@/lib/github";
 import type { TreeNode } from "@/lib/types";
+
+const ERROR_MAP: Record<string, string> = {
+  "Failed to fetch": "Bağlantı kurulamadı. İnternet bağlantınızı kontrol edin.",
+  "Not Found": "Depo bulunamadı. Adı ve yetkilendirmeyi kontrol edin.",
+};
+
+function turkishError(msg: string): string {
+  return ERROR_MAP[msg] || msg.replace("rate limit", "istek limiti");
+}
 
 export function CoderView() {
   const config = useStore((s) => s.config);
@@ -47,14 +62,13 @@ export function CoderView() {
       setRepo({ ...parsed, branch });
       setTree(buildTree(items));
     } catch (e) {
-      setError((e as Error).message);
+      setError(turkishError((e as Error).message));
       setTree(null);
     } finally {
       setConnecting(false);
     }
   };
 
-  // Aktif depo değişince otomatik bağlan
   useEffect(() => {
     if (config.activeRepo) connect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -74,7 +88,10 @@ export function CoderView() {
       );
       setCurrentFile({ path, content });
     } catch (e) {
-      setCurrentFile({ path, content: `// Dosya açılamadı: ${(e as Error).message}` });
+      setCurrentFile({
+        path,
+        content: `// Dosya açılamadı: ${turkishError((e as Error).message)}`,
+      });
     } finally {
       setLoadingFile(false);
     }
@@ -106,7 +123,10 @@ export function CoderView() {
           disabled={connecting}
           className="ml-auto flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-brand hover:bg-branddim text-white font-semibold disabled:opacity-50"
         >
-          <RefreshCw size={13} className={connecting ? "animate-spin" : ""} />
+          <RefreshCw
+            size={13}
+            className={connecting ? "animate-spin" : ""}
+          />
           {connecting ? "Bağlanıyor" : "Bağlan / Yenile"}
         </button>
       </div>
@@ -115,13 +135,38 @@ export function CoderView() {
         {/* Dosya ağacı */}
         <div className="w-[280px] shrink-0 border-r border-line overflow-auto p-2">
           {error ? (
-            <p className="text-xs text-red p-3">{error}</p>
+            <div className="text-center py-8 px-3">
+              <FolderGit2
+                size={28}
+                className="mx-auto mb-2 text-red/60"
+              />
+              <p className="text-xs text-red leading-relaxed">{error}</p>
+              <button
+                onClick={connect}
+                className="mt-3 text-xs text-brand hover:text-branddim font-semibold"
+              >
+                Tekrar dene
+              </button>
+            </div>
           ) : !tree ? (
-            <p className="text-xs text-muted p-3">
-              {connecting ? "Yükleniyor…" : "Bir depo seçip bağlan."}
-            </p>
+            <div className="text-center py-8 px-3">
+              <FolderGit2
+                size={28}
+                className="mx-auto mb-2 text-muted/40"
+              />
+              <p className="text-xs text-muted leading-relaxed">
+                {connecting
+                  ? "Depo yükleniyor..."
+                  : 'Bir depo seçip "Bağlan / Yenile" butonuna tıkla.'}
+              </p>
+            </div>
           ) : (
-            <TreeView node={tree} root onOpen={openFile} activePath={currentFile?.path} />
+            <TreeView
+              node={tree}
+              root
+              onOpen={openFile}
+              activePath={currentFile?.path}
+            />
           )}
         </div>
 
@@ -142,13 +187,21 @@ export function CoderView() {
           </div>
           <div className="flex-1 overflow-auto">
             {loadingFile ? (
-              <div className="h-full grid place-items-center text-muted">Yükleniyor…</div>
+              <div className="h-full grid place-items-center text-muted">
+                Yükleniyor...
+              </div>
             ) : currentFile ? (
-              <CodeView path={currentFile.path} content={currentFile.content} />
+              <CodeView
+                path={currentFile.path}
+                content={currentFile.content}
+              />
             ) : (
               <div className="h-full grid place-items-center text-muted text-center px-8">
                 <div>
-                  <FolderGit2 size={40} className="mx-auto mb-3 opacity-60" />
+                  <FolderGit2
+                    size={40}
+                    className="mx-auto mb-3 opacity-60"
+                  />
                   Soldan bir dosya seç. İçeriğini gör, sonra
                   <br />
                   &quot;Sohbete gönder&quot; ile kod hakkında soru sor.
@@ -170,8 +223,9 @@ function CodeView({ path, content }: { path: string; content: string }) {
       ? hljs.highlight(content, { language: ext }).value
       : hljs.highlightAuto(content).value;
   } catch {
-    html = content.replace(/[&<>]/g, (c) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c] as string,
+    html = content.replace(
+      /[&<>]/g,
+      (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c] as string,
     );
   }
   return (

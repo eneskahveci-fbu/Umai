@@ -1,12 +1,16 @@
 import { create } from "zustand";
 import type {
+  Artifact,
   Chat,
   ChatMessage,
   Config,
   GitHubAccount,
+  MemoryItem,
   ModelProfile,
   OpenFile,
+  Project,
   RepoState,
+  Toast,
   TreeNode,
 } from "./types";
 import { DEFAULT_CONFIG } from "./constants";
@@ -46,13 +50,16 @@ function saveLocalChats(chats: Chat[]) {
   );
 }
 
+function applyTheme(theme: "dark" | "light") {
+  if (typeof document === "undefined") return;
+  document.documentElement.classList.toggle("light", theme === "light");
+}
+
 interface StoreState {
-  // kimlik
   userId: string | null;
   userEmail: string | null;
   setUser: (id: string | null, email: string | null) => void;
 
-  // yapılandırma (çoklu model + github + repo)
   config: Config;
   saveConfig: (c: Config) => void;
   addModel: (m: Omit<ModelProfile, "id">) => void;
@@ -66,10 +73,20 @@ interface StoreState {
   activeGithub: () => GitHubAccount | null;
   addRepo: (repo: string) => void;
   setActiveRepo: (repo: string) => void;
+  toggleTheme: () => void;
 
-  // arayüz
-  view: "chat" | "coder";
-  setView: (v: "chat" | "coder") => void;
+  // projects
+  addProject: (name: string) => void;
+  removeProject: (id: string) => void;
+  updateProject: (id: string, patch: Partial<Project>) => void;
+  setActiveProject: (id: string | null) => void;
+
+  // memory
+  addMemory: (content: string) => void;
+  removeMemory: (id: string) => void;
+
+  view: "chat" | "coder" | "compare";
+  setView: (v: "chat" | "coder" | "compare") => void;
   sidebarOpen: boolean;
   setSidebarOpen: (b: boolean) => void;
   settingsOpen: boolean;
@@ -77,7 +94,6 @@ interface StoreState {
   streaming: boolean;
   setStreaming: (b: boolean) => void;
 
-  // sohbetler
   chats: Chat[];
   currentId: string | null;
   incognito: boolean;
@@ -85,11 +101,30 @@ interface StoreState {
   newChat: (incognito?: boolean) => void;
   selectChat: (id: string) => void;
   deleteChat: (id: string) => Promise<void>;
+  renameChat: (id: string, title: string) => void;
   current: () => Chat | null;
   pushMessage: (m: ChatMessage) => void;
   updateLastContent: (content: string) => void;
+  popLastMessage: () => void;
+  editMessageAt: (index: number, content: string) => void;
+  truncateAfter: (index: number) => void;
   maybeSetTitle: (text: string) => void;
   persistCurrent: () => Promise<void>;
+  exportChat: (id: string) => void;
+  exportChatHtml: (id: string) => void;
+
+  // follow-up
+  followUpSuggestions: string[];
+  setFollowUpSuggestions: (s: string[]) => void;
+
+  // artifact
+  artifact: Artifact | null;
+  setArtifact: (a: Artifact | null) => void;
+
+  // toast
+  toasts: Toast[];
+  addToast: (message: string, type?: Toast["type"]) => void;
+  removeToast: (id: string) => void;
 
   // coder
   repo: RepoState | null;
@@ -99,9 +134,22 @@ interface StoreState {
   setTree: (t: TreeNode | null) => void;
   setCurrentFile: (f: OpenFile | null) => void;
 
-  // Coder -> Sohbet köprüsü
   pendingInput: string | null;
   setPendingInput: (s: string | null) => void;
+
+  // prompt library
+  promptLibraryOpen: boolean;
+  setPromptLibraryOpen: (b: boolean) => void;
+
+  // command palette
+  commandPaletteOpen: boolean;
+  setCommandPaletteOpen: (b: boolean) => void;
+
+  // compare view
+  compareModelA: string | null;
+  compareModelB: string | null;
+  setCompareModelA: (id: string | null) => void;
+  setCompareModelB: (id: string | null) => void;
 }
 
 export const useStore = create<StoreState>()((set, get) => ({
@@ -113,18 +161,18 @@ export const useStore = create<StoreState>()((set, get) => ({
   saveConfig: (c) => {
     if (typeof window !== "undefined") {
       localStorage.setItem(CONFIG_KEY, JSON.stringify(c));
+      applyTheme(c.theme);
     }
     set({ config: c });
   },
   addModel: (m) => {
     const model: ModelProfile = { ...m, id: uid() };
     const config = get().config;
-    const next: Config = {
+    get().saveConfig({
       ...config,
       models: [...config.models, model],
       activeModelId: config.activeModelId ?? model.id,
-    };
-    get().saveConfig(next);
+    });
   },
   updateModel: (id, patch) => {
     const config = get().config;
@@ -140,9 +188,7 @@ export const useStore = create<StoreState>()((set, get) => ({
       ...config,
       models,
       activeModelId:
-        config.activeModelId === id
-          ? (models[0]?.id ?? null)
-          : config.activeModelId,
+        config.activeModelId === id ? (models[0]?.id ?? null) : config.activeModelId,
     });
   },
   setActiveModel: (id) => get().saveConfig({ ...get().config, activeModelId: id }),
@@ -166,13 +212,10 @@ export const useStore = create<StoreState>()((set, get) => ({
       ...config,
       githubAccounts,
       activeGithubId:
-        config.activeGithubId === id
-          ? (githubAccounts[0]?.id ?? null)
-          : config.activeGithubId,
+        config.activeGithubId === id ? (githubAccounts[0]?.id ?? null) : config.activeGithubId,
     });
   },
-  setActiveGithub: (id) =>
-    get().saveConfig({ ...get().config, activeGithubId: id }),
+  setActiveGithub: (id) => get().saveConfig({ ...get().config, activeGithubId: id }),
   activeGithub: () => {
     const { githubAccounts, activeGithubId } = get().config;
     return githubAccounts.find((a) => a.id === activeGithubId) || null;
@@ -183,6 +226,56 @@ export const useStore = create<StoreState>()((set, get) => ({
     get().saveConfig({ ...config, repos, activeRepo: repo });
   },
   setActiveRepo: (repo) => get().saveConfig({ ...get().config, activeRepo: repo }),
+  toggleTheme: () => {
+    const config = get().config;
+    get().saveConfig({ ...config, theme: config.theme === "dark" ? "light" : "dark" });
+  },
+
+  /* ─── Projeler ─── */
+  addProject: (name) => {
+    const project: Project = { id: uid(), name, systemPrompt: "", created_at: Date.now() };
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      projects: [...config.projects, project],
+      activeProjectId: project.id,
+    });
+  },
+  removeProject: (id) => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      projects: config.projects.filter((p) => p.id !== id),
+      activeProjectId: config.activeProjectId === id ? null : config.activeProjectId,
+    });
+    set((s) => ({
+      chats: s.chats.map((c) => (c.projectId === id ? { ...c, projectId: undefined } : c)),
+    }));
+  },
+  updateProject: (id, patch) => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      projects: config.projects.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    });
+  },
+  setActiveProject: (id) => get().saveConfig({ ...get().config, activeProjectId: id }),
+
+  /* ─── Bellek ─── */
+  addMemory: (content) => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      memories: [...config.memories, { id: uid(), content }],
+    });
+  },
+  removeMemory: (id) => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      memories: config.memories.filter((m) => m.id !== id),
+    });
+  },
 
   view: "chat",
   setView: (v) => set({ view: v }),
@@ -213,6 +306,7 @@ export const useStore = create<StoreState>()((set, get) => ({
               title: r.title,
               messages: r.messages,
               created_at: new Date(r.created_at).getTime(),
+              projectId: r.project_id,
             })),
           });
           return;
@@ -223,22 +317,26 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
 
   newChat: (incognito = false) => {
+    const config = get().config;
     const chat: Chat = {
       id: uid(),
       title: "Yeni sohbet",
       messages: [],
       created_at: Date.now(),
       incognito,
+      projectId: config.activeProjectId ?? undefined,
     };
     set((state) => ({
       chats: [chat, ...state.chats],
       currentId: chat.id,
       incognito,
       view: "chat",
+      followUpSuggestions: [],
     }));
   },
 
-  selectChat: (id) => set({ currentId: id, incognito: false, view: "chat" }),
+  selectChat: (id) =>
+    set({ currentId: id, incognito: false, view: "chat", followUpSuggestions: [] }),
 
   deleteChat: async (id) => {
     const { userId } = get();
@@ -254,37 +352,69 @@ export const useStore = create<StoreState>()((set, get) => ({
     }
   },
 
+  renameChat: (id, title) => {
+    set((s) => ({ chats: s.chats.map((c) => (c.id === id ? { ...c, title } : c)) }));
+    const { userId } = get();
+    if (userId) {
+      const sb = createClient();
+      if (sb) sb.from("chats").update({ title }).eq("id", id);
+    } else {
+      saveLocalChats(get().chats);
+    }
+  },
+
   current: () => {
     const { chats, currentId } = get();
     return chats.find((c) => c.id === currentId) || null;
   },
 
   pushMessage: (m) =>
-    set((state) => ({
-      chats: state.chats.map((c) =>
-        c.id === state.currentId ? { ...c, messages: [...c.messages, m] } : c,
+    set((s) => ({
+      chats: s.chats.map((c) =>
+        c.id === s.currentId ? { ...c, messages: [...c.messages, m] } : c,
       ),
     })),
 
   updateLastContent: (content) =>
-    set((state) => ({
-      chats: state.chats.map((c) => {
-        if (c.id !== state.currentId) return c;
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
         const messages = c.messages.slice();
         if (messages.length) {
-          messages[messages.length - 1] = {
-            ...messages[messages.length - 1],
-            content,
-          };
+          messages[messages.length - 1] = { ...messages[messages.length - 1], content };
         }
         return { ...c, messages };
       }),
     })),
 
+  popLastMessage: () =>
+    set((s) => ({
+      chats: s.chats.map((c) =>
+        c.id === s.currentId ? { ...c, messages: c.messages.slice(0, -1) } : c,
+      ),
+    })),
+
+  editMessageAt: (index, content) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const messages = c.messages.slice();
+        if (messages[index]) messages[index] = { ...messages[index], content };
+        return { ...c, messages };
+      }),
+    })),
+
+  truncateAfter: (index) =>
+    set((s) => ({
+      chats: s.chats.map((c) =>
+        c.id === s.currentId ? { ...c, messages: c.messages.slice(0, index + 1) } : c,
+      ),
+    })),
+
   maybeSetTitle: (text) =>
-    set((state) => ({
-      chats: state.chats.map((c) =>
-        c.id === state.currentId && c.title === "Yeni sohbet"
+    set((s) => ({
+      chats: s.chats.map((c) =>
+        c.id === s.currentId && c.title === "Yeni sohbet"
           ? { ...c, title: text.slice(0, 48) }
           : c,
       ),
@@ -311,6 +441,48 @@ export const useStore = create<StoreState>()((set, get) => ({
     }
   },
 
+  exportChat: (id) => {
+    const chat = get().chats.find((c) => c.id === id);
+    if (!chat) return;
+    let md = `# ${chat.title}\n\n`;
+    for (const m of chat.messages) {
+      md += `**${m.role === "user" ? "Kullanıcı" : "Asistan"}:**\n\n${m.content}\n\n---\n\n`;
+    }
+    download(md, `${safeName(chat.title)}.md`, "text/markdown");
+  },
+
+  exportChatHtml: (id) => {
+    const chat = get().chats.find((c) => c.id === id);
+    if (!chat) return;
+    const msgs = chat.messages
+      .map((m) => {
+        const cls = m.role === "user" ? "user" : "assistant";
+        const label = m.role === "user" ? "Kullanıcı" : "Asistan";
+        const escaped = m.content
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        return `<div class="msg ${cls}"><div class="role">${label}</div><pre>${escaped}</pre></div>`;
+      })
+      .join("\n");
+    const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${chat.title} — craft.ai</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#0e0e13;color:#ececf1;padding:2rem;max-width:800px;margin:auto}.msg{padding:1rem;border-radius:12px;margin-bottom:1rem}.user{background:#1c1c26;border:1px solid #28283a}.assistant{background:#14141b;border:1px solid #28283a}.role{font-size:.75rem;font-weight:700;color:#7c5cff;margin-bottom:.5rem;text-transform:uppercase}pre{white-space:pre-wrap;font-size:.9rem;line-height:1.6}h1{text-align:center;margin-bottom:2rem;background:linear-gradient(120deg,#9d7bff,#c4b1ff);-webkit-background-clip:text;background-clip:text;color:transparent}footer{text-align:center;margin-top:2rem;font-size:.75rem;color:#9a9ab0}</style></head><body><h1>${chat.title}</h1>${msgs}<footer>craft.ai ile oluşturuldu</footer></body></html>`;
+    download(html, `${safeName(chat.title)}.html`, "text/html");
+  },
+
+  followUpSuggestions: [],
+  setFollowUpSuggestions: (s) => set({ followUpSuggestions: s }),
+
+  artifact: null,
+  setArtifact: (a) => set({ artifact: a }),
+
+  toasts: [],
+  addToast: (message, type = "info") => {
+    const toast: Toast = { id: uid(), message, type };
+    set((s) => ({ toasts: [...s.toasts, toast] }));
+    setTimeout(() => get().removeToast(toast.id), 3500);
+  },
+  removeToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+
   repo: null,
   tree: null,
   currentFile: null,
@@ -320,4 +492,29 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   pendingInput: null,
   setPendingInput: (s) => set({ pendingInput: s }),
+
+  promptLibraryOpen: false,
+  setPromptLibraryOpen: (b) => set({ promptLibraryOpen: b }),
+
+  commandPaletteOpen: false,
+  setCommandPaletteOpen: (b) => set({ commandPaletteOpen: b }),
+
+  compareModelA: null,
+  compareModelB: null,
+  setCompareModelA: (id) => set({ compareModelA: id }),
+  setCompareModelB: (id) => set({ compareModelB: id }),
 }));
+
+function safeName(s: string) {
+  return s.replace(/[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ\s-]/g, "").trim() || "sohbet";
+}
+
+function download(content: string, filename: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

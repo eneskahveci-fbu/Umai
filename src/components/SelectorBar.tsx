@@ -61,7 +61,12 @@ export function SelectorBar() {
           onChange={(e) => {
             if (e.target.value === "__add__") {
               const v = window.prompt("Depo (kullanici/depo):");
-              if (v) addRepo(v.trim());
+              if (v) {
+                const clean = v.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "").replace(/\/$/, "");
+                const valid = /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/.test(clean);
+                if (valid) addRepo(clean);
+                else useStore.getState().addToast("Geçersiz depo formatı. Örn: kullanici/depo", "error");
+              }
             } else {
               setActiveRepo(e.target.value);
             }

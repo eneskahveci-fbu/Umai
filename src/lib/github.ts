@@ -13,7 +13,9 @@ export function parseRepo(input: string): { owner: string; repo: string } | null
     .replace(/\.git$/, "")
     .replace(/\/$/, "");
   const [owner, repo] = v.split("/");
-  return owner && repo ? { owner, repo } : null;
+  const valid = /^[a-zA-Z0-9._-]+$/;
+  if (!owner || !repo || !valid.test(owner) || !valid.test(repo)) return null;
+  return { owner, repo };
 }
 
 function ghHeaders(token?: string): Record<string, string> {
