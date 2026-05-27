@@ -6,12 +6,13 @@ import Link from "next/link";
 import { ArrowRight, KeyRound, Loader2, Mail, Phone, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
-type Step = "choose" | "email" | "email-code" | "phone" | "phone-code";
+type Step = "choose" | "email" | "email-code" | "email-password" | "phone" | "phone-code";
 
 export default function LoginPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("choose");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -93,6 +94,20 @@ export default function LoginPage() {
     router.push("/app");
   };
 
+  const signInWithPassword = async () => {
+    const e = email.trim();
+    const p = password;
+    if (!e || !p) return;
+    setLoading(true);
+    setError("");
+    const sb = createClient();
+    if (!sb) { setError("Kimlik doğrulama yapılandırılmamış."); setLoading(false); return; }
+    const { error: err } = await sb.auth.signInWithPassword({ email: e, password: p });
+    setLoading(false);
+    if (err) { setError("E-posta veya şifre hatalı."); return; }
+    router.push("/app");
+  };
+
   return (
     <div className="min-h-screen bg-bg flex flex-col items-center justify-center px-4 relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 -z-10">
@@ -113,7 +128,20 @@ export default function LoginPage() {
               onGoogle={() => signInOAuth("google")}
               onApple={() => signInOAuth("apple")}
               onEmail={() => { setError(""); setStep("email"); }}
+              onEmailPassword={() => { setError(""); setStep("email-password"); }}
               onPhone={() => { setError(""); setStep("phone"); }}
+              loading={loading}
+              error={error}
+            />
+          )}
+          {step === "email-password" && (
+            <EmailPasswordStep
+              email={email}
+              setEmail={setEmail}
+              password={password}
+              setPassword={setPassword}
+              onSubmit={signInWithPassword}
+              onBack={reset}
               loading={loading}
               error={error}
             />
@@ -177,9 +205,9 @@ export default function LoginPage() {
 /* ─── Choose Method ─── */
 
 function ChooseStep({
-  onGoogle, onApple, onEmail, onPhone, loading, error,
+  onGoogle, onApple, onEmail, onEmailPassword, onPhone, loading, error,
 }: {
-  onGoogle: () => void; onApple: () => void; onEmail: () => void; onPhone: () => void;
+  onGoogle: () => void; onApple: () => void; onEmail: () => void; onEmailPassword: () => void; onPhone: () => void;
   loading: boolean; error: string;
 }) {
   return (
@@ -221,11 +249,19 @@ function ChooseStep({
         </div>
 
         <button
+          onClick={onEmailPassword}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-line hover:border-brand/40 hover:bg-brand/5 text-sm font-medium transition-colors"
+        >
+          <KeyRound size={18} className="text-muted" />
+          E-posta + Şifre ile giriş
+        </button>
+
+        <button
           onClick={onEmail}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-line hover:border-brand/40 hover:bg-brand/5 text-sm font-medium transition-colors"
         >
           <Mail size={18} className="text-muted" />
-          E-posta ile devam et
+          E-posta ile kod gönder
         </button>
 
         <button
@@ -238,6 +274,64 @@ function ChooseStep({
       </div>
 
       {error && <p className="text-red text-xs text-center mt-3">{error}</p>}
+    </>
+  );
+}
+
+/* ─── Email + Password Step ─── */
+
+function EmailPasswordStep({
+  email, setEmail, password, setPassword, onSubmit, onBack, loading, error,
+}: {
+  email: string; setEmail: (v: string) => void; password: string; setPassword: (v: string) => void;
+  onSubmit: () => void; onBack: () => void; loading: boolean; error: string;
+}) {
+  return (
+    <>
+      <div className="text-center mb-8">
+        <div className="w-[52px] h-[52px] mx-auto mb-4 rounded-2xl bg-brand/10 border border-brand/20 grid place-items-center">
+          <KeyRound size={24} className="text-brand" />
+        </div>
+        <h1 className="text-xl font-bold tracking-tight">E-posta + Şifre</h1>
+        <p className="text-muted text-sm mt-2 leading-relaxed">
+          E-posta ve şifrenle giriş yap
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="ornek@email.com"
+          autoFocus
+          autoComplete="email"
+          className="w-full bg-bgsoft border border-line rounded-xl px-4 py-3 text-sm outline-none focus:border-brand transition-colors placeholder:text-muted/40"
+        />
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && onSubmit()}
+          placeholder="Şifre"
+          autoComplete="current-password"
+          className="w-full bg-bgsoft border border-line rounded-xl px-4 py-3 text-sm outline-none focus:border-brand transition-colors placeholder:text-muted/40"
+        />
+
+        {error && <p className="text-red text-xs px-1">{error}</p>}
+
+        <button
+          onClick={onSubmit}
+          disabled={!email.trim() || !password || loading}
+          className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-branddim disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+        >
+          {loading ? <Loader2 size={16} className="animate-spin" /> : <>Giriş Yap <ArrowRight size={15} /></>}
+        </button>
+
+        <button onClick={onBack} className="w-full flex items-center justify-center gap-1.5 text-sm text-muted hover:text-ink py-2 transition-colors">
+          <ArrowLeft size={14} /> Geri dön
+        </button>
+      </div>
     </>
   );
 }
