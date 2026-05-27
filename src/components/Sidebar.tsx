@@ -5,6 +5,7 @@ import {
   Code2,
   Download,
   FolderPlus,
+  GitCompareArrows,
   MessageSquare,
   Pencil,
   Plus,
@@ -80,18 +81,24 @@ export function Sidebar() {
             <X size={18} />
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-2 mt-4">
+        <div className="grid grid-cols-3 gap-1.5 mt-4">
           <TabButton
             active={view === "chat"}
             onClick={() => setView("chat")}
-            icon={<MessageSquare size={15} />}
+            icon={<MessageSquare size={14} />}
             label="Sohbet"
           />
           <TabButton
             active={view === "coder"}
             onClick={() => setView("coder")}
-            icon={<Code2 size={15} />}
+            icon={<Code2 size={14} />}
             label="Coder"
+          />
+          <TabButton
+            active={view === "compare"}
+            onClick={() => setView("compare")}
+            icon={<GitCompareArrows size={14} />}
+            label="Karşılaştır"
           />
         </div>
       </div>

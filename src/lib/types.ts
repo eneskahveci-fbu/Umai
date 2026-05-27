@@ -47,9 +47,16 @@ export interface MemoryItem {
 }
 
 export interface Artifact {
-  type: "html" | "svg";
+  type: "html" | "svg" | "mermaid";
   content: string;
   title: string;
+}
+
+export interface PromptTemplate {
+  id: string;
+  category: string;
+  title: string;
+  prompt: string;
 }
 
 export interface Config {

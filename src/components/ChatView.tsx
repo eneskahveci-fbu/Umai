@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
+  BookOpen,
   Download,
   Globe,
   Image as ImageIcon,
   Menu,
+  Mic,
+  MicOff,
   Paperclip,
   Square,
   VenetianMask,

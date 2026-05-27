@@ -85,8 +85,8 @@ interface StoreState {
   addMemory: (content: string) => void;
   removeMemory: (id: string) => void;
 
-  view: "chat" | "coder";
-  setView: (v: "chat" | "coder") => void;
+  view: "chat" | "coder" | "compare";
+  setView: (v: "chat" | "coder" | "compare") => void;
   sidebarOpen: boolean;
   setSidebarOpen: (b: boolean) => void;
   settingsOpen: boolean;
@@ -136,6 +136,20 @@ interface StoreState {
 
   pendingInput: string | null;
   setPendingInput: (s: string | null) => void;
+
+  // prompt library
+  promptLibraryOpen: boolean;
+  setPromptLibraryOpen: (b: boolean) => void;
+
+  // command palette
+  commandPaletteOpen: boolean;
+  setCommandPaletteOpen: (b: boolean) => void;
+
+  // compare view
+  compareModelA: string | null;
+  compareModelB: string | null;
+  setCompareModelA: (id: string | null) => void;
+  setCompareModelB: (id: string | null) => void;
 }
 
 export const useStore = create<StoreState>()((set, get) => ({
@@ -478,6 +492,17 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   pendingInput: null,
   setPendingInput: (s) => set({ pendingInput: s }),
+
+  promptLibraryOpen: false,
+  setPromptLibraryOpen: (b) => set({ promptLibraryOpen: b }),
+
+  commandPaletteOpen: false,
+  setCommandPaletteOpen: (b) => set({ commandPaletteOpen: b }),
+
+  compareModelA: null,
+  compareModelB: null,
+  setCompareModelA: (id) => set({ compareModelA: id }),
+  setCompareModelB: (id) => set({ compareModelB: id }),
 }));
 
 function safeName(s: string) {
