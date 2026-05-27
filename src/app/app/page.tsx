@@ -15,21 +15,23 @@ import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 
 function MainView({ view }: { view: string }) {
-  switch (view) {
-    case "coder":
-      return <CoderView />;
-    case "compare":
-      return <CompareView />;
-    default:
-      return <ChatView />;
-  }
+  if (view === "coder") return <CoderView />;
+  if (view === "compare") return <CompareView />;
+  return <ChatView />;
 }
 
 export default function AppPage() {
   const view = useStore((s) => s.view);
   const artifact = useStore((s) => s.artifact);
+  const sidebarOpen = useStore((s) => s.sidebarOpen);
+  const setSidebarOpen = useStore((s) => s.setSidebarOpen);
   const setUser = useStore((s) => s.setUser);
   const loadChats = useStore((s) => s.loadChats);
+
+  useEffect(() => {
+    /* Desktop'ta sidebar varsayılan açık */
+    if (window.innerWidth >= 768) setSidebarOpen(true);
+  }, [setSidebarOpen]);
 
   useEffect(() => {
     const sb = createClient();
@@ -59,6 +61,7 @@ export default function AppPage() {
       if (mod && e.key === "n") { e.preventDefault(); useStore.getState().newChat(e.shiftKey); }
       if (mod && e.key === ",") { e.preventDefault(); useStore.getState().setSettingsOpen(true); }
       if (mod && e.key === "k") { e.preventDefault(); useStore.getState().setCommandPaletteOpen(true); }
+      if (mod && e.key === "b") { e.preventDefault(); useStore.getState().setSidebarOpen(!useStore.getState().sidebarOpen); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -66,11 +69,26 @@ export default function AppPage() {
 
   return (
     <ErrorBoundary>
-      <div className="flex h-screen overflow-hidden">
+      <div className="flex h-screen overflow-hidden bg-bg">
         <Sidebar />
-        <main className="flex-1 min-w-0 flex flex-col">
+
+        {/* Mobil backdrop */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-30 bg-bg/70 backdrop-blur-sm md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        {/* Ana içerik — sidebar genişliğini hesaba katar */}
+        <main
+          className={`flex-1 min-w-0 flex flex-col transition-[margin] duration-300 ease-in-out ${
+            sidebarOpen ? "md:ml-64" : "md:ml-0"
+          }`}
+        >
           <MainView view={view} />
         </main>
+
         {artifact && <ArtifactPanel />}
         <SettingsModal />
         <PromptLibrary />
