@@ -38,6 +38,12 @@ export const PRESETS: Record<Provider, Preset> = {
     model: "gemini-2.0-flash",
     keyHint: "AIza...",
   },
+  ollama: {
+    label: "Ollama (Yerel / Ücretsiz)",
+    baseUrl: "http://localhost:11434/v1",
+    model: "qwen2.5-coder:7b",
+    keyHint: "ollama (boş bırakılabilir)",
+  },
   custom: {
     label: "⚙️ Özel (manuel URL)",
     baseUrl: "",

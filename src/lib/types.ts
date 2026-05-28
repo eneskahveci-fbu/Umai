@@ -38,7 +38,7 @@ export interface Chat {
   totalOutTokens?: number;
 }
 
-export type Provider = "hf" | "deepseek" | "openrouter" | "custom" | "groq" | "gemini";
+export type Provider = "hf" | "deepseek" | "openrouter" | "custom" | "groq" | "gemini" | "ollama";
 
 export interface ModelProfile {
   id: string;
