@@ -69,6 +69,18 @@ export interface MemoryItem {
   content: string;
 }
 
+export interface Skill {
+  id: string;
+  title: string;
+  content: string;
+  tags: string[];
+  enabled: boolean;
+  source: "manual" | "file";
+  fileName?: string;
+  usageCount: number;
+  createdAt: number;
+}
+
 export interface Artifact {
   type: "html" | "svg" | "mermaid";
   content: string;
@@ -93,6 +105,7 @@ export interface Config {
   theme: "dark" | "light";
   style: ResponseStyle;
   memories: MemoryItem[];
+  skills: Skill[];
   projects: Project[];
   activeProjectId: string | null;
   followUps: boolean;

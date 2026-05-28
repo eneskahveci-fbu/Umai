@@ -465,6 +465,7 @@ export function CoderView() {
     const toolsEnabled = store.toolsEnabled && !!repo;
 
     try {
+      const activeSkills = (store.config.skills ?? []).filter((s) => s.enabled);
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -473,7 +474,11 @@ export function CoderView() {
           messages: apiMessages,
           baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey,
           provider: active.provider, systemPrompt: finalSystemPrompt,
-          style: store.config.style, memories: store.config.memories,
+          style: store.config.style,
+          memories: store.config.memories,
+          skills: activeSkills.map((s) => ({
+            title: s.title, content: s.content, tags: s.tags, source: s.source, fileName: s.fileName,
+          })),
           tools: toolsEnabled,
           repoCtx: toolsEnabled && repo ? {
             owner: repo.owner,
@@ -524,6 +529,11 @@ export function CoderView() {
         }
       }
       if (!full) useStore.getState().updateLastContent("_(Model boş yanıt döndürdü.)_");
+
+      /* Skills kullanım sayacını artır (sadece başarılı yanıtta) */
+      if (full && activeSkills.length > 0) {
+        useStore.getState().incrementSkillUsage(activeSkills.map((s) => s.id));
+      }
 
       /* AI'nın yazdığı dosyayı otomatik IDE'de aç */
       const autoFile = extractFirstFileFence(full);

@@ -12,6 +12,14 @@ interface RepoCtx {
   token?: string;
 }
 
+interface SkillPayload {
+  title: string;
+  content: string;
+  tags?: string[];
+  source?: "manual" | "file";
+  fileName?: string;
+}
+
 interface ChatRequest {
   messages: (ChatMessage | { role: string; content: unknown; tool_calls?: unknown[]; tool_call_id?: string })[];
   baseUrl?: string;
@@ -21,6 +29,7 @@ interface ChatRequest {
   systemPrompt?: string;
   style?: ResponseStyle;
   memories?: MemoryItem[];
+  skills?: SkillPayload[];
   searchContext?: string;
   projectPrompt?: string;
   tools?: boolean;
@@ -189,24 +198,34 @@ async function streamRound(
   return { content, toolCalls, finishReason };
 }
 
-function friendlyApiError(status: number, rawDetail: string, provider?: Provider): string {
+function friendlyApiError(status: number, rawDetail: string, ctx?: { model?: string; provider?: string }): string {
+  const tag = ctx?.model || ctx?.provider ? ` [${ctx.provider ?? ""}${ctx.provider && ctx.model ? " / " : ""}${ctx.model ?? ""}]` : "";
+  let providerMsg = "";
   try {
     const json = JSON.parse(rawDetail);
-    const msg: string = json?.error?.message || json?.message || json?.error || "";
-    if (msg.toLowerCase().includes("insufficient balance") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("resource exhausted"))
-      return `Yetersiz bakiye/kota (${status}): Sağlayıcı hesabına kredi yükle veya ödeme yöntemini ekle.`;
-    if (msg.toLowerCase().includes("invalid api key") || msg.toLowerCase().includes("unauthorized") || msg.toLowerCase().includes("permission denied") || status === 401)
-      return `API anahtarı geçersiz (${status}): Ayarlardan anahtarı kontrol et.`;
-    if (msg.toLowerCase().includes("rate limit") || status === 429)
-      return `İstek limiti aşıldı (${status}): Biraz bekle ve tekrar dene.`;
-    if (msg) return `Sağlayıcı hatası (${status}): ${msg}`;
+    providerMsg = json?.error?.message || json?.message || "";
   } catch { /* raw text */ }
-  if (status === 401) return "API anahtarı geçersiz (401): Ayarlardan anahtarı kontrol et.";
-  if (status === 402) return "Yetersiz bakiye (402): Sağlayıcı hesabına kredi yükle.";
-  if (status === 429) return "İstek limiti aşıldı (429): Biraz bekle ve tekrar dene.";
-  if (status === 400) return `İstek hatası (${status}): Provider ayarları veya model adı hatalı olabilir. Kontrol et ve tekrar dene.`;
-  if (status >= 500) return `Sağlayıcı sunucu hatası (${status}): Kısa süre sonra tekrar dene.`;
-  return `Sağlayıcı hatası (${status}): ${rawDetail.slice(0, 200)}`;
+  const low = providerMsg.toLowerCase();
+
+  if (low.includes("insufficient balance") || low.includes("quota") || low.includes("resource exhausted") || status === 402)
+    return `💳 Yetersiz bakiye${tag}: Sağlayıcı hesabına kredi yükle veya ödeme yöntemini ekle.`;
+  if (low.includes("invalid api key") || low.includes("unauthorized") || low.includes("authentication") || low.includes("permission denied") || status === 401)
+    return `🔑 API anahtarı geçersiz${tag}: Ayarlar → Modeller'den anahtarı kontrol et. Anahtarın doğru sağlayıcıya ait olduğundan emin ol.`;
+  if (low.includes("rate limit") || low.includes("too many") || status === 429)
+    return `⏱️ İstek limiti aşıldı${tag}: 30-60 saniye bekle ve tekrar dene.`;
+  if (low.includes("model") && (low.includes("not found") || low.includes("does not exist") || low.includes("decommissioned") || low.includes("unknown"))) {
+    return `🚫 Model bulunamadı${tag}: Bu model artık desteklenmiyor veya yanlış yazılmış. Ayarlar'dan farklı bir model seç.`;
+  }
+  if (status === 400 || status === 404) {
+    const hint = providerMsg ? `\n\nDetay: ${providerMsg.slice(0, 200)}` : "";
+    return `⚠️ Geçersiz istek (${status})${tag}: Model adı, baseUrl veya sağlayıcı yanlış olabilir.${hint}`;
+  }
+  if (status === 403)
+    return `🚷 Erişim reddedildi${tag}: Bu modele erişim izninin olduğundan emin ol (bazı modeller plan/onay gerektirir).`;
+  if (status >= 500)
+    return `🛠️ Sağlayıcı sunucu hatası (${status})${tag}: Kısa süre sonra tekrar dene.`;
+  if (providerMsg) return `Sağlayıcı hatası (${status})${tag}: ${providerMsg.slice(0, 300)}`;
+  return `Sağlayıcı hatası (${status})${tag}: ${rawDetail.slice(0, 200)}`;
 }
 
 export async function POST(req: Request) {
@@ -248,6 +267,23 @@ export async function POST(req: Request) {
   if (body.memories?.length) {
     sysPrompt += `\n\n[Kullanıcı hakkında bildiklerin]:\n${body.memories.map((m) => `- ${m.content}`).join("\n")}`;
   }
+  if (body.skills?.length) {
+    const fileSkills = body.skills.filter((s) => s.source === "file");
+    const manualSkills = body.skills.filter((s) => s.source !== "file");
+    if (manualSkills.length) {
+      sysPrompt +=
+        `\n\n[Eğitim seti — bu kurallara her zaman uy]:\n` +
+        manualSkills.map((s) => {
+          const tags = s.tags?.length ? ` (${s.tags.join(", ")})` : "";
+          return `### ${s.title}${tags}\n${s.content}`;
+        }).join("\n\n");
+    }
+    if (fileSkills.length) {
+      sysPrompt +=
+        `\n\n[Referans dosyalar — örnek olarak kullan]:\n` +
+        fileSkills.map((s) => `--- ${s.fileName || s.title} ---\n${s.content}`).join("\n\n");
+    }
+  }
   if (body.searchContext) {
     sysPrompt += `\n\n[Web arama sonuçları]:\n${body.searchContext}`;
   }
@@ -275,7 +311,7 @@ export async function POST(req: Request) {
     }
     if (!upstream.ok || !upstream.body) {
       const detail = await upstream.text().catch(() => "");
-      return new Response(friendlyApiError(upstream.status, detail, provider), { status: upstream.status || 500 });
+      return new Response(friendlyApiError(upstream.status, detail, { model, provider: body.provider }), { status: upstream.status || 500 });
     }
     return new Response(upstream.body, {
       headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" },
@@ -314,7 +350,7 @@ export async function POST(req: Request) {
         }
         if (!upstream.ok || !upstream.body) {
           const detail = await upstream.text().catch(() => "");
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**${friendlyApiError(upstream.status, detail, provider)}` } }] })}\n\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**${friendlyApiError(upstream.status, detail, { model, provider: body.provider })}**` } }] })}\n\n`));
           break;
         }
 

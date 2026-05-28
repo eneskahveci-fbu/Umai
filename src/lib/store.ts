@@ -10,6 +10,7 @@ import type {
   OpenFile,
   Project,
   RepoState,
+  Skill,
   Snippet,
   Toast,
   ToolCallRecord,
@@ -38,7 +39,24 @@ function loadConfig(): Config {
   if (typeof window === "undefined") return DEFAULT_CONFIG;
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
-    if (raw) return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const merged = { ...DEFAULT_CONFIG, ...parsed };
+      /* migrate: eski memories'i Skill formatına çevir */
+      if ((!merged.skills || merged.skills.length === 0) && Array.isArray(merged.memories) && merged.memories.length > 0) {
+        merged.skills = merged.memories.map((m: MemoryItem, i: number) => ({
+          id: m.id || `migrated_${i}`,
+          title: m.content.split("\n")[0].slice(0, 60) || "Skill",
+          content: m.content,
+          tags: [],
+          enabled: true,
+          source: "manual" as const,
+          usageCount: 0,
+          createdAt: Date.now() - (merged.memories.length - i) * 1000,
+        }));
+      }
+      return merged;
+    }
   } catch {
     /* yok say */
   }
@@ -94,12 +112,20 @@ interface StoreState {
   updateProject: (id: string, patch: Partial<Project>) => void;
   setActiveProject: (id: string | null) => void;
 
-  // memory / skills
+  // memory (legacy — kept for back-compat)
   addMemory: (content: string) => void;
   removeMemory: (id: string) => void;
   editMemory: (id: string, content: string) => void;
+
+  // skills
   skillsOpen: boolean;
   setSkillsOpen: (b: boolean) => void;
+  addSkill: (s: Omit<Skill, "id" | "createdAt" | "usageCount">) => void;
+  updateSkill: (id: string, patch: Partial<Skill>) => void;
+  removeSkill: (id: string) => void;
+  toggleSkill: (id: string) => void;
+  incrementSkillUsage: (ids: string[]) => void;
+  resetSkillProgress: () => void;
 
   view: "chat" | "coder" | "compare";
   setView: (v: "chat" | "coder" | "compare") => void;
@@ -339,6 +365,54 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
   skillsOpen: false,
   setSkillsOpen: (b) => set({ skillsOpen: b }),
+
+  addSkill: (s) => {
+    const config = get().config;
+    const skill: Skill = {
+      ...s,
+      id: uid(),
+      createdAt: Date.now(),
+      usageCount: 0,
+    };
+    get().saveConfig({ ...config, skills: [skill, ...(config.skills ?? [])] });
+  },
+  updateSkill: (id, patch) => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      skills: (config.skills ?? []).map((s) => s.id === id ? { ...s, ...patch } : s),
+    });
+  },
+  removeSkill: (id) => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      skills: (config.skills ?? []).filter((s) => s.id !== id),
+    });
+  },
+  toggleSkill: (id) => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      skills: (config.skills ?? []).map((s) => s.id === id ? { ...s, enabled: !s.enabled } : s),
+    });
+  },
+  incrementSkillUsage: (ids) => {
+    if (!ids.length) return;
+    const config = get().config;
+    const set = new Set(ids);
+    get().saveConfig({
+      ...config,
+      skills: (config.skills ?? []).map((s) => set.has(s.id) ? { ...s, usageCount: s.usageCount + 1 } : s),
+    });
+  },
+  resetSkillProgress: () => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      skills: (config.skills ?? []).map((s) => ({ ...s, usageCount: 0 })),
+    });
+  },
 
   view: "chat",
   setView: (v) => set({ view: v }),
