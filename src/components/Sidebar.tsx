@@ -119,9 +119,9 @@ export function Sidebar() {
       <div className="h-14 px-4 flex items-center justify-between border-b border-line/60 shrink-0">
         <div className="flex items-center gap-2.5 font-extrabold text-base">
           <span className="w-7 h-7 rounded-lg brand-gradient grid place-items-center text-white text-sm shadow-sm shadow-brand/30">
-            ◆
+            ◈
           </span>
-          craft<span className="brand-text">.ai</span>
+          Craft<span className="brand-text">.Coder</span>
         </div>
         <button
           onClick={() => setSidebarOpen(false)}

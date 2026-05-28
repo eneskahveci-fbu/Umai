@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "craft.ai — AI kod asistanı",
+  title: "Craft.Coder — AI kod asistanı",
   description:
     "OpenAI-uyumlu herhangi bir modelle çalışan AI kod asistanı. Sohbet, gizli sohbet, geçmiş senkron ve GitHub deposuna bağlı Coder sekmesi.",
   keywords: [
@@ -28,16 +28,16 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Enes Kahveci", url: "mailto:eneskahveci.bs@gmail.com" }],
   openGraph: {
-    title: "craft.ai — AI kod asistanı",
+    title: "Craft.Coder — AI kod asistanı",
     description:
       "İstediğin modelle çalışan AI kod asistanı. Sohbet, GitHub Coder, gizli mod.",
-    siteName: "craft.ai",
+    siteName: "Craft.Coder",
     type: "website",
     locale: "tr_TR",
   },
   twitter: {
     card: "summary_large_image",
-    title: "craft.ai — AI kod asistanı",
+    title: "Craft.Coder — AI kod asistanı",
     description:
       "İstediğin modelle çalışan AI kod asistanı. Sohbet, GitHub Coder, gizli mod.",
   },
