@@ -1,3 +1,5 @@
+import { isValidationError, readJson, ValidationError } from "@/lib/validate";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -7,20 +9,43 @@ interface SearchResult {
   url: string;
 }
 
+const SEARCH_TIMEOUT_MS = 8_000;
+
 export async function POST(req: Request) {
-  const { query } = await req.json();
-  if (!query) return Response.json({ results: [] });
+  let query: string;
+  try {
+    const body = await readJson<{ query?: unknown }>(req);
+    if (typeof body.query !== "string") {
+      throw new ValidationError("query: metin olmalı");
+    }
+    query = body.query.trim();
+    if (query.length === 0) return Response.json({ results: [] });
+    if (query.length > 256) {
+      throw new ValidationError("query: çok uzun (>256)");
+    }
+  } catch (e) {
+    if (isValidationError(e)) {
+      return new Response(e.message, { status: e.status });
+    }
+    return new Response("Geçersiz istek", { status: 400 });
+  }
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), SEARCH_TIMEOUT_MS);
 
   try {
     const res = await fetch(
       `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
       {
+        signal: ctrl.signal,
         headers: {
-          "User-Agent":
-            `Mozilla/5.0 (compatible; craft.ai/1.0; +${process.env.NEXT_PUBLIC_SITE_URL ?? "https://craft-coder.vercel.app"})`,
+          "User-Agent": `Mozilla/5.0 (compatible; craft.ai/1.0; +${
+            process.env.NEXT_PUBLIC_SITE_URL ?? "https://craft-coder.vercel.app"
+          })`,
         },
       },
     );
+    if (!res.ok) return Response.json({ results: [] });
     const html = await res.text();
     const results: SearchResult[] = [];
 
@@ -41,9 +66,9 @@ export async function POST(req: Request) {
 
       if (title && snippet) {
         results.push({
-          title,
-          snippet,
-          url: urlMatch?.[1] || "",
+          title: title.slice(0, 200),
+          snippet: snippet.slice(0, 400),
+          url: urlMatch?.[1]?.slice(0, 2048) || "",
         });
       }
     }
@@ -51,5 +76,7 @@ export async function POST(req: Request) {
     return Response.json({ results });
   } catch {
     return Response.json({ results: [] });
+  } finally {
+    clearTimeout(timer);
   }
 }

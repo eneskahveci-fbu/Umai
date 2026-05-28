@@ -51,9 +51,34 @@ const PROVIDERS = [
   "⚙️ Özel uç",
 ];
 
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://craft-coder.vercel.app";
+
+const JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Craft.AI",
+  description:
+    "OpenAI-uyumlu herhangi bir modelle çalışan AI kod asistanı. Sohbet, gizli sohbet, geçmiş senkron ve GitHub deposuna bağlı Coder sekmesi.",
+  url: SITE_URL,
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "Web",
+  inLanguage: "tr",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  author: {
+    "@type": "Person",
+    name: "Enes Kahveci",
+    email: "eneskahveci.bs@gmail.com",
+  },
+};
+
 export default function Home() {
   return (
     <div className="min-h-screen flex flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
+      />
       {/* NAV */}
       <nav className="sticky top-0 z-50 backdrop-blur bg-bg/70 border-b border-line">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">

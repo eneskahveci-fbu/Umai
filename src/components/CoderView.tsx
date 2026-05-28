@@ -32,7 +32,34 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { EditorPanel, detectLanguage, type EditorFile } from "./EditorPanel";
+import dynamic from "next/dynamic";
+import { detectLanguage, type EditorFile } from "@/lib/editor";
+
+const EditorPanel = dynamic(
+  () => import("./EditorPanel").then((m) => m.EditorPanel),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        role="status"
+        aria-live="polite"
+        className="flex flex-col h-full bg-[#0e0e13] border-l border-line/60"
+      >
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-line/60 shrink-0 bg-surface">
+          <div className="h-4 flex-1 rounded bg-bgsoft animate-pulse" aria-hidden="true" />
+        </div>
+        <div className="flex-1 grid place-items-center">
+          <div className="flex items-center gap-1.5">
+            <span className="typing-dot" aria-hidden="true" />
+            <span className="typing-dot delay-1" aria-hidden="true" />
+            <span className="typing-dot delay-2" aria-hidden="true" />
+          </div>
+        </div>
+        <span className="sr-only">Editör yükleniyor…</span>
+      </div>
+    ),
+  },
+);
 import { GitPanel } from "./GitPanel";
 import { useStore } from "@/lib/store";
 import { MessageBubble } from "./MessageBubble";

@@ -1,50 +1,102 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  asBranch,
+  asContent,
+  asOwner,
+  asOptString,
+  asRepo,
+  asRepoPath,
+  asToken,
+  isValidationError,
+  readJson,
+} from "@/lib/validate";
+
+export const runtime = "nodejs";
+
+interface WriteBody {
+  owner?: unknown;
+  repo?: unknown;
+  branch?: unknown;
+  path?: unknown;
+  content?: unknown;
+  message?: unknown;
+  token?: unknown;
+}
 
 export async function POST(req: NextRequest) {
+  let owner: string, repo: string, branch: string, path: string;
+  let content: string, message: string | undefined, token: string;
   try {
-    const { owner, repo, branch, path, content, message, token } = await req.json();
-    if (!owner || !repo || !path || content === undefined || !token) {
-      return NextResponse.json({ error: "Eksik parametre" }, { status: 400 });
+    const body = await readJson<WriteBody>(req);
+    owner = asOwner(body.owner);
+    repo = asRepo(body.repo);
+    branch = asBranch(body.branch);
+    path = asRepoPath(body.path);
+    content = asContent(body.content);
+    message = asOptString(body.message, "message", { max: 500 });
+    token = asToken(body.token);
+  } catch (e) {
+    if (isValidationError(e)) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
     }
+    return NextResponse.json({ error: "Geçersiz istek" }, { status: 400 });
+  }
 
-    const headers: Record<string, string> = {
-      "Accept": "application/vnd.github+json",
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json",
-    };
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+    "User-Agent": "craft-ai-web",
+  };
 
-    // Get current file SHA (required for updates)
+  try {
+    // Mevcut dosyanın SHA'sını al (güncelleme için gerekli)
+    const encodedPath = path.split("/").map(encodeURIComponent).join("/");
     const getRes = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`,
-      { headers }
+      `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(branch)}`,
+      { headers },
     );
     let sha: string | undefined;
     if (getRes.ok) {
       const data = await getRes.json();
       sha = data.sha;
+    } else if (getRes.status !== 404) {
+      const detail = await getRes.text().catch(() => "");
+      return NextResponse.json(
+        { error: `GitHub okuma hatası: ${detail.slice(0, 200)}` },
+        { status: getRes.status },
+      );
     }
 
-    // Create or update file
     const body: Record<string, string> = {
       message: message || `Update ${path}`,
-      content: Buffer.from(content).toString("base64"),
+      content: Buffer.from(content, "utf-8").toString("base64"),
       branch,
     };
     if (sha) body.sha = sha;
 
     const putRes = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
-      { method: "PUT", headers, body: JSON.stringify(body) }
+      `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`,
+      { method: "PUT", headers, body: JSON.stringify(body) },
     );
 
     if (!putRes.ok) {
-      const err = await putRes.json();
-      return NextResponse.json({ error: err.message || "GitHub hatası" }, { status: putRes.status });
+      const err = await putRes.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: err.message || "GitHub yazma hatası" },
+        { status: putRes.status },
+      );
     }
 
     const result = await putRes.json();
-    return NextResponse.json({ sha: result.commit?.sha, url: result.content?.html_url });
+    return NextResponse.json({
+      sha: result.commit?.sha,
+      url: result.content?.html_url,
+    });
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    return NextResponse.json(
+      { error: `Ağ hatası: ${(e as Error).message}` },
+      { status: 502 },
+    );
   }
 }
