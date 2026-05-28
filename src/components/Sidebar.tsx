@@ -142,7 +142,7 @@ export function Sidebar() {
         </div>
 
         <button
-          onClick={() => newChat(false)}
+          onClick={() => { setView("chat"); newChat(false); }}
           className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-brand hover:bg-branddim text-white font-semibold text-sm transition-colors"
         >
           <Plus size={15} /> Yeni Sohbet
@@ -281,16 +281,9 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* ── Alt navigasyon ── */}
+      {/* ── Alt: ayarlar + auth ── */}
       <div className="border-t border-line/60 shrink-0">
-        <div className="px-2 pt-2 pb-1">
-          <div className="flex rounded-xl bg-bgsoft/50 p-1 gap-0.5">
-            <NavBtn active={view === "chat"} onClick={() => setView("chat")} icon={<MessageSquare size={15} />} label="Sohbet" />
-            <NavBtn active={view === "coder"} onClick={() => setView("coder")} icon={<Code2 size={15} />} label="Coder" />
-          </div>
-        </div>
-
-        <div className="px-3 py-2 space-y-1">
+        <div className="px-3 pt-3 pb-2 space-y-1">
           <button
             onClick={() => setSettingsOpen(true)}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border border-line/60 hover:border-brand/40 hover:bg-bgsoft text-sm text-muted hover:text-ink transition-colors"
@@ -321,26 +314,6 @@ function NavIconBtn({
       }`}
     >
       {children}
-    </button>
-  );
-}
-
-function NavBtn({
-  active, onClick, icon, label,
-}: {
-  active: boolean; onClick: () => void; icon: React.ReactNode; label: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-lg text-[10px] font-bold tracking-wide transition-all ${
-        active
-          ? "bg-brand text-white shadow-md shadow-brand/25"
-          : "text-muted hover:text-ink hover:bg-bgsoft/60"
-      }`}
-    >
-      {icon}
-      <span>{label}</span>
     </button>
   );
 }
