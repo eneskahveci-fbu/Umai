@@ -33,7 +33,8 @@ function checkRate(ip: string): boolean {
   const now = Date.now();
   const e = rl.get(ip);
   if (!e || now > e.reset) { rl.set(ip, { count: 1, reset: now + 60_000 }); return true; }
-  if (e.count >= 30) return false;
+  // İstek limitini 60 → 120'ye çıkardık (Gemini'nin 1.5M/gün limit'ini aşmamız için)
+  if (e.count >= 120) return false;
   e.count++;
   return true;
 }
@@ -210,8 +211,14 @@ function friendlyApiError(status: number, rawDetail: string, provider?: Provider
 
 export async function POST(req: Request) {
   if (!checkOrigin(req)) return new Response("Geçersiz origin.", { status: 403 });
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  if (!checkRate(ip)) return new Response("İstek limiti aşıldı.", { status: 429 });
+  
+  // IP adresi alırken daha güvenilir bir method
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() 
+    || req.headers.get("x-real-ip")?.trim()
+    || req.headers.get("cf-connecting-ip")?.trim()
+    || "unknown";
+  
+  if (!checkRate(ip)) return new Response("İstek limiti aşıldı (30 req/min). Lütfen biraz bekle.", { status: 429 });
 
   let body: ChatRequest;
   try { body = await req.json(); } catch { return new Response("Geçersiz istek gövdesi", { status: 400 }); }
