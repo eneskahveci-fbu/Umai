@@ -609,13 +609,6 @@ export function CoderView() {
             </span>
           )}
           <button
-            onClick={() => setFilesOpen((v) => !v)}
-            title="Dosyalar"
-            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${filesOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
-          >
-            <FolderOpen size={14} />
-          </button>
-          <button
             onClick={() => setTerminalOpen((v) => !v)}
             title="Terminal"
             className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${terminalOpen ? "text-green bg-green/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
@@ -720,35 +713,7 @@ export function CoderView() {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto">
             {messages.length === 0 ? (
-              <div className="max-w-2xl mx-auto px-5 pt-[10vh] text-center">
-                <div className="w-14 h-14 rounded-2xl bg-brand/10 border border-brand/20 grid place-items-center mx-auto mb-5">
-                  <Code2 size={26} className="text-brand" />
-                </div>
-                <h2 className="text-2xl font-extrabold tracking-tight">
-                  Ne üzerinde çalışalım?
-                </h2>
-                <p className="text-muted mt-2 text-sm leading-relaxed max-w-md mx-auto">
-                  Dosya ekle, kod yapıştır, soru sor. Claude Code tarzı bir kodlama asistanı.
-                </p>
-                {repo && (
-                  <div className="mt-4 inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl bg-brand/8 border border-brand/20 text-brand/80">
-                    <FolderGit2 size={13} />
-                    {repo.owner}/{repo.repo} bağlı
-                  </div>
-                )}
-                <div className="grid sm:grid-cols-2 gap-2.5 mt-8 text-left">
-                  {CODER_SUGGESTIONS.map((s) => (
-                    <button
-                      key={s.text}
-                      onClick={() => setInput(s.text)}
-                      className="group/sug flex items-start gap-3 p-4 rounded-2xl border border-line bg-surface hover:border-brand/50 text-sm transition-all"
-                    >
-                      <span className="text-lg shrink-0 mt-0.5">{s.icon}</span>
-                      <span className="text-muted group-hover/sug:text-ink transition-colors leading-snug">{s.text}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <div className="flex-1" />
             ) : (
               <div className="max-w-3xl mx-auto px-5 py-6">
                 {messages.map((m, i) => {
@@ -933,7 +898,7 @@ export function CoderView() {
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) readFileIntoInput(f); e.target.value = ""; }} />
 
               {/* Textarea — geniş, butonsuz */}
-              <div className="bg-surface border border-line rounded-2xl px-4 pt-3 pb-2 focus-within:border-brand/50 focus-within:shadow-[0_0_0_3px_rgba(124,92,255,0.08)] transition-all">
+              <div className="flex items-end gap-2 bg-surface border border-line rounded-2xl px-4 py-2.5 focus-within:border-brand/50 focus-within:shadow-[0_0_0_3px_rgba(124,92,255,0.08)] transition-all">
                 <textarea
                   ref={taRef}
                   value={input}
@@ -960,34 +925,55 @@ export function CoderView() {
                       ? activeAgent.placeholder
                       : attachedFiles.length > 0
                       ? `${attachedFiles.length} dosya eklendi — sor veya / yaz…`
-                      : "Sor, / ile agent seç, @ ile dosya mention…"
+                      : "Mesajınızı yazın…"
                   }
-                  className="w-full bg-transparent resize-none outline-none text-[15px] leading-relaxed max-h-[240px] placeholder:text-muted/45"
+                  className="flex-1 bg-transparent resize-none outline-none text-[15px] leading-relaxed max-h-[240px] py-1 placeholder:text-muted/45"
                 />
 
-                {/* Alt sıra: butonlar */}
-                <div className="flex items-center gap-1 mt-2 pt-2 border-t border-line/30">
+                {streaming ? (
+                  <button onClick={stop} className="shrink-0 w-9 h-9 rounded-xl bg-red hover:bg-red/80 text-white grid place-items-center transition-colors" title="Durdur">
+                    <Square size={13} />
+                  </button>
+                ) : (
+                  <button
+                    onClick={send}
+                    disabled={!input.trim() && pendingImages.length === 0 && attachedFiles.length === 0}
+                    className="shrink-0 w-9 h-9 rounded-xl bg-brand hover:bg-branddim text-white grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ArrowUp size={17} />
+                  </button>
+                )}
+              </div>
+
+              {/* Alt araç çubuğu */}
+              <div className="flex items-center justify-between mt-2 px-0.5">
+                <div className="flex items-center gap-0.5 flex-wrap">
                   <ComposerButton onClick={() => fileRef.current?.click()} title="Dosya ekle">
-                    <Paperclip size={14} />
+                    <Paperclip size={13} />
+                    <span>Dosya</span>
                   </ComposerButton>
-                  <ComposerButton onClick={() => imgRef.current?.click()} title="Görsel">
-                    <ImageIcon size={14} />
+                  <ComposerButton onClick={() => imgRef.current?.click()} title="Görsel ekle">
+                    <ImageIcon size={13} />
                   </ComposerButton>
                   <ComposerButton onClick={() => setSearchOn(!searchOn)} active={searchOn} title="Web arama">
-                    <Globe size={14} />
+                    <Globe size={13} />
+                    <span>Web</span>
                   </ComposerButton>
                   <ComposerButton onClick={() => useStore.getState().setPromptLibraryOpen(true)} title="Şablonlar">
-                    <BookOpen size={14} />
+                    <BookOpen size={13} />
+                    <span>Şablonlar</span>
                   </ComposerButton>
                   <ComposerButton onClick={() => useStore.getState().setSnippetsOpen(true)} title="Snippet kütüphanesi">
-                    <BookmarkPlus size={14} />
+                    <BookmarkPlus size={13} />
+                    <span>Snippets</span>
                   </ComposerButton>
                   <ComposerButton
                     onClick={() => { setSlashQuery("/"); setSlashOpen((o) => !o); }}
                     active={!!activeAgent || slashOpen}
                     title="Subagent seç ( / )"
                   >
-                    <Sparkles size={14} />
+                    <Sparkles size={13} />
+                    <span>{activeAgent ? activeAgent.command : "Agent"}</span>
                   </ComposerButton>
                   <ComposerButton
                     onClick={() => {
@@ -999,37 +985,20 @@ export function CoderView() {
                       store.setToolsEnabled(!store.toolsEnabled);
                     }}
                     active={toolsEnabled}
-                    title={toolsEnabled ? "Tool-use açık (modelin dosya okuyabilir)" : "Tool-use kapalı"}
+                    title={toolsEnabled ? "Tool-use açık" : "Tool-use kapalı"}
                   >
-                    <Wrench size={14} />
+                    <Wrench size={13} />
+                    <span>Tools</span>
                   </ComposerButton>
 
-                  {/* Thinking mode */}
                   <ThinkingModeToggle />
-
-                  <div className="flex-1" />
-
-                  {streaming ? (
-                    <button onClick={stop} className="w-9 h-9 rounded-xl bg-red hover:bg-red/80 text-white grid place-items-center transition-colors" title="Durdur">
-                      <Square size={13} />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={send}
-                      disabled={!input.trim() && pendingImages.length === 0 && attachedFiles.length === 0}
-                      className="w-9 h-9 rounded-xl bg-brand hover:bg-branddim text-white grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <ArrowUp size={17} />
-                    </button>
-                  )}
                 </div>
-              </div>
 
-              <div className="flex items-center justify-center gap-2 mt-2 text-[11px] text-muted/50">
-                {searchOn && <><span className="text-brand font-medium">Web arama</span><span>·</span></>}
-                {toolsEnabled && <><span className="text-green/80 font-medium">Tool-use</span><span>·</span></>}
-                {activeAgent && <><span className="text-brand font-medium">{activeAgent.command}</span><span>·</span></>}
-                <span>/ ile agent · @ ile dosya · craft.ai coder</span>
+                <div className="flex items-center gap-1.5 text-[11px] text-muted/50 shrink-0">
+                  {searchOn && <span className="text-brand font-medium">Web</span>}
+                  {toolsEnabled && <span className="text-green/80 font-medium">Tools</span>}
+                  {activeAgent && <span className="text-brand font-medium">{activeAgent.command}</span>}
+                </div>
               </div>
             </div>
           </div>
