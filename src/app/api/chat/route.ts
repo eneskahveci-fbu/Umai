@@ -188,13 +188,13 @@ async function streamRound(
   return { content, toolCalls, finishReason };
 }
 
-function friendlyApiError(status: number, rawDetail: string): string {
+function friendlyApiError(status: number, rawDetail: string, provider?: Provider): string {
   try {
     const json = JSON.parse(rawDetail);
-    const msg: string = json?.error?.message || json?.message || "";
-    if (msg.toLowerCase().includes("insufficient balance") || msg.toLowerCase().includes("quota"))
-      return `Yetersiz bakiye (${status}): Sağlayıcı hesabına kredi yükle veya ödeme yöntemini ekle.`;
-    if (msg.toLowerCase().includes("invalid api key") || msg.toLowerCase().includes("unauthorized") || status === 401)
+    const msg: string = json?.error?.message || json?.message || json?.error || "";
+    if (msg.toLowerCase().includes("insufficient balance") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("resource exhausted"))
+      return `Yetersiz bakiye/kota (${status}): Sağlayıcı hesabına kredi yükle veya ödeme yöntemini ekle.`;
+    if (msg.toLowerCase().includes("invalid api key") || msg.toLowerCase().includes("unauthorized") || msg.toLowerCase().includes("permission denied") || status === 401)
       return `API anahtarı geçersiz (${status}): Ayarlardan anahtarı kontrol et.`;
     if (msg.toLowerCase().includes("rate limit") || status === 429)
       return `İstek limiti aşıldı (${status}): Biraz bekle ve tekrar dene.`;
@@ -203,6 +203,7 @@ function friendlyApiError(status: number, rawDetail: string): string {
   if (status === 401) return "API anahtarı geçersiz (401): Ayarlardan anahtarı kontrol et.";
   if (status === 402) return "Yetersiz bakiye (402): Sağlayıcı hesabına kredi yükle.";
   if (status === 429) return "İstek limiti aşıldı (429): Biraz bekle ve tekrar dene.";
+  if (status === 400) return `İstek hatası (${status}): Provider ayarları veya model adı hatalı olabilir. Kontrol et ve tekrar dene.`;
   if (status >= 500) return `Sağlayıcı sunucu hatası (${status}): Kısa süre sonra tekrar dene.`;
   return `Sağlayıcı hatası (${status}): ${rawDetail.slice(0, 200)}`;
 }
@@ -218,12 +219,22 @@ export async function POST(req: Request) {
   const baseUrl = (body.baseUrl || process.env.LLM_BASE_URL || "https://router.huggingface.co/v1").replace(/\/$/, "");
   const model = body.model || process.env.LLM_MODEL || "";
   const apiKey = body.apiKey || process.env.LLM_API_KEY || "";
+  const provider = body.provider || "hf";
 
   if (!model) return new Response("Model seçilmedi.", { status: 400 });
   if (!apiKey) return new Response("API anahtarı yok.", { status: 400 });
 
-  const upstreamHeaders: Record<string, string> = { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` };
-  if (body.provider === "openrouter") {
+  const upstreamHeaders: Record<string, string> = { "Content-Type": "application/json" };
+  
+  /* Provider-specific header setup */
+  if (provider === "gemini") {
+    /* Gemini API Key parametresi URL'de gider */
+    upstreamHeaders["Authorization"] = `Bearer ${apiKey}`;
+  } else {
+    upstreamHeaders["Authorization"] = `Bearer ${apiKey}`;
+  }
+  
+  if (provider === "openrouter") {
     upstreamHeaders["HTTP-Referer"] = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://craft-coder.vercel.app";
     upstreamHeaders["X-Title"] = "craft.ai";
   }
@@ -251,8 +262,15 @@ export async function POST(req: Request) {
   if (!body.tools || !body.repoCtx) {
     const messages = [{ role: "system", content: sysPrompt }, ...body.messages];
     let upstream: Response;
+    let url = `${baseUrl}/chat/completions`;
+    
+    /* Gemini API format adjustment */
+    if (provider === "gemini") {
+      url = `${baseUrl}/chat/completions?key=${apiKey}`;
+    }
+    
     try {
-      upstream = await fetch(`${baseUrl}/chat/completions`, {
+      upstream = await fetch(url, {
         method: "POST", headers: upstreamHeaders,
         body: JSON.stringify({ model, messages, stream: true }),
       });
@@ -261,7 +279,7 @@ export async function POST(req: Request) {
     }
     if (!upstream.ok || !upstream.body) {
       const detail = await upstream.text().catch(() => "");
-      return new Response(friendlyApiError(upstream.status, detail), { status: upstream.status || 500 });
+      return new Response(friendlyApiError(upstream.status, detail, provider), { status: upstream.status || 500 });
     }
     return new Response(upstream.body, {
       headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" },
@@ -281,8 +299,15 @@ export async function POST(req: Request) {
       const MAX_ROUNDS = 6;
       for (let round = 0; round < MAX_ROUNDS; round++) {
         let upstream: Response;
+        let url = `${baseUrl}/chat/completions`;
+        
+        /* Gemini API format adjustment */
+        if (provider === "gemini") {
+          url = `${baseUrl}/chat/completions?key=${apiKey}`;
+        }
+        
         try {
-          upstream = await fetch(`${baseUrl}/chat/completions`, {
+          upstream = await fetch(url, {
             method: "POST", headers: upstreamHeaders,
             body: JSON.stringify({
               model,
@@ -298,7 +323,7 @@ export async function POST(req: Request) {
         }
         if (!upstream.ok || !upstream.body) {
           const detail = await upstream.text().catch(() => "");
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**${friendlyApiError(upstream.status, detail)}` } }] })}\n\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**${friendlyApiError(upstream.status, detail, provider)}` } }] })}\n\n`));
           break;
         }
 
