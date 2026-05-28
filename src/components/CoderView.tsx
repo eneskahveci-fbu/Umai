@@ -706,6 +706,7 @@ export function CoderView() {
           >
             <GitBranch size={14} />
           </button>
+          <ThinkingModeToggle />
         </div>
       </div>
 
@@ -1142,7 +1143,6 @@ export function CoderView() {
                     <span>Tools</span>
                   </ComposerButton>
 
-                  <ThinkingModeToggle />
                   {typeof window !== "undefined" && "webkitSpeechRecognition" in window && (
                     <button
                       onClick={() => {
