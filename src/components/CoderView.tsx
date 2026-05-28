@@ -1,699 +1,760 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import hljs from "highlight.js/lib/common";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Bot,
+  ArrowUp,
+  BookOpen,
   ChevronDown,
   ChevronRight,
   Code2,
-  Copy,
   File,
   FolderGit2,
   FolderOpen,
   Folder,
-  MessageSquarePlus,
+  Globe,
+  Image as ImageIcon,
+  PanelLeft,
+  Paperclip,
   RefreshCw,
   Search,
-  Send,
+  Settings,
+  Square,
+  VenetianMask,
   X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { MessageBubble } from "./MessageBubble";
 import {
   buildTree,
   fetchFileContent,
   fetchRepoTree,
   parseRepo,
 } from "@/lib/github";
-import type { OpenFile, TreeFile, TreeNode } from "@/lib/types";
+import type { TreeFile, TreeNode } from "@/lib/types";
 
-const EXT_COLORS: Record<string, string> = {
-  ts: "text-blue-400", tsx: "text-blue-400",
-  js: "text-yellow-400", jsx: "text-yellow-400",
-  py: "text-green-400",
-  css: "text-pink-400", scss: "text-pink-400", sass: "text-pink-400",
-  html: "text-orange-400",
-  json: "text-yellow-600",
-  md: "text-gray-300",
-  go: "text-cyan-400",
-  rs: "text-orange-500",
-  java: "text-red-400",
-  rb: "text-red-500",
-  php: "text-purple-400",
-  sh: "text-green-600",
-  yml: "text-yellow-600", yaml: "text-yellow-600",
-  toml: "text-orange-300",
-  sql: "text-blue-300",
-};
-
-const LANG_LABELS: Record<string, string> = {
-  ts: "TypeScript", tsx: "TSX", js: "JavaScript", jsx: "JSX",
-  py: "Python", css: "CSS", scss: "SCSS", sass: "Sass",
-  html: "HTML", json: "JSON", md: "Markdown", go: "Go",
-  rs: "Rust", java: "Java", rb: "Ruby", php: "PHP",
-  sh: "Shell", yml: "YAML", yaml: "YAML", toml: "TOML",
-  sql: "SQL", c: "C", cpp: "C++", cs: "C#",
-};
+/* ─── helpers ─── */
 
 function getExt(name: string) {
   return name.split(".").pop()?.toLowerCase() ?? "";
 }
 
-function FileIcon({ name, size = 12 }: { name: string; size?: number }) {
-  const ext = getExt(name);
-  const color = EXT_COLORS[ext] ?? "text-muted/60";
+const EXT_COLOR: Record<string, string> = {
+  ts: "text-blue-400", tsx: "text-blue-400",
+  js: "text-yellow-400", jsx: "text-yellow-400",
+  py: "text-green-400",
+  css: "text-pink-400", scss: "text-pink-400",
+  html: "text-orange-400",
+  json: "text-yellow-600",
+  md: "text-gray-300",
+  go: "text-cyan-400",
+  rs: "text-orange-500",
+};
+
+function FileIcon({ name, size = 13 }: { name: string; size?: number }) {
+  const color = EXT_COLOR[getExt(name)] ?? "text-muted/60";
   return <File size={size} className={`shrink-0 ${color}`} />;
 }
 
-function LangBadge({ path }: { path: string }) {
-  const ext = getExt(path.split("/").pop() ?? path);
-  const label = LANG_LABELS[ext];
-  if (!label) return null;
-  return (
-    <span className="text-[10px] px-1.5 py-0.5 rounded bg-bgsoft border border-line/60 text-muted/60 font-mono shrink-0">
-      {label}
-    </span>
-  );
+function getAllFiles(node: TreeNode): TreeFile[] {
+  return [...node.files, ...Object.values(node.dirs).flatMap(getAllFiles)];
 }
 
-const ERROR_MAP: Record<string, string> = {
-  "Failed to fetch": "Bağlantı kurulamadı.",
-  "Not Found": "Depo bulunamadı.",
-};
+const CODER_SUGGESTIONS = [
+  { icon: "🔍", text: "Bu kodu incele ve iyileştirme öner" },
+  { icon: "🐛", text: "Bu hatayı nasıl düzeltebilirim?" },
+  { icon: "⚡", text: "Bu fonksiyonu daha verimli yaz" },
+  { icon: "✅", text: "Bu kod için unit test yaz" },
+];
 
-function turkishError(msg: string) {
-  return ERROR_MAP[msg] || msg.replace("rate limit", "istek limiti");
-}
+let coderAbort: AbortController | null = null;
+
+type AttachedFile = { path: string; content: string };
+
+/* ─── main component ─── */
 
 export function CoderView() {
   const config = useStore((s) => s.config);
   const repo = useStore((s) => s.repo);
   const tree = useStore((s) => s.tree);
+  const chats = useStore((s) => s.chats);
+  const currentId = useStore((s) => s.currentId);
+  const incognito = useStore((s) => s.incognito);
+  const streaming = useStore((s) => s.streaming);
+  const pendingInput = useStore((s) => s.pendingInput);
+  const followUpSuggestions = useStore((s) => s.followUpSuggestions);
+
   const setRepo = useStore((s) => s.setRepo);
   const setTree = useStore((s) => s.setTree);
-  const setCurrentFile = useStore((s) => s.setCurrentFile);
+  const setSidebarOpen = useStore((s) => s.setSidebarOpen);
+  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
+  const setPendingInput = useStore((s) => s.setPendingInput);
+  const setFollowUpSuggestions = useStore((s) => s.setFollowUpSuggestions);
   const addToast = useStore((s) => s.addToast);
 
+  const [input, setInput] = useState("");
+  const [pendingImages, setPendingImages] = useState<string[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [searchOn, setSearchOn] = useState(false);
+
+  /* repo panel */
+  const [repoOpen, setRepoOpen] = useState(false);
+  const [repoSearch, setRepoSearch] = useState("");
   const [connecting, setConnecting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [loadingFile, setLoadingFile] = useState(false);
+  const [fetchingFile, setFetchingFile] = useState<string | null>(null);
 
-  /* tabs */
-  const [tabs, setTabs] = useState<OpenFile[]>([]);
-  const [activeTab, setActiveTab] = useState<string | null>(null);
-  const activeFile = tabs.find((t) => t.path === activeTab) ?? null;
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const imgRef = useRef<HTMLInputElement>(null);
+  const repoRef = useRef<HTMLDivElement>(null);
 
-  /* file tree search */
-  const [treeSearch, setTreeSearch] = useState("");
+  const current = chats.find((c) => c.id === currentId) || null;
+  const messages = current?.messages ?? [];
 
-  /* AI panel */
-  const [aiOpen, setAiOpen] = useState(false);
-  const [aiMessages, setAiMessages] = useState<{ q: string; a: string }[]>([]);
-  const [aiInput, setAiInput] = useState("");
-  const [aiStreaming, setAiStreaming] = useState(false);
-  const aiEndRef = useRef<HTMLDivElement>(null);
-  const aiInputRef = useRef<HTMLTextAreaElement>(null);
+  /* pending input from CoderView → chat bridge */
+  useEffect(() => {
+    if (pendingInput) {
+      setInput(pendingInput);
+      setPendingInput(null);
+      taRef.current?.focus();
+    }
+  }, [pendingInput, setPendingInput]);
 
-  /* ── repo connect ── */
-  const connect = async () => {
+  /* auto-scroll */
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length, messages[messages.length - 1]?.content]);
+
+  /* textarea auto-height */
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 200) + "px";
+  }, [input]);
+
+  /* close repo panel on outside click */
+  useEffect(() => {
+    if (!repoOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (repoRef.current && !repoRef.current.contains(e.target as Node)) {
+        setRepoOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [repoOpen]);
+
+  /* connect to repo */
+  const connectRepo = async () => {
     const store = useStore.getState();
     const parsed = parseRepo(store.config.activeRepo || "");
-    if (!parsed) { setError("Geçerli bir depo seç (kullanici/depo)."); return; }
+    if (!parsed) {
+      addToast("Ayarlar'dan bir GitHub deposu ekle.", "error");
+      return;
+    }
     const token = store.activeGithub()?.token;
     setConnecting(true);
-    setError(null);
     try {
       const { branch, items } = await fetchRepoTree(parsed.owner, parsed.repo, token);
       setRepo({ ...parsed, branch });
       setTree(buildTree(items));
     } catch (e) {
-      setError(turkishError((e as Error).message));
-      setTree(null);
+      addToast(`Depo bağlantısı başarısız: ${(e as Error).message}`, "error");
     } finally {
       setConnecting(false);
     }
   };
 
   useEffect(() => {
-    if (config.activeRepo) connect();
+    if (config.activeRepo && !tree) connectRepo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.activeRepo, config.activeGithubId]);
 
-  /* ── open file / tabs ── */
-  const openFile = async (path: string) => {
-    const existing = tabs.find((t) => t.path === path);
-    if (existing) {
-      setActiveTab(path);
-      setCurrentFile(existing);
+  /* attach file from repo */
+  const attachRepoFile = async (file: TreeFile) => {
+    if (attachedFiles.find((f) => f.path === file.path)) {
+      setAttachedFiles((prev) => prev.filter((f) => f.path !== file.path));
       return;
     }
     if (!repo) return;
-    setLoadingFile(true);
+    setFetchingFile(file.path);
     try {
       const token = useStore.getState().activeGithub()?.token;
-      const content = await fetchFileContent(repo.owner, repo.repo, repo.branch, path, token);
-      const file: OpenFile = { path, content };
-      setTabs((prev) => [...prev, file]);
-      setActiveTab(path);
-      setCurrentFile(file);
+      const content = await fetchFileContent(repo.owner, repo.repo, repo.branch, file.path, token);
+      setAttachedFiles((prev) => [...prev, { path: file.path, content }]);
     } catch (e) {
-      addToast(`Dosya açılamadı: ${turkishError((e as Error).message)}`, "error");
+      addToast(`Dosya okunamadı: ${(e as Error).message}`, "error");
     } finally {
-      setLoadingFile(false);
+      setFetchingFile(null);
     }
   };
 
-  const closeTab = (path: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const newTabs = tabs.filter((t) => t.path !== path);
-    setTabs(newTabs);
-    if (activeTab === path) {
-      const newActive = newTabs[newTabs.length - 1]?.path ?? null;
-      setActiveTab(newActive);
-      setCurrentFile(newTabs.find((t) => t.path === newActive) ?? null);
+  /* file readers */
+  const readFileIntoInput = (f: File) => {
+    if (f.type.startsWith("image/")) {
+      if (f.size > 5_000_000) { addToast("Görsel 5MB'den büyük.", "error"); return; }
+      const reader = new FileReader();
+      reader.onload = () => setPendingImages((prev) => [...prev, reader.result as string]);
+      reader.readAsDataURL(f);
+      return;
     }
+    if (f.size > 512_000) { addToast("Dosya 512KB'den büyük.", "error"); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const ext = f.name.split(".").pop() || "";
+      setInput((prev) => prev + (prev ? "\n\n" : "") + `\`${f.name}\`:\n\`\`\`${ext}\n${reader.result as string}\n\`\`\``);
+      taRef.current?.focus();
+    };
+    reader.readAsText(f);
   };
 
-  /* ── actions ── */
-  const sendToChat = () => {
-    if (!activeFile) return;
-    const ext = getExt(activeFile.path);
-    const msg = `Şu dosyaya bakar mısın — \`${activeFile.path}\`:\n\n\`\`\`${ext}\n${activeFile.content}\n\`\`\`\n\nBu dosyayı açıkla / iyileştirme öner.`;
+  /* api call */
+  const fetchFollowUps = useCallback(async () => {
     const store = useStore.getState();
-    if (!store.currentId) store.newChat(false);
-    store.setPendingInput(msg);
-    store.setView("chat");
-  };
+    if (!store.config.followUps) return;
+    const active = store.activeModel();
+    if (!active) return;
+    const chat = store.current();
+    if (!chat || chat.messages.length < 2) return;
+    try {
+      const res = await fetch("/api/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: chat.messages.map((m) => ({ role: m.role, content: m.content })),
+          baseUrl: active.baseUrl,
+          model: active.model,
+          apiKey: active.apiKey,
+        }),
+      });
+      const { suggestions } = await res.json();
+      store.setFollowUpSuggestions(suggestions || []);
+    } catch { /* yoksay */ }
+  }, []);
 
-  const copyFile = () => {
-    if (!activeFile) return;
-    navigator.clipboard.writeText(activeFile.content);
-    addToast("Kopyalandı", "info");
-  };
+  const callApi = useCallback(async () => {
+    const store = useStore.getState();
+    const active = store.activeModel();
+    if (!active) { store.setSettingsOpen(true); return; }
 
-  /* ── AI panel ── */
-  const askAI = async () => {
-    const q = aiInput.trim();
-    if (!q || aiStreaming) return;
-    const model = useStore.getState().activeModel();
-    if (!model) { addToast("Önce Ayarlar'dan bir model ekle.", "error"); return; }
+    const apiMessages = (store.current()?.messages ?? []).map((m) => {
+      if (m.images?.length) {
+        const content: unknown[] = m.images.map((img) => ({
+          type: "image_url",
+          image_url: { url: img },
+        }));
+        content.push({ type: "text", text: m.content });
+        return { role: m.role, content };
+      }
+      return { role: m.role, content: m.content };
+    });
 
-    setAiInput("");
-    setAiStreaming(true);
-    setAiMessages((prev) => [...prev, { q, a: "" }]);
+    const coderSystemPrompt = [
+      config.systemPrompt,
+      "Sen uzman bir yazılım geliştiricisisin. Kod yazarken best practice'leri uygula, okunabilir ve sürdürülebilir çözümler sun. Hata ayıklarken adım adım düşün.",
+    ].filter(Boolean).join("\n\n");
 
-    const fileCtx = activeFile
-      ? `Mevcut dosya: \`${activeFile.path}\`\n\`\`\`\n${activeFile.content.slice(0, 12000)}\n\`\`\`\n\n`
-      : "";
+    store.pushMessage({ role: "assistant", content: "" });
+    store.setStreaming(true);
+    store.setFollowUpSuggestions([]);
+    coderAbort = new AbortController();
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: coderAbort.signal,
         body: JSON.stringify({
-          messages: [{ role: "user", content: fileCtx + q }],
-          model,
-          systemPrompt: "Sen deneyimli bir yazılım geliştiricisin. Kısa, net ve teknik cevaplar ver.",
+          messages: apiMessages,
+          baseUrl: active.baseUrl,
+          model: active.model,
+          apiKey: active.apiKey,
+          provider: active.provider,
+          systemPrompt: coderSystemPrompt,
+          style: store.config.style,
+          memories: store.config.memories,
         }),
       });
-      if (!res.ok || !res.body) throw new Error("API hatası");
+
+      if (!res.ok || !res.body) {
+        const detail = await res.text().catch(() => "");
+        throw new Error(detail || `${res.status}`);
+      }
+
       const reader = res.body.getReader();
-      const dec = new TextDecoder();
+      const decoder = new TextDecoder();
+      let buffer = "";
       let full = "";
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        for (const line of dec.decode(value).split("\n")) {
-          if (!line.startsWith("data: ")) continue;
-          const d = line.slice(6);
-          if (d === "[DONE]") break;
-          try { const { content } = JSON.parse(d); if (content) full += content; } catch {}
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          const t = line.trim();
+          if (!t.startsWith("data:")) continue;
+          const data = t.slice(5).trim();
+          if (data === "[DONE]") continue;
+          try {
+            const delta = JSON.parse(data).choices?.[0]?.delta?.content ?? "";
+            if (delta) { full += delta; useStore.getState().updateLastContent(full); }
+          } catch { /* parçalı satır */ }
         }
-        setAiMessages((prev) => {
-          const updated = [...prev];
-          updated[updated.length - 1] = { q, a: full };
-          return updated;
-        });
       }
-    } catch (e) {
-      setAiMessages((prev) => {
-        const updated = [...prev];
-        updated[updated.length - 1] = { q, a: `Hata: ${(e as Error).message}` };
-        return updated;
-      });
+      if (!full) useStore.getState().updateLastContent("_(Model boş yanıt döndürdü.)_");
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        useStore.getState().updateLastContent(`**Hata:** ${(err as Error).message}\n\n_Anahtar/model doğru mu? Ayarlardan kontrol et._`);
+      }
     } finally {
-      setAiStreaming(false);
-      setTimeout(() => aiEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+      coderAbort = null;
+      useStore.getState().setStreaming(false);
+      await useStore.getState().persistCurrent();
+      fetchFollowUps();
     }
+  }, [config.systemPrompt, fetchFollowUps]);
+
+  const send = async () => {
+    const text = input.trim();
+    if ((!text && pendingImages.length === 0) || streaming) return;
+    const store = useStore.getState();
+    if (!store.activeModel()) { store.setSettingsOpen(true); return; }
+    if (!store.currentId) store.newChat(incognito);
+
+    /* prepend attached file contents */
+    let fullText = text;
+    if (attachedFiles.length > 0) {
+      const ctx = attachedFiles
+        .map((f) => `\`${f.path}\`:\n\`\`\`${getExt(f.path)}\n${f.content.slice(0, 10000)}\n\`\`\``)
+        .join("\n\n");
+      fullText = ctx + (text ? "\n\n" + text : "");
+    }
+
+    store.pushMessage({
+      role: "user",
+      content: fullText,
+      images: pendingImages.length ? [...pendingImages] : undefined,
+    });
+    store.maybeSetTitle(text || attachedFiles[0]?.path || "Dosya analizi");
+    setInput("");
+    setPendingImages([]);
+    setAttachedFiles([]);
+
+    await callApi();
   };
+
+  const stop = () => { coderAbort?.abort(); coderAbort = null; };
+
+  const regenerate = async () => {
+    if (streaming) return;
+    const store = useStore.getState();
+    const chat = store.current();
+    if (!chat || chat.messages.length < 2) return;
+    if (chat.messages[chat.messages.length - 1].role === "assistant") store.popLastMessage();
+    await callApi();
+  };
+
+  const editAndResend = async (index: number, content: string) => {
+    const store = useStore.getState();
+    store.editMessageAt(index, content);
+    store.truncateAfter(index);
+    await callApi();
+  };
+
+  /* flat repo file list */
+  const allFiles = tree ? getAllFiles(tree) : [];
+  const filteredFiles = repoSearch
+    ? allFiles.filter((f) => f.name.toLowerCase().includes(repoSearch.toLowerCase()) || f.path.toLowerCase().includes(repoSearch.toLowerCase()))
+    : allFiles;
 
   return (
     <div className="flex flex-col h-full min-h-0">
 
       {/* ── Header ── */}
-      <div className="shrink-0 flex items-center gap-3 px-4 h-14 border-b border-line bg-surface/50">
-        <Code2 size={17} className="text-brand shrink-0" />
-        {repo ? (
-          <div className="flex-1 min-w-0 flex items-center gap-2 text-sm">
-            <span className="font-semibold text-ink truncate">
-              {repo.owner}<span className="text-muted/50">/</span>{repo.repo}
-            </span>
-            <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-cyan/10 text-cyan font-mono border border-cyan/20">
-              {repo.branch}
-            </span>
-            {tabs.length > 0 && (
-              <span className="text-[11px] text-muted/50">
-                {tabs.length} dosya açık
-              </span>
-            )}
-          </div>
-        ) : (
-          <span className="flex-1 text-sm text-muted/60 italic">Depo bağlı değil — Ayarlar&apos;dan GitHub deposu ekle</span>
-        )}
+      <div className="h-14 shrink-0 flex items-center gap-3 px-4 border-b border-line/60 bg-surface/60 backdrop-blur-sm">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          title="Yan panel (Ctrl+B)"
+          className="w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors shrink-0"
+        >
+          <PanelLeft size={17} />
+        </button>
 
         <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => setAiOpen((o) => !o)}
-            title="AI Asistan aç/kapat"
-            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border font-semibold transition-colors ${
-              aiOpen
-                ? "bg-brand/10 border-brand/40 text-brand"
-                : "border-line/60 text-muted hover:text-ink hover:border-line"
-            }`}
-          >
-            <Bot size={14} />
-            AI Asistan
-          </button>
-          <button
-            onClick={connect}
-            disabled={connecting}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl bg-brand hover:bg-branddim text-white font-semibold disabled:opacity-50 transition-colors"
-          >
-            <RefreshCw size={13} className={connecting ? "animate-spin" : ""} />
-            {connecting ? "Bağlanıyor…" : "Bağlan"}
-          </button>
-        </div>
-      </div>
-
-      {/* ── Body: tree + code + AI ── */}
-      <div className="flex-1 flex min-h-0">
-
-        {/* ── File tree ── */}
-        <div className="w-52 shrink-0 border-r border-line flex flex-col min-h-0 bg-bgsoft/20">
-          <div className="p-2 border-b border-line/50">
-            <div className="relative">
-              <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted/40" />
-              <input
-                value={treeSearch}
-                onChange={(e) => setTreeSearch(e.target.value)}
-                placeholder="Dosya ara..."
-                className="w-full bg-bgsoft/70 rounded-lg pl-7 pr-2 py-1.5 text-xs outline-none focus:ring-1 ring-brand/40 placeholder:text-muted/35 transition-all"
-              />
-            </div>
+          <div className="w-7 h-7 rounded-lg bg-brand/15 border border-brand/25 grid place-items-center">
+            <Code2 size={14} className="text-brand" />
           </div>
-          <div className="flex-1 overflow-y-auto p-1">
-            {error ? (
-              <div className="text-center py-8 px-3">
-                <FolderGit2 size={24} className="mx-auto mb-2 text-red/50" />
-                <p className="text-xs text-red/80 leading-relaxed">{error}</p>
-                <button onClick={connect} className="mt-3 text-xs text-brand hover:text-branddim font-semibold">
-                  Tekrar dene
-                </button>
-              </div>
-            ) : !tree ? (
-              <div className="text-center py-8 px-3">
-                <FolderGit2 size={24} className="mx-auto mb-2 text-muted/25" />
-                <p className="text-xs text-muted/50 leading-relaxed">
-                  {connecting ? "Yükleniyor…" : "Ayarlar → GitHub'dan depo ekle"}
-                </p>
-              </div>
-            ) : treeSearch ? (
-              <FlatSearch
-                node={tree}
-                filter={treeSearch}
-                activePath={activeTab}
-                onOpen={openFile}
-              />
-            ) : (
-              <TreeDir
-                node={tree}
-                root
-                activePath={activeTab}
-                onOpen={openFile}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* ── Code panel ── */}
-        <div className="flex-1 flex flex-col min-w-0">
-
-          {/* Tabs bar */}
-          <div className="shrink-0 flex items-center border-b border-line bg-bgsoft/10 overflow-x-auto scrollbar-thin min-h-[36px]">
-            {tabs.length === 0 ? (
-              <span className="text-xs text-muted/35 px-4 py-2 italic">Dosya seçilmedi</span>
-            ) : (
-              tabs.map((tab) => {
-                const name = tab.path.split("/").pop() ?? tab.path;
-                const isActive = tab.path === activeTab;
-                return (
-                  <button
-                    key={tab.path}
-                    onClick={() => { setActiveTab(tab.path); setCurrentFile(tab); }}
-                    title={tab.path}
-                    className={`group/tab flex items-center gap-1.5 px-3 py-2 text-xs whitespace-nowrap border-r border-line/50 transition-colors ${
-                      isActive
-                        ? "bg-bg text-ink border-t-2 border-t-brand"
-                        : "text-muted hover:text-ink hover:bg-bgsoft/50"
-                    }`}
-                  >
-                    <FileIcon name={name} size={11} />
-                    {name}
-                    <span
-                      onClick={(e) => closeTab(tab.path, e)}
-                      className="opacity-0 group-hover/tab:opacity-100 hover:bg-line/60 rounded p-0.5 transition-opacity ml-0.5"
-                    >
-                      <X size={9} />
-                    </span>
-                  </button>
-                );
-              })
-            )}
-          </div>
-
-          {/* File info bar + code */}
-          {activeFile ? (
-            <div className="flex-1 flex flex-col min-h-0">
-              <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-line/40 bg-bgsoft/10">
-                {/* Breadcrumb */}
-                <div className="flex items-center gap-0.5 text-xs text-muted/60 min-w-0 flex-1">
-                  {activeFile.path.split("/").map((part, i, arr) => (
-                    <span key={i} className="flex items-center gap-0.5">
-                      {i > 0 && <ChevronRight size={10} className="text-muted/25 shrink-0" />}
-                      <span className={i === arr.length - 1 ? "text-ink/90 font-medium" : ""}>{part}</span>
-                    </span>
-                  ))}
-                </div>
-                {/* Actions */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <LangBadge path={activeFile.path} />
-                  <span className="text-[11px] text-muted/40">
-                    {activeFile.content.split("\n").length} satır
-                  </span>
-                  <button
-                    onClick={copyFile}
-                    title="İçeriği kopyala"
-                    className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-bgsoft transition-colors"
-                  >
-                    <Copy size={13} />
-                  </button>
-                  <button
-                    onClick={sendToChat}
-                    className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-xl bg-brand/10 border border-brand/30 text-brand font-semibold hover:bg-brand/20 transition-colors"
-                  >
-                    <MessageSquarePlus size={13} />
-                    Sohbete gönder
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-auto">
-                {loadingFile ? (
-                  <div className="h-full grid place-items-center">
-                    <div className="flex items-center gap-2 text-sm text-muted">
-                      <RefreshCw size={15} className="animate-spin" /> Yükleniyor…
-                    </div>
-                  </div>
-                ) : (
-                  <CodeView path={activeFile.path} content={activeFile.content} />
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 grid place-items-center">
-              <div className="text-center px-8">
-                <div className="w-16 h-16 rounded-2xl bg-brand/5 border border-brand/10 grid place-items-center mx-auto mb-4">
-                  <FolderGit2 size={28} className="text-muted/25" />
-                </div>
-                <p className="text-sm text-muted/50 font-medium mb-1">Dosya seçilmedi</p>
-                <p className="text-xs text-muted/30 leading-relaxed">
-                  Sol panelden bir dosyaya tıkla.<br />
-                  Birden fazla dosyayı sekmelerle takip edebilirsin.
-                </p>
-              </div>
-            </div>
+          <span className="text-sm font-semibold text-ink">Coder</span>
+          {repo && (
+            <span className="hidden sm:flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-bgsoft border border-line/60 text-muted/70 font-mono">
+              {repo.owner}/{repo.repo}
+              <span className="text-muted/40">:</span>
+              <span className="text-cyan">{repo.branch}</span>
+            </span>
           )}
         </div>
 
-        {/* ── AI Panel ── */}
-        {aiOpen && (
-          <div className="w-80 shrink-0 border-l border-line flex flex-col min-h-0 bg-bgsoft/10">
-            {/* AI header */}
-            <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-line bg-surface/40">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-xl bg-brand/15 border border-brand/25 grid place-items-center">
-                  <Bot size={14} className="text-brand" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold leading-none">AI Asistan</p>
-                  <p className="text-[10px] text-muted/60 mt-0.5">Kod hakkında sor</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-1">
-                {aiMessages.length > 0 && (
-                  <button
-                    onClick={() => setAiMessages([])}
-                    className="text-xs text-muted hover:text-ink px-2 py-1 rounded-lg hover:bg-bgsoft transition-colors"
-                  >
-                    Temizle
-                  </button>
-                )}
-                <button
-                  onClick={() => setAiOpen(false)}
-                  className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-bgsoft transition-colors"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            </div>
+        <div className="flex-1 min-w-0">
+          {config.models.length > 0 ? (
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors"
+              title="Model ayarları"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-green shrink-0" />
+              <span className="truncate text-xs font-medium text-muted/80">
+                {config.models.find((m) => m.id === config.activeModelId)?.label ||
+                  config.models.find((m) => m.id === config.activeModelId)?.model ||
+                  "Model seç"}
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-brand/40 text-brand hover:bg-brand/10 transition-colors"
+            >
+              + Model ekle
+            </button>
+          )}
+        </div>
 
-            {/* Context chip */}
-            {activeFile && (
-              <div className="shrink-0 mx-3 mt-3 mb-0 px-3 py-2 rounded-xl bg-brand/5 border border-brand/15 flex items-center gap-2">
-                <FileIcon name={activeFile.path.split("/").pop() ?? ""} size={12} />
-                <span className="text-[11px] text-muted/70 font-mono truncate flex-1">
-                  {activeFile.path.split("/").pop()}
-                </span>
-                <LangBadge path={activeFile.path} />
+        <div className="flex items-center gap-1 shrink-0">
+          {incognito && (
+            <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-purple/10 text-purple border border-purple/30">
+              <VenetianMask size={11} /> Gizli
+            </span>
+          )}
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
+            title="Ayarlar"
+          >
+            <Settings size={15} />
+          </button>
+        </div>
+      </div>
+
+      {/* ── Messages ── */}
+      <div className="flex-1 overflow-y-auto">
+        {messages.length === 0 ? (
+          <div className="max-w-xl mx-auto px-5 pt-[8vh] text-center">
+            <div className="w-16 h-16 rounded-2xl bg-brand/10 border border-brand/20 grid place-items-center mx-auto mb-6">
+              <Code2 size={28} className="text-brand" />
+            </div>
+            <h2 className="text-2xl font-extrabold tracking-tight">
+              Coding Assistant
+            </h2>
+            <p className="text-muted mt-2 text-sm leading-relaxed max-w-sm mx-auto">
+              Kod yaz, hata ayıkla, refactor et. Depo dosyalarını bağlam olarak eklemek için{" "}
+              <span className="text-brand font-medium">Repo</span> butonunu kullan.
+            </p>
+            {repo && (
+              <div className="mt-4 inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl bg-brand/8 border border-brand/20 text-brand/80">
+                <FolderGit2 size={13} />
+                {repo.owner}/{repo.repo} bağlı
               </div>
             )}
-
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-4 min-h-0">
-              {aiMessages.length === 0 && (
-                <div className="text-center py-8">
-                  <Bot size={32} className="mx-auto mb-3 text-muted/15" />
-                  <p className="text-xs text-muted/40 leading-relaxed">
-                    {activeFile
-                      ? `"${activeFile.path.split("/").pop()}" dosyası hakkında\nsoru sorabilirsin`
-                      : "Bir dosya aç ve soru sor"}
-                  </p>
-                </div>
-              )}
-              {aiMessages.map((msg, i) => (
-                <div key={i} className="space-y-2">
-                  <div className="flex items-start gap-2">
-                    <div className="w-5 h-5 rounded-full bg-brand/20 grid place-items-center shrink-0 mt-0.5">
-                      <span className="text-[9px] font-bold text-brand">S</span>
-                    </div>
-                    <div className="bg-bgsoft rounded-xl px-3 py-2 text-xs text-ink leading-relaxed flex-1">
-                      {msg.q}
-                    </div>
-                  </div>
-                  {msg.a && (
-                    <div className="flex items-start gap-2">
-                      <div className="w-5 h-5 rounded-full bg-brand grid place-items-center shrink-0 mt-0.5">
-                        <Bot size={10} className="text-white" />
-                      </div>
-                      <div className="text-xs text-muted/90 leading-relaxed whitespace-pre-wrap flex-1 pt-1">
-                        {msg.a}
-                        {aiStreaming && i === aiMessages.length - 1 && (
-                          <span className="inline-block w-1 h-3 bg-brand ml-0.5 animate-pulse rounded-sm" />
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-              <div ref={aiEndRef} />
-            </div>
-
-            {/* Input */}
-            <div className="shrink-0 p-3 border-t border-line">
-              <div className="flex gap-2 items-end">
-                <textarea
-                  ref={aiInputRef}
-                  value={aiInput}
-                  onChange={(e) => setAiInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); askAI(); }
-                  }}
-                  placeholder={activeFile ? "Dosya hakkında sor… (Enter)" : "Bir dosya aç…"}
-                  rows={2}
-                  className="flex-1 bg-bgsoft border border-line/60 rounded-xl px-3 py-2 text-xs outline-none focus:border-brand/50 resize-none placeholder:text-muted/35 transition-colors"
-                />
+            <div className="grid sm:grid-cols-2 gap-2.5 mt-8 text-left">
+              {CODER_SUGGESTIONS.map((s) => (
                 <button
-                  onClick={askAI}
-                  disabled={aiStreaming || !aiInput.trim()}
-                  className="w-9 h-9 rounded-xl bg-brand hover:bg-branddim disabled:opacity-40 text-white grid place-items-center transition-colors shrink-0"
+                  key={s.text}
+                  onClick={() => setInput(s.text)}
+                  className="group/sug flex items-start gap-3 p-4 rounded-2xl border border-line bg-surface hover:border-brand/50 hover:bg-surface2 text-sm transition-all duration-200"
                 >
-                  <Send size={14} />
+                  <span className="text-lg shrink-0 mt-0.5">{s.icon}</span>
+                  <span className="text-muted group-hover/sug:text-ink transition-colors leading-snug">{s.text}</span>
                 </button>
-              </div>
+              ))}
             </div>
+          </div>
+        ) : (
+          <div className="max-w-3xl mx-auto px-5 py-6">
+            {messages.map((m, i) => {
+              const isLastAssistant = m.role === "assistant" && i === messages.length - 1;
+              return (
+                <MessageBubble
+                  key={i}
+                  index={i}
+                  message={m}
+                  showRegenerate={isLastAssistant && !streaming}
+                  onRegenerate={regenerate}
+                  onEdit={m.role === "user" ? editAndResend : undefined}
+                />
+              );
+            })}
+            {streaming && messages[messages.length - 1]?.content === "" && (
+              <div className="flex gap-3 py-4">
+                <div className="shrink-0 w-8 h-8 rounded-lg bg-brand/15 border border-brand/25 grid place-items-center">
+                  <Code2 size={14} className="text-brand" />
+                </div>
+                <div className="flex items-center gap-1 pt-2">
+                  <span className="typing-dot" />
+                  <span className="typing-dot delay-1" />
+                  <span className="typing-dot delay-2" />
+                </div>
+              </div>
+            )}
+            {!streaming && followUpSuggestions.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-3 mb-4">
+                {followUpSuggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    onClick={() => { setInput(s); setFollowUpSuggestions([]); }}
+                    className="text-xs px-3 py-1.5 rounded-full border border-line bg-surface hover:border-brand/50 transition-colors text-muted hover:text-ink"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div ref={endRef} />
           </div>
         )}
       </div>
-    </div>
-  );
-}
 
-/* ── Code view with line numbers ── */
-function CodeView({ path, content }: { path: string; content: string }) {
-  const ext = getExt(path.split("/").pop() ?? path);
-  let html: string;
-  try {
-    html = hljs.getLanguage(ext)
-      ? hljs.highlight(content, { language: ext }).value
-      : hljs.highlightAuto(content).value;
-  } catch {
-    html = content.replace(
-      /[&<>]/g,
-      (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c] as string,
-    );
-  }
-  const lineCount = content.split("\n").length;
-  return (
-    <div className="flex text-[13px] font-mono leading-relaxed py-4 min-h-full">
-      {/* Line numbers */}
+      {/* ── Composer ── */}
       <div
-        className="select-none text-right pr-4 pl-3 text-muted/25 border-r border-line/20 shrink-0"
-        style={{ minWidth: `${String(lineCount).length * 0.6 + 2.5}rem` }}
-        aria-hidden
+        className="shrink-0 bg-gradient-to-t from-bg via-bg to-transparent pt-2 pb-4"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => { e.preventDefault(); for (const f of Array.from(e.dataTransfer.files)) readFileIntoInput(f); }}
       >
-        {Array.from({ length: lineCount }, (_, i) => (
-          <div key={i} className="leading-relaxed">{i + 1}</div>
-        ))}
+        <div className="max-w-3xl mx-auto px-5">
+
+          {/* Repo file picker panel */}
+          {repoOpen && (
+            <div
+              ref={repoRef}
+              className="mb-2 bg-surface border border-line/80 rounded-2xl overflow-hidden shadow-2xl shadow-black/30 animate-fade-in"
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-line/60">
+                <div className="flex items-center gap-2">
+                  <FolderGit2 size={15} className="text-brand" />
+                  <span className="text-sm font-semibold">
+                    {repo ? `${repo.owner}/${repo.repo}` : "Depo bağlı değil"}
+                  </span>
+                  {repo && (
+                    <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-cyan/10 text-cyan font-mono border border-cyan/20">
+                      {repo.branch}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={connectRepo}
+                    disabled={connecting}
+                    className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink hover:border-brand/40 transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw size={11} className={connecting ? "animate-spin" : ""} />
+                    {connecting ? "Bağlanıyor…" : "Yenile"}
+                  </button>
+                  <button onClick={() => setRepoOpen(false)} className="p-1 rounded-lg text-muted hover:text-ink transition-colors">
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+
+              {!tree ? (
+                <div className="py-8 text-center px-6">
+                  <FolderGit2 size={28} className="mx-auto mb-3 text-muted/20" />
+                  <p className="text-sm text-muted/60 mb-3">
+                    {connecting ? "Depo yükleniyor…" : "Ayarlar → GitHub'dan depo ekle"}
+                  </p>
+                  {!connecting && (
+                    <button
+                      onClick={() => setSettingsOpen(true)}
+                      className="text-xs px-3 py-1.5 rounded-xl bg-brand/10 border border-brand/30 text-brand font-medium hover:bg-brand/20 transition-colors"
+                    >
+                      Ayarları aç
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Search */}
+                  <div className="px-3 py-2 border-b border-line/40">
+                    <div className="relative">
+                      <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted/40" />
+                      <input
+                        value={repoSearch}
+                        onChange={(e) => setRepoSearch(e.target.value)}
+                        placeholder="Dosya ara…"
+                        autoFocus
+                        className="w-full bg-bgsoft/60 rounded-xl pl-8 pr-3 py-2 text-xs outline-none focus:ring-1 ring-brand/40 placeholder:text-muted/35"
+                      />
+                    </div>
+                  </div>
+                  {/* File list */}
+                  <div className="max-h-52 overflow-y-auto p-2">
+                    {filteredFiles.length === 0 ? (
+                      <p className="text-center text-xs text-muted/40 py-4">Sonuç yok</p>
+                    ) : (
+                      <>
+                        <p className="text-[10px] text-muted/40 px-2 py-1">
+                          {filteredFiles.length} dosya · tıkla → bağlam olarak ekle
+                        </p>
+                        {filteredFiles.slice(0, 80).map((f) => {
+                          const isAttached = attachedFiles.some((a) => a.path === f.path);
+                          const isFetching = fetchingFile === f.path;
+                          return (
+                            <button
+                              key={f.path}
+                              onClick={() => attachRepoFile(f)}
+                              disabled={isFetching}
+                              className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs text-left transition-colors ${
+                                isAttached
+                                  ? "bg-brand/10 text-brand border border-brand/20"
+                                  : "text-muted/80 hover:text-ink hover:bg-bgsoft/60"
+                              }`}
+                            >
+                              {isFetching ? (
+                                <RefreshCw size={11} className="animate-spin shrink-0 text-brand" />
+                              ) : (
+                                <FileIcon name={f.name} size={11} />
+                              )}
+                              <span className="truncate flex-1">{f.path}</span>
+                              {isAttached && <span className="text-[10px] font-bold">✓</span>}
+                            </button>
+                          );
+                        })}
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Attached file chips */}
+          {attachedFiles.length > 0 && (
+            <div className="flex gap-2 mb-2.5 flex-wrap">
+              {attachedFiles.map((f) => (
+                <div
+                  key={f.path}
+                  className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-xl bg-brand/10 border border-brand/25 text-brand"
+                >
+                  <FileIcon name={f.path.split("/").pop() ?? ""} size={11} />
+                  <span className="max-w-[180px] truncate font-mono">{f.path.split("/").pop()}</span>
+                  <button
+                    onClick={() => setAttachedFiles((prev) => prev.filter((x) => x.path !== f.path))}
+                    className="text-brand/60 hover:text-red transition-colors"
+                  >
+                    <X size={10} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Pending images */}
+          {pendingImages.length > 0 && (
+            <div className="flex gap-2 mb-2.5 flex-wrap">
+              {pendingImages.map((img, i) => (
+                <div key={i} className="relative group/img">
+                  <img src={img} alt="" className="w-16 h-16 object-cover rounded-xl border border-line shadow-sm" />
+                  <button
+                    onClick={() => setPendingImages((p) => p.filter((_, j) => j !== i))}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red text-white grid place-items-center text-xs opacity-0 group-hover/img:opacity-100 transition-opacity"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Input box */}
+          <div className="flex items-end gap-2 bg-surface border border-line rounded-2xl px-3 py-2.5 focus-within:border-brand/50 focus-within:shadow-[0_0_0_3px_rgba(124,92,255,0.08)] transition-all duration-200">
+            <div className="flex items-center gap-0.5 shrink-0">
+              <button
+                onClick={() => fileRef.current?.click()}
+                title="Dosya ekle"
+                className="text-muted hover:text-ink hover:bg-bgsoft p-1.5 rounded-lg transition-colors"
+              >
+                <Paperclip size={16} />
+              </button>
+              <button
+                onClick={() => imgRef.current?.click()}
+                title="Görsel ekle"
+                className="text-muted hover:text-ink hover:bg-bgsoft p-1.5 rounded-lg transition-colors"
+              >
+                <ImageIcon size={16} />
+              </button>
+              <button
+                onClick={() => setSearchOn(!searchOn)}
+                title={searchOn ? "Web arama açık" : "Web arama kapalı"}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  searchOn ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
+                }`}
+              >
+                <Globe size={16} />
+              </button>
+              <button
+                onClick={() => useStore.getState().setPromptLibraryOpen(true)}
+                title="Şablon kütüphanesi"
+                className="text-muted hover:text-ink hover:bg-bgsoft p-1.5 rounded-lg transition-colors"
+              >
+                <BookOpen size={16} />
+              </button>
+              {/* Repo button */}
+              <button
+                onClick={() => setRepoOpen((o) => !o)}
+                title="Depo dosyalarını bağlam olarak ekle"
+                className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg font-semibold transition-colors ${
+                  repoOpen || attachedFiles.length > 0
+                    ? "bg-brand/10 text-brand"
+                    : "text-muted hover:text-ink hover:bg-bgsoft"
+                }`}
+              >
+                <FolderGit2 size={15} />
+                {attachedFiles.length > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-brand text-white text-[10px] font-bold grid place-items-center">
+                    {attachedFiles.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            <input ref={fileRef} type="file" accept=".txt,.md,.js,.ts,.tsx,.jsx,.py,.json,.yaml,.yml,.toml,.html,.css,.sql,.sh,.go,.rs,.java,.c,.cpp,.h,.rb,.php" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) readFileIntoInput(f); e.target.value = ""; }} />
+            <input ref={imgRef} type="file" accept="image/*" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) readFileIntoInput(f); e.target.value = ""; }} />
+
+            <textarea
+              ref={taRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+              }}
+              rows={1}
+              placeholder={attachedFiles.length > 0 ? `${attachedFiles.length} dosya eklendi — sorunuzu yazın…` : "Kodunuz hakkında sorun, hata düzeltin, refactor isteyin…"}
+              className="flex-1 bg-transparent resize-none outline-none text-[15px] leading-relaxed max-h-[200px] py-1.5 placeholder:text-muted/45"
+            />
+
+            {streaming ? (
+              <button onClick={stop} className="shrink-0 w-9 h-9 rounded-xl bg-red hover:bg-red/80 text-white grid place-items-center transition-colors" title="Durdur">
+                <Square size={14} />
+              </button>
+            ) : (
+              <button
+                onClick={send}
+                disabled={!input.trim() && pendingImages.length === 0 && attachedFiles.length === 0}
+                className="shrink-0 w-9 h-9 rounded-xl bg-brand hover:bg-branddim text-white grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <ArrowUp size={18} />
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center justify-center gap-2 mt-2 text-[11px] text-muted/50">
+            {searchOn && <><span className="text-brand font-medium">Web arama açık</span><span>·</span></>}
+            <span>craft.ai Coder — AI destekli geliştirici asistanı</span>
+          </div>
+        </div>
       </div>
-      {/* Highlighted code */}
-      <pre className="flex-1 overflow-x-auto px-4 pb-8">
-        <code
-          className="hljs bg-transparent"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      </pre>
-    </div>
-  );
-}
-
-/* ── Tree directory (with fold/unfold) ── */
-function TreeDir({
-  node, root, activePath, onOpen,
-}: {
-  node: TreeNode; root?: boolean; activePath: string | null; onOpen: (path: string) => void;
-}) {
-  const dirs = Object.keys(node.dirs).sort();
-  const files = node.files.slice().sort((a, b) => a.name.localeCompare(b.name));
-
-  return (
-    <div className={root ? "" : "ml-2 border-l border-line/25 pl-1"}>
-      {dirs.map((name) => (
-        <TreeDirItem key={name} name={name} node={node.dirs[name]} activePath={activePath} onOpen={onOpen} />
-      ))}
-      {files.map((f) => (
-        <TreeFileBtn key={f.path} file={f} activePath={activePath} onOpen={onOpen} />
-      ))}
-    </div>
-  );
-}
-
-function TreeDirItem({
-  name, node, activePath, onOpen,
-}: {
-  name: string; node: TreeNode; activePath: string | null; onOpen: (path: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-muted hover:text-ink hover:bg-bgsoft/60 transition-colors text-left"
-      >
-        {open
-          ? <FolderOpen size={12} className="shrink-0 text-yellow-500/70" />
-          : <Folder size={12} className="shrink-0 text-muted/50" />}
-        <span className="truncate font-medium">{name}</span>
-        <ChevronDown size={10} className={`ml-auto shrink-0 text-muted/30 transition-transform ${open ? "" : "-rotate-90"}`} />
-      </button>
-      {open && (
-        <TreeDir node={node} activePath={activePath} onOpen={onOpen} />
-      )}
-    </div>
-  );
-}
-
-function TreeFileBtn({
-  file, activePath, onOpen,
-}: {
-  file: TreeFile; activePath: string | null; onOpen: (path: string) => void;
-}) {
-  const isActive = activePath === file.path;
-  return (
-    <button
-      onClick={() => onOpen(file.path)}
-      title={file.path}
-      className={`w-full flex items-center gap-1.5 px-2 py-1 pl-3 rounded-lg text-xs transition-colors text-left ${
-        isActive
-          ? "bg-brand/12 text-brand border border-brand/20"
-          : "text-muted/80 hover:bg-bgsoft/60 hover:text-ink"
-      }`}
-    >
-      <FileIcon name={file.name} />
-      <span className="truncate">{file.name}</span>
-    </button>
-  );
-}
-
-/* ── Flat search results ── */
-function getAllFiles(node: TreeNode): TreeFile[] {
-  return [
-    ...node.files,
-    ...Object.values(node.dirs).flatMap(getAllFiles),
-  ];
-}
-
-function FlatSearch({
-  node, filter, activePath, onOpen,
-}: {
-  node: TreeNode; filter: string; activePath: string | null; onOpen: (path: string) => void;
-}) {
-  const lower = filter.toLowerCase();
-  const results = getAllFiles(node).filter((f) =>
-    f.name.toLowerCase().includes(lower) || f.path.toLowerCase().includes(lower),
-  );
-  if (results.length === 0) {
-    return (
-      <div className="text-center py-6">
-        <p className="text-xs text-muted/40">Eşleşme yok</p>
-      </div>
-    );
-  }
-  return (
-    <div>
-      <p className="text-[10px] text-muted/40 px-2 py-1">{results.length} sonuç</p>
-      {results.map((f) => (
-        <TreeFileBtn key={f.path} file={f} activePath={activePath} onOpen={onOpen} />
-      ))}
     </div>
   );
 }
