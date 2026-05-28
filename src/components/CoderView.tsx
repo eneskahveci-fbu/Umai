@@ -8,6 +8,7 @@ import {
   BookmarkPlus,
   Brain,
   ChevronDown,
+  GitBranch,
   ChevronRight,
   Code2,
   DollarSign,
@@ -32,12 +33,14 @@ import {
   Zap,
 } from "lucide-react";
 import { EditorPanel, detectLanguage, type EditorFile } from "./EditorPanel";
+import { GitPanel } from "./GitPanel";
 import { useStore } from "@/lib/store";
 import { MessageBubble } from "./MessageBubble";
 import { SlashMenu } from "./SlashMenu";
 import { MentionMenu } from "./MentionMenu";
 import {
   buildTree,
+  fetchAllFiles,
   fetchFileContent,
   fetchRepoTree,
   parseRepo,
@@ -241,6 +244,8 @@ export function CoderView() {
   const [fetchingFile, setFetchingFile] = useState<string | null>(null);
   const [editorFile, setEditorFile] = useState<EditorFile | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [gitPanelOpen, setGitPanelOpen] = useState(false);
+  const [loadingAll, setLoadingAll] = useState(false);
   const [listening, setListening] = useState(false);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -409,6 +414,7 @@ export function CoderView() {
       agent
         ? agent.systemPrompt
         : "Sen uzman bir yazılım geliştiricisisin. Claude Code tarzında çalış: kullanıcının kod tabanını anla, dosya içeriklerini incele, sorunlara adım adım yaklaş. Kod yazarken best practice'leri uygula, okunabilir ve sürdürülebilir çözümler sun.",
+      config.rulesFile?.trim() ? `## Proje Kuralları (.rules)\n${config.rulesFile.trim()}` : "",
     ].filter(Boolean).join("\n\n");
 
     store.pushMessage({ role: "assistant", content: "" });
@@ -503,6 +509,18 @@ export function CoderView() {
       coderAbort = null;
       useStore.getState().setStreaming(false);
       await useStore.getState().persistCurrent();
+      if (useStore.getState().config.soundEnabled) {
+        try {
+          const ctx = new AudioContext();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.frequency.setValueAtTime(880, ctx.currentTime);
+          gain.gain.setValueAtTime(0.1, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+          osc.start(); osc.stop(ctx.currentTime + 0.3);
+        } catch { /* yoksay */ }
+      }
       fetchFollowUps();
     }
   }, [config.systemPrompt, fetchFollowUps]);
@@ -645,6 +663,13 @@ export function CoderView() {
           >
             <PenLine size={14} />
           </button>
+          <button
+            onClick={() => setGitPanelOpen((v) => !v)}
+            title="Git işlemleri (dal, PR)"
+            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${gitPanelOpen ? "text-purple-400 bg-purple-400/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
+          >
+            <GitBranch size={14} />
+          </button>
         </div>
       </div>
 
@@ -659,6 +684,31 @@ export function CoderView() {
                 {repo ? `${repo.owner}/${repo.repo}` : "Dosyalar"}
               </span>
               <div className="flex items-center gap-1">
+                {repo && tree && (
+                  <button
+                    onClick={async () => {
+                      setLoadingAll(true);
+                      try {
+                        const activeGithub = useStore.getState().activeGithub();
+                        const allItems = [...Object.values(tree.dirs), ...tree.files].length > 0
+                          ? await fetchAllFiles(repo.owner, repo.repo, repo.branch,
+                              [...(useStore.getState().tree ? getTreeItems(useStore.getState().tree!) : [])],
+                              activeGithub?.token)
+                          : [];
+                        if (allItems.length > 0) {
+                          setAttachedFiles(allItems.map(f => ({ path: f.path, content: f.content })));
+                          addToast(`${allItems.length} dosya yüklendi`, "success");
+                        }
+                      } catch { addToast("Yükleme başarısız", "error"); }
+                      finally { setLoadingAll(false); }
+                    }}
+                    disabled={loadingAll}
+                    title="Tüm dosyaları bağlama ekle (max 50)"
+                    className="text-muted/40 hover:text-brand transition-colors disabled:opacity-30"
+                  >
+                    <ArrowDown size={10} className={loadingAll ? "animate-bounce" : ""} />
+                  </button>
+                )}
                 {repo && (
                   <button onClick={connectRepo} disabled={connecting} title="Yenile" className="text-muted/40 hover:text-brand transition-colors">
                     <RefreshCw size={10} className={connecting ? "animate-spin" : ""} />
@@ -1080,9 +1130,19 @@ export function CoderView() {
             />
           </div>
         )}
+        {gitPanelOpen && (
+          <GitPanel onClose={() => setGitPanelOpen(false)} />
+        )}
       </div>
     </div>
   );
+}
+
+function getTreeItems(node: import("@/lib/types").TreeNode): { path: string; type: string }[] {
+  const items: { path: string; type: string }[] = [];
+  for (const f of node.files) items.push({ path: f.path, type: "blob" });
+  for (const child of Object.values(node.dirs)) items.push(...getTreeItems(child));
+  return items;
 }
 
 /* ── Token + cost rozeti ── */

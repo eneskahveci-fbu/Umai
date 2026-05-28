@@ -39,8 +39,13 @@ export default function AppPage() {
   }, [setUser, loadChats]);
 
   useEffect(() => {
-    const theme = useStore.getState().config.theme;
-    document.documentElement.classList.toggle("light", theme === "light");
+    const { theme, accentColor, fontScale } = useStore.getState().config;
+    const cl = document.documentElement.classList;
+    cl.toggle("light", theme === "light");
+    cl.remove("accent-purple", "accent-blue", "accent-green", "accent-orange");
+    cl.add(`accent-${accentColor ?? "purple"}`);
+    cl.remove("font-sm", "font-base", "font-lg");
+    cl.add(`font-${fontScale ?? "base"}`);
   }, []);
 
   useEffect(() => {
