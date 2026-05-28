@@ -18,13 +18,25 @@ export const PRESETS: Record<Provider, Preset> = {
     label: "🐋 DeepSeek",
     baseUrl: "https://api.deepseek.com/v1",
     model: "deepseek-chat",
-    keyHint: "DeepSeek anahtarı (sk-...)",
+    keyHint: "sk-...",
   },
   openrouter: {
     label: "🔀 OpenRouter",
     baseUrl: "https://openrouter.ai/api/v1",
     model: "meta-llama/llama-3.1-70b-instruct",
     keyHint: "OpenRouter anahtarı (sk-or-...)",
+  },
+  groq: {
+    label: "Groq (Ücretsiz)",
+    baseUrl: "https://api.groq.com/openai/v1",
+    model: "deepseek-r1-distill-llama-70b",
+    keyHint: "gsk_...",
+  },
+  gemini: {
+    label: "Google Gemini (Ücretsiz)",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+    model: "gemini-2.0-flash",
+    keyHint: "AIza...",
   },
   custom: {
     label: "⚙️ Özel (manuel URL)",
@@ -79,6 +91,9 @@ export const DEFAULT_CONFIG: Config = {
   webSearch: false,
   cliMode: false,
   autoTerminal: false,
+  fontScale: "base",
+  soundEnabled: false,
+  accentColor: "purple",
   maxContext: 8192,
 };
 

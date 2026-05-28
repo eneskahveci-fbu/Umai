@@ -35,11 +35,12 @@ export function SettingsModal() {
   const saveConfig = useStore((s) => s.saveConfig);
   const toggleTheme = useStore((s) => s.toggleTheme);
   const addToast = useStore((s) => s.addToast);
+  const chats = useStore((s) => s.chats);
   const addMemory = useStore((s) => s.addMemory);
   const removeMemory = useStore((s) => s.removeMemory);
   const updateProject = useStore((s) => s.updateProject);
 
-  const [tab, setTab] = useState<"model" | "github" | "general">("model");
+  const [tab, setTab] = useState<"model" | "github" | "general" | "advanced">("model");
   const [provider, setProvider] = useState<Provider>("hf");
   const [label, setLabel] = useState("");
   const [baseUrl, setBaseUrl] = useState(PRESETS.hf.baseUrl);
@@ -102,7 +103,7 @@ export function SettingsModal() {
         </div>
 
         <div className="flex gap-1 mb-5 border-b border-line">
-          {([["model", "Model"], ["github", "GitHub"], ["general", "Genel"]] as const).map(([key, lbl]) => (
+          {([["model", "Model"], ["github", "GitHub"], ["general", "Genel"], ["advanced", "Gelişmiş"]] as const).map(([key, lbl]) => (
             <button key={key} onClick={() => setTab(key)} className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${tab === key ? "border-brand text-brand" : "border-transparent text-muted hover:text-ink"}`}>{lbl}</button>
           ))}
         </div>
@@ -334,6 +335,98 @@ export function SettingsModal() {
                   <div key={key} className="flex items-center gap-3">
                     <kbd className="px-2 py-0.5 rounded bg-bgsoft border border-line font-mono text-[11px] text-muted">{key}</kbd>
                     <span className="text-muted">{desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* GELİŞMİŞ */}
+        {tab === "advanced" && (
+          <section className="flex flex-col gap-5">
+            {/* Yazı tipi boyutu */}
+            <div>
+              <h4 className="text-sm font-bold mb-2">Kod Yazı Tipi Boyutu</h4>
+              <div className="flex gap-2">
+                {(["sm", "base", "lg"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => {
+                      saveConfig({ ...config, fontScale: s });
+                      document.documentElement.className = document.documentElement.className
+                        .replace(/font-\w+/g, "")
+                        .concat(` font-${s}`);
+                    }}
+                    className={`flex-1 py-2 rounded-lg border text-sm transition-colors ${
+                      config.fontScale === s ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
+                    }`}
+                  >
+                    {s === "sm" ? "Küçük" : s === "base" ? "Normal" : "Büyük"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Vurgu rengi */}
+            <div>
+              <h4 className="text-sm font-bold mb-2">Vurgu Rengi</h4>
+              <div className="flex gap-2">
+                {([
+                  { k: "purple", label: "Mor", color: "bg-purple-500" },
+                  { k: "blue", label: "Mavi", color: "bg-blue-500" },
+                  { k: "green", label: "Yeşil", color: "bg-green-500" },
+                  { k: "orange", label: "Turuncu", color: "bg-orange-500" },
+                ] as { k: "purple" | "blue" | "green" | "orange"; label: string; color: string }[]).map(({ k, label, color }) => (
+                  <button
+                    key={k}
+                    onClick={() => {
+                      saveConfig({ ...config, accentColor: k });
+                      const cls = document.documentElement.classList;
+                      cls.remove("accent-purple", "accent-blue", "accent-green", "accent-orange");
+                      cls.add(`accent-${k}`);
+                    }}
+                    className={`flex-1 py-2 rounded-lg border text-xs flex items-center justify-center gap-1.5 transition-colors ${
+                      config.accentColor === k ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
+                    }`}
+                  >
+                    <span className={`w-2.5 h-2.5 rounded-full ${color} shrink-0`} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Bildirim sesi */}
+            <div>
+              <h4 className="text-sm font-bold mb-2">Bildirim Sesi</h4>
+              <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={config.soundEnabled}
+                  onChange={() => saveConfig({ ...config, soundEnabled: !config.soundEnabled })}
+                  className="accent-brand"
+                />
+                <div>
+                  <div className="text-sm font-semibold">AI yanıt sesini aç</div>
+                  <div className="text-xs text-muted mt-0.5">Yanıt tamamlanınca kısa bir bip sesi çalar.</div>
+                </div>
+              </label>
+            </div>
+
+            {/* İstatistikler */}
+            <div>
+              <h4 className="text-sm font-bold mb-2">İstatistikler</h4>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: "Toplam Oturum", value: chats.length },
+                  { label: "Toplam Mesaj", value: chats.reduce((n, c) => n + c.messages.length, 0) },
+                  { label: "Toplam Token (giriş)", value: chats.reduce((n, c) => n + (c.totalInTokens ?? 0), 0).toLocaleString() },
+                  { label: "Toplam Token (çıkış)", value: chats.reduce((n, c) => n + (c.totalOutTokens ?? 0), 0).toLocaleString() },
+                ].map(({ label, value }) => (
+                  <div key={label} className="bg-bgsoft border border-line rounded-xl px-3 py-2.5">
+                    <div className="text-xs text-muted">{label}</div>
+                    <div className="text-lg font-bold mt-0.5">{value}</div>
                   </div>
                 ))}
               </div>

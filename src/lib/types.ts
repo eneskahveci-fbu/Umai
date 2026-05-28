@@ -38,7 +38,7 @@ export interface Chat {
   totalOutTokens?: number;
 }
 
-export type Provider = "hf" | "deepseek" | "openrouter" | "custom";
+export type Provider = "hf" | "deepseek" | "openrouter" | "custom" | "groq" | "gemini";
 
 export interface ModelProfile {
   id: string;
@@ -99,6 +99,9 @@ export interface Config {
   webSearch: boolean;
   cliMode: boolean;
   autoTerminal: boolean;
+  fontScale: "sm" | "base" | "lg";
+  soundEnabled: boolean;
+  accentColor: "purple" | "blue" | "green" | "orange";
   maxContext: number;
 }
 
