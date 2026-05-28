@@ -5,7 +5,7 @@ import {
   Brain,
   Check,
   FolderGit2,
-  Github,
+  GitBranch,
   Moon,
   Pencil,
   Play,
@@ -170,7 +170,7 @@ export function SettingsModal() {
                         >
                           {isActive && <Check size={11} />}
                         </button>
-                        <Github size={13} className={isActive ? "text-brand" : "text-muted"} />
+                        <GitBranch size={13} className={isActive ? "text-brand" : "text-muted"} />
                         <span className="flex-1 text-sm font-semibold truncate">{a.username}</span>
                         {isActive && <span className="text-[10px] text-brand font-mono">aktif</span>}
                         <button onClick={() => removeGithub(a.id)} className="text-muted hover:text-red p-1 shrink-0"><Trash2 size={13} /></button>
