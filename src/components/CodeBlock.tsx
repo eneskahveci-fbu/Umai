@@ -20,7 +20,7 @@ export function CodeBlock({
     .replace(/hljs/g, "")
     .trim();
 
-  const isPreviewable = ["html", "svg", "htm"].includes(lang);
+  const isPreviewable = ["html", "svg", "htm", "mermaid"].includes(lang);
 
   const getText = () => preRef.current?.textContent || "";
 
@@ -33,8 +33,9 @@ export function CodeBlock({
   };
 
   const preview = () => {
+    const type = lang === "svg" ? "svg" : lang === "mermaid" ? "mermaid" : "html";
     useStore.getState().setArtifact({
-      type: lang === "svg" ? "svg" : "html",
+      type,
       content: getText(),
       title: `${lang.toUpperCase()} Önizleme`,
     });
