@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Keyboard, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 
@@ -41,6 +42,23 @@ const GROUPS: { title: string; items: Shortcut[] }[] = [
 export function KeyboardShortcuts() {
   const open = useStore((s) => s.shortcutsOpen);
   const setOpen = useStore((s) => s.setShortcutsOpen);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (
+        e.key === "?" &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !(e.target instanceof HTMLInputElement) &&
+        !(e.target instanceof HTMLTextAreaElement)
+      ) {
+        e.preventDefault();
+        useStore.getState().setShortcutsOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   if (!open) return null;
 

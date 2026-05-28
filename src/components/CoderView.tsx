@@ -44,6 +44,17 @@ import type { TreeFile, TreeNode } from "@/lib/types";
 import { AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agents";
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
 
+declare global {
+  interface SpeechRecognition {
+    lang: string; continuous: boolean; interimResults: boolean;
+    onresult: (e: SpeechRecognitionEvent) => void;
+    onerror: () => void; onend: () => void; start: () => void;
+  }
+  interface SpeechRecognitionEvent {
+    results: { 0: { 0: { transcript: string } } };
+  }
+}
+
 /* ─── helpers ─── */
 
 function ComposerButton({
