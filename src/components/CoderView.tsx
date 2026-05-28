@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ArrowDown,
   ArrowUp,
   BookOpen,
   ChevronDown,
   ChevronRight,
   Code2,
+  DollarSign,
   File,
   FolderGit2,
   FolderOpen,
@@ -17,6 +19,7 @@ import {
   Paperclip,
   RefreshCw,
   Search,
+  Sparkles,
   Square,
   Terminal,
   VenetianMask,
@@ -24,6 +27,8 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { MessageBubble } from "./MessageBubble";
+import { SlashMenu } from "./SlashMenu";
+import { MentionMenu } from "./MentionMenu";
 import {
   buildTree,
   fetchFileContent,
@@ -31,6 +36,8 @@ import {
   parseRepo,
 } from "@/lib/github";
 import type { TreeFile, TreeNode } from "@/lib/types";
+import { AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agents";
+import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
 
 /* ─── helpers ─── */
 
@@ -145,6 +152,11 @@ export function CoderView() {
 
   const [filesOpen, setFilesOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
+  const [activeAgent, setActiveAgent] = useState<Agent | null>(null);
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [slashQuery, setSlashQuery] = useState("");
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
 
   const [termLines, setTermLines] = useState<string[]>(["$ craft.ai — hazır. 'help' yazarak komut listesi"]);
   const [termInput, setTermInput] = useState("");
@@ -289,12 +301,22 @@ export function CoderView() {
     } catch { /* yoksay */ }
   }, []);
 
-  const callApi = useCallback(async () => {
+  const callApi = useCallback(async (overrideAgent?: Agent | null) => {
     const store = useStore.getState();
     const active = store.activeModel();
     if (!active) { store.setSettingsOpen(true); return; }
 
-    const apiMessages = (store.current()?.messages ?? []).map((m) => {
+    const chat = store.current();
+    const lastUserMsg = chat?.messages.findLast?.((m) => m.role === "user");
+    const messageAgentId = lastUserMsg?.agentId;
+    const agent =
+      overrideAgent !== undefined
+        ? overrideAgent
+        : messageAgentId
+        ? AGENTS.find((a) => a.id === messageAgentId) ?? null
+        : null;
+
+    const apiMessages = (chat?.messages ?? []).map((m) => {
       if (m.images?.length) {
         const content: unknown[] = m.images.map((img) => ({ type: "image_url", image_url: { url: img } }));
         content.push({ type: "text", text: m.content });
@@ -305,7 +327,9 @@ export function CoderView() {
 
     const coderSystemPrompt = [
       config.systemPrompt,
-      "Sen uzman bir yazılım geliştiricisisin. Claude Code tarzında çalış: kullanıcının kod tabanını anla, dosya içeriklerini incele, sorunlara adım adım yaklaş. Kod yazarken best practice'leri uygula, okunabilir ve sürdürülebilir çözümler sun.",
+      agent
+        ? agent.systemPrompt
+        : "Sen uzman bir yazılım geliştiricisisin. Claude Code tarzında çalış: kullanıcının kod tabanını anla, dosya içeriklerini incele, sorunlara adım adım yaklaş. Kod yazarken best practice'leri uygula, okunabilir ve sürdürülebilir çözümler sun.",
     ].filter(Boolean).join("\n\n");
 
     store.pushMessage({ role: "assistant", content: "" });
@@ -351,6 +375,12 @@ export function CoderView() {
         }
       }
       if (!full) useStore.getState().updateLastContent("_(Model boş yanıt döndürdü.)_");
+
+      /* token tahmini */
+      const inputText = apiMessages.map((m) => typeof m.content === "string" ? m.content : "").join("\n");
+      const tokenIn = estimateTokens(inputText) + estimateTokens(coderSystemPrompt);
+      const tokenOut = estimateTokens(full);
+      useStore.getState().updateLastTokens(tokenIn, tokenOut);
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
         useStore.getState().updateLastContent(`**Hata:** ${(err as Error).message}\n\n_Anahtar/model doğru mu? Ayarlardan kontrol et._`);
@@ -370,19 +400,40 @@ export function CoderView() {
     if (!store.activeModel()) { store.setSettingsOpen(true); return; }
     if (!store.currentId) store.newChat(incognito);
 
-    let fullText = text;
+    /* slash command algıla */
+    const detected = findAgentByCommand(text);
+    const agent = detected ?? activeAgent;
+    const userText = detected ? stripCommand(text) : text;
+
+    let fullText = userText;
     if (attachedFiles.length > 0) {
       const ctx = attachedFiles
         .map((f) => `\`${f.path}\`:\n\`\`\`${getExt(f.path)}\n${f.content.slice(0, 12000)}\n\`\`\``)
         .join("\n\n");
-      fullText = ctx + (text ? "\n\n" + text : "");
+      fullText = ctx + (userText ? "\n\n" + userText : "");
     }
 
-    store.pushMessage({ role: "user", content: fullText, images: pendingImages.length ? [...pendingImages] : undefined });
-    store.maybeSetTitle(text || attachedFiles[0]?.path || "Kod analizi");
+    store.pushMessage({
+      role: "user",
+      content: fullText,
+      images: pendingImages.length ? [...pendingImages] : undefined,
+      agentId: agent?.id,
+    });
+    store.maybeSetTitle(userText || attachedFiles[0]?.path || agent?.label || "Kod analizi");
     setInput("");
     setPendingImages([]);
     setAttachedFiles([]);
+    setActiveAgent(null);
+    await callApi(agent);
+  };
+
+  const continueAnswer = async () => {
+    if (streaming) return;
+    const store = useStore.getState();
+    if (!store.activeModel()) { store.setSettingsOpen(true); return; }
+    const chat = store.current();
+    if (!chat || chat.messages.length === 0) return;
+    store.pushMessage({ role: "user", content: "Kaldığın yerden tam olarak devam et. Tekrarlama, baştan başlama." });
     await callApi();
   };
 
@@ -441,6 +492,11 @@ export function CoderView() {
         </div>
 
         <div className="flex-1 min-w-0" />
+
+        {/* Token + cost */}
+        {current && (current.totalInTokens || current.totalOutTokens) ? (
+          <UsageBadge chat={current} />
+        ) : null}
 
         <div className="flex items-center gap-1 shrink-0">
           {config.models.length > 0 ? (
@@ -629,6 +685,17 @@ export function CoderView() {
                     </div>
                   </div>
                 )}
+                {!streaming && messages.length > 0 && messages[messages.length - 1].role === "assistant" && messages[messages.length - 1].content.length > 200 && (
+                  <div className="flex justify-center mt-2 mb-3">
+                    <button
+                      onClick={continueAnswer}
+                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-line bg-surface hover:border-brand/50 hover:text-ink transition-colors text-muted"
+                      title="Cevap kısaldıysa kaldığı yerden devam ettir"
+                    >
+                      <ArrowDown size={11} /> Devam Et
+                    </button>
+                  </div>
+                )}
                 {!streaming && followUpSuggestions.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-3 mb-4">
                     {followUpSuggestions.map((s, i) => (
@@ -683,7 +750,65 @@ export function CoderView() {
 
           {/* Composer */}
           <div className="shrink-0 bg-gradient-to-t from-bg via-bg to-transparent pt-2 pb-4">
-            <div className="max-w-3xl mx-auto px-5">
+            <div className="max-w-3xl mx-auto px-5 relative">
+
+              {/* Slash menu */}
+              {slashOpen && (
+                <SlashMenu
+                  query={slashQuery}
+                  onSelect={(a) => {
+                    setActiveAgent(a);
+                    setInput("");
+                    setSlashOpen(false);
+                    taRef.current?.focus();
+                  }}
+                  onClose={() => setSlashOpen(false)}
+                />
+              )}
+
+              {/* Mention menu */}
+              {mentionOpen && attachedFiles.length > 0 && (
+                <MentionMenu
+                  query={mentionQuery}
+                  items={attachedFiles.map((f) => ({ path: f.path }))}
+                  onSelect={(item) => {
+                    const ta = taRef.current;
+                    if (!ta) return;
+                    const pos = ta.selectionStart;
+                    const before = input.slice(0, pos);
+                    const after = input.slice(pos);
+                    const atIdx = before.lastIndexOf("@");
+                    if (atIdx === -1) return;
+                    const newText = before.slice(0, atIdx) + `@${item.path} ` + after;
+                    setInput(newText);
+                    setMentionOpen(false);
+                    setTimeout(() => {
+                      ta.focus();
+                      const newPos = atIdx + item.path.length + 2;
+                      ta.setSelectionRange(newPos, newPos);
+                    }, 0);
+                  }}
+                  onClose={() => setMentionOpen(false)}
+                />
+              )}
+
+              {/* Active agent badge */}
+              {activeAgent && (
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-brand/10 border border-brand/30 text-brand text-xs">
+                    <span>{activeAgent.icon}</span>
+                    <code className="font-mono font-bold">{activeAgent.command}</code>
+                    <span className="text-brand/70">{activeAgent.label}</span>
+                    <button
+                      onClick={() => setActiveAgent(null)}
+                      className="hover:text-red transition-colors ml-1"
+                      title="Agent'ı kaldır"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Attached files */}
               {attachedFiles.length > 0 && (
@@ -726,6 +851,18 @@ export function CoderView() {
                     <BookOpen size={16} />
                   </button>
                   <button
+                    onClick={() => {
+                      setSlashQuery("/");
+                      setSlashOpen((o) => !o);
+                    }}
+                    title="Subagent seç ( / )"
+                    className={`p-1.5 rounded-lg transition-colors ${
+                      activeAgent || slashOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
+                    }`}
+                  >
+                    <Sparkles size={15} />
+                  </button>
+                  <button
                     onClick={() => setFilesOpen((o) => !o)}
                     title="Depo dosyaları"
                     className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg font-semibold transition-colors ${
@@ -747,10 +884,42 @@ export function CoderView() {
                 <textarea
                   ref={taRef}
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setInput(v);
+                    const pos = e.target.selectionStart;
+                    const before = v.slice(0, pos);
+
+                    /* slash detection — only at line start */
+                    const slashMatch = before.match(/(^|\n)(\/\w*)$/);
+                    if (slashMatch) {
+                      setSlashQuery(slashMatch[2]);
+                      setSlashOpen(true);
+                    } else {
+                      setSlashOpen(false);
+                    }
+
+                    /* mention detection */
+                    const mentionMatch = before.match(/(^|\s)@(\S*)$/);
+                    if (mentionMatch && attachedFiles.length > 0) {
+                      setMentionQuery(mentionMatch[2]);
+                      setMentionOpen(true);
+                    } else {
+                      setMentionOpen(false);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (slashOpen || mentionOpen) return;
+                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+                  }}
                   rows={1}
-                  placeholder={attachedFiles.length > 0 ? `${attachedFiles.length} dosya eklendi — sorunu yaz…` : "Kodun hakkında sor, hata ayıkla, refactor iste…"}
+                  placeholder={
+                    activeAgent
+                      ? activeAgent.placeholder
+                      : attachedFiles.length > 0
+                      ? `${attachedFiles.length} dosya eklendi — sor veya / yaz…`
+                      : "Sor, / ile agent seç, @ ile dosya mention…"
+                  }
                   className="flex-1 bg-transparent resize-none outline-none text-[15px] leading-relaxed max-h-[200px] py-1.5 placeholder:text-muted/45"
                 />
 
@@ -771,12 +940,39 @@ export function CoderView() {
 
               <div className="flex items-center justify-center gap-2 mt-2 text-[11px] text-muted/50">
                 {searchOn && <><span className="text-brand font-medium">Web arama açık</span><span>·</span></>}
-                <span>craft.ai coder — Claude Code tarzı asistan</span>
+                {activeAgent && <><span className="text-brand font-medium">{activeAgent.command}</span><span>·</span></>}
+                <span>/ ile agent · @ ile dosya · craft.ai coder</span>
               </div>
             </div>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── Token + cost rozeti ── */
+function UsageBadge({ chat }: { chat: { totalInTokens?: number; totalOutTokens?: number } }) {
+  const config = useStore((s) => s.config);
+  const tokenIn = chat.totalInTokens ?? 0;
+  const tokenOut = chat.totalOutTokens ?? 0;
+  const total = tokenIn + tokenOut;
+  const activeModel = config.models.find((m) => m.id === config.activeModelId);
+  const cost = activeModel ? calculateCost(activeModel.model, tokenIn, tokenOut) : null;
+  const hasPrice = activeModel ? getModelPrice(activeModel.model) !== null : false;
+
+  return (
+    <div
+      className="hidden md:flex items-center gap-1.5 text-[10px] text-muted/70 font-mono px-2 py-1 rounded-lg border border-line/40 mr-1"
+      title={`Girdi: ${tokenIn.toLocaleString()} · Çıktı: ${tokenOut.toLocaleString()} token`}
+    >
+      <span>{total.toLocaleString()} tok</span>
+      {cost !== null && hasPrice && (
+        <>
+          <span className="text-muted/40">·</span>
+          <span className="text-brand/80">{formatCost(cost)}</span>
+        </>
+      )}
     </div>
   );
 }

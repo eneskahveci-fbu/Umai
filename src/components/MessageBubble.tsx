@@ -7,6 +7,7 @@ import rehypeHighlight from "rehype-highlight";
 import { Check, Copy, Pencil, RefreshCw, X } from "lucide-react";
 import type { ChatMessage } from "@/lib/types";
 import { CodeBlock } from "./CodeBlock";
+import { AGENTS } from "@/lib/agents";
 
 function ActionBtn({ onClick, icon, label }: { onClick: () => void; icon: React.ReactNode; label: string }) {
   return (
@@ -71,6 +72,17 @@ export function MessageBubble({
         {isUser ? "S" : "✦"}
       </div>
       <div className="flex-1 min-w-0 pt-0.5">
+        {/* Agent rozeti */}
+        {message.agentId && (() => {
+          const agent = AGENTS.find((a) => a.id === message.agentId);
+          if (!agent) return null;
+          return (
+            <div className="inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-md bg-brand/10 border border-brand/25 text-brand/90 font-mono mb-2">
+              <span>{agent.icon}</span>
+              <span>{agent.command}</span>
+            </div>
+          );
+        })()}
         {/* Görseller */}
         {message.images?.map((img, i) => (
           <img

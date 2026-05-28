@@ -4,6 +4,9 @@ export interface ChatMessage {
   role: Role;
   content: string;
   images?: string[];
+  agentId?: string;
+  tokenIn?: number;
+  tokenOut?: number;
 }
 
 export interface Chat {
@@ -13,6 +16,8 @@ export interface Chat {
   created_at: number;
   incognito?: boolean;
   projectId?: string;
+  totalInTokens?: number;
+  totalOutTokens?: number;
 }
 
 export type Provider = "hf" | "deepseek" | "openrouter" | "custom";

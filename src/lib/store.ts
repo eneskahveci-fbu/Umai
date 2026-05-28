@@ -105,6 +105,8 @@ interface StoreState {
   current: () => Chat | null;
   pushMessage: (m: ChatMessage) => void;
   updateLastContent: (content: string) => void;
+  updateLastTokens: (tokenIn: number, tokenOut: number) => void;
+  setLastAgentId: (agentId: string | undefined) => void;
   popLastMessage: () => void;
   editMessageAt: (index: number, content: string) => void;
   truncateAfter: (index: number) => void;
@@ -144,6 +146,14 @@ interface StoreState {
   // command palette
   commandPaletteOpen: boolean;
   setCommandPaletteOpen: (b: boolean) => void;
+
+  // keyboard shortcuts overlay
+  shortcutsOpen: boolean;
+  setShortcutsOpen: (b: boolean) => void;
+
+  // onboarding
+  onboardingDone: boolean;
+  setOnboardingDone: (b: boolean) => void;
 
   // compare view
   compareModelA: string | null;
@@ -387,6 +397,39 @@ export const useStore = create<StoreState>()((set, get) => ({
       }),
     })),
 
+  updateLastTokens: (tokenIn, tokenOut) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const messages = c.messages.slice();
+        if (messages.length) {
+          messages[messages.length - 1] = {
+            ...messages[messages.length - 1],
+            tokenIn,
+            tokenOut,
+          };
+        }
+        return {
+          ...c,
+          messages,
+          totalInTokens: (c.totalInTokens ?? 0) + tokenIn,
+          totalOutTokens: (c.totalOutTokens ?? 0) + tokenOut,
+        };
+      }),
+    })),
+
+  setLastAgentId: (agentId) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const messages = c.messages.slice();
+        if (messages.length) {
+          messages[messages.length - 1] = { ...messages[messages.length - 1], agentId };
+        }
+        return { ...c, messages };
+      }),
+    })),
+
   popLastMessage: () =>
     set((s) => ({
       chats: s.chats.map((c) =>
@@ -498,6 +541,19 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   commandPaletteOpen: false,
   setCommandPaletteOpen: (b) => set({ commandPaletteOpen: b }),
+
+  shortcutsOpen: false,
+  setShortcutsOpen: (b) => set({ shortcutsOpen: b }),
+
+  onboardingDone:
+    typeof window !== "undefined" && localStorage.getItem("craftai_onboarded") === "1",
+  setOnboardingDone: (b) => {
+    if (typeof window !== "undefined") {
+      if (b) localStorage.setItem("craftai_onboarded", "1");
+      else localStorage.removeItem("craftai_onboarded");
+    }
+    set({ onboardingDone: b });
+  },
 
   compareModelA: null,
   compareModelB: null,

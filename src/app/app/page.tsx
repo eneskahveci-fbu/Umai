@@ -8,6 +8,8 @@ import { PromptLibrary } from "@/components/PromptLibrary";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { Onboarding } from "@/components/Onboarding";
+import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 
@@ -50,6 +52,7 @@ export default function AppPage() {
       if (mod && e.key === ",") { e.preventDefault(); useStore.getState().setSettingsOpen(true); }
       if (mod && e.key === "k") { e.preventDefault(); useStore.getState().setCommandPaletteOpen(true); }
       if (mod && e.key === "b") { e.preventDefault(); useStore.getState().setSidebarOpen(!useStore.getState().sidebarOpen); }
+      if (mod && e.key === "/") { e.preventDefault(); useStore.getState().setShortcutsOpen(!useStore.getState().shortcutsOpen); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -78,6 +81,8 @@ export default function AppPage() {
         <SettingsModal />
         <PromptLibrary />
         <CommandPalette />
+        <KeyboardShortcuts />
+        <Onboarding />
         <ToastContainer />
       </div>
     </ErrorBoundary>
