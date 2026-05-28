@@ -220,8 +220,14 @@ function friendlyApiError(status: number, rawDetail: string, ctx?: { model?: str
     const hint = providerMsg ? `\n\nDetay: ${providerMsg.slice(0, 200)}` : "";
     return `⚠️ Geçersiz istek (${status})${tag}: Model adı, baseUrl veya sağlayıcı yanlış olabilir.${hint}`;
   }
-  if (status === 403)
-    return `🚷 Erişim reddedildi${tag}: Bu modele erişim izninin olduğundan emin ol (bazı modeller plan/onay gerektirir).`;
+  if (status === 403) {
+    const raw = rawDetail.toLowerCase();
+    if (raw.includes("host") && raw.includes("allow"))
+      return `🌍 Sağlayıcı bu sunucudan istek kabul etmiyor${tag}: Bu, yerel IP/proxy engelidir; canlı deployment'tan (Vercel) çalışır.`;
+    if (raw.includes("api key") || raw.includes("auth") || low.includes("api key") || low.includes("auth"))
+      return `🔑 API anahtarı geçersiz${tag}: Anahtarın doğru ve aktif olduğunu kontrol et.`;
+    return `🚷 Erişim reddedildi${tag}: Anahtar geçersiz veya modele erişim izni yok (bazı modeller plan/onay gerektirir).`;
+  }
   if (status >= 500)
     return `🛠️ Sağlayıcı sunucu hatası (${status})${tag}: Kısa süre sonra tekrar dene.`;
   if (providerMsg) return `Sağlayıcı hatası (${status})${tag}: ${providerMsg.slice(0, 300)}`;
