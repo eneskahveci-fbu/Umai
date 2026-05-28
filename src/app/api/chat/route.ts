@@ -211,14 +211,13 @@ function friendlyApiError(status: number, rawDetail: string, provider?: Provider
 
 export async function POST(req: Request) {
   if (!checkOrigin(req)) return new Response("Geçersiz origin.", { status: 403 });
-  
-  // IP adresi alırken daha güvenilir bir method
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() 
+
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
     || req.headers.get("x-real-ip")?.trim()
     || req.headers.get("cf-connecting-ip")?.trim()
     || "unknown";
-  
-  if (!checkRate(ip)) return new Response("İstek limiti aşıldı (30 req/min). Lütfen biraz bekle.", { status: 429 });
+
+  if (!checkRate(ip)) return new Response("İstek limiti aşıldı (120 req/min). Lütfen biraz bekle.", { status: 429 });
 
   let body: ChatRequest;
   try { body = await req.json(); } catch { return new Response("Geçersiz istek gövdesi", { status: 400 }); }
@@ -231,16 +230,11 @@ export async function POST(req: Request) {
   if (!model) return new Response("Model seçilmedi.", { status: 400 });
   if (!apiKey) return new Response("API anahtarı yok.", { status: 400 });
 
-  const upstreamHeaders: Record<string, string> = { "Content-Type": "application/json" };
-  
-  /* Provider-specific header setup */
-  if (provider === "gemini") {
-    /* Gemini API Key parametresi URL'de gider */
-    upstreamHeaders["Authorization"] = `Bearer ${apiKey}`;
-  } else {
-    upstreamHeaders["Authorization"] = `Bearer ${apiKey}`;
-  }
-  
+  const upstreamHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${apiKey}`,
+  };
+
   if (provider === "openrouter") {
     upstreamHeaders["HTTP-Referer"] = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://craft-coder.vercel.app";
     upstreamHeaders["X-Title"] = "craft.ai";
@@ -269,13 +263,8 @@ export async function POST(req: Request) {
   if (!body.tools || !body.repoCtx) {
     const messages = [{ role: "system", content: sysPrompt }, ...body.messages];
     let upstream: Response;
-    let url = `${baseUrl}/chat/completions`;
-    
-    /* Gemini API format adjustment */
-    if (provider === "gemini") {
-      url = `${baseUrl}/chat/completions?key=${apiKey}`;
-    }
-    
+    const url = `${baseUrl}/chat/completions`;
+
     try {
       upstream = await fetch(url, {
         method: "POST", headers: upstreamHeaders,
@@ -304,15 +293,10 @@ export async function POST(req: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       const MAX_ROUNDS = 6;
+      const url = `${baseUrl}/chat/completions`;
       for (let round = 0; round < MAX_ROUNDS; round++) {
         let upstream: Response;
-        let url = `${baseUrl}/chat/completions`;
-        
-        /* Gemini API format adjustment */
-        if (provider === "gemini") {
-          url = `${baseUrl}/chat/completions?key=${apiKey}`;
-        }
-        
+
         try {
           upstream = await fetch(url, {
             method: "POST", headers: upstreamHeaders,
