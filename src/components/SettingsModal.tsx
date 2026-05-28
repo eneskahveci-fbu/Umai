@@ -112,6 +112,17 @@ export function SettingsModal() {
         {tab === "model" && (
           <section>
             <p className="text-xs text-muted mb-3">Birden fazla model ekleyebilirsin. Anahtarlar yalnızca bu tarayıcıda saklanır.</p>
+            
+            {/* Gemini API Info */}
+            <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+              <div className="text-xs text-blue-400 font-semibold mb-1">💡 Gemini API Hakkında</div>
+              <p className="text-xs text-blue-300 leading-relaxed">
+                Google Gemini ücretsiz olarak kullanılabilir. 
+                <a href="https://ai.google.dev/pricing" target="_blank" rel="noopener noreferrer" className="text-blue-200 hover:text-blue-100 underline"> ai.google.dev</a>'den API anahtarı alabilirsin. 
+                Günde 1.5 milyon istek sınırı var.
+              </p>
+            </div>
+
             {config.models.length > 0 && (
               <div className="flex flex-col gap-2 mb-4">
                 {config.models.map((m) => {
@@ -120,15 +131,18 @@ export function SettingsModal() {
                   return (
                     <div key={m.id} className={`flex flex-col gap-2 px-3 py-2.5 rounded-xl border ${active ? "border-branddim bg-brand/10" : "border-line bg-bgsoft"}`}>
                       <div className="flex items-center gap-2">
-                        <button onClick={() => setActiveModel(m.id)} className={`w-5 h-5 rounded-full grid place-items-center border ${active ? "bg-brand border-brand text-white" : "border-muted text-transparent"}`}><Check size={12} /></button>
+                        <button onClick={() => setActiveModel(m.id)} className={`w-5 h-5 rounded-full grid place-items-center border ${active ? "bg-brand border-brand text-white" : "border-muted"}`}>
+                          {active && <Check size={11} />}
+                        </button>
                         <div className="flex-1 min-w-0">
-                          {ed ? <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} className="input-mono !py-1 text-sm" /> : <><div className="text-sm font-semibold truncate">{m.label}</div><div className="text-xs text-muted font-mono truncate">{PRESETS[m.provider]?.label.split(" ")[0]} · {m.model}</div></>}
+                          {ed ? <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} className="input-mono !py-1 text-sm" /> : <><div className="text-sm font-semibold truncate">{m.label}</div><div className="text-xs text-muted font-mono truncate">{m.model}</div></>}
                         </div>
                         <div className="flex items-center gap-1">
-                          {ed ? <button onClick={() => { updateModel(editId!, { label: editLabel.trim() || undefined, apiKey: editKey.trim() }); addToast("Güncellendi.", "success"); setEditId(null); }} className="text-green p-1"><Check size={15} /></button> : <>
-                            <button onClick={() => testModel(m)} disabled={testing} className="text-muted hover:text-green p-1 disabled:opacity-40" title="Test et"><Play size={14} /></button>
-                            <button onClick={() => { setEditId(m.id); setEditLabel(m.label); setEditKey(m.apiKey); }} className="text-muted hover:text-ink p-1"><Pencil size={14} /></button>
-                          </>}
+                          {ed ? <button onClick={() => { updateModel(editId!, { label: editLabel.trim() || undefined, apiKey: editKey.trim() }); addToast("Güncellendi.", "success"); setEditId(null); }} className="text-muted hover:text-green p-1"><Check size={14} /></button>
+                            : <>
+                              <button onClick={() => testModel(m)} disabled={testing} className="text-muted hover:text-green p-1 disabled:opacity-40" title="Test et"><Play size={14} /></button>
+                              <button onClick={() => { setEditId(m.id); setEditLabel(m.label); setEditKey(m.apiKey); }} className="text-muted hover:text-ink p-1"><Pencil size={14} /></button>
+                            </>}
                           <button onClick={() => removeModel(m.id)} className="text-muted hover:text-red p-1"><Trash2 size={14} /></button>
                         </div>
                       </div>
@@ -146,7 +160,7 @@ export function SettingsModal() {
                 <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="Base URL" className="input-mono" />
                 <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="Model adı" className="input-mono" />
                 <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={`API anahtarı — ${PRESETS[provider].keyHint}`} className="input-mono" />
-                <button onClick={submitModel} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-brand hover:bg-branddim text-white text-sm font-semibold"><Plus size={15} /> Modeli Ekle</button>
+                <button onClick={submitModel} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-brand hover:bg-branddim text-white text-sm font-semibold"><Plus size={15} /> Model Ekle</button>
               </div>
             </div>
           </section>
@@ -185,7 +199,7 @@ export function SettingsModal() {
                 <div className="grid gap-2">
                   <input value={ghUser} onChange={(e) => setGhUser(e.target.value)} placeholder="Kullanıcı adı" className="input-mono" />
                   <input type="password" value={ghToken} onChange={(e) => setGhToken(e.target.value)} placeholder="GitHub token (ghp_...)" className="input-mono" />
-                  <button onClick={submitGithub} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-line hover:border-brand text-sm font-semibold transition-colors"><Plus size={14} /> Hesabı Ekle</button>
+                  <button onClick={submitGithub} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-line hover:border-brand text-sm font-semibold transition-colors"><Plus size={15} /> Hesap Ekle</button>
                 </div>
               </div>
             </div>
@@ -219,7 +233,7 @@ export function SettingsModal() {
                 <div className="text-xs font-bold text-muted uppercase tracking-wide mb-2.5">+ Depo Ekle</div>
                 <div className="grid gap-2">
                   <input value={repoInput} onChange={(e) => setRepoInput(e.target.value)} placeholder="sahip/depo veya sahip/depo:dal" className="input-mono" onKeyDown={(e) => { if (e.key === "Enter") submitRepo(); }} />
-                  <button onClick={submitRepo} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-line hover:border-brand text-sm font-semibold transition-colors"><Plus size={14} /> Depo Ekle</button>
+                  <button onClick={submitRepo} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-line hover:border-brand text-sm font-semibold transition-colors"><Plus size={15} /> Depo Ekle</button>
                 </div>
               </div>
             </div>
@@ -249,7 +263,7 @@ export function SettingsModal() {
             <div>
               <h4 className="text-sm font-bold mb-1">.rules — Proje Kuralları</h4>
               <p className="text-xs text-muted mb-2">
-                Coder&apos;da her istekte sistem promptuna eklenir. Teknoloji tercihlerin, kod stili, kısıtlamalar.
+                Coder'da her istekte sistem promptuna eklenir. Teknoloji tercihlerin, kod stili, kısıtlamalar.
               </p>
               <textarea
                 value={config.rulesFile}
@@ -300,8 +314,8 @@ export function SettingsModal() {
                 </div>
               )}
               <div className="flex gap-2">
-                <input value={memInput} onChange={(e) => setMemInput(e.target.value)} placeholder="Örn: Python tercih ederim" className="input-mono !py-1.5 text-xs flex-1" onKeyDown={(e) => { if (e.key === "Enter" && memInput.trim()) { addMemory(memInput.trim()); setMemInput(""); } }} />
-                <button onClick={() => { if (memInput.trim()) { addMemory(memInput.trim()); setMemInput(""); } }} className="text-xs px-3 py-1.5 rounded-lg bg-brand text-white font-semibold shrink-0"><Plus size={12} /></button>
+                <input value={memInput} onChange={(e) => setMemInput(e.target.value)} placeholder="Örn: Python tercih ederim" className="input-mono !py-1.5 text-xs flex-1" onKeyDown={(e) => { if (e.key === "Enter") { if (memInput.trim()) { addMemory(memInput.trim()); setMemInput(""); } } }} />
+                <button onClick={() => { if (memInput.trim()) { addMemory(memInput.trim()); setMemInput(""); } }} className="text-xs px-3 py-1.5 rounded-lg bg-brand text-white font-semibold shrink-0">Ekle</button>
               </div>
             </div>
 
@@ -309,7 +323,7 @@ export function SettingsModal() {
             {activeProj && (
               <div>
                 <h4 className="text-sm font-bold mb-1">Proje Promptu: {activeProj.name}</h4>
-                <textarea value={activeProj.systemPrompt} onChange={(e) => updateProject(activeProj.id, { systemPrompt: e.target.value })} rows={3} className="input-mono !text-xs" placeholder="Bu projeye özel talimatlar..." />
+                <textarea value={activeProj.systemPrompt} onChange={(e) => updateProject(activeProj.id, { systemPrompt: e.target.value })} rows={3} className="input-mono !text-xs" placeholder="Bu projenin için özel sistem promptu..." />
               </div>
             )}
 
