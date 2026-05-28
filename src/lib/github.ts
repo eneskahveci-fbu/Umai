@@ -65,6 +65,34 @@ export async function fetchFileContent(
   return res.text();
 }
 
+/** Depodaki tüm metin dosyalarını paralel olarak getirir (max 50 dosya). */
+export async function fetchAllFiles(
+  owner: string,
+  repo: string,
+  branch: string,
+  items: { path: string; type: string }[],
+  token?: string,
+  maxFiles = 50,
+): Promise<{ path: string; content: string }[]> {
+  const textExts = new Set(["ts","tsx","js","jsx","py","go","rs","java","c","cpp","h","css","scss","html","json","md","yaml","yml","toml","sh","sql","rb","php","swift","kt","xml","txt","env.example","gitignore","dockerfile"]);
+  const blobs = items
+    .filter((i) => i.type === "blob")
+    .filter((i) => {
+      const ext = i.path.split(".").pop()?.toLowerCase() ?? "";
+      const name = i.path.split("/").pop()?.toLowerCase() ?? "";
+      return textExts.has(ext) || name === ".env.example" || name === "dockerfile" || name === "makefile";
+    })
+    .filter((i) => !i.path.includes("node_modules") && !i.path.includes(".git") && !i.path.includes("dist/") && !i.path.includes("build/"))
+    .slice(0, maxFiles);
+
+  const results = await Promise.allSettled(
+    blobs.map((b) => fetchFileContent(owner, repo, branch, b.path, token).then((content) => ({ path: b.path, content })))
+  );
+  return results
+    .filter((r): r is PromiseFulfilledResult<{ path: string; content: string }> => r.status === "fulfilled")
+    .map((r) => r.value);
+}
+
 /** Düz yol listesini iç içe ağaç yapısına dönüştürür. */
 export function buildTree(items: GitHubTreeItem[]): TreeNode {
   const root: TreeNode = { dirs: {}, files: [] };

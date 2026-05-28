@@ -97,6 +97,7 @@ export const DEFAULT_CONFIG: Config = {
   webSearch: false,
   cliMode: false,
   autoTerminal: false,
+  rulesFile: "",
   fontScale: "base",
   soundEnabled: false,
   accentColor: "purple",

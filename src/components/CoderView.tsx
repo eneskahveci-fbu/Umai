@@ -20,6 +20,7 @@ import {
   Mic,
   PanelLeft,
   Paperclip,
+  PenLine,
   RefreshCw,
   Search,
   Sparkles,
@@ -30,6 +31,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { EditorPanel, detectLanguage, type EditorFile } from "./EditorPanel";
 import { useStore } from "@/lib/store";
 import { MessageBubble } from "./MessageBubble";
 import { SlashMenu } from "./SlashMenu";
@@ -237,6 +239,8 @@ export function CoderView() {
   const [repoSearch, setRepoSearch] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [fetchingFile, setFetchingFile] = useState<string | null>(null);
+  const [editorFile, setEditorFile] = useState<EditorFile | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [listening, setListening] = useState(false);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -307,6 +311,8 @@ export function CoderView() {
       const token = useStore.getState().activeGithub()?.token;
       const content = await fetchFileContent(repo.owner, repo.repo, repo.branch, file.path, token);
       setAttachedFiles((prev) => [...prev, { path: file.path, content }]);
+      setEditorFile({ path: file.path, content, language: detectLanguage(file.path) });
+      setEditorOpen(true);
     } catch (e) {
       addToast(`Dosya okunamadı: ${(e as Error).message}`, "error");
     } finally {
@@ -631,6 +637,13 @@ export function CoderView() {
             className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${terminalOpen ? "text-green bg-green/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
           >
             <Terminal size={14} />
+          </button>
+          <button
+            onClick={() => setEditorOpen((v) => !v)}
+            title="Kod editörü"
+            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${editorOpen && editorFile ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
+          >
+            <PenLine size={14} />
           </button>
         </div>
       </div>
@@ -1058,6 +1071,15 @@ export function CoderView() {
             </div>
           </div>
         </div>
+
+        {editorOpen && editorFile && (
+          <div className="w-[520px] shrink-0 flex flex-col min-h-0 overflow-hidden">
+            <EditorPanel
+              file={editorFile}
+              onClose={() => setEditorOpen(false)}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

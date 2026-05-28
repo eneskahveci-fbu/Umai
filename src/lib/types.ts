@@ -99,6 +99,7 @@ export interface Config {
   webSearch: boolean;
   cliMode: boolean;
   autoTerminal: boolean;
+  rulesFile: string;
   fontScale: "sm" | "base" | "lg";
   soundEnabled: boolean;
   accentColor: "purple" | "blue" | "green" | "orange";

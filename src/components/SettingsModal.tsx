@@ -244,6 +244,21 @@ export function SettingsModal() {
                 </label>
               </div>
             </div>
+
+            {/* .rules dosyası */}
+            <div>
+              <h4 className="text-sm font-bold mb-1">.rules — Proje Kuralları</h4>
+              <p className="text-xs text-muted mb-2">
+                Coder&apos;da her istekte sistem promptuna eklenir. Teknoloji tercihlerin, kod stili, kısıtlamalar.
+              </p>
+              <textarea
+                value={config.rulesFile}
+                onChange={(e) => saveConfig({ ...config, rulesFile: e.target.value })}
+                rows={5}
+                placeholder={"Örn:\n- TypeScript strict mode kullan\n- Tailwind CSS tercih et\n- Yorum satırı yazma\n- Her fonksiyon max 20 satır"}
+                className="input-mono !text-xs leading-relaxed w-full"
+              />
+            </div>
           </section>
         )}
 

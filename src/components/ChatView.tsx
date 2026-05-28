@@ -560,7 +560,7 @@ export function ChatView() {
               onKeyDown={onKeyDown}
               onPaste={handlePaste}
               rows={1}
-              placeholder="Mesajınızı yazın..."
+              placeholder={pendingImages.length > 0 ? "Görseli koda dönüştür veya açıkla…" : "Mesajınızı yazın…"}
               className="flex-1 bg-transparent resize-none outline-none text-[15px] leading-relaxed max-h-[200px] py-1.5 placeholder:text-muted/50"
             />
             {streaming ? (
