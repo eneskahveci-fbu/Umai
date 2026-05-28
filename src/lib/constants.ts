@@ -29,7 +29,7 @@ export const PRESETS: Record<Provider, Preset> = {
   groq: {
     label: "Groq (Ücretsiz)",
     baseUrl: "https://api.groq.com/openai/v1",
-    model: "deepseek-r1-distill-llama-70b",
+        model: "llama-3.3-70b-versatile",
     keyHint: "gsk_...",
   },
   gemini: {
