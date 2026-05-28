@@ -30,10 +30,10 @@ interface ChatRequest {
 const rl = new Map<string, { count: number; reset: number }>();
 
 function checkRate(ip: string): boolean {
+  if (ip === "unknown" || ip === "::1" || ip === "127.0.0.1") return true;
   const now = Date.now();
   const e = rl.get(ip);
   if (!e || now > e.reset) { rl.set(ip, { count: 1, reset: now + 60_000 }); return true; }
-  // İstek limitini 60 → 120'ye çıkardık (Gemini'nin 1.5M/gün limit'ini aşmamız için)
   if (e.count >= 120) return false;
   e.count++;
   return true;
