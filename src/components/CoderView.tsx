@@ -19,9 +19,9 @@ import {
   Globe,
   Image as ImageIcon,
   Mic,
+  Palette,
   PanelLeft,
   Paperclip,
-  PenLine,
   RefreshCw,
   Search,
   Sparkles,
@@ -61,6 +61,7 @@ const EditorPanel = dynamic(
   },
 );
 import { GitPanel } from "./GitPanel";
+import { ArtifactPanel } from "./ArtifactPanel";
 import { useStore } from "@/lib/store";
 import { MessageBubble } from "./MessageBubble";
 import { SlashMenu } from "./SlashMenu";
@@ -240,6 +241,7 @@ export function CoderView() {
   const followUpSuggestions = useStore((s) => s.followUpSuggestions);
 
   const toolsEnabledStore = useStore((s) => s.toolsEnabled);
+  const artifact = useStore((s) => s.artifact);
   const setRepo = useStore((s) => s.setRepo);
   const setTree = useStore((s) => s.setTree);
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
@@ -523,6 +525,13 @@ export function CoderView() {
       }
       if (!full) useStore.getState().updateLastContent("_(Model boş yanıt döndürdü.)_");
 
+      /* AI'nın yazdığı dosyayı otomatik IDE'de aç */
+      const autoFile = extractFirstFileFence(full);
+      if (autoFile) {
+        setEditorFile(autoFile);
+        setEditorOpen(true);
+      }
+
       /* token tahmini */
       const inputText = apiMessages.map((m) => typeof m.content === "string" ? m.content : "").join("\n");
       const tokenIn = estimateTokens(inputText) + estimateTokens(coderSystemPrompt);
@@ -685,10 +694,10 @@ export function CoderView() {
           </button>
           <button
             onClick={() => setEditorOpen((v) => !v)}
-            title="Kod editörü"
-            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${editorOpen && editorFile ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
+            title="IDE'yi aç/kapat"
+            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${editorOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
           >
-            <PenLine size={14} />
+            <Code2 size={14} />
           </button>
           <button
             onClick={() => setGitPanelOpen((v) => !v)}
@@ -1079,6 +1088,28 @@ export function CoderView() {
                     <Globe size={13} />
                     <span>Web</span>
                   </ComposerButton>
+                  <ComposerButton
+                    onClick={() => {
+                      const msgs = useStore.getState().current()?.messages ?? [];
+                      for (let i = msgs.length - 1; i >= 0; i--) {
+                        const m = /```(html|svg|mermaid)\n([\s\S]*?)\n```/.exec(msgs[i].content);
+                        if (m) {
+                          useStore.getState().setArtifact({
+                            type: m[1] as "html" | "svg" | "mermaid",
+                            content: m[2],
+                            title: `${m[1].toUpperCase()} Önizleme`,
+                          });
+                          return;
+                        }
+                      }
+                      addToast("Önizlenecek HTML, SVG veya Mermaid kodu bulunamadı", "info");
+                    }}
+                    active={!!artifact}
+                    title="Canvas önizleme"
+                  >
+                    <Palette size={13} />
+                    <span>Canvas</span>
+                  </ComposerButton>
                   <ComposerButton onClick={() => useStore.getState().setPromptLibraryOpen(true)} title="Şablonlar">
                     <BookOpen size={13} />
                     <span>Şablonlar</span>
@@ -1149,17 +1180,36 @@ export function CoderView() {
           </div>
         </div>
 
-        {editorOpen && editorFile && (
-          <div className="w-[520px] shrink-0 flex flex-col min-h-0 overflow-hidden">
-            <EditorPanel
-              file={editorFile}
-              onClose={() => setEditorOpen(false)}
-              onAskAI={(text, context) => {
-                useStore.getState().setPendingInput(context);
-              }}
-            />
-          </div>
+        {editorOpen && (
+          editorFile ? (
+            <div className="w-[520px] shrink-0 flex flex-col min-h-0 overflow-hidden">
+              <EditorPanel
+                file={editorFile}
+                onClose={() => setEditorOpen(false)}
+                onAskAI={(text, context) => {
+                  useStore.getState().setPendingInput(context);
+                }}
+              />
+            </div>
+          ) : (
+            <div className="w-[520px] shrink-0 flex flex-col min-h-0 overflow-hidden border-l border-line/60 bg-[#0e0e13]">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-line/60 bg-surface shrink-0">
+                <span className="text-xs font-mono text-muted/50">IDE</span>
+                <button onClick={() => setEditorOpen(false)} className="text-muted hover:text-ink p-1 rounded transition-colors">
+                  <X size={13} />
+                </button>
+              </div>
+              <div className="flex-1 grid place-items-center">
+                <div className="text-center px-8">
+                  <Code2 size={36} className="mx-auto mb-3 text-muted/20" />
+                  <p className="text-sm text-muted/50">AI bir dosya yazınca burada açılır</p>
+                  <p className="text-xs mt-1.5 text-muted/30">veya sol panelden bir dosya seçin</p>
+                </div>
+              </div>
+            </div>
+          )
         )}
+        {artifact && <ArtifactPanel />}
         {gitPanelOpen && (
           <GitPanel onClose={() => setGitPanelOpen(false)} />
         )}
@@ -1199,4 +1249,22 @@ function UsageBadge({ chat }: { chat: { totalInTokens?: number; totalOutTokens?:
       )}
     </div>
   );
+}
+
+/* Parses the first code-fence with an embedded file path from AI output.
+   Supports: ```lang:path  |  ```lang file=path  |  ```lang title="path" */
+function extractFirstFileFence(md: string): EditorFile | null {
+  const re = /```(\w+)(?::([^\s\n`]+)|[ \t]+(?:file|title)=["']?([^\s"'\n`]+)["']?)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(md)) !== null) {
+    const path = (m[2] ?? m[3] ?? "").trim();
+    if (!path || (!path.includes("/") && !path.includes("."))) continue;
+    const fenceEnd = m.index + m[0].length;
+    const nlIdx = md.indexOf("\n", fenceEnd);
+    if (nlIdx === -1) continue;
+    const closeIdx = md.indexOf("\n```", nlIdx);
+    const content = closeIdx === -1 ? md.slice(nlIdx + 1) : md.slice(nlIdx + 1, closeIdx);
+    return { path, content, language: detectLanguage(path) };
+  }
+  return null;
 }

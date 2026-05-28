@@ -12,11 +12,13 @@ export function ArtifactPanel() {
   if (!artifact) return null;
 
   const srcdoc =
-    artifact.type === "svg"
-      ? `<!DOCTYPE html><html><head><style>body{margin:0;display:grid;place-items:center;min-height:100vh;background:#0e0e13;}</style></head><body>${artifact.content}</body></html>`
-      : artifact.content.includes("<html")
-        ? artifact.content
-        : `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;margin:1rem;}</style></head><body>${artifact.content}</body></html>`;
+    artifact.type === "mermaid"
+      ? `<!DOCTYPE html><html><head><meta charset="UTF-8"><script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"><\/script><style>body{margin:1.5rem;background:#fff;font-family:system-ui,sans-serif;}</style></head><body><div class="mermaid">${artifact.content}</div><script>mermaid.initialize({startOnLoad:true,theme:'default'});<\/script></body></html>`
+      : artifact.type === "svg"
+        ? `<!DOCTYPE html><html><head><style>body{margin:0;display:grid;place-items:center;min-height:100vh;background:#0e0e13;}</style></head><body>${artifact.content}</body></html>`
+        : artifact.content.includes("<html")
+          ? artifact.content
+          : `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;margin:1rem;}</style></head><body>${artifact.content}</body></html>`;
 
   return (
     <div
