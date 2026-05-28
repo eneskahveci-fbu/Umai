@@ -706,6 +706,13 @@ export function CoderView() {
           >
             <GitBranch size={14} />
           </button>
+          <button
+            onClick={() => useStore.getState().setSkillsOpen(true)}
+            title="Skills — her sohbete eklenen bağlam"
+            className="w-8 h-8 rounded-lg grid place-items-center transition-colors text-muted hover:text-amber-400 hover:bg-amber-400/10"
+          >
+            <Zap size={14} />
+          </button>
           <ThinkingModeToggle />
         </div>
       </div>

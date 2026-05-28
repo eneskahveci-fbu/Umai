@@ -188,6 +188,25 @@ async function streamRound(
   return { content, toolCalls, finishReason };
 }
 
+function friendlyApiError(status: number, rawDetail: string): string {
+  try {
+    const json = JSON.parse(rawDetail);
+    const msg: string = json?.error?.message || json?.message || "";
+    if (msg.toLowerCase().includes("insufficient balance") || msg.toLowerCase().includes("quota"))
+      return `Yetersiz bakiye (${status}): Sağlayıcı hesabına kredi yükle veya ödeme yöntemini ekle.`;
+    if (msg.toLowerCase().includes("invalid api key") || msg.toLowerCase().includes("unauthorized") || status === 401)
+      return `API anahtarı geçersiz (${status}): Ayarlardan anahtarı kontrol et.`;
+    if (msg.toLowerCase().includes("rate limit") || status === 429)
+      return `İstek limiti aşıldı (${status}): Biraz bekle ve tekrar dene.`;
+    if (msg) return `Sağlayıcı hatası (${status}): ${msg}`;
+  } catch { /* raw text */ }
+  if (status === 401) return "API anahtarı geçersiz (401): Ayarlardan anahtarı kontrol et.";
+  if (status === 402) return "Yetersiz bakiye (402): Sağlayıcı hesabına kredi yükle.";
+  if (status === 429) return "İstek limiti aşıldı (429): Biraz bekle ve tekrar dene.";
+  if (status >= 500) return `Sağlayıcı sunucu hatası (${status}): Kısa süre sonra tekrar dene.`;
+  return `Sağlayıcı hatası (${status}): ${rawDetail.slice(0, 200)}`;
+}
+
 export async function POST(req: Request) {
   if (!checkOrigin(req)) return new Response("Geçersiz origin.", { status: 403 });
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
@@ -242,7 +261,7 @@ export async function POST(req: Request) {
     }
     if (!upstream.ok || !upstream.body) {
       const detail = await upstream.text().catch(() => "");
-      return new Response(`Sağlayıcı hatası ${upstream.status}: ${detail.slice(0, 400)}`, { status: upstream.status || 500 });
+      return new Response(friendlyApiError(upstream.status, detail), { status: upstream.status || 500 });
     }
     return new Response(upstream.body, {
       headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" },
@@ -279,7 +298,7 @@ export async function POST(req: Request) {
         }
         if (!upstream.ok || !upstream.body) {
           const detail = await upstream.text().catch(() => "");
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**Sağlayıcı ${upstream.status}:** ${detail.slice(0, 200)}` } }] })}\n\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**${friendlyApiError(upstream.status, detail)}` } }] })}\n\n`));
           break;
         }
 

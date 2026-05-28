@@ -94,9 +94,12 @@ interface StoreState {
   updateProject: (id: string, patch: Partial<Project>) => void;
   setActiveProject: (id: string | null) => void;
 
-  // memory
+  // memory / skills
   addMemory: (content: string) => void;
   removeMemory: (id: string) => void;
+  editMemory: (id: string, content: string) => void;
+  skillsOpen: boolean;
+  setSkillsOpen: (b: boolean) => void;
 
   view: "chat" | "coder" | "compare";
   setView: (v: "chat" | "coder" | "compare") => void;
@@ -327,6 +330,15 @@ export const useStore = create<StoreState>()((set, get) => ({
       memories: config.memories.filter((m) => m.id !== id),
     });
   },
+  editMemory: (id, content) => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      memories: config.memories.map((m) => m.id === id ? { ...m, content } : m),
+    });
+  },
+  skillsOpen: false,
+  setSkillsOpen: (b) => set({ skillsOpen: b }),
 
   view: "chat",
   setView: (v) => set({ view: v }),
