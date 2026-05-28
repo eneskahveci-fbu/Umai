@@ -4,12 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
   BookOpen,
+  Brain,
   Globe,
   Image as ImageIcon,
   Paperclip,
   PanelLeft,
   Square,
   VenetianMask,
+  Zap,
 } from "lucide-react";
 
 import { useStore } from "@/lib/store";
@@ -44,6 +46,10 @@ export function ChatView() {
   const [input, setInput] = useState("");
   const [searchOn, setSearchOn] = useState(false);
   const [pendingImages, setPendingImages] = useState<string[]>([]);
+  const [thinkingMode, setThinkingMode] = useState<null | "fast" | "pro">(null);
+
+  const cycleThinking = () =>
+    setThinkingMode((m) => (m === null ? "fast" : m === "fast" ? "pro" : null));
   const taRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -492,38 +498,6 @@ export function ChatView() {
             </div>
           )}
           <div className="flex items-end gap-2 bg-surface border border-line rounded-2xl px-3 py-2.5 focus-within:border-brand/50 focus-within:shadow-[0_0_0_3px_rgba(124,92,255,0.08)] transition-all duration-200">
-            <div className="flex items-center gap-0.5 shrink-0">
-              <button
-                onClick={() => fileRef.current?.click()}
-                title="Dosya ekle"
-                className="text-muted hover:text-ink hover:bg-bgsoft p-1.5 rounded-lg transition-colors"
-              >
-                <Paperclip size={16} />
-              </button>
-              <button
-                onClick={() => imgRef.current?.click()}
-                title="Görsel ekle"
-                className="text-muted hover:text-ink hover:bg-bgsoft p-1.5 rounded-lg transition-colors"
-              >
-                <ImageIcon size={16} />
-              </button>
-              <button
-                onClick={() => setSearchOn(!searchOn)}
-                title={searchOn ? "Web arama açık" : "Web arama kapalı"}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  searchOn ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
-                }`}
-              >
-                <Globe size={16} />
-              </button>
-              <button
-                onClick={() => useStore.getState().setPromptLibraryOpen(true)}
-                title="Şablon kütüphanesi"
-                className="text-muted hover:text-ink hover:bg-bgsoft p-1.5 rounded-lg transition-colors"
-              >
-                <BookOpen size={16} />
-              </button>
-            </div>
             <input
               ref={fileRef}
               type="file"
@@ -574,12 +548,77 @@ export function ChatView() {
               </button>
             )}
           </div>
-          <div className="flex items-center justify-center gap-2 mt-2.5 text-[11px] text-muted/60">
-            {searchOn && <span className="text-brand font-medium">Web arama açık</span>}
-            {searchOn && <span>·</span>}
-            <span>Anahtarların yalnızca senin cihazında saklanır</span>
-            <span>·</span>
-            <span className="font-medium">craft.ai</span>
+
+          {/* Alt araç çubuğu */}
+          <div className="flex items-center justify-between mt-2 px-0.5">
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={() => fileRef.current?.click()}
+                title="Dosya ekle"
+                className="flex items-center gap-1.5 text-[12px] text-muted hover:text-ink hover:bg-bgsoft px-2 py-1.5 rounded-lg transition-colors"
+              >
+                <Paperclip size={13} />
+              </button>
+              <button
+                onClick={() => imgRef.current?.click()}
+                title="Görsel ekle"
+                className="flex items-center gap-1.5 text-[12px] text-muted hover:text-ink hover:bg-bgsoft px-2 py-1.5 rounded-lg transition-colors"
+              >
+                <ImageIcon size={13} />
+              </button>
+              <button
+                onClick={() => setSearchOn(!searchOn)}
+                title={searchOn ? "Web aramayı kapat" : "Web aramayı aç"}
+                className={`flex items-center gap-1.5 text-[12px] px-2 py-1.5 rounded-lg transition-colors ${
+                  searchOn ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
+                }`}
+              >
+                <Globe size={13} />
+                <span>Web</span>
+              </button>
+              <button
+                onClick={() => useStore.getState().setPromptLibraryOpen(true)}
+                title="Şablon kütüphanesi"
+                className="flex items-center gap-1.5 text-[12px] text-muted hover:text-ink hover:bg-bgsoft px-2 py-1.5 rounded-lg transition-colors"
+              >
+                <BookOpen size={13} />
+                <span>Şablonlar</span>
+              </button>
+
+              {/* Düşünme modu */}
+              <button
+                onClick={cycleThinking}
+                title="Düşünme modunu değiştir"
+                className={`flex items-center gap-1.5 text-[12px] px-2 py-1.5 rounded-lg transition-colors ${
+                  thinkingMode === "pro"
+                    ? "text-brand bg-brand/10 font-semibold"
+                    : thinkingMode === "fast"
+                    ? "text-amber-400 bg-amber-400/10 font-semibold"
+                    : "text-muted hover:text-ink hover:bg-bgsoft"
+                }`}
+              >
+                {thinkingMode === "pro" ? (
+                  <Brain size={13} />
+                ) : thinkingMode === "fast" ? (
+                  <Zap size={13} />
+                ) : (
+                  <Brain size={13} />
+                )}
+                <span>
+                  {thinkingMode === "pro"
+                    ? "Pro Düşünce"
+                    : thinkingMode === "fast"
+                    ? "Hızlı Düşünce"
+                    : "Düşünce"}
+                </span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 text-[11px] text-muted/50">
+              {searchOn && <span className="text-brand font-medium">Web açık</span>}
+              {searchOn && <span>·</span>}
+              <span className="font-medium">craft.ai</span>
+            </div>
           </div>
         </div>
       </div>

@@ -5,6 +5,8 @@ import {
   ArrowDown,
   ArrowUp,
   BookOpen,
+  BookmarkPlus,
+  Brain,
   ChevronDown,
   ChevronRight,
   Code2,
@@ -23,7 +25,9 @@ import {
   Square,
   Terminal,
   VenetianMask,
+  Wrench,
   X,
+  Zap,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { MessageBubble } from "./MessageBubble";
@@ -40,6 +44,55 @@ import { AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agen
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
 
 /* ─── helpers ─── */
+
+function ComposerButton({
+  onClick,
+  active,
+  title,
+  children,
+}: {
+  onClick: () => void;
+  active?: boolean;
+  title?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={`flex items-center gap-1.5 text-[12px] px-2 py-1.5 rounded-lg transition-colors ${
+        active
+          ? "text-brand bg-brand/10"
+          : "text-muted hover:text-ink hover:bg-bgsoft"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ThinkingModeToggle() {
+  const thinkingMode = useStore((s) => s.thinkingMode);
+  const setThinkingMode = useStore((s) => s.setThinkingMode);
+
+  const cycle = () =>
+    setThinkingMode(thinkingMode === "fast" ? "pro" : "fast");
+
+  return (
+    <button
+      onClick={cycle}
+      title={`Düşünce modu: ${thinkingMode === "pro" ? "Pro" : "Hızlı"} — tıkla değiştir`}
+      className={`flex items-center gap-1.5 text-[12px] px-2 py-1.5 rounded-lg transition-colors font-semibold ${
+        thinkingMode === "pro"
+          ? "text-brand bg-brand/10"
+          : "text-amber-400 bg-amber-400/10"
+      }`}
+    >
+      {thinkingMode === "pro" ? <Brain size={13} /> : <Zap size={13} />}
+      <span>{thinkingMode === "pro" ? "Pro Düşünce" : "Hızlı Düşünce"}</span>
+    </button>
+  );
+}
 
 function getExt(name: string) {
   return name.split(".").pop()?.toLowerCase() ?? "";
@@ -142,6 +195,7 @@ export function CoderView() {
   const pendingInput = useStore((s) => s.pendingInput);
   const followUpSuggestions = useStore((s) => s.followUpSuggestions);
 
+  const toolsEnabledStore = useStore((s) => s.toolsEnabled);
   const setRepo = useStore((s) => s.setRepo);
   const setTree = useStore((s) => s.setTree);
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
@@ -149,6 +203,8 @@ export function CoderView() {
   const setPendingInput = useStore((s) => s.setPendingInput);
   const setFollowUpSuggestions = useStore((s) => s.setFollowUpSuggestions);
   const addToast = useStore((s) => s.addToast);
+
+  const toolsEnabled = toolsEnabledStore && !!repo;
 
   const [filesOpen, setFilesOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
@@ -337,6 +393,19 @@ export function CoderView() {
     store.setFollowUpSuggestions([]);
     coderAbort = new AbortController();
 
+    const thinkingMode = store.thinkingMode;
+    let finalSystemPrompt = coderSystemPrompt;
+    if (thinkingMode === "pro") {
+      finalSystemPrompt +=
+        "\n\n[Düşünme modu: PRO] Adım adım analiz et. Önce sorunu içselleştir, " +
+        "olası yaklaşımları kıyasla, edge case'leri düşün, ardından gerekçeli çözümü ver. " +
+        "Daha derin akıl yürütme yap, kısa kesme.";
+    }
+
+    const repo = store.repo;
+    const activeGithub = store.activeGithub();
+    const toolsEnabled = store.toolsEnabled && !!repo;
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -345,8 +414,15 @@ export function CoderView() {
         body: JSON.stringify({
           messages: apiMessages,
           baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey,
-          provider: active.provider, systemPrompt: coderSystemPrompt,
+          provider: active.provider, systemPrompt: finalSystemPrompt,
           style: store.config.style, memories: store.config.memories,
+          tools: toolsEnabled,
+          repoCtx: toolsEnabled && repo ? {
+            owner: repo.owner,
+            repo: repo.repo,
+            branch: repo.branch,
+            token: activeGithub?.token,
+          } : undefined,
         }),
       });
 
@@ -369,7 +445,22 @@ export function CoderView() {
           const data = t.slice(5).trim();
           if (data === "[DONE]") continue;
           try {
-            const delta = JSON.parse(data).choices?.[0]?.delta?.content ?? "";
+            const parsed = JSON.parse(data);
+            /* tool event */
+            if (parsed.tool_event) {
+              const ev = parsed.tool_event;
+              if (ev.phase === "start") {
+                useStore.getState().appendToolCallToLast({
+                  id: ev.id, name: ev.name, arguments: ev.arguments || "{}", status: "pending",
+                });
+              } else if (ev.phase === "end") {
+                useStore.getState().updateToolCallOnLast(ev.id, {
+                  result: ev.result, status: "done",
+                });
+              }
+              continue;
+            }
+            const delta = parsed.choices?.[0]?.delta?.content ?? "";
             if (delta) { full += delta; useStore.getState().updateLastContent(full); }
           } catch { /* parçalı satır */ }
         }
@@ -836,51 +927,13 @@ export function CoderView() {
                 </div>
               )}
 
-              <div className="flex items-end gap-2 bg-surface border border-line rounded-2xl px-3 py-2.5 focus-within:border-brand/50 focus-within:shadow-[0_0_0_3px_rgba(124,92,255,0.08)] transition-all">
-                <div className="flex items-center gap-0.5 shrink-0">
-                  <button onClick={() => fileRef.current?.click()} title="Dosya ekle" className="text-muted hover:text-ink hover:bg-bgsoft p-1.5 rounded-lg transition-colors">
-                    <Paperclip size={16} />
-                  </button>
-                  <button onClick={() => imgRef.current?.click()} title="Görsel" className="text-muted hover:text-ink hover:bg-bgsoft p-1.5 rounded-lg transition-colors">
-                    <ImageIcon size={16} />
-                  </button>
-                  <button onClick={() => setSearchOn(!searchOn)} title={searchOn ? "Web arama açık" : "Web arama kapalı"} className={`p-1.5 rounded-lg transition-colors ${searchOn ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}>
-                    <Globe size={16} />
-                  </button>
-                  <button onClick={() => useStore.getState().setPromptLibraryOpen(true)} title="Şablonlar" className="text-muted hover:text-ink hover:bg-bgsoft p-1.5 rounded-lg transition-colors">
-                    <BookOpen size={16} />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSlashQuery("/");
-                      setSlashOpen((o) => !o);
-                    }}
-                    title="Subagent seç ( / )"
-                    className={`p-1.5 rounded-lg transition-colors ${
-                      activeAgent || slashOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
-                    }`}
-                  >
-                    <Sparkles size={15} />
-                  </button>
-                  <button
-                    onClick={() => setFilesOpen((o) => !o)}
-                    title="Depo dosyaları"
-                    className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg font-semibold transition-colors ${
-                      filesOpen || attachedFiles.length > 0 ? "bg-brand/10 text-brand" : "text-muted hover:text-ink hover:bg-bgsoft"
-                    }`}
-                  >
-                    <FolderGit2 size={15} />
-                    {attachedFiles.length > 0 && (
-                      <span className="w-4 h-4 rounded-full bg-brand text-white text-[10px] font-bold grid place-items-center">{attachedFiles.length}</span>
-                    )}
-                  </button>
-                </div>
+              <input ref={fileRef} type="file" multiple accept=".txt,.md,.js,.ts,.tsx,.jsx,.py,.json,.yaml,.yml,.toml,.html,.css,.sql,.sh,.go,.rs,.java,.c,.cpp,.h,.rb,.php" className="hidden"
+                onChange={(e) => { for (const f of Array.from(e.target.files ?? [])) readFileIntoInput(f); e.target.value = ""; }} />
+              <input ref={imgRef} type="file" accept="image/*" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) readFileIntoInput(f); e.target.value = ""; }} />
 
-                <input ref={fileRef} type="file" multiple accept=".txt,.md,.js,.ts,.tsx,.jsx,.py,.json,.yaml,.yml,.toml,.html,.css,.sql,.sh,.go,.rs,.java,.c,.cpp,.h,.rb,.php" className="hidden"
-                  onChange={(e) => { for (const f of Array.from(e.target.files ?? [])) readFileIntoInput(f); e.target.value = ""; }} />
-                <input ref={imgRef} type="file" accept="image/*" className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) readFileIntoInput(f); e.target.value = ""; }} />
-
+              {/* Textarea — geniş, butonsuz */}
+              <div className="bg-surface border border-line rounded-2xl px-4 pt-3 pb-2 focus-within:border-brand/50 focus-within:shadow-[0_0_0_3px_rgba(124,92,255,0.08)] transition-all">
                 <textarea
                   ref={taRef}
                   value={input}
@@ -889,24 +942,13 @@ export function CoderView() {
                     setInput(v);
                     const pos = e.target.selectionStart;
                     const before = v.slice(0, pos);
-
-                    /* slash detection — only at line start */
                     const slashMatch = before.match(/(^|\n)(\/\w*)$/);
-                    if (slashMatch) {
-                      setSlashQuery(slashMatch[2]);
-                      setSlashOpen(true);
-                    } else {
-                      setSlashOpen(false);
-                    }
-
-                    /* mention detection */
+                    if (slashMatch) { setSlashQuery(slashMatch[2]); setSlashOpen(true); }
+                    else setSlashOpen(false);
                     const mentionMatch = before.match(/(^|\s)@(\S*)$/);
                     if (mentionMatch && attachedFiles.length > 0) {
-                      setMentionQuery(mentionMatch[2]);
-                      setMentionOpen(true);
-                    } else {
-                      setMentionOpen(false);
-                    }
+                      setMentionQuery(mentionMatch[2]); setMentionOpen(true);
+                    } else setMentionOpen(false);
                   }}
                   onKeyDown={(e) => {
                     if (slashOpen || mentionOpen) return;
@@ -920,26 +962,72 @@ export function CoderView() {
                       ? `${attachedFiles.length} dosya eklendi — sor veya / yaz…`
                       : "Sor, / ile agent seç, @ ile dosya mention…"
                   }
-                  className="flex-1 bg-transparent resize-none outline-none text-[15px] leading-relaxed max-h-[200px] py-1.5 placeholder:text-muted/45"
+                  className="w-full bg-transparent resize-none outline-none text-[15px] leading-relaxed max-h-[240px] placeholder:text-muted/45"
                 />
 
-                {streaming ? (
-                  <button onClick={stop} className="shrink-0 w-9 h-9 rounded-xl bg-red hover:bg-red/80 text-white grid place-items-center transition-colors" title="Durdur">
-                    <Square size={14} />
-                  </button>
-                ) : (
-                  <button
-                    onClick={send}
-                    disabled={!input.trim() && pendingImages.length === 0 && attachedFiles.length === 0}
-                    className="shrink-0 w-9 h-9 rounded-xl bg-brand hover:bg-branddim text-white grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                {/* Alt sıra: butonlar */}
+                <div className="flex items-center gap-1 mt-2 pt-2 border-t border-line/30">
+                  <ComposerButton onClick={() => fileRef.current?.click()} title="Dosya ekle">
+                    <Paperclip size={14} />
+                  </ComposerButton>
+                  <ComposerButton onClick={() => imgRef.current?.click()} title="Görsel">
+                    <ImageIcon size={14} />
+                  </ComposerButton>
+                  <ComposerButton onClick={() => setSearchOn(!searchOn)} active={searchOn} title="Web arama">
+                    <Globe size={14} />
+                  </ComposerButton>
+                  <ComposerButton onClick={() => useStore.getState().setPromptLibraryOpen(true)} title="Şablonlar">
+                    <BookOpen size={14} />
+                  </ComposerButton>
+                  <ComposerButton onClick={() => useStore.getState().setSnippetsOpen(true)} title="Snippet kütüphanesi">
+                    <BookmarkPlus size={14} />
+                  </ComposerButton>
+                  <ComposerButton
+                    onClick={() => { setSlashQuery("/"); setSlashOpen((o) => !o); }}
+                    active={!!activeAgent || slashOpen}
+                    title="Subagent seç ( / )"
                   >
-                    <ArrowUp size={18} />
-                  </button>
-                )}
+                    <Sparkles size={14} />
+                  </ComposerButton>
+                  <ComposerButton
+                    onClick={() => {
+                      const store = useStore.getState();
+                      if (!store.repo) {
+                        addToast("Tool-use için önce bir GitHub deposu bağla", "error");
+                        return;
+                      }
+                      store.setToolsEnabled(!store.toolsEnabled);
+                    }}
+                    active={toolsEnabled}
+                    title={toolsEnabled ? "Tool-use açık (modelin dosya okuyabilir)" : "Tool-use kapalı"}
+                  >
+                    <Wrench size={14} />
+                  </ComposerButton>
+
+                  {/* Thinking mode */}
+                  <ThinkingModeToggle />
+
+                  <div className="flex-1" />
+
+                  {streaming ? (
+                    <button onClick={stop} className="w-9 h-9 rounded-xl bg-red hover:bg-red/80 text-white grid place-items-center transition-colors" title="Durdur">
+                      <Square size={13} />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={send}
+                      disabled={!input.trim() && pendingImages.length === 0 && attachedFiles.length === 0}
+                      className="w-9 h-9 rounded-xl bg-brand hover:bg-branddim text-white grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ArrowUp size={17} />
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center justify-center gap-2 mt-2 text-[11px] text-muted/50">
-                {searchOn && <><span className="text-brand font-medium">Web arama açık</span><span>·</span></>}
+                {searchOn && <><span className="text-brand font-medium">Web arama</span><span>·</span></>}
+                {toolsEnabled && <><span className="text-green/80 font-medium">Tool-use</span><span>·</span></>}
                 {activeAgent && <><span className="text-brand font-medium">{activeAgent.command}</span><span>·</span></>}
                 <span>/ ile agent · @ ile dosya · craft.ai coder</span>
               </div>
