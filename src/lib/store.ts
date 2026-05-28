@@ -10,7 +10,9 @@ import type {
   OpenFile,
   Project,
   RepoState,
+  Snippet,
   Toast,
+  ToolCallRecord,
   TreeNode,
 } from "./types";
 import { DEFAULT_CONFIG } from "./constants";
@@ -18,6 +20,16 @@ import { createClient } from "./supabase/client";
 
 const CONFIG_KEY = "craftai_config";
 const CHATS_KEY = "craftai_chats";
+const SNIPPETS_KEY = "craftai_snippets";
+
+function loadSnippets(): Snippet[] {
+  if (typeof window === "undefined") return [];
+  try { return JSON.parse(localStorage.getItem(SNIPPETS_KEY) || "[]"); } catch { return []; }
+}
+function saveSnippets(s: Snippet[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(SNIPPETS_KEY, JSON.stringify(s));
+}
 
 const uid = () =>
   Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -154,6 +166,27 @@ interface StoreState {
   // onboarding
   onboardingDone: boolean;
   setOnboardingDone: (b: boolean) => void;
+
+  // thinking mode
+  thinkingMode: "fast" | "pro";
+  setThinkingMode: (m: "fast" | "pro") => void;
+
+  // tool-use
+  toolsEnabled: boolean;
+  setToolsEnabled: (b: boolean) => void;
+  appendToolCallToLast: (tc: ToolCallRecord) => void;
+  updateToolCallOnLast: (id: string, patch: Partial<ToolCallRecord>) => void;
+
+  // snippets
+  snippets: Snippet[];
+  addSnippet: (s: Omit<Snippet, "id" | "created_at">) => void;
+  removeSnippet: (id: string) => void;
+  snippetsOpen: boolean;
+  setSnippetsOpen: (b: boolean) => void;
+
+  // diff modal
+  diffModal: { original: string; newCode: string; language: string; path?: string } | null;
+  setDiffModal: (m: { original: string; newCode: string; language: string; path?: string } | null) => void;
 
   // compare view
   compareModelA: string | null;
@@ -554,6 +587,82 @@ export const useStore = create<StoreState>()((set, get) => ({
     }
     set({ onboardingDone: b });
   },
+
+  /* thinking mode */
+  thinkingMode:
+    (typeof window !== "undefined" &&
+      (localStorage.getItem("craftai_thinking") as "fast" | "pro")) ||
+    "fast",
+  setThinkingMode: (m) => {
+    if (typeof window !== "undefined") localStorage.setItem("craftai_thinking", m);
+    set({ thinkingMode: m });
+  },
+
+  /* tool-use */
+  toolsEnabled:
+    typeof window !== "undefined" && localStorage.getItem("craftai_tools") === "1",
+  setToolsEnabled: (b) => {
+    if (typeof window !== "undefined") {
+      if (b) localStorage.setItem("craftai_tools", "1");
+      else localStorage.removeItem("craftai_tools");
+    }
+    set({ toolsEnabled: b });
+  },
+  appendToolCallToLast: (tc) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const messages = c.messages.slice();
+        if (messages.length) {
+          const last = messages[messages.length - 1];
+          messages[messages.length - 1] = {
+            ...last,
+            toolCalls: [...(last.toolCalls ?? []), tc],
+          };
+        }
+        return { ...c, messages };
+      }),
+    })),
+  updateToolCallOnLast: (id, patch) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const messages = c.messages.slice();
+        if (messages.length) {
+          const last = messages[messages.length - 1];
+          messages[messages.length - 1] = {
+            ...last,
+            toolCalls: (last.toolCalls ?? []).map((tc) =>
+              tc.id === id ? { ...tc, ...patch } : tc,
+            ),
+          };
+        }
+        return { ...c, messages };
+      }),
+    })),
+
+  /* snippets */
+  snippets: loadSnippets(),
+  addSnippet: (s) => {
+    const snippet: Snippet = { ...s, id: uid(), created_at: Date.now() };
+    set((st) => {
+      const snippets = [snippet, ...st.snippets];
+      saveSnippets(snippets);
+      return { snippets };
+    });
+  },
+  removeSnippet: (id) =>
+    set((st) => {
+      const snippets = st.snippets.filter((x) => x.id !== id);
+      saveSnippets(snippets);
+      return { snippets };
+    }),
+  snippetsOpen: false,
+  setSnippetsOpen: (b) => set({ snippetsOpen: b }),
+
+  /* diff modal */
+  diffModal: null,
+  setDiffModal: (m) => set({ diffModal: m }),
 
   compareModelA: null,
   compareModelB: null,

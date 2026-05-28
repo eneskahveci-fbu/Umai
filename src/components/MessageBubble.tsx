@@ -4,10 +4,46 @@ import { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { Check, Copy, Pencil, RefreshCw, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Copy, Loader2, Pencil, RefreshCw, Wrench, X } from "lucide-react";
 import type { ChatMessage } from "@/lib/types";
 import { CodeBlock } from "./CodeBlock";
 import { AGENTS } from "@/lib/agents";
+
+function ToolCallCard({ call }: { call: NonNullable<ChatMessage["toolCalls"]>[number] }) {
+  const [open, setOpen] = useState(false);
+  let argsPreview = "";
+  try {
+    const args = JSON.parse(call.arguments || "{}");
+    argsPreview = Object.values(args).filter(Boolean).join(", ");
+  } catch { argsPreview = call.arguments?.slice(0, 60) ?? ""; }
+
+  const isRunning = call.status === "pending";
+
+  return (
+    <div className="border border-line/60 bg-bgsoft/30 rounded-xl text-xs overflow-hidden">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bgsoft/60 transition-colors text-left"
+      >
+        {open ? <ChevronDown size={11} className="text-muted/50 shrink-0" /> : <ChevronRight size={11} className="text-muted/50 shrink-0" />}
+        {isRunning ? <Loader2 size={11} className="animate-spin text-brand shrink-0" /> : <Wrench size={11} className="text-brand/70 shrink-0" />}
+        <code className="font-mono font-semibold text-brand/90 shrink-0">{call.name}</code>
+        {argsPreview && (
+          <span className="text-muted/60 truncate text-[11px] font-mono">({argsPreview})</span>
+        )}
+        {isRunning && <span className="text-[10px] text-muted/50 ml-auto shrink-0">çalışıyor…</span>}
+      </button>
+      {open && (
+        <div className="border-t border-line/40 px-3 py-2 bg-[#0a0a0d]">
+          <div className="text-[10px] text-muted/40 uppercase font-bold mb-1">Sonuç</div>
+          <pre className="font-mono text-[11px] text-muted/80 whitespace-pre-wrap break-all max-h-40 overflow-y-auto">
+            {call.result ?? "(beklemede)"}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ActionBtn({ onClick, icon, label }: { onClick: () => void; icon: React.ReactNode; label: string }) {
   return (
@@ -83,6 +119,13 @@ export function MessageBubble({
             </div>
           );
         })()}
+
+        {/* Tool calls */}
+        {message.toolCalls?.length ? (
+          <div className="space-y-1 mb-3">
+            {message.toolCalls.map((tc) => <ToolCallCard key={tc.id} call={tc} />)}
+          </div>
+        ) : null}
         {/* Görseller */}
         {message.images?.map((img, i) => (
           <img

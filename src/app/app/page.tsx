@@ -8,7 +8,6 @@ import { PromptLibrary } from "@/components/PromptLibrary";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { Onboarding } from "@/components/Onboarding";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
@@ -82,7 +81,6 @@ export default function AppPage() {
         <PromptLibrary />
         <CommandPalette />
         <KeyboardShortcuts />
-        <Onboarding />
         <ToastContainer />
       </div>
     </ErrorBoundary>

@@ -1,4 +1,12 @@
-export type Role = "user" | "assistant" | "system";
+export type Role = "user" | "assistant" | "system" | "tool";
+
+export interface ToolCallRecord {
+  id: string;
+  name: string;
+  arguments: string;
+  result?: string;
+  status: "pending" | "done" | "error";
+}
 
 export interface ChatMessage {
   role: Role;
@@ -7,6 +15,16 @@ export interface ChatMessage {
   agentId?: string;
   tokenIn?: number;
   tokenOut?: number;
+  toolCalls?: ToolCallRecord[];
+}
+
+export interface Snippet {
+  id: string;
+  title: string;
+  language: string;
+  code: string;
+  created_at: number;
+  tags?: string[];
 }
 
 export interface Chat {
