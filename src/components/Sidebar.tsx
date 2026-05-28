@@ -6,7 +6,6 @@ import {
   Download,
   FolderOpen,
   FolderPlus,
-  GitCompareArrows,
   MessageSquare,
   Pencil,
   Plus,
@@ -14,7 +13,6 @@ import {
   Settings,
   Share2,
   Trash2,
-  VenetianMask,
   X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -79,7 +77,7 @@ export function Sidebar() {
           </button>
         </div>
 
-        {/* New chat */}
+        {/* New chat + Coder */}
         <div className="px-2 py-2 border-b border-line/60 shrink-0 space-y-1">
           <button
             onClick={() => newChat(false)}
@@ -89,11 +87,13 @@ export function Sidebar() {
             <Plus size={16} />
           </button>
           <button
-            onClick={() => newChat(true)}
-            title="Gizli Sohbet"
-            className="w-full h-9 rounded-xl border border-line/60 hover:border-line text-muted hover:text-purple grid place-items-center transition-colors"
+            onClick={() => setView("coder")}
+            title="Coder"
+            className={`w-full h-9 rounded-xl border grid place-items-center transition-colors ${
+              view === "coder" ? "border-brand/40 bg-brand/10 text-brand" : "border-line/60 text-muted hover:text-ink hover:border-line"
+            }`}
           >
-            <VenetianMask size={14} />
+            <Code2 size={15} />
           </button>
         </div>
 
@@ -104,9 +104,6 @@ export function Sidebar() {
           </NavIconBtn>
           <NavIconBtn active={view === "coder"} onClick={() => setView("coder")} title="Coder">
             <Code2 size={16} />
-          </NavIconBtn>
-          <NavIconBtn active={view === "compare"} onClick={() => setView("compare")} title="Karşılaştır">
-            <GitCompareArrows size={15} />
           </NavIconBtn>
         </div>
 
@@ -151,11 +148,15 @@ export function Sidebar() {
           <Plus size={15} /> Yeni Sohbet
         </button>
         <button
-          onClick={() => newChat(true)}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-line/60 hover:border-line text-xs text-muted hover:text-ink transition-colors"
+          onClick={() => setView("coder")}
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border text-xs transition-colors ${
+            view === "coder"
+              ? "border-brand/40 bg-brand/10 text-brand"
+              : "border-line/60 text-muted hover:border-line hover:text-ink"
+          }`}
         >
-          <VenetianMask size={13} className="shrink-0" />
-          Gizli Sohbet
+          <Code2 size={13} className="shrink-0" />
+          Coder
         </button>
       </div>
 
@@ -286,7 +287,6 @@ export function Sidebar() {
           <div className="flex rounded-xl bg-bgsoft/50 p-1 gap-0.5">
             <NavBtn active={view === "chat"} onClick={() => setView("chat")} icon={<MessageSquare size={15} />} label="Sohbet" />
             <NavBtn active={view === "coder"} onClick={() => setView("coder")} icon={<Code2 size={15} />} label="Coder" />
-            <NavBtn active={view === "compare"} onClick={() => setView("compare")} icon={<GitCompareArrows size={13} />} label="Karşılaştır" />
           </div>
         </div>
 

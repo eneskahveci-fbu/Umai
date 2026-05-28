@@ -22,7 +22,6 @@ import {
   Play,
   RefreshCw,
   Search,
-  Settings,
   Square,
   Terminal,
   VenetianMask,
@@ -591,13 +590,6 @@ export function CoderView() {
             className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${terminalOpen ? "text-green bg-green/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
           >
             <Terminal size={14} />
-          </button>
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
-            title="Ayarlar"
-          >
-            <Settings size={14} />
           </button>
         </div>
       </div>

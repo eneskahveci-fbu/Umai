@@ -11,6 +11,7 @@ import {
   Square,
   VenetianMask,
 } from "lucide-react";
+
 import { useStore } from "@/lib/store";
 import { MessageBubble } from "./MessageBubble";
 
@@ -383,13 +384,6 @@ export function ChatView() {
               <span className="text-[10px] text-muted/60 font-mono tabular-nums">{Math.round(tokenPct)}%</span>
             </div>
           )}
-          <button
-            onClick={() => useStore.getState().newChat(true)}
-            className="w-8 h-8 rounded-lg text-muted hover:text-purple hover:bg-purple/10 grid place-items-center transition-colors"
-            title="Gizli Sohbet"
-          >
-            <VenetianMask size={15} />
-          </button>
         </div>
       </div>
 
