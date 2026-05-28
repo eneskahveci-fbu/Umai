@@ -2,34 +2,22 @@
 
 import { useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
-import { ChatView } from "@/components/ChatView";
 import { CoderView } from "@/components/CoderView";
-import { CompareView } from "@/components/CompareView";
 import { SettingsModal } from "@/components/SettingsModal";
 import { PromptLibrary } from "@/components/PromptLibrary";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { ArtifactPanel } from "@/components/ArtifactPanel";
 import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 
-function MainView({ view }: { view: string }) {
-  if (view === "coder") return <CoderView />;
-  if (view === "compare") return <CompareView />;
-  return <ChatView />;
-}
-
 export default function AppPage() {
-  const view = useStore((s) => s.view);
-  const artifact = useStore((s) => s.artifact);
   const sidebarOpen = useStore((s) => s.sidebarOpen);
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
   const setUser = useStore((s) => s.setUser);
   const loadChats = useStore((s) => s.loadChats);
 
   useEffect(() => {
-    /* Desktop'ta sidebar varsayılan kapalı (ikon modu) */
     if (window.innerWidth >= 768) setSidebarOpen(false);
   }, [setSidebarOpen]);
 
@@ -58,7 +46,7 @@ export default function AppPage() {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key === "n") { e.preventDefault(); useStore.getState().newChat(e.shiftKey); }
+      if (mod && e.key === "n") { e.preventDefault(); useStore.getState().newChat(false); }
       if (mod && e.key === ",") { e.preventDefault(); useStore.getState().setSettingsOpen(true); }
       if (mod && e.key === "k") { e.preventDefault(); useStore.getState().setCommandPaletteOpen(true); }
       if (mod && e.key === "b") { e.preventDefault(); useStore.getState().setSidebarOpen(!useStore.getState().sidebarOpen); }
@@ -72,7 +60,6 @@ export default function AppPage() {
       <div className="flex h-screen overflow-hidden bg-bg">
         <Sidebar />
 
-        {/* Mobil backdrop */}
         {sidebarOpen && (
           <div
             className="fixed inset-0 z-30 bg-bg/70 backdrop-blur-sm md:hidden"
@@ -80,16 +67,14 @@ export default function AppPage() {
           />
         )}
 
-        {/* Ana içerik — sidebar genişliğini hesaba katar */}
         <main
           className={`flex-1 min-w-0 flex flex-col transition-[margin] duration-300 ease-in-out ${
             sidebarOpen ? "md:ml-64" : "md:ml-14"
           }`}
         >
-          <MainView view={view} />
+          <CoderView />
         </main>
 
-        {artifact && <ArtifactPanel />}
         <SettingsModal />
         <PromptLibrary />
         <CommandPalette />
@@ -98,3 +83,4 @@ export default function AppPage() {
     </ErrorBoundary>
   );
 }
+

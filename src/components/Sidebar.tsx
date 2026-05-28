@@ -19,8 +19,6 @@ import { useStore } from "@/lib/store";
 import { AuthButton } from "./AuthButton";
 
 export function Sidebar() {
-  const view = useStore((s) => s.view);
-  const setView = useStore((s) => s.setView);
   const chats = useStore((s) => s.chats);
   const currentId = useStore((s) => s.currentId);
   const config = useStore((s) => s.config);
@@ -47,9 +45,7 @@ export function Sidebar() {
   const history = chats
     .filter((c) => !c.incognito)
     .filter((c) => (activeProject ? c.projectId === activeProject : true))
-    .filter((c) =>
-      search ? c.title.toLowerCase().includes(search.toLowerCase()) : true,
-    )
+    .filter((c) => search ? c.title.toLowerCase().includes(search.toLowerCase()) : true)
     .sort((a, b) => b.created_at - a.created_at);
 
   const startRename = (id: string, title: string) => {
@@ -62,108 +58,94 @@ export function Sidebar() {
     setEditingId(null);
   };
 
-  /* ── Collapsed icon-only sidebar ── */
+  /* ── Collapsed icon-only ── */
   if (!sidebarOpen) {
     return (
-      <aside className="fixed top-0 left-0 z-40 h-full w-14 flex-col hidden md:flex bg-surface border-r border-line/60">
-        {/* Logo */}
+      <aside className="fixed top-0 left-0 z-40 h-full w-14 hidden md:flex flex-col bg-surface border-r border-line/60">
         <div className="h-14 flex items-center justify-center border-b border-line/60 shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
-            title="Yan paneli aç"
+            title="Paneli aç (Ctrl+B)"
             className="w-9 h-9 rounded-xl brand-gradient grid place-items-center text-white shadow-sm shadow-brand/30 hover:shadow-brand/50 transition-shadow"
           >
-            <span className="text-sm">◆</span>
+            <span className="text-sm font-bold">◆</span>
           </button>
         </div>
 
-        {/* New chat + Coder */}
-        <div className="px-2 py-2 border-b border-line/60 shrink-0 space-y-1">
+        <div className="px-2 py-3 border-b border-line/60 shrink-0">
           <button
             onClick={() => newChat(false)}
-            title="Yeni Sohbet"
+            title="Yeni oturum (Ctrl+N)"
             className="w-full h-9 rounded-xl bg-brand hover:bg-branddim text-white grid place-items-center transition-colors"
           >
             <Plus size={16} />
           </button>
-          <button
-            onClick={() => setView("coder")}
-            title="Coder"
-            className={`w-full h-9 rounded-xl border grid place-items-center transition-colors ${
-              view === "coder" ? "border-brand/40 bg-brand/10 text-brand" : "border-line/60 text-muted hover:text-ink hover:border-line"
-            }`}
-          >
-            <Code2 size={15} />
-          </button>
         </div>
 
-        {/* View nav icons */}
-        <div className="flex-1 flex flex-col items-center gap-1 pt-3 min-h-0">
-          <NavIconBtn active={view === "chat"} onClick={() => setView("chat")} title="Sohbet">
-            <MessageSquare size={16} />
-          </NavIconBtn>
-          <NavIconBtn active={view === "coder"} onClick={() => setView("coder")} title="Coder">
-            <Code2 size={16} />
-          </NavIconBtn>
+        <div className="flex-1 flex flex-col items-center gap-1 pt-3 overflow-y-auto min-h-0">
+          {history.slice(0, 8).map((c) => (
+            <button
+              key={c.id}
+              onClick={() => selectChat(c.id)}
+              title={c.title}
+              className={`w-10 h-10 rounded-xl grid place-items-center transition-colors ${
+                currentId === c.id
+                  ? "bg-brand/15 text-brand"
+                  : "text-muted/50 hover:text-ink hover:bg-bgsoft"
+              }`}
+            >
+              <MessageSquare size={14} />
+            </button>
+          ))}
         </div>
 
-        {/* Bottom settings + auth */}
-        <div className="px-2 pb-3 space-y-1 shrink-0">
+        <div className="px-2 pb-3 space-y-1 shrink-0 border-t border-line/60 pt-3">
           <button
             onClick={() => setSettingsOpen(true)}
-            title="Ayarlar"
+            title="Ayarlar (Ctrl+,)"
             className="w-full h-9 rounded-xl border border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink grid place-items-center transition-colors"
           >
-            <Settings size={15} />
+            <Settings size={14} />
           </button>
         </div>
       </aside>
     );
   }
 
-  /* ── Expanded full sidebar ── */
+  /* ── Expanded ── */
   return (
-    <aside className="fixed top-0 left-0 z-40 h-full w-64 flex flex-col bg-surface border-r border-line/60 transition-transform duration-300 ease-in-out translate-x-0">
-      {/* ── Üst: logo + kapat + yeni sohbet ── */}
-      <div className="px-3 pt-4 pb-3 border-b border-line/60 space-y-2">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2 font-extrabold text-lg">
-            <span className="w-7 h-7 rounded-lg brand-gradient grid place-items-center text-white text-sm shadow-sm shadow-brand/30">
-              ◆
-            </span>
-            craft<span className="brand-text">.ai</span>
-          </div>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="w-7 h-7 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
-          >
-            <X size={14} />
-          </button>
+    <aside className="fixed top-0 left-0 z-40 h-full w-64 flex flex-col bg-surface border-r border-line/60">
+      {/* Header */}
+      <div className="h-14 px-4 flex items-center justify-between border-b border-line/60 shrink-0">
+        <div className="flex items-center gap-2.5 font-extrabold text-base">
+          <span className="w-7 h-7 rounded-lg brand-gradient grid place-items-center text-white text-sm shadow-sm shadow-brand/30">
+            ◆
+          </span>
+          craft<span className="brand-text">.ai</span>
         </div>
-
         <button
-          onClick={() => { setView("chat"); newChat(false); }}
-          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-brand hover:bg-branddim text-white font-semibold text-sm transition-colors"
+          onClick={() => setSidebarOpen(false)}
+          title="Kapat (Ctrl+B)"
+          className="w-7 h-7 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
         >
-          <Plus size={15} /> Yeni Sohbet
-        </button>
-        <button
-          onClick={() => setView("coder")}
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border text-xs transition-colors ${
-            view === "coder"
-              ? "border-brand/40 bg-brand/10 text-brand"
-              : "border-line/60 text-muted hover:border-line hover:text-ink"
-          }`}
-        >
-          <Code2 size={13} className="shrink-0" />
-          Coder
+          <X size={14} />
         </button>
       </div>
 
-      {/* ── Projeler ── */}
-      <div className="px-3 pt-3 pb-2 border-b border-line/60">
+      {/* New session */}
+      <div className="px-3 py-3 border-b border-line/60 shrink-0">
+        <button
+          onClick={() => newChat(false)}
+          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-brand hover:bg-branddim text-white font-semibold text-sm transition-colors"
+        >
+          <Plus size={15} /> Yeni Oturum
+        </button>
+      </div>
+
+      {/* Projects */}
+      <div className="px-3 pt-3 pb-2 border-b border-line/60 shrink-0">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted/60 px-1">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted/50 px-1">
             Projeler
           </span>
           <button
@@ -171,8 +153,8 @@ export function Sidebar() {
               const name = window.prompt("Proje adı:");
               if (name?.trim()) addProject(name.trim());
             }}
-            className="text-muted hover:text-brand p-0.5 transition-colors"
             title="Yeni proje"
+            className="text-muted/50 hover:text-brand p-0.5 transition-colors"
           >
             <FolderPlus size={12} />
           </button>
@@ -201,9 +183,7 @@ export function Sidebar() {
                 <FolderOpen size={10} /> {p.name}
               </button>
               <button
-                onClick={() => {
-                  if (confirm(`"${p.name}" projesini sil?`)) removeProject(p.id);
-                }}
+                onClick={() => { if (confirm(`"${p.name}" projesini sil?`)) removeProject(p.id); }}
                 className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red text-white grid place-items-center text-[9px] opacity-0 group-hover/proj:opacity-100 transition-opacity"
               >
                 ×
@@ -213,23 +193,28 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* ── Arama + geçmiş ── */}
+      {/* Search + history */}
       <div className="flex-1 overflow-y-auto px-3 py-3 min-h-0">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted/50 px-1">
+            Geçmiş
+          </span>
+        </div>
         <div className="relative mb-3">
-          <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted/50" />
+          <Search size={11} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted/40" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Sohbet ara..."
-            className="w-full bg-bgsoft/60 border border-line/60 rounded-xl pl-8 pr-3 py-2 text-xs outline-none focus:border-brand/50 placeholder:text-muted/40 transition-colors"
+            placeholder="Oturum ara..."
+            className="w-full bg-bgsoft/60 border border-line/60 rounded-xl pl-8 pr-3 py-2 text-xs outline-none focus:border-brand/50 placeholder:text-muted/35 transition-colors"
           />
         </div>
 
         {history.length === 0 ? (
-          <div className="text-center py-8 px-3">
-            <MessageSquare size={22} className="mx-auto mb-2 text-muted/20" />
-            <p className="text-xs text-muted/50 leading-relaxed">
-              {search ? "Eşleşen sohbet yok." : "Henüz sohbet yok."}
+          <div className="text-center py-10 px-3">
+            <Code2 size={24} className="mx-auto mb-3 text-muted/15" />
+            <p className="text-xs text-muted/40 leading-relaxed">
+              {search ? "Eşleşen oturum yok." : "Henüz oturum yok.\nYeni oturum başlat."}
             </p>
           </div>
         ) : (
@@ -238,13 +223,13 @@ export function Sidebar() {
               <div
                 key={c.id}
                 onClick={() => selectChat(c.id)}
-                className={`group/chat flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all duration-150 ${
+                className={`group/item flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all duration-100 ${
                   currentId === c.id
-                    ? "bg-bgsoft border border-line/50 text-ink"
-                    : "border border-transparent text-muted hover:text-ink hover:bg-bgsoft/50"
+                    ? "bg-brand/8 border border-brand/20 text-ink"
+                    : "border border-transparent text-muted hover:text-ink hover:bg-bgsoft/60"
                 }`}
               >
-                <MessageSquare size={12} className="shrink-0 opacity-50" />
+                <Code2 size={11} className={`shrink-0 ${currentId === c.id ? "text-brand/60" : "opacity-30"}`} />
                 {editingId === c.id ? (
                   <input
                     ref={editRef}
@@ -256,16 +241,16 @@ export function Sidebar() {
                       if (e.key === "Escape") setEditingId(null);
                     }}
                     onClick={(e) => e.stopPropagation()}
-                    className="flex-1 bg-transparent border-b border-brand outline-none text-sm min-w-0"
+                    className="flex-1 bg-transparent border-b border-brand outline-none text-xs min-w-0"
                   />
                 ) : (
                   <span className="flex-1 truncate text-[12px]">{c.title}</span>
                 )}
-                <div className="flex items-center gap-0.5 opacity-0 group-hover/chat:opacity-100 transition-opacity shrink-0">
+                <div className="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0">
                   <ActionIcon title="Yeniden adlandır" onClick={(e) => { e.stopPropagation(); startRename(c.id, c.title); }}>
                     <Pencil size={10} />
                   </ActionIcon>
-                  <ActionIcon title="HTML paylaş" onClick={(e) => { e.stopPropagation(); exportChatHtml(c.id); }}>
+                  <ActionIcon title="Paylaş" onClick={(e) => { e.stopPropagation(); exportChatHtml(c.id); }}>
                     <Share2 size={10} />
                   </ActionIcon>
                   <ActionIcon title="İndir" onClick={(e) => { e.stopPropagation(); exportChat(c.id); }}>
@@ -281,7 +266,7 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* ── Alt: ayarlar + auth ── */}
+      {/* Bottom */}
       <div className="border-t border-line/60 shrink-0">
         <div className="px-3 pt-3 pb-2 space-y-1">
           <button
@@ -298,26 +283,6 @@ export function Sidebar() {
   );
 }
 
-function NavIconBtn({
-  active, onClick, title, children,
-}: {
-  active: boolean; onClick: () => void; title: string; children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      title={title}
-      className={`w-10 h-10 rounded-xl grid place-items-center transition-all ${
-        active
-          ? "bg-brand text-white shadow-md shadow-brand/25"
-          : "text-muted hover:text-ink hover:bg-bgsoft"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
 function ActionIcon({
   children, title, danger, onClick,
 }: {
@@ -328,7 +293,7 @@ function ActionIcon({
       onClick={onClick}
       title={title}
       className={`p-1 rounded transition-colors ${
-        danger ? "text-muted hover:text-red" : "text-muted hover:text-ink"
+        danger ? "text-muted/50 hover:text-red" : "text-muted/50 hover:text-ink"
       }`}
     >
       {children}
@@ -338,7 +303,7 @@ function ActionIcon({
 
 export function DevCredit() {
   return (
-    <div className="text-center text-[10px] text-muted/40 leading-relaxed px-3 pb-3">
+    <div className="text-center text-[10px] text-muted/30 leading-relaxed px-3 pb-3">
       <div className="flex justify-center gap-3">
         <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-brand transition-colors">Gizlilik</a>
         <span>·</span>
