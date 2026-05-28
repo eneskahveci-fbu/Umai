@@ -121,7 +121,7 @@ export function Sidebar() {
           <span className="w-7 h-7 rounded-lg brand-gradient grid place-items-center text-white text-sm shadow-sm shadow-brand/30">
             ◈
           </span>
-          Craft<span className="brand-text">.Coder</span>
+          {"Craft"}<span className="brand-text">.Coder</span>
         </div>
         <button
           onClick={() => setSidebarOpen(false)}
