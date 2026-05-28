@@ -5,8 +5,10 @@ import {
   ArrowUp,
   BookOpen,
   Brain,
+  Download,
   Globe,
   Image as ImageIcon,
+  Mic,
   Paperclip,
   PanelLeft,
   Square,
@@ -16,6 +18,17 @@ import {
 
 import { useStore } from "@/lib/store";
 import { MessageBubble } from "./MessageBubble";
+
+declare global {
+  interface SpeechRecognition {
+    lang: string; continuous: boolean; interimResults: boolean;
+    onresult: (e: SpeechRecognitionEvent) => void;
+    onerror: () => void; onend: () => void; start: () => void;
+  }
+  interface SpeechRecognitionEvent {
+    results: { 0: { 0: { transcript: string } } };
+  }
+}
 
 const SUGGESTIONS = [
   { icon: "🧑‍💻", text: "Python'da bir CLI argüman ayrıştırıcı yaz" },
@@ -47,6 +60,7 @@ export function ChatView() {
   const [searchOn, setSearchOn] = useState(false);
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   const [thinkingMode, setThinkingMode] = useState<null | "fast" | "pro">(null);
+  const [listening, setListening] = useState(false);
 
   const cycleThinking = () =>
     setThinkingMode((m) => (m === null ? "fast" : m === "fast" ? "pro" : null));
@@ -463,6 +477,25 @@ export function ChatView() {
                     {s}
                   </button>
                 ))}
+              </div>
+            )}
+            {messages.length > 0 && !streaming && (
+              <div className="flex justify-center mt-2 mb-1">
+                <button
+                  onClick={() => {
+                    const md = messages
+                      .map((m) => `**${m.role === "user" ? "Sen" : "AI"}:** ${m.content}`)
+                      .join("\n\n---\n\n");
+                    const blob = new Blob([md], { type: "text/markdown" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url; a.download = "sohbet.md"; a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="flex items-center gap-1.5 text-[11px] text-muted/50 hover:text-muted px-3 py-1.5 rounded-lg hover:bg-bgsoft transition-colors"
+                >
+                  <Download size={12} /> Sohbeti dışa aktar
+                </button>
               </div>
             )}
             <div ref={endRef} />

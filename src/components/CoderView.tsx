@@ -17,6 +17,7 @@ import {
   Folder,
   Globe,
   Image as ImageIcon,
+  Mic,
   PanelLeft,
   Paperclip,
   RefreshCw,
@@ -225,6 +226,7 @@ export function CoderView() {
   const [repoSearch, setRepoSearch] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [fetchingFile, setFetchingFile] = useState<string | null>(null);
+  const [listening, setListening] = useState(false);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -717,7 +719,16 @@ export function CoderView() {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto">
             {messages.length === 0 ? (
-              <div className="flex-1" />
+              <div className="flex flex-col items-center justify-center h-full text-center px-6 pb-16 select-none pointer-events-none">
+                <div className="w-12 h-12 rounded-2xl brand-gradient grid place-items-center text-white text-xl mb-4 shadow-lg shadow-brand/20">
+                  ◈
+                </div>
+                <h2 className="text-xl font-extrabold tracking-tight mb-1">Ne üzerinde çalışalım?</h2>
+                <p className="text-sm text-muted/60 max-w-xs leading-relaxed">
+                  Dosya ekle, kod yapıştır veya bir soru sor.<br />
+                  <span className="text-muted/40 text-xs">/ ile agent seç · @ ile dosya mention</span>
+                </p>
+              </div>
             ) : (
               <div className="max-w-3xl mx-auto px-5 py-6">
                 {messages.map((m, i) => {
@@ -1000,6 +1011,31 @@ export function CoderView() {
                   </ComposerButton>
 
                   <ThinkingModeToggle />
+                  {typeof window !== "undefined" && "webkitSpeechRecognition" in window && (
+                    <button
+                      onClick={() => {
+                        const SR = (window as typeof window & { webkitSpeechRecognition: new () => SpeechRecognition }).webkitSpeechRecognition;
+                        const recognition = new SR();
+                        recognition.lang = "tr-TR";
+                        recognition.continuous = false;
+                        recognition.interimResults = false;
+                        recognition.onresult = (e: SpeechRecognitionEvent) => {
+                          setInput((prev) => prev + (prev ? " " : "") + e.results[0][0].transcript);
+                          setListening(false);
+                        };
+                        recognition.onerror = () => setListening(false);
+                        recognition.onend = () => setListening(false);
+                        setListening(true);
+                        recognition.start();
+                      }}
+                      title="Sesle yaz"
+                      className={`flex items-center gap-1.5 text-[12px] px-2 py-1.5 rounded-lg transition-colors ${
+                        listening ? "text-red-400 bg-red-400/10 animate-pulse" : "text-muted hover:text-ink hover:bg-bgsoft"
+                      }`}
+                    >
+                      <Mic size={13} />
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-1.5 text-[11px] text-muted/50 shrink-0">
