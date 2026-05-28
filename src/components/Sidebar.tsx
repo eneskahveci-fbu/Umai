@@ -244,7 +244,13 @@ export function Sidebar() {
                     className="flex-1 bg-transparent border-b border-brand outline-none text-xs min-w-0"
                   />
                 ) : (
-                  <span className="flex-1 truncate text-[12px]">{c.title}</span>
+                  <span
+                    onDoubleClick={(e) => { e.stopPropagation(); startRename(c.id, c.title); }}
+                    className="flex-1 truncate text-[12px]"
+                    title="Çift tıkla yeniden adlandır"
+                  >
+                    {c.title}
+                  </span>
                 )}
                 <div className="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0">
                   <ActionIcon title="Yeniden adlandır" onClick={(e) => { e.stopPropagation(); startRename(c.id, c.title); }}>

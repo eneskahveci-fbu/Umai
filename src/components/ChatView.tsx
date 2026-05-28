@@ -645,6 +645,31 @@ export function ChatView() {
                     : "Düşünce"}
                 </span>
               </button>
+              {typeof window !== "undefined" && "webkitSpeechRecognition" in window && (
+                <button
+                  onClick={() => {
+                    const SR = (window as typeof window & { webkitSpeechRecognition: new () => SpeechRecognition }).webkitSpeechRecognition;
+                    const recognition = new SR();
+                    recognition.lang = "tr-TR";
+                    recognition.continuous = false;
+                    recognition.interimResults = false;
+                    recognition.onresult = (e: SpeechRecognitionEvent) => {
+                      setInput((prev) => prev + (prev ? " " : "") + e.results[0][0].transcript);
+                      setListening(false);
+                    };
+                    recognition.onerror = () => setListening(false);
+                    recognition.onend = () => setListening(false);
+                    setListening(true);
+                    recognition.start();
+                  }}
+                  title="Sesle yaz"
+                  className={`flex items-center gap-1.5 text-[12px] px-2 py-1.5 rounded-lg transition-colors ${
+                    listening ? "text-red-400 bg-red-400/10 animate-pulse" : "text-muted hover:text-ink hover:bg-bgsoft"
+                  }`}
+                >
+                  <Mic size={13} />
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-2 text-[11px] text-muted/50">
