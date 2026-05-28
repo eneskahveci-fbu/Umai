@@ -85,6 +85,7 @@ interface StoreState {
   activeGithub: () => GitHubAccount | null;
   addRepo: (repo: string) => void;
   setActiveRepo: (repo: string) => void;
+  removeRepo: (repo: string) => void;
   toggleTheme: () => void;
 
   // projects
@@ -269,6 +270,12 @@ export const useStore = create<StoreState>()((set, get) => ({
     get().saveConfig({ ...config, repos, activeRepo: repo });
   },
   setActiveRepo: (repo) => get().saveConfig({ ...get().config, activeRepo: repo }),
+  removeRepo: (repo) => {
+    const config = get().config;
+    const repos = config.repos.filter((r) => r !== repo);
+    const activeRepo = config.activeRepo === repo ? (repos[0] ?? null) : config.activeRepo;
+    get().saveConfig({ ...config, repos, activeRepo });
+  },
   toggleTheme: () => {
     const config = get().config;
     get().saveConfig({ ...config, theme: config.theme === "dark" ? "light" : "dark" });

@@ -77,6 +77,8 @@ export const DEFAULT_CONFIG: Config = {
   activeProjectId: null,
   followUps: true,
   webSearch: false,
+  cliMode: false,
+  autoTerminal: false,
   maxContext: 8192,
 };
 

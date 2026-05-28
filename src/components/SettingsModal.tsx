@@ -4,6 +4,8 @@ import { useState } from "react";
 import {
   Brain,
   Check,
+  FolderGit2,
+  Github,
   Moon,
   Pencil,
   Play,
@@ -26,6 +28,10 @@ export function SettingsModal() {
   const setActiveModel = useStore((s) => s.setActiveModel);
   const addGithub = useStore((s) => s.addGithub);
   const removeGithub = useStore((s) => s.removeGithub);
+  const setActiveGithub = useStore((s) => s.setActiveGithub);
+  const addRepo = useStore((s) => s.addRepo);
+  const setActiveRepo = useStore((s) => s.setActiveRepo);
+  const removeRepo = useStore((s) => s.removeRepo);
   const saveConfig = useStore((s) => s.saveConfig);
   const toggleTheme = useStore((s) => s.toggleTheme);
   const addToast = useStore((s) => s.addToast);
@@ -44,6 +50,7 @@ export function SettingsModal() {
   const [editKey, setEditKey] = useState("");
   const [ghUser, setGhUser] = useState("");
   const [ghToken, setGhToken] = useState("");
+  const [repoInput, setRepoInput] = useState("");
   const [testing, setTesting] = useState(false);
   const [memInput, setMemInput] = useState("");
 
@@ -66,6 +73,13 @@ export function SettingsModal() {
     addGithub({ username: ghUser.trim(), token: ghToken.trim() });
     addToast("GitHub hesabı eklendi.", "success");
     setGhUser(""); setGhToken("");
+  };
+
+  const submitRepo = () => {
+    if (!repoInput.trim()) { addToast("Depo adı gerekli.", "error"); return; }
+    addRepo(repoInput.trim());
+    addToast("Depo eklendi.", "success");
+    setRepoInput("");
   };
 
   const testModel = async (m: { baseUrl: string; model: string; apiKey: string; provider: Provider }) => {
@@ -139,25 +153,94 @@ export function SettingsModal() {
 
         {/* GITHUB */}
         {tab === "github" && (
-          <section>
-            <p className="text-xs text-muted mb-3">Coder sekmesinde özel depolara erişmek için token ekle.</p>
-            {config.githubAccounts.length > 0 && (
-              <div className="flex flex-col gap-2 mb-4">
-                {config.githubAccounts.map((a) => (
-                  <div key={a.id} className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-line bg-bgsoft">
-                    <span className="text-brand">⌥</span>
-                    <span className="flex-1 text-sm font-semibold truncate">{a.username}</span>
-                    <button onClick={() => removeGithub(a.id)} className="text-muted hover:text-red p-1"><Trash2 size={15} /></button>
-                  </div>
-                ))}
+          <section className="flex flex-col gap-5">
+            {/* Accounts */}
+            <div>
+              <h4 className="text-sm font-bold mb-1">GitHub Hesapları</h4>
+              <p className="text-xs text-muted mb-2">Birden fazla hesap ekleyebilirsin. Aktif hesap token gerektiren işlemlerde kullanılır.</p>
+              {config.githubAccounts.length > 0 && (
+                <div className="flex flex-col gap-2 mb-3">
+                  {config.githubAccounts.map((a) => {
+                    const isActive = config.activeGithubId === a.id;
+                    return (
+                      <div key={a.id} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${isActive ? "border-branddim bg-brand/10" : "border-line bg-bgsoft"}`}>
+                        <button
+                          onClick={() => setActiveGithub(a.id)}
+                          className={`w-5 h-5 rounded-full grid place-items-center border shrink-0 ${isActive ? "bg-brand border-brand text-white" : "border-muted"}`}
+                        >
+                          {isActive && <Check size={11} />}
+                        </button>
+                        <Github size={13} className={isActive ? "text-brand" : "text-muted"} />
+                        <span className="flex-1 text-sm font-semibold truncate">{a.username}</span>
+                        {isActive && <span className="text-[10px] text-brand font-mono">aktif</span>}
+                        <button onClick={() => removeGithub(a.id)} className="text-muted hover:text-red p-1 shrink-0"><Trash2 size={13} /></button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50">
+                <div className="text-xs font-bold text-muted uppercase tracking-wide mb-2.5">+ Hesap Ekle</div>
+                <div className="grid gap-2">
+                  <input value={ghUser} onChange={(e) => setGhUser(e.target.value)} placeholder="Kullanıcı adı" className="input-mono" />
+                  <input type="password" value={ghToken} onChange={(e) => setGhToken(e.target.value)} placeholder="GitHub token (ghp_...)" className="input-mono" />
+                  <button onClick={submitGithub} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-line hover:border-brand text-sm font-semibold transition-colors"><Plus size={14} /> Hesabı Ekle</button>
+                </div>
               </div>
-            )}
-            <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50">
-              <div className="text-xs font-bold text-muted uppercase tracking-wide mb-3">+ GitHub Hesabı Ekle</div>
-              <div className="grid gap-2.5">
-                <input value={ghUser} onChange={(e) => setGhUser(e.target.value)} placeholder="Kullanıcı adı" className="input-mono" />
-                <input type="password" value={ghToken} onChange={(e) => setGhToken(e.target.value)} placeholder="GitHub token (ghp_...)" className="input-mono" />
-                <button onClick={submitGithub} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-line hover:border-brand text-sm font-semibold"><Plus size={15} /> Hesabı Ekle</button>
+            </div>
+
+            {/* Repositories */}
+            <div>
+              <h4 className="text-sm font-bold mb-1">Depolar</h4>
+              <p className="text-xs text-muted mb-2">Aktif depo Coder'da otomatik bağlanır. En fazla 12 depo kaydedilir.</p>
+              {config.repos.length > 0 && (
+                <div className="flex flex-col gap-2 mb-3">
+                  {config.repos.map((r) => {
+                    const isActive = config.activeRepo === r;
+                    return (
+                      <div key={r} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${isActive ? "border-branddim bg-brand/10" : "border-line bg-bgsoft"}`}>
+                        <button
+                          onClick={() => setActiveRepo(r)}
+                          className={`w-5 h-5 rounded-full grid place-items-center border shrink-0 ${isActive ? "bg-brand border-brand text-white" : "border-muted"}`}
+                        >
+                          {isActive && <Check size={11} />}
+                        </button>
+                        <FolderGit2 size={13} className={isActive ? "text-brand" : "text-muted"} />
+                        <span className="flex-1 text-xs font-mono truncate">{r}</span>
+                        {isActive && <span className="text-[10px] text-brand font-mono">aktif</span>}
+                        <button onClick={() => removeRepo(r)} className="text-muted hover:text-red p-1 shrink-0"><Trash2 size={13} /></button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50">
+                <div className="text-xs font-bold text-muted uppercase tracking-wide mb-2.5">+ Depo Ekle</div>
+                <div className="grid gap-2">
+                  <input value={repoInput} onChange={(e) => setRepoInput(e.target.value)} placeholder="sahip/depo veya sahip/depo:dal" className="input-mono" onKeyDown={(e) => { if (e.key === "Enter") submitRepo(); }} />
+                  <button onClick={submitRepo} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-line hover:border-brand text-sm font-semibold transition-colors"><Plus size={14} /> Depo Ekle</button>
+                </div>
+              </div>
+            </div>
+
+            {/* CLI Mode */}
+            <div>
+              <h4 className="text-sm font-bold mb-2">CLI Modu</h4>
+              <div className="flex flex-col gap-2.5">
+                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
+                  <input type="checkbox" checked={config.cliMode} onChange={() => saveConfig({ ...config, cliMode: !config.cliMode })} className="accent-brand mt-0.5" />
+                  <div>
+                    <div className="text-sm font-semibold">Otomatik bağlantı</div>
+                    <div className="text-xs text-muted mt-0.5">Coder sekmesi açılınca aktif depoyu otomatik olarak bağlar.</div>
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
+                  <input type="checkbox" checked={config.autoTerminal} onChange={() => saveConfig({ ...config, autoTerminal: !config.autoTerminal })} className="accent-brand mt-0.5" />
+                  <div>
+                    <div className="text-sm font-semibold">Terminal'i otomatik aç</div>
+                    <div className="text-xs text-muted mt-0.5">Coder sekmesi açılınca terminal panelini otomatik gösterir.</div>
+                  </div>
+                </label>
               </div>
             </div>
           </section>

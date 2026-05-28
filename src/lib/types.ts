@@ -97,6 +97,8 @@ export interface Config {
   activeProjectId: string | null;
   followUps: boolean;
   webSearch: boolean;
+  cliMode: boolean;
+  autoTerminal: boolean;
   maxContext: number;
 }
 

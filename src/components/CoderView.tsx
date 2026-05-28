@@ -275,9 +275,13 @@ export function CoderView() {
   };
 
   useEffect(() => {
-    if (config.activeRepo && !tree) connectRepo();
+    if (config.cliMode && config.activeRepo && !tree) connectRepo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.activeRepo, config.activeGithubId]);
+  }, [config.activeRepo, config.activeGithubId, config.cliMode]);
+
+  useEffect(() => {
+    if (config.autoTerminal) setTerminalOpen(true);
+  }, [config.autoTerminal]);
 
   const attachRepoFile = async (file: TreeFile) => {
     if (attachedFiles.find((f) => f.path === file.path)) {
