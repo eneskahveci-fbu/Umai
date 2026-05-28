@@ -182,6 +182,7 @@ interface StoreState {
   snippets: Snippet[];
   addSnippet: (s: Omit<Snippet, "id" | "created_at">) => void;
   removeSnippet: (id: string) => void;
+  reorderSnippets: (fromId: string, toId: string) => void;
   snippetsOpen: boolean;
   setSnippetsOpen: (b: boolean) => void;
 
@@ -664,6 +665,16 @@ export const useStore = create<StoreState>()((set, get) => ({
       saveSnippets(snippets);
       return { snippets };
     }),
+  reorderSnippets: (fromId, toId) => {
+    const snips = [...get().snippets];
+    const fromIdx = snips.findIndex((s) => s.id === fromId);
+    const toIdx = snips.findIndex((s) => s.id === toId);
+    if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+    const [item] = snips.splice(fromIdx, 1);
+    snips.splice(toIdx, 0, item);
+    saveSnippets(snips);
+    set({ snippets: snips });
+  },
   snippetsOpen: false,
   setSnippetsOpen: (b) => set({ snippetsOpen: b }),
 

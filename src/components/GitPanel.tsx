@@ -13,6 +13,7 @@ export function GitPanel({ onClose }: { onClose: () => void }) {
   const [prBody, setPrBody] = useState("");
   const [prHead, setPrHead] = useState("");
   const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
 
   const getToken = () => useStore.getState().activeGithub()?.token ?? "";
 
@@ -32,6 +33,7 @@ export function GitPanel({ onClose }: { onClose: () => void }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       addToast(`Dal oluşturuldu: ${branchName}`, "success");
+      setResult(branchName.trim());
       setBranchName("");
     } catch (e) { addToast(`Hata: ${(e as Error).message}`, "error"); }
     finally { setLoading(false); }
@@ -86,6 +88,22 @@ export function GitPanel({ onClose }: { onClose: () => void }) {
               className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-brand hover:bg-branddim text-white text-xs font-semibold disabled:opacity-40 transition-colors">
               {loading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Dal Oluştur
             </button>
+            {result && (
+              <div className="text-xs text-green/80 bg-green/5 border border-green/20 rounded-lg px-3 py-2 flex items-center gap-2">
+                <span>✓ Dal hazır: <code className="font-mono">{result}</code></span>
+                <button
+                  onClick={() => {
+                    const store = useStore.getState();
+                    if (store.repo) store.setRepo({ ...store.repo, branch: result });
+                    addToast(`Aktif dal: ${result}`, "success");
+                    setResult(null);
+                  }}
+                  className="ml-auto text-[10px] px-2 py-1 rounded bg-green/10 hover:bg-green/20 transition-colors font-semibold"
+                >
+                  Geç
+                </button>
+              </div>
+            )}
           </div>
         )}
         {tab === "pr" && (

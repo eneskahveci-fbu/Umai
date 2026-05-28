@@ -9,9 +9,11 @@ export function SnippetsPanel() {
   const setOpen = useStore((s) => s.setSnippetsOpen);
   const snippets = useStore((s) => s.snippets);
   const removeSnippet = useStore((s) => s.removeSnippet);
+  const reorderSnippets = useStore((s) => s.reorderSnippets);
   const addToast = useStore((s) => s.addToast);
   const [search, setSearch] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
 
   if (!open) return null;
 
@@ -84,7 +86,18 @@ export function SnippetsPanel() {
             </div>
           ) : (
             filtered.map((s) => (
-              <div key={s.id} className="bg-bgsoft/40 border border-line/60 rounded-xl overflow-hidden">
+              <div
+                key={s.id}
+                draggable
+                onDragStart={() => setDragId(s.id)}
+                onDragEnd={() => setDragId(null)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragId && dragId !== s.id) reorderSnippets(dragId, s.id);
+                }}
+                className={`bg-bgsoft/40 border border-line/60 rounded-xl overflow-hidden transition-opacity cursor-grab active:cursor-grabbing ${dragId === s.id ? "opacity-40" : ""}`}
+              >
                 <div className="flex items-center justify-between px-3 py-2 border-b border-line/40">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-xs font-semibold truncate">{s.title}</span>

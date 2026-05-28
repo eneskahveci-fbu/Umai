@@ -1036,7 +1036,7 @@ export function CoderView() {
 
               {/* Alt araç çubuğu */}
               <div className="flex items-center justify-between mt-2 px-0.5">
-                <div className="flex items-center gap-0.5 flex-wrap">
+                <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-none pb-0.5 flex-nowrap">
                   <ComposerButton onClick={() => setFilesOpen((v) => !v)} active={filesOpen} title="Depo dosyaları">
                     <FolderOpen size={13} />
                     <span>Dosyalar</span>
@@ -1127,6 +1127,9 @@ export function CoderView() {
             <EditorPanel
               file={editorFile}
               onClose={() => setEditorOpen(false)}
+              onAskAI={(text, context) => {
+                useStore.getState().setPendingInput(context);
+              }}
             />
           </div>
         )}

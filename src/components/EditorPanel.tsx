@@ -1,8 +1,8 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import Editor, { OnMount } from "@monaco-editor/react";
-import { Check, Copy, GitCommit, Loader2, X } from "lucide-react";
+import Editor, { OnMount, useMonaco } from "@monaco-editor/react";
+import { Check, Copy, GitCommit, Loader2, Sparkles, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 
 interface EditorFile {
@@ -26,9 +26,11 @@ function detectLanguage(path: string): string {
 export function EditorPanel({
   file,
   onClose,
+  onAskAI,
 }: {
   file: EditorFile;
   onClose: () => void;
+  onAskAI?: (text: string, context: string) => void;
 }) {
   const repo = useStore((s) => s.repo);
   const addToast = useStore((s) => s.addToast);
@@ -38,7 +40,10 @@ export function EditorPanel({
   const [committing, setCommitting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showCommit, setShowCommit] = useState(false);
+  const [selection, setSelection] = useState("");
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const monacoInstance = useMonaco();
+  const completionRef = useRef<{ dispose: () => void } | null>(null);
 
   useEffect(() => {
     setValue(file.content);
@@ -48,7 +53,83 @@ export function EditorPanel({
 
   const handleMount: OnMount = (editor) => {
     editorRef.current = editor;
+    editor.onDidChangeCursorSelection(() => {
+      const sel = editor.getSelection();
+      if (!sel) { setSelection(""); return; }
+      const model = editor.getModel();
+      if (!model) { setSelection(""); return; }
+      const text = model.getValueInRange(sel);
+      setSelection(text.trim());
+    });
   };
+
+  useEffect(() => {
+    if (!monacoInstance) return;
+    completionRef.current?.dispose();
+
+    const provider = monacoInstance.languages.registerInlineCompletionsProvider(
+      { pattern: "**" },
+      {
+        provideInlineCompletions: async (model, position) => {
+          const textBefore = model.getValueInRange({
+            startLineNumber: 1, startColumn: 1,
+            endLineNumber: position.lineNumber,
+            endColumn: position.column,
+          });
+          if (textBefore.trim().length < 20) return { items: [] };
+          const active = useStore.getState().activeModel();
+          if (!active) return { items: [] };
+          try {
+            const res = await fetch("/api/chat", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                messages: [{
+                  role: "user",
+                  content: `Aşağıdaki ${file.language} kodunu tamamla. SADECE tamamlama kodunu yaz, açıklama yapma:\n\`\`\`${file.language}\n${textBefore}`,
+                }],
+                baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey,
+                provider: active.provider,
+              }),
+            });
+            if (!res.ok || !res.body) return { items: [] };
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let completion = "";
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const chunk = decoder.decode(value, { stream: true });
+              for (const line of chunk.split("\n")) {
+                const t = line.trim();
+                if (!t.startsWith("data:")) continue;
+                const data = t.slice(5).trim();
+                if (data === "[DONE]") continue;
+                try {
+                  const json = JSON.parse(data);
+                  completion += json.choices?.[0]?.delta?.content ?? "";
+                } catch { /* skip */ }
+              }
+            }
+            completion = completion.replace(/^```[\w]*\n?/, "").replace(/\n?```$/, "").trim();
+            if (!completion) return { items: [] };
+            return {
+              items: [{
+                insertText: completion,
+                range: new monacoInstance.Range(
+                  position.lineNumber, position.column,
+                  position.lineNumber, position.column
+                ),
+              }],
+            };
+          } catch { return { items: [] }; }
+        },
+        disposeInlineCompletions: () => {},
+      }
+    );
+    completionRef.current = provider;
+    return () => { provider.dispose(); };
+  }, [monacoInstance, file.language]);
 
   const handleChange = (v: string | undefined) => {
     setValue(v ?? "");
@@ -104,6 +185,15 @@ export function EditorPanel({
         <button onClick={copy} className="text-muted hover:text-ink p-1 rounded transition-colors" title="Kopyala">
           {copied ? <Check size={13} className="text-green" /> : <Copy size={13} />}
         </button>
+        {selection && onAskAI && (
+          <button
+            onClick={() => onAskAI(selection, `Dosya: ${file.path}\n\`\`\`${file.language}\n${selection}\n\`\`\``)}
+            className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-colors font-semibold"
+            title="Seçili kodu AI'ya sor"
+          >
+            <Sparkles size={12} /> AI&apos;ya Sor
+          </button>
+        )}
         {dirty && (
           <button
             onClick={() => setShowCommit((v) => !v)}
@@ -157,6 +247,7 @@ export function EditorPanel({
             tabSize: 2,
             wordWrap: "on",
             padding: { top: 12, bottom: 12 },
+            inlineSuggest: { enabled: true },
           }}
         />
       </div>

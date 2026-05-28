@@ -57,6 +57,8 @@ export function ChatView() {
   const setFollowUpSuggestions = useStore((s) => s.setFollowUpSuggestions);
 
   const [input, setInput] = useState("");
+  const [ghost, setGhost] = useState("");
+  const ghostTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [searchOn, setSearchOn] = useState(false);
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   const [thinkingMode, setThinkingMode] = useState<null | "fast" | "pro">(null);
@@ -160,7 +162,10 @@ export function ChatView() {
             model: active.model,
             apiKey: active.apiKey,
             provider: active.provider,
-            systemPrompt: store.config.systemPrompt,
+            systemPrompt: [
+              store.config.systemPrompt,
+              store.config.rulesFile?.trim() ? `## Proje Kuralları\n${store.config.rulesFile.trim()}` : "",
+            ].filter(Boolean).join("\n\n"),
             style: store.config.style,
             memories: store.config.memories,
             searchContext,
@@ -220,6 +225,18 @@ export function ChatView() {
         currentAbort = null;
         useStore.getState().setStreaming(false);
         await useStore.getState().persistCurrent();
+        if (useStore.getState().config.soundEnabled) {
+          try {
+            const ctx = new AudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+            osc.start(); osc.stop(ctx.currentTime + 0.3);
+          } catch { /* yoksay */ }
+        }
         fetchFollowUps();
       }
     },
@@ -294,6 +311,16 @@ export function ChatView() {
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Tab" && ghost) {
+      e.preventDefault();
+      setInput((prev) => prev + ghost);
+      setGhost("");
+      return;
+    }
+    if (e.key === "Escape" && ghost) {
+      setGhost("");
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       send();
@@ -531,6 +558,7 @@ export function ChatView() {
             </div>
           )}
           <div className="flex items-end gap-2 bg-surface border border-line rounded-2xl px-3 py-2.5 focus-within:border-brand/50 focus-within:shadow-[0_0_0_3px_rgba(124,92,255,0.08)] transition-all duration-200">
+            <div className="flex-1 min-w-0 flex flex-col">
             <input
               ref={fileRef}
               type="file"
@@ -556,13 +584,63 @@ export function ChatView() {
             <textarea
               ref={taRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setInput(v);
+                setGhost("");
+                if (ghostTimer.current) clearTimeout(ghostTimer.current);
+                if (v.trim().length > 10) {
+                  ghostTimer.current = setTimeout(async () => {
+                    const store = useStore.getState();
+                    const active = store.activeModel();
+                    if (!active) return;
+                    try {
+                      const res = await fetch("/api/chat", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          messages: [{ role: "user", content: `Kullanıcı şunu yazmaya başladı: "${v}"\n\nBu mesajı tamamla — SADECE tamamlama kısmını yaz, 1-2 cümle, Türkçe. Nokta ile bitir.` }],
+                          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey,
+                          provider: active.provider,
+                        }),
+                      });
+                      if (!res.ok || !res.body) return;
+                      const reader = res.body.getReader();
+                      const decoder = new TextDecoder();
+                      let result = "";
+                      while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        const chunk = decoder.decode(value, { stream: true });
+                        for (const line of chunk.split("\n")) {
+                          const t = line.trim();
+                          if (!t.startsWith("data:")) continue;
+                          const data = t.slice(5).trim();
+                          if (data === "[DONE]") continue;
+                          try {
+                            const json = JSON.parse(data);
+                            result += json.choices?.[0]?.delta?.content ?? "";
+                          } catch { /* skip */ }
+                        }
+                      }
+                      setGhost(result.trim().slice(0, 120));
+                    } catch { /* yoksay */ }
+                  }, 1800);
+                }
+              }}
               onKeyDown={onKeyDown}
               onPaste={handlePaste}
               rows={1}
               placeholder={pendingImages.length > 0 ? "Görseli koda dönüştür veya açıkla…" : "Mesajınızı yazın…"}
-              className="flex-1 bg-transparent resize-none outline-none text-[15px] leading-relaxed max-h-[200px] py-1.5 placeholder:text-muted/50"
+              className="w-full bg-transparent resize-none outline-none text-[15px] leading-relaxed max-h-[200px] py-1.5 placeholder:text-muted/50"
             />
+            {ghost && (
+              <div className="px-3 pb-1.5 text-[13px] text-muted/35 leading-relaxed pointer-events-none select-none flex items-start gap-1">
+                <span className="truncate italic">{ghost}</span>
+                <kbd className="shrink-0 text-[10px] px-1 py-0.5 rounded border border-line/40 text-muted/30 font-mono">Tab</kbd>
+              </div>
+            )}
+            </div>
             {streaming ? (
               <button
                 onClick={stop}
@@ -584,7 +662,7 @@ export function ChatView() {
 
           {/* Alt araç çubuğu */}
           <div className="flex items-center justify-between mt-2 px-0.5">
-            <div className="flex items-center gap-0.5">
+            <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-none pb-0.5 flex-nowrap">
               <button
                 onClick={() => fileRef.current?.click()}
                 title="Dosya ekle"
