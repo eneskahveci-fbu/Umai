@@ -20,20 +20,52 @@ export default function LoginPage() {
     if (!email.trim()) errs.email = "E-posta gerekli";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errs.email = "Geçersiz e-posta adresi";
     if (!password) errs.password = "Şifre gerekli";
-    else if (password.length < 6) errs.password = "Şifre en az 6 karakter olmalı";
+    else if (password.length < 8) errs.password = "Şifre en az 8 karakter olmalı";
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
+  /* Brute-force koruması: arka arkaya başarısız denemelerde gecikme ekle */
+  const ATTEMPTS_KEY = "craftai_login_attempts";
+  const readAttempts = (): { count: number; lockUntil: number } => {
+    if (typeof window === "undefined") return { count: 0, lockUntil: 0 };
+    try {
+      return JSON.parse(localStorage.getItem(ATTEMPTS_KEY) ?? "") ?? { count: 0, lockUntil: 0 };
+    } catch {
+      return { count: 0, lockUntil: 0 };
+    }
+  };
+  const writeAttempts = (a: { count: number; lockUntil: number }) => {
+    if (typeof window !== "undefined") localStorage.setItem(ATTEMPTS_KEY, JSON.stringify(a));
+  };
+
   const signIn = async () => {
     if (!validate()) return;
+    const attempts = readAttempts();
+    const now = Date.now();
+    if (attempts.lockUntil > now) {
+      const secs = Math.ceil((attempts.lockUntil - now) / 1000);
+      setError(`Çok fazla başarısız deneme. ${secs} saniye sonra tekrar dene.`);
+      return;
+    }
     setLoading(true);
     setError("");
     const sb = createClient();
     if (!sb) { setError("Kimlik doğrulama yapılandırılmamış."); setLoading(false); return; }
     const { error: err } = await sb.auth.signInWithPassword({ email: email.trim(), password });
     setLoading(false);
-    if (err) { setError("E-posta veya şifre hatalı. Lütfen tekrar dene."); return; }
+    if (err) {
+      const nextCount = attempts.count + 1;
+      const lockUntil = nextCount >= 5 ? now + 60_000 : 0; /* 5 hata = 60s kilit */
+      writeAttempts({ count: nextCount, lockUntil });
+      setError(
+        lockUntil > 0
+          ? "Çok fazla başarısız deneme. 60 saniye bekle."
+          : "E-posta veya şifre hatalı. Lütfen tekrar dene.",
+      );
+      return;
+    }
+    writeAttempts({ count: 0, lockUntil: 0 });
     router.push("/app");
   };
 
@@ -105,6 +137,7 @@ export default function LoginPage() {
                   onKeyDown={(e) => e.key === "Enter" && signIn()}
                   placeholder="••••••••"
                   autoComplete="current-password"
+                  minLength={8}
                   className={`w-full bg-bgsoft border rounded-xl pl-10 pr-11 py-3 text-sm outline-none transition-colors placeholder:text-muted/35 ${
                     fieldErrors.password ? "border-red/60 focus:border-red" : "border-line focus:border-brand"
                   }`}

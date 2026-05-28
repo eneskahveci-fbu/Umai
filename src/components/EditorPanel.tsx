@@ -4,24 +4,7 @@ import { useRef, useState, useEffect } from "react";
 import Editor, { OnMount, useMonaco } from "@monaco-editor/react";
 import { Check, Copy, GitCommit, Loader2, Sparkles, X } from "lucide-react";
 import { useStore } from "@/lib/store";
-
-interface EditorFile {
-  path: string;
-  content: string;
-  language: string;
-}
-
-function detectLanguage(path: string): string {
-  const ext = path.split(".").pop()?.toLowerCase() ?? "";
-  const map: Record<string, string> = {
-    ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
-    py: "python", rs: "rust", go: "go", java: "java", c: "c", cpp: "cpp",
-    css: "css", scss: "scss", html: "html", json: "json", md: "markdown",
-    yaml: "yaml", yml: "yaml", toml: "toml", sh: "shell", sql: "sql",
-    rb: "ruby", php: "php", swift: "swift", kt: "kotlin", xml: "xml",
-  };
-  return map[ext] ?? "plaintext";
-}
+import type { EditorFile } from "@/lib/editor";
 
 export function EditorPanel({
   file,
@@ -255,5 +238,4 @@ export function EditorPanel({
   );
 }
 
-export type { EditorFile };
-export { detectLanguage };
+export default EditorPanel;

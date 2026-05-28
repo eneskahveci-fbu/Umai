@@ -14,7 +14,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Craft.Coder — AI kod asistanı",
+  title: {
+    default: "Craft.Coder — AI kod asistanı",
+    template: "%s — Craft.Coder",
+  },
   description:
     "OpenAI-uyumlu herhangi bir modelle çalışan AI kod asistanı. Sohbet, gizli sohbet, geçmiş senkron ve GitHub deposuna bağlı Coder sekmesi.",
   keywords: [
@@ -27,6 +30,9 @@ export const metadata: Metadata = {
     "code assistant",
   ],
   authors: [{ name: "Enes Kahveci", url: "mailto:eneskahveci.bs@gmail.com" }],
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     title: "Craft.Coder — AI kod asistanı",
     description:
@@ -34,6 +40,7 @@ export const metadata: Metadata = {
     siteName: "Craft.Coder",
     type: "website",
     locale: "tr_TR",
+    url: "/",
   },
   twitter: {
     card: "summary_large_image",
@@ -41,7 +48,27 @@ export const metadata: Metadata = {
     description:
       "İstediğin modelle çalışan AI kod asistanı. Sohbet, GitHub Coder, gizli mod.",
   },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://craft-coder.vercel.app"),
+};
+
+export const viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0e0e13" },
+    { media: "(prefers-color-scheme: light)", color: "#f5f5f7" },
+  ],
+  colorScheme: "dark light",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
