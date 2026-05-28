@@ -64,12 +64,69 @@ export function Sidebar() {
     setEditingId(null);
   };
 
+  /* ── Collapsed icon-only sidebar ── */
+  if (!sidebarOpen) {
+    return (
+      <aside className="fixed top-0 left-0 z-40 h-full w-14 flex-col hidden md:flex bg-surface border-r border-line/60">
+        {/* Logo */}
+        <div className="h-14 flex items-center justify-center border-b border-line/60 shrink-0">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            title="Yan paneli aç"
+            className="w-9 h-9 rounded-xl brand-gradient grid place-items-center text-white shadow-sm shadow-brand/30 hover:shadow-brand/50 transition-shadow"
+          >
+            <span className="text-sm">◆</span>
+          </button>
+        </div>
+
+        {/* New chat */}
+        <div className="px-2 py-2 border-b border-line/60 shrink-0 space-y-1">
+          <button
+            onClick={() => newChat(false)}
+            title="Yeni Sohbet"
+            className="w-full h-9 rounded-xl bg-brand hover:bg-branddim text-white grid place-items-center transition-colors"
+          >
+            <Plus size={16} />
+          </button>
+          <button
+            onClick={() => newChat(true)}
+            title="Gizli Sohbet"
+            className="w-full h-9 rounded-xl border border-line/60 hover:border-line text-muted hover:text-purple grid place-items-center transition-colors"
+          >
+            <VenetianMask size={14} />
+          </button>
+        </div>
+
+        {/* View nav icons */}
+        <div className="flex-1 flex flex-col items-center gap-1 pt-3 min-h-0">
+          <NavIconBtn active={view === "chat"} onClick={() => setView("chat")} title="Sohbet">
+            <MessageSquare size={16} />
+          </NavIconBtn>
+          <NavIconBtn active={view === "coder"} onClick={() => setView("coder")} title="Coder">
+            <Code2 size={16} />
+          </NavIconBtn>
+          <NavIconBtn active={view === "compare"} onClick={() => setView("compare")} title="Karşılaştır">
+            <GitCompareArrows size={15} />
+          </NavIconBtn>
+        </div>
+
+        {/* Bottom settings + auth */}
+        <div className="px-2 pb-3 space-y-1 shrink-0">
+          <button
+            onClick={() => setSettingsOpen(true)}
+            title="Ayarlar"
+            className="w-full h-9 rounded-xl border border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink grid place-items-center transition-colors"
+          >
+            <Settings size={15} />
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
+  /* ── Expanded full sidebar ── */
   return (
-    <aside
-      className={`fixed top-0 left-0 z-40 h-full w-64 flex flex-col bg-surface border-r border-line/60 transition-transform duration-300 ease-in-out ${
-        sidebarOpen ? "translate-x-0" : "-translate-x-full"
-      }`}
-    >
+    <aside className="fixed top-0 left-0 z-40 h-full w-64 flex flex-col bg-surface border-r border-line/60 transition-transform duration-300 ease-in-out translate-x-0">
       {/* ── Üst: logo + kapat + yeni sohbet ── */}
       <div className="px-3 pt-4 pb-3 border-b border-line/60 space-y-2">
         <div className="flex items-center justify-between mb-1">
@@ -223,7 +280,7 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* ── Alt navigasyon (Claude tarzı) ── */}
+      {/* ── Alt navigasyon ── */}
       <div className="border-t border-line/60 shrink-0">
         <div className="px-2 pt-2 pb-1">
           <div className="flex rounded-xl bg-bgsoft/50 p-1 gap-0.5">
@@ -245,6 +302,26 @@ export function Sidebar() {
         <DevCredit />
       </div>
     </aside>
+  );
+}
+
+function NavIconBtn({
+  active, onClick, title, children,
+}: {
+  active: boolean; onClick: () => void; title: string; children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={`w-10 h-10 rounded-xl grid place-items-center transition-all ${
+        active
+          ? "bg-brand text-white shadow-md shadow-brand/25"
+          : "text-muted hover:text-ink hover:bg-bgsoft"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

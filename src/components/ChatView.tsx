@@ -8,7 +8,6 @@ import {
   Image as ImageIcon,
   Paperclip,
   PanelLeft,
-  Settings,
   Square,
   VenetianMask,
 } from "lucide-react";
@@ -385,11 +384,11 @@ export function ChatView() {
             </div>
           )}
           <button
-            onClick={() => setSettingsOpen(true)}
-            className="w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
-            title="Ayarlar"
+            onClick={() => useStore.getState().newChat(true)}
+            className="w-8 h-8 rounded-lg text-muted hover:text-purple hover:bg-purple/10 grid place-items-center transition-colors"
+            title="Gizli Sohbet"
           >
-            <Settings size={15} />
+            <VenetianMask size={15} />
           </button>
         </div>
       </div>

@@ -29,8 +29,8 @@ export default function AppPage() {
   const loadChats = useStore((s) => s.loadChats);
 
   useEffect(() => {
-    /* Desktop'ta sidebar varsayılan açık */
-    if (window.innerWidth >= 768) setSidebarOpen(true);
+    /* Desktop'ta sidebar varsayılan kapalı (ikon modu) */
+    if (window.innerWidth >= 768) setSidebarOpen(false);
   }, [setSidebarOpen]);
 
   useEffect(() => {
@@ -83,7 +83,7 @@ export default function AppPage() {
         {/* Ana içerik — sidebar genişliğini hesaba katar */}
         <main
           className={`flex-1 min-w-0 flex flex-col transition-[margin] duration-300 ease-in-out ${
-            sidebarOpen ? "md:ml-64" : "md:ml-0"
+            sidebarOpen ? "md:ml-64" : "md:ml-14"
           }`}
         >
           <MainView view={view} />
