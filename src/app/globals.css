@@ -188,10 +188,38 @@ html.light .prose-chat :not(pre) > code {
   font-size: 13.5px;
   font-family: var(--font-mono);
   color: var(--color-ink);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .input-mono:focus {
   outline: none;
   border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 15%, transparent);
+}
+
+/* ─── Global smooth scrolling + branded focus ring ─── */
+html { scroll-behavior: smooth; }
+
+/* Use the active accent for any tabbable element's focus-visible state.
+   The :where() wrapper keeps specificity low so component styles always win. */
+:where(button, a, [role="button"], [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand) 60%, transparent);
+  border-radius: 0.5rem;
+}
+
+/* ─── Subtle scrollbar ─── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-muted) 25%, transparent);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-muted) 45%, transparent);
+  background-clip: padding-box;
+  border: 2px solid transparent;
 }
 
 /* ─── Yanıp sönen cursor ─── */

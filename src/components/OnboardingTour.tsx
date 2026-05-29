@@ -50,7 +50,7 @@ export function OnboardingTour() {
         <>Harika — bir model zaten ekli. <Check size={13} className="inline text-green" /></>
       ) : (
         <>
-          Ayarlar → Model'den bir provider seç, baseURL + API anahtarını gir, "Test" düğmesiyle doğrula.
+          Ayarlar → Model&apos;den bir provider seç, baseURL + API anahtarını gir, &quot;Test&quot; düğmesiyle doğrula.
           Cevap dönüyorsa hazırsın.
         </>
       ),
@@ -66,7 +66,7 @@ export function OnboardingTour() {
         <>GitHub hesabı bağlı. <Check size={13} className="inline text-green" /></>
       ) : (
         <>
-          Kod tabanına özel cevaplar için Ayarlar → GitHub'tan kişisel access token ekle (
+          Kod tabanına özel cevaplar için Ayarlar → GitHub&apos;tan kişisel access token ekle (
           <code className="text-[11px] bg-bgsoft px-1 rounded">repo</code> izni yeter). Sonra sol panelden bir depo seç.
         </>
       ),
@@ -76,8 +76,8 @@ export function OnboardingTour() {
       title: "3. İlk sorunu sor",
       body: (
         <>
-          Composer'a yaz. <code className="text-[11px] bg-bgsoft px-1 rounded">/</code> ile agent seç,
-          {" "}<code className="text-[11px] bg-bgsoft px-1 rounded">@</code> ile dosya mention'la.
+          Composer&apos;a yaz. <code className="text-[11px] bg-bgsoft px-1 rounded">/</code> ile agent seç,
+          {" "}<code className="text-[11px] bg-bgsoft px-1 rounded">@</code> ile dosya mention&apos;la.
           AI birden fazla dosya yazınca, otomatik <strong className="text-ink">çok dosyalı commit</strong> barı çıkar.
         </>
       ),
