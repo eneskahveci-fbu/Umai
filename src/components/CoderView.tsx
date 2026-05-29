@@ -302,6 +302,11 @@ export function CoderView() {
   }, [pendingInput, setPendingInput]);
 
   useEffect(() => {
+    /* silently restore last mounted folder if browser still grants permission */
+    import("@/lib/localfs").then(({ restoreMounted }) => restoreMounted().catch(() => { /* ignore */ }));
+  }, []);
+
+  useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, messages[messages.length - 1]?.content]);
 

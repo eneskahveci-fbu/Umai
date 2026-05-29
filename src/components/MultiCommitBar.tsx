@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { Check, FileText, GitCommit, Loader2, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, FileText, FolderOpen, GitCommit, Loader2, Terminal, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { EditorFile } from "@/lib/editor";
+import { getMountedHandle, getMountedName, writeBackToDir } from "@/lib/localfs";
+import { getWebContainer, isSupported as wcSupported, needsApiKey, writeFile as wcWriteFile } from "@/lib/webcontainer";
 
 export function MultiCommitBar({
   files,
@@ -16,10 +18,20 @@ export function MultiCommitBar({
 }) {
   const repo = useStore((s) => s.repo);
   const addToast = useStore((s) => s.addToast);
+  const apiKey = useStore((s) => s.config.webcontainerApiKey);
   const [selected, setSelected] = useState<Set<string>>(new Set(files.map((f) => f.path)));
   const [message, setMessage] = useState("");
   const [committing, setCommitting] = useState(false);
+  const [writingLocal, setWritingLocal] = useState(false);
+  const [writingSandbox, setWritingSandbox] = useState(false);
   const [done, setDone] = useState(false);
+  const [mountedName, setMountedName] = useState<string | null>(getMountedName());
+
+  useEffect(() => {
+    const fn = () => setMountedName(getMountedName());
+    window.addEventListener("localfs:changed", fn);
+    return () => window.removeEventListener("localfs:changed", fn);
+  }, []);
 
   if (files.length === 0) return null;
   const toCommit = files.filter((f) => selected.has(f.path));
@@ -28,6 +40,41 @@ export function MultiCommitBar({
     const next = new Set(selected);
     if (next.has(path)) next.delete(path); else next.add(path);
     setSelected(next);
+  };
+
+  const writeLocal = async () => {
+    const handle = getMountedHandle();
+    if (!handle) { addToast("Yerel klasör mount edilmemiş", "error"); return; }
+    if (toCommit.length === 0) return;
+    setWritingLocal(true);
+    try {
+      let ok = 0;
+      for (const f of toCommit) {
+        await writeBackToDir(handle, f.path, f.content);
+        ok++;
+      }
+      addToast(`✓ ${ok} dosya yerel klasöre yazıldı`, "success");
+    } catch (e) {
+      addToast(`Yerel yazma hatası: ${(e as Error).message}`, "error");
+    } finally {
+      setWritingLocal(false);
+    }
+  };
+
+  const writeSandbox = async () => {
+    if (!wcSupported()) { addToast("Tarayıcı sandbox'ı desteklemiyor", "error"); return; }
+    if (needsApiKey() && !apiKey.trim()) { addToast("Sandbox API key gerekli (Ayarlar → Gelişmiş)", "error"); return; }
+    if (toCommit.length === 0) return;
+    setWritingSandbox(true);
+    try {
+      const wc = await getWebContainer(apiKey);
+      for (const f of toCommit) await wcWriteFile(wc, f.path, f.content);
+      addToast(`✓ ${toCommit.length} dosya sandbox FS'sine yazıldı`, "success");
+    } catch (e) {
+      addToast(`Sandbox yazma hatası: ${(e as Error).message}`, "error");
+    } finally {
+      setWritingSandbox(false);
+    }
   };
 
   const commit = async () => {
@@ -114,13 +161,36 @@ export function MultiCommitBar({
           onKeyDown={(e) => { if (e.key === "Enter") commit(); }}
           className="flex-1 bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50 disabled:opacity-50"
         />
+
+        {mountedName && (
+          <button
+            onClick={writeLocal}
+            disabled={writingLocal || toCommit.length === 0}
+            title={`${mountedName} klasörüne yaz`}
+            className="flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg bg-green/15 hover:bg-green/25 text-green/90 font-semibold disabled:opacity-50 transition-colors"
+          >
+            {writingLocal ? <Loader2 size={11} className="animate-spin" /> : <FolderOpen size={11} />}
+            Yerel
+          </button>
+        )}
+
+        <button
+          onClick={writeSandbox}
+          disabled={writingSandbox || toCommit.length === 0}
+          title="WebContainer (sandbox) FS'sine yaz"
+          className="flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg bg-amber-400/15 hover:bg-amber-400/25 text-amber-400/90 font-semibold disabled:opacity-50 transition-colors"
+        >
+          {writingSandbox ? <Loader2 size={11} className="animate-spin" /> : <Terminal size={11} />}
+          Sandbox
+        </button>
+
         <button
           onClick={commit}
           disabled={committing || done || toCommit.length === 0}
           className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-brand hover:bg-branddim text-white font-semibold disabled:opacity-50 transition-colors"
         >
           {done ? <Check size={12} /> : committing ? <Loader2 size={12} className="animate-spin" /> : <GitCommit size={12} />}
-          {done ? "Tamam" : committing ? `${toCommit.length} dosya…` : `${toCommit.length} dosyayı commit et`}
+          {done ? "Tamam" : committing ? `${toCommit.length}…` : `${toCommit.length} commit`}
         </button>
       </div>
     </div>

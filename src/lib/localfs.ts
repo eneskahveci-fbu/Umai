@@ -11,11 +11,82 @@ export function getMountedName(): string | null { return mountedName; }
 export function setMounted(h: FileSystemDirectoryHandle | null, name: string | null) {
   mountedHandle = h;
   mountedName = name;
-  if (typeof window !== "undefined") window.dispatchEvent(new Event("localfs:changed"));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("localfs:changed"));
+    /* fire-and-forget; failures (e.g. private mode) are silently ignored */
+    idbPut(h).catch(() => { /* ignore */ });
+  }
 }
 
 export function isLocalFsSupported(): boolean {
   return typeof window !== "undefined" && "showDirectoryPicker" in window;
+}
+
+/* ----- IndexedDB persistence: keep the picked handle across reloads ----- */
+const DB_NAME = "craft-ai-localfs";
+const STORE = "handles";
+const KEY = "rootDir";
+
+function openDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(STORE);
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+async function idbPut(handle: FileSystemDirectoryHandle | null) {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    if (handle) tx.objectStore(STORE).put(handle, KEY);
+    else tx.objectStore(STORE).delete(KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+async function idbGet(): Promise<FileSystemDirectoryHandle | null> {
+  const db = await openDb();
+  const handle = await new Promise<FileSystemDirectoryHandle | null>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readonly");
+    const req = tx.objectStore(STORE).get(KEY);
+    req.onsuccess = () => resolve((req.result as FileSystemDirectoryHandle | undefined) ?? null);
+    req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return handle;
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export async function verifyPermission(handle: FileSystemDirectoryHandle): Promise<"granted" | "prompt" | "denied"> {
+  const h = handle as any;
+  const cur = await h.queryPermission?.({ mode: "readwrite" });
+  if (cur === "granted") return "granted";
+  return cur === "denied" ? "denied" : "prompt";
+}
+
+export async function requestPermission(handle: FileSystemDirectoryHandle): Promise<boolean> {
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const h = handle as any;
+  const r = await h.requestPermission?.({ mode: "readwrite" });
+  return r === "granted";
+}
+
+/* On app load, try to silently re-mount the last picked folder if permission
+   is still granted. Returns true if restored. */
+export async function restoreMounted(): Promise<boolean> {
+  if (!isLocalFsSupported()) return false;
+  try {
+    const handle = await idbGet();
+    if (!handle) return false;
+    const perm = await verifyPermission(handle);
+    if (perm !== "granted") return false;
+    setMounted(handle, handle.name);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const SKIP_DIRS = new Set([
