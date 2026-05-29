@@ -8,8 +8,25 @@ export function isSupported(): boolean {
   return (
     typeof SharedArrayBuffer !== "undefined" &&
     typeof window.crossOriginIsolated === "boolean" &&
-    window.crossOriginIsolated
+    window.crossOriginIsolated &&
+    !isMobile()
   );
+}
+
+export function isMobile(): boolean {
+  if (typeof navigator === "undefined") return false;
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const uaData = (navigator as any).userAgentData;
+  if (uaData && typeof uaData.mobile === "boolean") return uaData.mobile;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
+export function getUnsupportedReason(): string | null {
+  if (typeof window === "undefined") return null;
+  if (isMobile()) return "WebContainer mobil tarayıcılarda çalışmaz. Masaüstünde Chrome veya Edge ile aç.";
+  if (typeof SharedArrayBuffer === "undefined") return "Tarayıcı SharedArrayBuffer'ı desteklemiyor (Chrome/Edge gerekli).";
+  if (!window.crossOriginIsolated) return "Sayfa cross-origin isolation'da değil (sayfayı yenilemeyi dene).";
+  return null;
 }
 
 /* WebContainer is free on localhost / *.stackblitz.io / *.webcontainer.io.

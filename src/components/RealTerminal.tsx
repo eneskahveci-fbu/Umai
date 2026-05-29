@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { FolderOpen, Loader2, Power, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
-import { getWebContainer, isSupported, mountDefaults, needsApiKey } from "@/lib/webcontainer";
+import { getUnsupportedReason, getWebContainer, isSupported, mountDefaults, needsApiKey } from "@/lib/webcontainer";
 import {
   dirHandleToTree,
   getMountedHandle,
@@ -36,7 +36,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
     if (!containerRef.current) return;
     if (!isSupported()) {
       setStatus("error");
-      setErrMsg("Tarayıcı cross-origin isolation desteklemiyor (Chrome/Edge önerilen).");
+      setErrMsg(getUnsupportedReason() ?? "Tarayıcı desteklemiyor.");
       return;
     }
     if (needsApiKey() && !apiKey.trim()) {

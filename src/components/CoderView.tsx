@@ -264,6 +264,7 @@ export function CoderView() {
 
   const [filesOpen, setFilesOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalSupported, setTerminalSupported] = useState(true);
   const [activeAgent, setActiveAgent] = useState<Agent | null>(null);
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashQuery, setSlashQuery] = useState("");
@@ -304,6 +305,7 @@ export function CoderView() {
   useEffect(() => {
     /* silently restore last mounted folder if browser still grants permission */
     import("@/lib/localfs").then(({ restoreMounted }) => restoreMounted().catch(() => { /* ignore */ }));
+    import("@/lib/webcontainer").then(({ isSupported }) => setTerminalSupported(isSupported()));
   }, []);
 
   useEffect(() => {
@@ -340,7 +342,10 @@ export function CoderView() {
   }, [config.activeRepo, config.activeGithubId, config.cliMode]);
 
   useEffect(() => {
-    if (config.autoTerminal) setTerminalOpen(true);
+    if (!config.autoTerminal) return;
+    import("@/lib/webcontainer").then(({ isSupported }) => {
+      if (isSupported()) setTerminalOpen(true);
+    });
   }, [config.autoTerminal]);
 
   const attachRepoFile = async (file: TreeFile) => {
@@ -686,8 +691,12 @@ export function CoderView() {
           )}
           <button
             onClick={() => setTerminalOpen((v) => !v)}
-            title="Terminal"
-            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${terminalOpen ? "text-green bg-green/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
+            title={terminalSupported ? "Terminal" : "Terminal (masaüstü Chrome/Edge gerekli)"}
+            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${
+              terminalOpen ? "text-green bg-green/10" :
+              terminalSupported ? "text-muted hover:text-ink hover:bg-bgsoft" :
+              "text-muted/40 hover:text-muted/60 hover:bg-bgsoft"
+            }`}
           >
             <Terminal size={14} />
           </button>
