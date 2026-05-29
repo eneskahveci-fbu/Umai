@@ -1,8 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { BookmarkPlus, Check, Copy, Eye, GitCompareArrows } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { BookmarkPlus, Check, ChevronDown, ChevronUp, Copy, Eye, GitCompareArrows } from "lucide-react";
 import { useStore } from "@/lib/store";
+
+const COLLAPSE_LINE_THRESHOLD = 30;
+const COLLAPSED_PX = 240;
 
 export function CodeBlock({
   children,
@@ -11,6 +14,15 @@ export function CodeBlock({
   const preRef = useRef<HTMLPreElement>(null);
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [lineCount, setLineCount] = useState(0);
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    const text = preRef.current?.textContent ?? "";
+    const lines = text === "" ? 0 : text.split("\n").length;
+    setLineCount(lines);
+    if (lines > COLLAPSE_LINE_THRESHOLD) setCollapsed(true);
+  }, [children]);
 
   const codeChild = Array.isArray(children) ? children[0] : children;
   const className =
@@ -94,9 +106,33 @@ export function CodeBlock({
           </button>
         </div>
       </div>
-      <pre ref={preRef} {...props} className="!rounded-t-none !mt-0 !border-t-0">
-        {children}
-      </pre>
+      <div className="relative">
+        <pre
+          ref={preRef}
+          {...props}
+          style={collapsed ? { maxHeight: COLLAPSED_PX, overflow: "hidden" } : undefined}
+          className="!rounded-t-none !mt-0 !border-t-0"
+        >
+          {children}
+        </pre>
+        {collapsed && (
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-20 rounded-b-[10px]"
+            style={{ background: "linear-gradient(to bottom, transparent, var(--color-bg) 95%)" }}
+          />
+        )}
+        {lineCount > COLLAPSE_LINE_THRESHOLD && (
+          <button
+            onClick={() => setCollapsed((v) => !v)}
+            className="absolute left-1/2 -translate-x-1/2 bottom-2 flex items-center gap-1.5 text-[11px] px-3 py-1 rounded-full bg-bgsoft/90 border border-line/60 text-muted hover:text-ink hover:bg-bgsoft backdrop-blur transition-colors shadow-sm"
+          >
+            {collapsed
+              ? <><ChevronDown size={11} /> {lineCount} satırı göster</>
+              : <><ChevronUp size={11} /> Katla</>
+            }
+          </button>
+        )}
+      </div>
     </div>
   );
 }
