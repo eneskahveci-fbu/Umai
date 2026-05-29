@@ -255,6 +255,7 @@ export function CoderView() {
   const [input, setInput] = useState("");
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [dragOver, setDragOver] = useState(false);
   const [searchOn, setSearchOn] = useState(false);
   const [repoSearch, setRepoSearch] = useState("");
   const [connecting, setConnecting] = useState(false);
@@ -610,10 +611,34 @@ export function CoderView() {
 
   return (
     <div
-      className="flex flex-col h-full min-h-0 bg-bg"
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => { e.preventDefault(); for (const f of Array.from(e.dataTransfer.files)) readFileIntoInput(f); }}
+      className="relative flex flex-col h-full min-h-0 bg-bg"
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes("Files")) {
+          e.preventDefault();
+          if (!dragOver) setDragOver(true);
+        }
+      }}
+      onDragLeave={(e) => {
+        /* only fire when the cursor actually leaves the outer container */
+        if (e.target === e.currentTarget) setDragOver(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        for (const f of Array.from(e.dataTransfer.files)) readFileIntoInput(f);
+      }}
     >
+      {dragOver && (
+        <div className="pointer-events-none absolute inset-3 z-40 rounded-2xl border-2 border-dashed border-brand/60 bg-brand/5 grid place-items-center backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="text-center px-6">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-brand/15 grid place-items-center text-brand text-2xl shadow-lg shadow-brand/10">
+              ↓
+            </div>
+            <p className="text-sm font-extrabold text-ink">Dosyaları buraya bırak</p>
+            <p className="text-xs text-muted/60 mt-1">Birden çok dosya destekli · görseller de olur</p>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="h-12 shrink-0 flex items-center gap-2 px-3 border-b border-line/60 bg-surface/60 backdrop-blur-sm">
         <button
