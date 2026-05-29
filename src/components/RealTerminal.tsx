@@ -1,22 +1,29 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Power, RefreshCw, X } from "lucide-react";
-import { getWebContainer, isSupported, mountDefaults } from "@/lib/webcontainer";
+import { Loader2, Power, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
+import { getWebContainer, isSupported, mountDefaults, needsApiKey } from "@/lib/webcontainer";
+import { useStore } from "@/lib/store";
 
-type Status = "idle" | "booting" | "ready" | "error";
+type Status = "idle" | "booting" | "ready" | "error" | "needs-key";
 
 export function RealTerminal({ onClose }: { onClose: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [errMsg, setErrMsg] = useState("");
   const cleanupRef = useRef<(() => void) | null>(null);
+  const apiKey = useStore((s) => s.config.webcontainerApiKey);
+  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
 
   const boot = async () => {
     if (!containerRef.current) return;
     if (!isSupported()) {
       setStatus("error");
       setErrMsg("Tarayıcı cross-origin isolation desteklemiyor (Chrome/Edge önerilen).");
+      return;
+    }
+    if (needsApiKey() && !apiKey.trim()) {
+      setStatus("needs-key");
       return;
     }
     setStatus("booting");
@@ -46,7 +53,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
       term.open(containerRef.current);
       fit.fit();
 
-      const wc = await getWebContainer();
+      const wc = await getWebContainer(apiKey);
       await mountDefaults(wc);
 
       term.writeln("\x1b[1;35m▲ craft.ai sandbox\x1b[0m — Node.js + busybox-shell hazır");
@@ -104,7 +111,12 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
           status === "error" ? "text-red" : "text-muted/40"
         } />
         <span className="text-[11px] font-mono text-muted/70">
-          Terminal · {status === "ready" ? "hazır" : status === "booting" ? "başlatılıyor…" : status === "error" ? "hata" : "boşta"}
+          Terminal · {
+            status === "ready" ? "hazır" :
+            status === "booting" ? "başlatılıyor…" :
+            status === "error" ? "hata" :
+            status === "needs-key" ? "API key gerekli" : "boşta"
+          }
         </span>
         <div className="flex-1" />
         <button onClick={restart} title="Yeniden başlat" className="text-muted/50 hover:text-ink p-1 rounded transition-colors">
@@ -114,7 +126,38 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
           <X size={12} />
         </button>
       </div>
-      {status === "error" ? (
+      {status === "needs-key" ? (
+        <div className="flex-1 grid place-items-center px-6">
+          <div className="text-center max-w-md">
+            <p className="text-xs font-semibold text-ink mb-2">WebContainer API key gerekli</p>
+            <p className="text-[11px] text-muted/60 leading-relaxed mb-3">
+              Gerçek terminal bu domain&apos;de çalışmak için ücretsiz bir API key istiyor.
+              <br />
+              <a
+                href="https://webcontainer.io/enterprise"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-brand hover:underline"
+              >
+                webcontainer.io
+              </a>
+              {" "}üzerinden ücretsiz al → Ayarlar → Gelişmiş&apos;e yapıştır.
+            </p>
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-white hover:bg-branddim transition-colors font-semibold"
+              >
+                <SettingsIcon size={11} />
+                Key&apos;i ayarla
+              </button>
+              <button onClick={restart} className="text-[11px] px-3 py-1.5 rounded-lg bg-bgsoft hover:bg-line/30 transition-colors text-muted">
+                Tekrar dene
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : status === "error" ? (
         <div className="flex-1 grid place-items-center px-6">
           <div className="text-center max-w-md">
             <p className="text-xs text-red mb-2">Terminal başlatılamadı</p>

@@ -374,6 +374,28 @@ export function SettingsModal() {
         {/* GELİŞMİŞ */}
         {tab === "advanced" && (
           <section className="flex flex-col gap-5">
+            {/* WebContainer API key */}
+            <div>
+              <h4 className="text-sm font-bold mb-1">WebContainer API Key</h4>
+              <p className="text-xs text-muted/70 mb-2 leading-relaxed">
+                Gerçek terminal için gerekli. <strong className="text-muted">localhost&apos;ta gerekmez</strong>;
+                production domain&apos;de (Vercel vb.){" "}
+                <a href="https://webcontainer.io/enterprise" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
+                  webcontainer.io
+                </a>
+                {" "}üzerinden bireysel/OSS hesaplara ücretsiz verilen key&apos;i buraya yapıştır.
+                Key tarayıcında saklanır, sunucuya gönderilmez.
+              </p>
+              <input
+                type="password"
+                value={config.webcontainerApiKey}
+                onChange={(e) => saveConfig({ ...config, webcontainerApiKey: e.target.value })}
+                placeholder="wc_..."
+                className="input-mono w-full"
+                autoComplete="off"
+              />
+            </div>
+
             {/* Yazı tipi boyutu */}
             <div>
               <h4 className="text-sm font-bold mb-2">Kod Yazı Tipi Boyutu</h4>

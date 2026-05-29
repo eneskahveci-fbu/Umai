@@ -105,6 +105,7 @@ export const DEFAULT_CONFIG: Config = {
   soundEnabled: false,
   accentColor: "purple",
   maxContext: 8192,
+  webcontainerApiKey: "",
 };
 
 export const DEFAULT_REPO = "eneskahveci-sdo/craft-ai";

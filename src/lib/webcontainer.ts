@@ -12,15 +12,27 @@ export function isSupported(): boolean {
   );
 }
 
-export async function getWebContainer(): Promise<WebContainer> {
+/* WebContainer is free on localhost / *.stackblitz.io / *.webcontainer.io.
+   On other origins (e.g. Vercel) you need a free API key from webcontainer.dev. */
+export function needsApiKey(): boolean {
+  if (typeof window === "undefined") return false;
+  const h = window.location.hostname;
+  if (h === "localhost" || h === "127.0.0.1") return false;
+  if (h.endsWith(".stackblitz.io") || h.endsWith(".webcontainer.io")) return false;
+  return true;
+}
+
+export async function getWebContainer(apiKey?: string): Promise<WebContainer> {
   if (instance) return instance;
   if (booting) return booting;
   if (!isSupported())
     throw new Error("Tarayıcı bu özelliği desteklemiyor (cross-origin isolation gerekli)");
 
   booting = (async () => {
-    const { WebContainer } = await import("@webcontainer/api");
-    instance = await WebContainer.boot();
+    const mod = await import("@webcontainer/api");
+    const key = apiKey?.trim();
+    if (key) mod.configureAPIKey(key);
+    instance = await mod.WebContainer.boot();
     booting = null;
     return instance;
   })();

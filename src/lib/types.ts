@@ -117,6 +117,7 @@ export interface Config {
   soundEnabled: boolean;
   accentColor: "purple" | "blue" | "green" | "orange";
   maxContext: number;
+  webcontainerApiKey: string;
 }
 
 export interface RepoState {
