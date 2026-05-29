@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Brain,
   Check,
@@ -10,6 +10,7 @@ import {
   Pencil,
   Play,
   Plus,
+  Search,
   Sun,
   Trash2,
   X,
@@ -41,9 +42,35 @@ export function SettingsModal() {
   const updateProject = useStore((s) => s.updateProject);
 
   const [tab, setTab] = useState<"model" | "github" | "general" | "advanced">("model");
+  const [search, setSearch] = useState("");
   const [guestMode, setGuestModeState] = useState(() =>
     typeof window === "undefined" ? false : isGuestMode(),
   );
+
+  /* Keyword index — typing in the search box jumps to whichever tab
+     contains the matching keyword (first hit wins). */
+  const SEARCH_INDEX: Record<"model" | "github" | "general" | "advanced", string[]> = {
+    model:    ["model", "api", "anahtar", "key", "openai", "anthropic", "huggingface", "hf", "provider", "test"],
+    github:   ["github", "token", "depo", "repo", "branch", "dal", "kullanıcı", "username"],
+    general:  ["sistem", "prompt", "stil", "style", "tema", "theme", "renk", "color", "accent", "font", "yazı", "ses", "sound", "skill", "memori", "ayar"],
+    advanced: ["webcontainer", "key", "context", "max", "guest", "misafir", "kural", "rules", "rulesfile", "gelişmiş"],
+  };
+  const matchingTabs = (() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return new Set<string>();
+    const hits = new Set<string>();
+    for (const [k, kws] of Object.entries(SEARCH_INDEX)) {
+      if (kws.some((kw) => kw.includes(q))) hits.add(k);
+    }
+    return hits;
+  })();
+  /* Auto-jump to the first matching tab when search changes */
+  useEffect(() => {
+    if (!search.trim() || matchingTabs.size === 0) return;
+    const first = (["model", "github", "general", "advanced"] as const).find((k) => matchingTabs.has(k));
+    if (first && first !== tab) setTab(first);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
   const [provider, setProvider] = useState<Provider>("hf");
   const [label, setLabel] = useState("");
   const [baseUrl, setBaseUrl] = useState(PRESETS.hf.baseUrl);
@@ -100,15 +127,48 @@ export function SettingsModal() {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setOpen(false)}>
       <div className="w-full max-w-lg rounded-2xl border border-line bg-surface p-6 max-h-[92vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-bold">Ayarlar</h3>
           <button onClick={() => setOpen(false)} className="text-muted hover:text-ink p-1 rounded-lg hover:bg-bgsoft"><X size={18} /></button>
         </div>
 
+        <div className="relative mb-4">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted/50" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Ayar ara — örn. font, github, webcontainer…"
+            className="w-full bg-bgsoft/60 border border-line/60 rounded-xl pl-9 pr-8 py-2 text-sm outline-none focus:border-brand/50 placeholder:text-muted/40 transition-colors"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted/40 hover:text-ink p-1 rounded transition-colors"
+              title="Temizle"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+
         <div className="flex gap-1 mb-5 border-b border-line">
-          {([["model", "Model"], ["github", "GitHub"], ["general", "Genel"], ["advanced", "Gelişmiş"]] as const).map(([key, lbl]) => (
-            <button key={key} onClick={() => setTab(key)} className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${tab === key ? "border-brand text-brand" : "border-transparent text-muted hover:text-ink"}`}>{lbl}</button>
-          ))}
+          {([["model", "Model"], ["github", "GitHub"], ["general", "Genel"], ["advanced", "Gelişmiş"]] as const).map(([key, lbl]) => {
+            const hit = matchingTabs.has(key);
+            return (
+              <button
+                key={key}
+                onClick={() => setTab(key)}
+                className={`relative px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+                  tab === key ? "border-brand text-brand" : "border-transparent text-muted hover:text-ink"
+                }`}
+              >
+                {lbl}
+                {hit && tab !== key && (
+                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* MODEL */}
