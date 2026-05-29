@@ -182,6 +182,8 @@ interface StoreState {
   persistCurrent: () => Promise<void>;
   exportChat: (id: string) => void;
   exportChatHtml: (id: string) => void;
+  exportChatJson: (id: string) => void;
+  copyChatMarkdown: (id: string) => Promise<void>;
 
   // follow-up
   followUpSuggestions: string[];
@@ -646,6 +648,44 @@ export const useStore = create<StoreState>()((set, get) => ({
       md += `**${m.role === "user" ? "Kullanıcı" : "Asistan"}:**\n\n${m.content}\n\n---\n\n`;
     }
     download(md, `${safeName(chat.title)}.md`, "text/markdown");
+  },
+
+  exportChatJson: (id: string) => {
+    const chat = get().chats.find((c) => c.id === id);
+    if (!chat) return;
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      chat: {
+        title: chat.title,
+        createdAt: chat.created_at,
+        projectId: chat.projectId,
+        totalInTokens: chat.totalInTokens,
+        totalOutTokens: chat.totalOutTokens,
+        messages: chat.messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+          tokenIn: m.tokenIn,
+          tokenOut: m.tokenOut,
+        })),
+      },
+    };
+    download(JSON.stringify(payload, null, 2), `${safeName(chat.title)}.json`, "application/json");
+  },
+
+  copyChatMarkdown: async (id: string) => {
+    const chat = get().chats.find((c) => c.id === id);
+    if (!chat) return;
+    let md = `# ${chat.title}\n\n`;
+    for (const m of chat.messages) {
+      md += `**${m.role === "user" ? "Kullanıcı" : "Asistan"}:**\n\n${m.content}\n\n---\n\n`;
+    }
+    try {
+      await navigator.clipboard.writeText(md);
+      get().addToast("Markdown panoya kopyalandı", "success");
+    } catch {
+      get().addToast("Kopyalanamadı", "error");
+    }
   },
 
   exportChatHtml: (id) => {

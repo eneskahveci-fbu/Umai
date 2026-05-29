@@ -41,6 +41,7 @@ import { RightPanel } from "./RightPanel";
 import { MultiCommitBar } from "./MultiCommitBar";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { EmptyChat } from "./EmptyChat";
+import { ExportMenu } from "./ExportMenu";
 
 const RealTerminal = dynamic(() => import("./RealTerminal").then((m) => m.RealTerminal), {
   ssr: false,
@@ -642,6 +643,11 @@ export function CoderView() {
         {current && (current.totalInTokens || current.totalOutTokens) ? (
           <UsageBadge chat={current} />
         ) : null}
+
+        {/* Export menu */}
+        {current && messages.length > 0 && (
+          <ExportMenu chatId={current.id} />
+        )}
 
         <div className="flex items-center gap-1 shrink-0">
           {config.models.length > 0 ? (
