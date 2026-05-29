@@ -10,8 +10,10 @@ import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { SkillsPanel } from "@/components/SkillsPanel";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
+import { registerServiceWorker, watchConnection } from "@/lib/sw-register";
 
 export default function AppPage() {
   const sidebarOpen = useStore((s) => s.sidebarOpen);
@@ -21,6 +23,8 @@ export default function AppPage() {
 
   useEffect(() => {
     if (window.innerWidth >= 768) setSidebarOpen(false);
+    registerServiceWorker();
+    return watchConnection();
   }, [setSidebarOpen]);
 
   useEffect(() => {
@@ -89,6 +93,7 @@ export default function AppPage() {
         <KeyboardShortcuts />
         <SkillsPanel />
         <ToastContainer />
+        <OfflineBanner />
       </div>
     </ErrorBoundary>
   );
