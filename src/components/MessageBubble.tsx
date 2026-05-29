@@ -61,12 +61,14 @@ export function MessageBubble({
   index,
   showRegenerate,
   onRegenerate,
+  onContinue,
   onEdit,
 }: {
   message: ChatMessage;
   index: number;
   showRegenerate?: boolean;
   onRegenerate?: () => void;
+  onContinue?: () => void;
   onEdit?: (index: number, content: string) => void;
 }) {
   const isUser = message.role === "user";
@@ -189,6 +191,9 @@ export function MessageBubble({
             )}
             {showRegenerate && onRegenerate && (
               <ActionBtn onClick={onRegenerate} icon={<RefreshCw size={13} />} label="Yeniden" />
+            )}
+            {showRegenerate && onContinue && (
+              <ActionBtn onClick={onContinue} icon={<ChevronRight size={13} />} label="Devam et" />
             )}
           </div>
         )}

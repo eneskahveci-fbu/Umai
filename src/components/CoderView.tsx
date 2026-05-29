@@ -596,6 +596,18 @@ export function CoderView() {
     await callApi();
   };
 
+  /* Keep the previous answer; ask the model to pick up where it left off.
+     Useful when the stream was stopped, hit a token cap, or got truncated. */
+  const continueLast = async () => {
+    if (streaming) return;
+    const store = useStore.getState();
+    const chat = store.current();
+    if (!chat || chat.messages.length === 0) return;
+    if (chat.messages[chat.messages.length - 1].role !== "assistant") return;
+    store.pushMessage({ role: "user", content: "Lütfen tam olarak kaldığın yerden devam et. Önceki cevabını tekrar etme." });
+    await callApi();
+  };
+
   const editAndResend = async (index: number, content: string) => {
     const store = useStore.getState();
     store.editMessageAt(index, content);
@@ -867,6 +879,7 @@ export function CoderView() {
                         message={m}
                         showRegenerate={isLastAssistant && !streaming}
                         onRegenerate={regenerate}
+                        onContinue={isLastAssistant && m.content ? continueLast : undefined}
                         onEdit={m.role === "user" ? editAndResend : undefined}
                       />
                       {isLastAssistant && !streaming && pendingCommit && pendingCommit.length > 0 && repo && (
