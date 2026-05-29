@@ -1,8 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Power, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
+import { FolderOpen, Loader2, Power, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
 import { getWebContainer, isSupported, mountDefaults, needsApiKey } from "@/lib/webcontainer";
+import {
+  dirHandleToTree,
+  getMountedHandle,
+  getMountedName,
+  isLocalFsSupported,
+  pickLocalDirectory,
+  setMounted,
+} from "@/lib/localfs";
 import { useStore } from "@/lib/store";
 
 type Status = "idle" | "booting" | "ready" | "error" | "needs-key";
@@ -11,9 +19,18 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [errMsg, setErrMsg] = useState("");
+  const [mountedFolder, setMountedFolder] = useState<string | null>(getMountedName());
+  const [mounting, setMounting] = useState(false);
   const cleanupRef = useRef<(() => void) | null>(null);
   const apiKey = useStore((s) => s.config.webcontainerApiKey);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
+  const addToast = useStore((s) => s.addToast);
+
+  useEffect(() => {
+    const fn = () => setMountedFolder(getMountedName());
+    window.addEventListener("localfs:changed", fn);
+    return () => window.removeEventListener("localfs:changed", fn);
+  }, []);
 
   const boot = async () => {
     if (!containerRef.current) return;
@@ -54,7 +71,17 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
       fit.fit();
 
       const wc = await getWebContainer(apiKey);
-      await mountDefaults(wc);
+      const handle = getMountedHandle();
+      if (handle) {
+        const { tree, fileCount, truncated, skipped } = await dirHandleToTree(handle);
+        await wc.mount(tree);
+        term.writeln(`\x1b[1;32m✓ Mount: \x1b[36m${getMountedName()}\x1b[0m (${fileCount} dosya${truncated ? ", \x1b[33mkesildi\x1b[0m" : ""})`);
+        if (skipped.length > 0) {
+          term.writeln(`\x1b[33m⚠ Atlandı (>5MB): ${skipped.slice(0, 3).join(", ")}${skipped.length > 3 ? ` ve ${skipped.length - 3} dosya daha` : ""}\x1b[0m`);
+        }
+      } else {
+        await mountDefaults(wc);
+      }
 
       term.writeln("\x1b[1;35m▲ craft.ai sandbox\x1b[0m — Node.js + busybox-shell hazır");
       term.writeln("\x1b[2mDeneyin: \x1b[36mls\x1b[2m, \x1b[36mnode -v\x1b[2m, \x1b[36mnpm init -y\x1b[0m\n");
@@ -102,6 +129,31 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
     boot();
   };
 
+  const mountFolder = async () => {
+    if (!isLocalFsSupported()) {
+      addToast("Tarayıcın yerel klasör seçimini desteklemiyor (Chrome/Edge gerekli)", "error");
+      return;
+    }
+    setMounting(true);
+    try {
+      const picked = await pickLocalDirectory();
+      if (!picked) return;
+      setMounted(picked.handle, picked.name);
+      addToast(`✓ ${picked.name} mount edildi — terminal yeniden başlatılıyor`, "success");
+      restart();
+    } catch (e) {
+      addToast(`Hata: ${(e as Error).message}`, "error");
+    } finally {
+      setMounting(false);
+    }
+  };
+
+  const unmountFolder = () => {
+    setMounted(null, null);
+    addToast("Klasör kaldırıldı — terminal yeniden başlatılıyor", "info");
+    restart();
+  };
+
   return (
     <div className="h-64 shrink-0 border-t border-line/60 bg-[#0a0a0d] flex flex-col">
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-line/40 bg-surface/40 shrink-0">
@@ -118,7 +170,26 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
             status === "needs-key" ? "API key gerekli" : "boşta"
           }
         </span>
+        {mountedFolder && (
+          <button
+            onClick={unmountFolder}
+            title="Klasörü kaldır"
+            className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-green/15 hover:bg-green/25 text-green/90 font-mono transition-colors"
+          >
+            <FolderOpen size={10} />
+            {mountedFolder}
+            <X size={9} className="opacity-60" />
+          </button>
+        )}
         <div className="flex-1" />
+        <button
+          onClick={mountFolder}
+          disabled={mounting}
+          title={mountedFolder ? "Başka klasör seç" : "Yerel klasör mount et"}
+          className="text-muted/50 hover:text-ink p-1 rounded transition-colors disabled:opacity-30"
+        >
+          {mounting ? <Loader2 size={11} className="animate-spin" /> : <FolderOpen size={11} />}
+        </button>
         <button onClick={restart} title="Yeniden başlat" className="text-muted/50 hover:text-ink p-1 rounded transition-colors">
           <RefreshCw size={11} />
         </button>
