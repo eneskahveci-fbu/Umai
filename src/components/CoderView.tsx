@@ -36,33 +36,8 @@ import dynamic from "next/dynamic";
 import { detectLanguage, type EditorFile } from "@/lib/editor";
 import { extractAllFileFences } from "@/lib/parsers";
 
-const EditorPanel = dynamic(
-  () => import("./EditorPanel").then((m) => m.EditorPanel),
-  {
-    ssr: false,
-    loading: () => (
-      <div
-        role="status"
-        aria-live="polite"
-        className="flex flex-col h-full bg-[#0e0e13] border-l border-line/60"
-      >
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-line/60 shrink-0 bg-surface">
-          <div className="h-4 flex-1 rounded bg-bgsoft animate-pulse" aria-hidden="true" />
-        </div>
-        <div className="flex-1 grid place-items-center">
-          <div className="flex items-center gap-1.5">
-            <span className="typing-dot" aria-hidden="true" />
-            <span className="typing-dot delay-1" aria-hidden="true" />
-            <span className="typing-dot delay-2" aria-hidden="true" />
-          </div>
-        </div>
-        <span className="sr-only">Editör yükleniyor…</span>
-      </div>
-    ),
-  },
-);
-import { GitPanel } from "./GitPanel";
-import { ArtifactPanel } from "./ArtifactPanel";
+import { RightPanel } from "./RightPanel";
+
 import { MultiCommitBar } from "./MultiCommitBar";
 import { ErrorBoundary } from "./ErrorBoundary";
 
@@ -1175,41 +1150,17 @@ export function CoderView() {
           </div>
         </div>
 
-        {editorOpen && (
-          editorFile ? (
-            <div className="w-[520px] shrink-0 flex flex-col min-h-0 overflow-hidden">
-              <ErrorBoundary variant="inline" label="Editör çöktü">
-                <EditorPanel
-                  file={editorFile}
-                  onClose={() => setEditorOpen(false)}
-                  onAskAI={(text, context) => {
-                    useStore.getState().setPendingInput(context);
-                  }}
-                />
-              </ErrorBoundary>
-            </div>
-          ) : (
-            <div className="w-[520px] shrink-0 flex flex-col min-h-0 overflow-hidden border-l border-line/60 bg-[#0e0e13]">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-line/60 bg-surface shrink-0">
-                <span className="text-xs font-mono text-muted/50">IDE</span>
-                <button onClick={() => setEditorOpen(false)} className="text-muted hover:text-ink p-1 rounded transition-colors">
-                  <X size={13} />
-                </button>
-              </div>
-              <div className="flex-1 grid place-items-center">
-                <div className="text-center px-8">
-                  <Code2 size={36} className="mx-auto mb-3 text-muted/20" />
-                  <p className="text-sm text-muted/50">AI bir dosya yazınca burada açılır</p>
-                  <p className="text-xs mt-1.5 text-muted/30">veya sol panelden bir dosya seçin</p>
-                </div>
-              </div>
-            </div>
-          )
-        )}
-        {artifact && <ArtifactPanel />}
-        {gitPanelOpen && (
-          <GitPanel onClose={() => setGitPanelOpen(false)} />
-        )}
+        <RightPanel
+          editorFile={editorFile}
+          editorOpen={editorOpen}
+          onCloseEditor={() => setEditorOpen(false)}
+          onAskAI={(_text, context) => {
+            useStore.getState().setPendingInput(context);
+          }}
+          gitOpen={gitPanelOpen}
+          onCloseGit={() => setGitPanelOpen(false)}
+          artifact={artifact}
+        />
       </div>
     </div>
   );
