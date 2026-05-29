@@ -12,12 +12,27 @@ const SECURITY_HEADERS = [
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
 ];
 
+/* WebContainer needs cross-origin isolation (SharedArrayBuffer).
+   Apply COEP only on /app so other pages (with third-party iframes/images) stay open. */
+const COOP_COEP_HEADERS = [
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+];
+
 const nextConfig: NextConfig = {
   async headers() {
     return [
       {
         source: "/:path*",
         headers: SECURITY_HEADERS,
+      },
+      {
+        source: "/app/:path*",
+        headers: COOP_COEP_HEADERS,
+      },
+      {
+        source: "/app",
+        headers: COOP_COEP_HEADERS,
       },
     ];
   },

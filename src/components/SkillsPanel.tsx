@@ -127,7 +127,7 @@ export function SkillsPanel() {
         {/* Footer */}
         <div className="px-5 py-2.5 border-t border-line/40 shrink-0">
           <p className="text-[11px] text-muted/40 leading-relaxed">
-            Aktif skills ve dosyalar <strong className="text-muted/60">her yeni sohbete</strong> sistem prompt'una otomatik eklenir.
+            Aktif skills ve dosyalar <strong className="text-muted/60">her yeni sohbete</strong> sistem prompt&apos;una otomatik eklenir.
             Her kullanımda sayaç artar.
           </p>
         </div>

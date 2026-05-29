@@ -1,0 +1,128 @@
+"use client";
+
+import { useState } from "react";
+import { Check, FileText, GitCommit, Loader2, X } from "lucide-react";
+import { useStore } from "@/lib/store";
+import type { EditorFile } from "@/lib/editor";
+
+export function MultiCommitBar({
+  files,
+  onClose,
+  onOpenInEditor,
+}: {
+  files: EditorFile[];
+  onClose: () => void;
+  onOpenInEditor: (f: EditorFile) => void;
+}) {
+  const repo = useStore((s) => s.repo);
+  const addToast = useStore((s) => s.addToast);
+  const [selected, setSelected] = useState<Set<string>>(new Set(files.map((f) => f.path)));
+  const [message, setMessage] = useState("");
+  const [committing, setCommitting] = useState(false);
+  const [done, setDone] = useState(false);
+
+  if (files.length === 0) return null;
+  const toCommit = files.filter((f) => selected.has(f.path));
+
+  const toggle = (path: string) => {
+    const next = new Set(selected);
+    if (next.has(path)) next.delete(path); else next.add(path);
+    setSelected(next);
+  };
+
+  const commit = async () => {
+    if (!repo) { addToast("Depo bağlı değil", "error"); return; }
+    const activeGithub = useStore.getState().activeGithub();
+    if (!activeGithub?.token) { addToast("GitHub token yok", "error"); return; }
+    if (toCommit.length === 0) { addToast("Hiç dosya seçilmedi", "error"); return; }
+
+    setCommitting(true);
+    try {
+      const res = await fetch("/api/github/batch-write", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          owner: repo.owner,
+          repo: repo.repo,
+          branch: repo.branch,
+          message: message.trim() || `Update ${toCommit.length} files`,
+          token: activeGithub.token,
+          files: toCommit.map((f) => ({ path: f.path, content: f.content })),
+        }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: "Bilinmeyen hata" }));
+        throw new Error(error);
+      }
+      const { sha } = await res.json();
+      addToast(`✓ ${toCommit.length} dosya commit'lendi (${sha.slice(0, 7)})`, "success");
+      setDone(true);
+      setTimeout(onClose, 2000);
+    } catch (e) {
+      addToast(`Commit hatası: ${(e as Error).message}`, "error");
+    } finally {
+      setCommitting(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 border border-brand/30 rounded-xl bg-brand/5 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 bg-brand/10 border-b border-brand/20">
+        <GitCommit size={13} className="text-brand" />
+        <span className="text-xs font-semibold text-brand">
+          {files.length} dosya bulundu — {toCommit.length} seçili
+        </span>
+        <div className="flex-1" />
+        <button onClick={onClose} className="text-muted hover:text-ink p-0.5 rounded transition-colors">
+          <X size={13} />
+        </button>
+      </div>
+
+      <div className="max-h-44 overflow-y-auto px-2 py-1">
+        {files.map((f) => (
+          <div
+            key={f.path}
+            className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-bgsoft/40 transition-colors group/file"
+          >
+            <button
+              onClick={() => toggle(f.path)}
+              className={`w-3.5 h-3.5 rounded border shrink-0 grid place-items-center transition-colors ${
+                selected.has(f.path) ? "bg-brand border-brand" : "border-line hover:border-muted"
+              }`}
+            >
+              {selected.has(f.path) && <Check size={9} className="text-white" />}
+            </button>
+            <FileText size={12} className="text-muted/50 shrink-0" />
+            <button
+              onClick={() => onOpenInEditor(f)}
+              className="flex-1 min-w-0 text-left text-[11px] font-mono text-muted hover:text-ink truncate transition-colors"
+              title="Editörde aç"
+            >
+              {f.path}
+            </button>
+            <span className="text-[10px] text-muted/40 shrink-0">{f.content.split("\n").length} satır</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="px-3 py-2 border-t border-brand/20 flex items-center gap-2">
+        <input
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder={`Update ${toCommit.length} files`}
+          disabled={committing || done}
+          onKeyDown={(e) => { if (e.key === "Enter") commit(); }}
+          className="flex-1 bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50 disabled:opacity-50"
+        />
+        <button
+          onClick={commit}
+          disabled={committing || done || toCommit.length === 0}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-brand hover:bg-branddim text-white font-semibold disabled:opacity-50 transition-colors"
+        >
+          {done ? <Check size={12} /> : committing ? <Loader2 size={12} className="animate-spin" /> : <GitCommit size={12} />}
+          {done ? "Tamam" : committing ? `${toCommit.length} dosya…` : `${toCommit.length} dosyayı commit et`}
+        </button>
+      </div>
+    </div>
+  );
+}

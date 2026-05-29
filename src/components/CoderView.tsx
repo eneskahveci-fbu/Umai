@@ -62,6 +62,16 @@ const EditorPanel = dynamic(
 );
 import { GitPanel } from "./GitPanel";
 import { ArtifactPanel } from "./ArtifactPanel";
+import { MultiCommitBar } from "./MultiCommitBar";
+
+const RealTerminal = dynamic(() => import("./RealTerminal").then((m) => m.RealTerminal), {
+  ssr: false,
+  loading: () => (
+    <div className="h-64 shrink-0 border-t border-line/60 bg-[#0a0a0d] grid place-items-center">
+      <div className="text-xs text-muted/50">Terminal yükleniyor…</div>
+    </div>
+  ),
+});
 import { useStore } from "@/lib/store";
 import { MessageBubble } from "./MessageBubble";
 import { SlashMenu } from "./SlashMenu";
@@ -260,9 +270,6 @@ export function CoderView() {
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
 
-  const [termLines, setTermLines] = useState<string[]>(["$ craft.ai — hazır. 'help' yazarak komut listesi"]);
-  const [termInput, setTermInput] = useState("");
-  const termEndRef = useRef<HTMLDivElement>(null);
 
   const [input, setInput] = useState("");
   const [pendingImages, setPendingImages] = useState<string[]>([]);
@@ -272,6 +279,7 @@ export function CoderView() {
   const [connecting, setConnecting] = useState(false);
   const [fetchingFile, setFetchingFile] = useState<string | null>(null);
   const [editorFile, setEditorFile] = useState<EditorFile | null>(null);
+  const [pendingCommit, setPendingCommit] = useState<EditorFile[] | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [gitPanelOpen, setGitPanelOpen] = useState(false);
   const [loadingAll, setLoadingAll] = useState(false);
@@ -296,10 +304,6 @@ export function CoderView() {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, messages[messages.length - 1]?.content]);
-
-  useEffect(() => {
-    termEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [termLines]);
 
   useEffect(() => {
     const ta = taRef.current;
@@ -368,28 +372,6 @@ export function CoderView() {
       setAttachedFiles((prev) => [...prev, { path: f.name, content: reader.result as string }]);
     };
     reader.readAsText(f);
-  };
-
-  const runTerminalCommand = (cmd: string) => {
-    const trimmed = cmd.trim();
-    setTermLines((prev) => [...prev, `$ ${trimmed}`]);
-    if (!trimmed) return;
-    if (trimmed === "clear") { setTermLines(["$ craft.ai — hazır"]); return; }
-    if (trimmed === "help") {
-      setTermLines((prev) => [...prev, "Komutlar: clear, help, ls, pwd, echo <text>, files"]);
-      return;
-    }
-    if (trimmed === "pwd") { setTermLines((prev) => [...prev, repo ? `/${repo.owner}/${repo.repo}` : "/workspace"]); return; }
-    if (trimmed === "ls" || trimmed === "files") {
-      const files = attachedFiles.map((f) => f.path).join("\n");
-      setTermLines((prev) => [...prev, files || "(eklenmiş dosya yok)"]);
-      return;
-    }
-    if (trimmed.startsWith("echo ")) {
-      setTermLines((prev) => [...prev, trimmed.slice(5)]);
-      return;
-    }
-    setTermLines((prev) => [...prev, `komut bulunamadı: ${trimmed.split(" ")[0]}`]);
   };
 
   /* API */
@@ -535,12 +517,13 @@ export function CoderView() {
         useStore.getState().incrementSkillUsage(activeSkills.map((s) => s.id));
       }
 
-      /* AI'nın yazdığı dosyayı otomatik IDE'de aç */
-      const autoFile = extractFirstFileFence(full);
-      if (autoFile) {
-        setEditorFile(autoFile);
+      /* AI'nın yazdığı dosyayı otomatik IDE'de aç + multi-commit bar */
+      const autoFiles = extractAllFileFences(full);
+      if (autoFiles.length > 0) {
+        setEditorFile(autoFiles[0]);
         setEditorOpen(true);
       }
+      setPendingCommit(autoFiles.length >= 2 ? autoFiles : null);
 
       /* token tahmini */
       const inputText = apiMessages.map((m) => typeof m.content === "string" ? m.content : "").join("\n");
@@ -577,6 +560,7 @@ export function CoderView() {
     const store = useStore.getState();
     if (!store.activeModel()) { store.setSettingsOpen(true); return; }
     if (!store.currentId) store.newChat(incognito);
+    setPendingCommit(null);
 
     /* slash command algıla */
     const detected = findAgentByCommand(text);
@@ -862,14 +846,24 @@ export function CoderView() {
                 {messages.map((m, i) => {
                   const isLastAssistant = m.role === "assistant" && i === messages.length - 1;
                   return (
-                    <MessageBubble
-                      key={i}
-                      index={i}
-                      message={m}
-                      showRegenerate={isLastAssistant && !streaming}
-                      onRegenerate={regenerate}
-                      onEdit={m.role === "user" ? editAndResend : undefined}
-                    />
+                    <div key={i}>
+                      <MessageBubble
+                        index={i}
+                        message={m}
+                        showRegenerate={isLastAssistant && !streaming}
+                        onRegenerate={regenerate}
+                        onEdit={m.role === "user" ? editAndResend : undefined}
+                      />
+                      {isLastAssistant && !streaming && pendingCommit && pendingCommit.length > 0 && repo && (
+                        <div className="ml-11 max-w-2xl">
+                          <MultiCommitBar
+                            files={pendingCommit}
+                            onClose={() => setPendingCommit(null)}
+                            onOpenInEditor={(f) => { setEditorFile(f); setEditorOpen(true); }}
+                          />
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
                 {streaming && messages[messages.length - 1]?.content === "" && (
@@ -915,36 +909,7 @@ export function CoderView() {
 
           {/* Terminal */}
           {terminalOpen && (
-            <div className="h-44 shrink-0 flex flex-col border-t border-line/60 bg-[#0a0a0d]">
-              <div className="flex items-center justify-between px-3 py-1.5 border-b border-line/40 shrink-0">
-                <div className="flex items-center gap-2">
-                  <Terminal size={12} className="text-green" />
-                  <span className="text-[11px] text-muted/60 font-mono">Terminal</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => setTermLines(["$ craft.ai — hazır"])} className="text-[10px] text-muted/40 hover:text-muted px-2 py-0.5 rounded transition-colors">Temizle</button>
-                  <button onClick={() => setTerminalOpen(false)} className="text-muted/40 hover:text-muted p-0.5 rounded transition-colors"><X size={11} /></button>
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto px-3 py-2 font-mono text-[12px]">
-                {termLines.map((line, i) => (
-                  <div key={i} className={`leading-relaxed whitespace-pre-wrap ${line.startsWith("$") ? "text-green/80" : "text-muted/70"}`}>{line}</div>
-                ))}
-                <div ref={termEndRef} />
-              </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 border-t border-line/40 shrink-0">
-                <span className="text-green/70 font-mono text-[12px]">$</span>
-                <input
-                  value={termInput}
-                  onChange={(e) => setTermInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { runTerminalCommand(termInput); setTermInput(""); } }}
-                  className="flex-1 bg-transparent outline-none font-mono text-[12px] text-muted/90 placeholder:text-muted/30"
-                  placeholder="komut gir…"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-              </div>
-            </div>
+            <RealTerminal onClose={() => setTerminalOpen(false)} />
           )}
 
           {/* Composer */}
@@ -1271,7 +1236,13 @@ function UsageBadge({ chat }: { chat: { totalInTokens?: number; totalOutTokens?:
 /* Parses the first code-fence with an embedded file path from AI output.
    Supports: ```lang:path  |  ```lang file=path  |  ```lang title="path" */
 function extractFirstFileFence(md: string): EditorFile | null {
+  return extractAllFileFences(md)[0] ?? null;
+}
+
+/* Same parser but returns every match, dedup'd by path (last wins). */
+function extractAllFileFences(md: string): EditorFile[] {
   const re = /```(\w+)(?::([^\s\n`]+)|[ \t]+(?:file|title)=["']?([^\s"'\n`]+)["']?)/g;
+  const map = new Map<string, EditorFile>();
   let m: RegExpExecArray | null;
   while ((m = re.exec(md)) !== null) {
     const path = (m[2] ?? m[3] ?? "").trim();
@@ -1281,7 +1252,7 @@ function extractFirstFileFence(md: string): EditorFile | null {
     if (nlIdx === -1) continue;
     const closeIdx = md.indexOf("\n```", nlIdx);
     const content = closeIdx === -1 ? md.slice(nlIdx + 1) : md.slice(nlIdx + 1, closeIdx);
-    return { path, content, language: detectLanguage(path) };
+    map.set(path, { path, content, language: detectLanguage(path) });
   }
-  return null;
+  return Array.from(map.values());
 }
