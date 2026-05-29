@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { AuthButton } from "./AuthButton";
+import { AccordionSection } from "./Accordion";
 
 export function Sidebar() {
   const chats = useStore((s) => s.chats);
@@ -142,134 +143,143 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Projects */}
-      <div className="px-3 pt-3 pb-2 border-b border-line/60 shrink-0">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted/50 px-1">
-            Projeler
-          </span>
-          <button
-            onClick={() => {
-              const name = window.prompt("Proje adı:");
-              if (name?.trim()) addProject(name.trim());
-            }}
-            title="Yeni proje"
-            className="text-muted/50 hover:text-brand p-0.5 transition-colors"
-          >
-            <FolderPlus size={12} />
-          </button>
-        </div>
-        <div className="flex flex-wrap gap-1">
-          <button
-            onClick={() => setActiveProject(null)}
-            className={`text-[11px] px-2.5 py-1 rounded-lg border transition-colors ${
-              !activeProject
-                ? "border-brand/40 bg-brand/10 text-brand"
-                : "border-line/60 text-muted hover:text-ink hover:border-line"
-            }`}
-          >
-            Tümü
-          </button>
-          {config.projects.map((p) => (
-            <div key={p.id} className="group/proj relative">
-              <button
-                onClick={() => setActiveProject(p.id)}
-                className={`text-[11px] px-2.5 py-1 rounded-lg border flex items-center gap-1 transition-colors ${
-                  activeProject === p.id
-                    ? "border-brand/40 bg-brand/10 text-brand"
-                    : "border-line/60 text-muted hover:text-ink hover:border-line"
-                }`}
-              >
-                <FolderOpen size={10} /> {p.name}
-              </button>
-              <button
-                onClick={() => { if (confirm(`"${p.name}" projesini sil?`)) removeProject(p.id); }}
-                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red text-white grid place-items-center text-[9px] opacity-0 group-hover/proj:opacity-100 transition-opacity"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Search + history */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 min-h-0">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted/50 px-1">
-            Geçmiş
-          </span>
-        </div>
-        <div className="relative mb-3">
-          <Search size={11} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted/40" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Oturum ara..."
-            className="w-full bg-bgsoft/60 border border-line/60 rounded-xl pl-8 pr-3 py-2 text-xs outline-none focus:border-brand/50 placeholder:text-muted/35 transition-colors"
-          />
-        </div>
-
-        {history.length === 0 ? (
-          <div className="text-center py-10 px-3">
-            <Code2 size={24} className="mx-auto mb-3 text-muted/15" />
-            <p className="text-xs text-muted/40 leading-relaxed">
-              {search ? "Eşleşen oturum yok." : "Henüz oturum yok.\nYeni oturum başlat."}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-0.5">
-            {history.map((c) => (
-              <div
-                key={c.id}
-                onClick={() => selectChat(c.id)}
-                className={`group/item flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all duration-100 ${
-                  currentId === c.id
-                    ? "bg-brand/8 border border-brand/20 text-ink"
-                    : "border border-transparent text-muted hover:text-ink hover:bg-bgsoft/60"
-                }`}
-              >
-                <Code2 size={11} className={`shrink-0 ${currentId === c.id ? "text-brand/60" : "opacity-30"}`} />
-                {editingId === c.id ? (
-                  <input
-                    ref={editRef}
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    onBlur={commitRename}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitRename();
-                      if (e.key === "Escape") setEditingId(null);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex-1 bg-transparent border-b border-brand outline-none text-xs min-w-0"
-                  />
-                ) : (
-                  <span
-                    onDoubleClick={(e) => { e.stopPropagation(); startRename(c.id, c.title); }}
-                    className="flex-1 truncate text-[12px]"
-                    title="Çift tıkla yeniden adlandır"
-                  >
-                    {c.title}
-                  </span>
-                )}
-                <div className="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0">
-                  <ActionIcon title="Yeniden adlandır" onClick={(e) => { e.stopPropagation(); startRename(c.id, c.title); }}>
-                    <Pencil size={10} />
-                  </ActionIcon>
-                  <ActionIcon title="Paylaş" onClick={(e) => { e.stopPropagation(); exportChatHtml(c.id); }}>
-                    <Share2 size={10} />
-                  </ActionIcon>
-                  <ActionIcon title="İndir" onClick={(e) => { e.stopPropagation(); exportChat(c.id); }}>
-                    <Download size={10} />
-                  </ActionIcon>
-                  <ActionIcon title="Sil" danger onClick={(e) => { e.stopPropagation(); deleteChat(c.id); }}>
-                    <Trash2 size={10} />
-                  </ActionIcon>
-                </div>
+      {/* Workspace accordion (Projects + History) */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <AccordionSection
+          id="projects"
+          title="Projeler"
+          icon={<FolderOpen size={11} />}
+          badge={config.projects.length > 0 ? String(config.projects.length) : undefined}
+          defaultOpen={!!activeProject}
+          action={
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const name = window.prompt("Proje adı:");
+                if (name?.trim()) addProject(name.trim());
+              }}
+              title="Yeni proje"
+              className="text-muted/50 hover:text-brand p-0.5 transition-colors"
+            >
+              <FolderPlus size={12} />
+            </button>
+          }
+        >
+          <div className="flex flex-wrap gap-1">
+            <button
+              onClick={() => setActiveProject(null)}
+              className={`text-[11px] px-2.5 py-1 rounded-lg border transition-colors ${
+                !activeProject
+                  ? "border-brand/40 bg-brand/10 text-brand"
+                  : "border-line/60 text-muted hover:text-ink hover:border-line"
+              }`}
+            >
+              Tümü
+            </button>
+            {config.projects.map((p) => (
+              <div key={p.id} className="group/proj relative">
+                <button
+                  onClick={() => setActiveProject(p.id)}
+                  className={`text-[11px] px-2.5 py-1 rounded-lg border flex items-center gap-1 transition-colors ${
+                    activeProject === p.id
+                      ? "border-brand/40 bg-brand/10 text-brand"
+                      : "border-line/60 text-muted hover:text-ink hover:border-line"
+                  }`}
+                >
+                  <FolderOpen size={10} /> {p.name}
+                </button>
+                <button
+                  onClick={() => { if (confirm(`"${p.name}" projesini sil?`)) removeProject(p.id); }}
+                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red text-white grid place-items-center text-[9px] opacity-0 group-hover/proj:opacity-100 transition-opacity"
+                >
+                  ×
+                </button>
               </div>
             ))}
+            {config.projects.length === 0 && (
+              <span className="text-[11px] text-muted/40 italic py-1">Henüz proje yok</span>
+            )}
           </div>
-        )}
+        </AccordionSection>
+
+        <AccordionSection
+          id="chats"
+          title="Sohbetler"
+          icon={<MessageSquare size={11} />}
+          badge={chats.length > 0 ? String(chats.length) : undefined}
+          defaultOpen
+        >
+          <div className="relative mb-2">
+            <Search size={11} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted/40" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Oturum ara..."
+              className="w-full bg-bgsoft/60 border border-line/60 rounded-xl pl-8 pr-3 py-2 text-xs outline-none focus:border-brand/50 placeholder:text-muted/35 transition-colors"
+            />
+          </div>
+
+          {history.length === 0 ? (
+            <div className="text-center py-8 px-3">
+              <Code2 size={20} className="mx-auto mb-2 text-muted/15" />
+              <p className="text-[11px] text-muted/40 leading-relaxed">
+                {search ? "Eşleşen oturum yok." : "Henüz oturum yok."}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-0.5">
+              {history.map((c) => (
+                <div
+                  key={c.id}
+                  onClick={() => selectChat(c.id)}
+                  className={`group/item flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all duration-100 ${
+                    currentId === c.id
+                      ? "bg-brand/8 border border-brand/20 text-ink"
+                      : "border border-transparent text-muted hover:text-ink hover:bg-bgsoft/60"
+                  }`}
+                >
+                  <Code2 size={11} className={`shrink-0 ${currentId === c.id ? "text-brand/60" : "opacity-30"}`} />
+                  {editingId === c.id ? (
+                    <input
+                      ref={editRef}
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      onBlur={commitRename}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitRename();
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex-1 bg-transparent border-b border-brand outline-none text-xs min-w-0"
+                    />
+                  ) : (
+                    <span
+                      onDoubleClick={(e) => { e.stopPropagation(); startRename(c.id, c.title); }}
+                      className="flex-1 truncate text-[12px]"
+                      title="Çift tıkla yeniden adlandır"
+                    >
+                      {c.title}
+                    </span>
+                  )}
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0">
+                    <ActionIcon title="Yeniden adlandır" onClick={(e) => { e.stopPropagation(); startRename(c.id, c.title); }}>
+                      <Pencil size={10} />
+                    </ActionIcon>
+                    <ActionIcon title="Paylaş" onClick={(e) => { e.stopPropagation(); exportChatHtml(c.id); }}>
+                      <Share2 size={10} />
+                    </ActionIcon>
+                    <ActionIcon title="İndir" onClick={(e) => { e.stopPropagation(); exportChat(c.id); }}>
+                      <Download size={10} />
+                    </ActionIcon>
+                    <ActionIcon title="Sil" danger onClick={(e) => { e.stopPropagation(); deleteChat(c.id); }}>
+                      <Trash2 size={10} />
+                    </ActionIcon>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </AccordionSection>
       </div>
 
       {/* Bottom */}
