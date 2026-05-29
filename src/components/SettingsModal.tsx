@@ -14,7 +14,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useStore } from "@/lib/store";
+import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
 import { PRESETS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS } from "@/lib/constants";
 import type { Provider, ResponseStyle } from "@/lib/types";
 
@@ -41,6 +41,9 @@ export function SettingsModal() {
   const updateProject = useStore((s) => s.updateProject);
 
   const [tab, setTab] = useState<"model" | "github" | "general" | "advanced">("model");
+  const [guestMode, setGuestModeState] = useState(() =>
+    typeof window === "undefined" ? false : isGuestMode(),
+  );
   const [provider, setProvider] = useState<Provider>("hf");
   const [label, setLabel] = useState("");
   const [baseUrl, setBaseUrl] = useState(PRESETS.hf.baseUrl);
@@ -374,6 +377,35 @@ export function SettingsModal() {
         {/* GELİŞMİŞ */}
         {tab === "advanced" && (
           <section className="flex flex-col gap-5">
+            {/* Guest mode */}
+            <div>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={guestMode}
+                  onChange={(e) => {
+                    setGuestModeState(e.target.checked);
+                    setGuestMode(e.target.checked);
+                    addToast(
+                      e.target.checked
+                        ? "Misafir mod açık — anahtarlar sekme kapanınca silinir. Yenile."
+                        : "Misafir mod kapalı — yenile.",
+                      "info",
+                    );
+                  }}
+                  className="accent-brand mt-0.5"
+                />
+                <span>
+                  <span className="text-sm font-semibold block">Misafir mod</span>
+                  <span className="text-xs text-muted/70 leading-relaxed">
+                    Açıkken API anahtarları ve GitHub token&apos;ları yalnızca bu sekmede saklanır
+                    (sessionStorage), sekme kapanınca silinir. Paylaşılan bilgisayarlarda öner.
+                    Değişiklikten sonra sayfayı yenile.
+                  </span>
+                </span>
+              </label>
+            </div>
+
             {/* WebContainer API key */}
             <div>
               <h4 className="text-sm font-bold mb-1">WebContainer API Key</h4>

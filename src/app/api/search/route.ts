@@ -1,4 +1,6 @@
+import type { NextRequest } from "next/server";
 import { isValidationError, readJson, ValidationError } from "@/lib/validate";
+import { checkLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +13,15 @@ interface SearchResult {
 
 const SEARCH_TIMEOUT_MS = 8_000;
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const limited = checkLimit(req, "search", 30, 60_000);
+  if (limited) {
+    return Response.json(limited.body, {
+      status: limited.status,
+      headers: { "Retry-After": String(limited.retryAfter) },
+    });
+  }
+
   let query: string;
   try {
     const body = await readJson<{ query?: unknown }>(req);

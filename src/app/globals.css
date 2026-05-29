@@ -26,14 +26,18 @@
   --accent: #7c5cff;
   --font-scale: 1;
 }
-.accent-blue { --accent: #3b82f6; }
-.accent-green { --accent: #22c55e; }
-.accent-orange { --accent: #f97316; }
-.accent-purple { --accent: #7c5cff; }
-.font-sm { --font-scale: 0.875; }
+.accent-purple { --accent: #7c5cff; --color-brand: #7c5cff; --color-branddim: #6a4be0; }
+.accent-blue   { --accent: #3b82f6; --color-brand: #3b82f6; --color-branddim: #2563eb; }
+.accent-green  { --accent: #22c55e; --color-brand: #22c55e; --color-branddim: #16a34a; }
+.accent-orange { --accent: #f97316; --color-brand: #f97316; --color-branddim: #ea580c; }
+
+.font-sm   { --font-scale: 0.9; }
 .font-base { --font-scale: 1; }
-.font-lg { --font-scale: 1.125; }
-pre, code { font-size: calc(0.8rem * var(--font-scale)); }
+.font-lg   { --font-scale: 1.1; }
+pre, code, .font-mono { font-size: calc(0.8rem * var(--font-scale)); }
+.text-xs   { font-size: calc(0.75rem * var(--font-scale)); }
+.text-sm   { font-size: calc(0.875rem * var(--font-scale)); }
+.text-base { font-size: calc(1rem * var(--font-scale)); }
 
 /* ─── Light tema ─── */
 html.light {

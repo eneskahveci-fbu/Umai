@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { detectLanguage, type EditorFile } from "@/lib/editor";
+import { extractAllFileFences } from "@/lib/parsers";
 
 const EditorPanel = dynamic(
   () => import("./EditorPanel").then((m) => m.EditorPanel),
@@ -63,6 +64,7 @@ const EditorPanel = dynamic(
 import { GitPanel } from "./GitPanel";
 import { ArtifactPanel } from "./ArtifactPanel";
 import { MultiCommitBar } from "./MultiCommitBar";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 const RealTerminal = dynamic(() => import("./RealTerminal").then((m) => m.RealTerminal), {
   ssr: false,
@@ -430,11 +432,13 @@ export function CoderView() {
       return { role: m.role, content: m.content };
     });
 
+    const activeProject = config.projects.find((p) => p.id === config.activeProjectId);
     const coderSystemPrompt = [
       config.systemPrompt,
       agent
         ? agent.systemPrompt
         : "Sen uzman bir yazılım geliştiricisisin. Claude Code tarzında çalış: kullanıcının kod tabanını anla, dosya içeriklerini incele, sorunlara adım adım yaklaş. Kod yazarken best practice'leri uygula, okunabilir ve sürdürülebilir çözümler sun.",
+      activeProject?.systemPrompt?.trim() ? `## Proje: ${activeProject.name}\n${activeProject.systemPrompt.trim()}` : "",
       config.rulesFile?.trim() ? `## Proje Kuralları (.rules)\n${config.rulesFile.trim()}` : "",
     ].filter(Boolean).join("\n\n");
 
@@ -549,16 +553,8 @@ export function CoderView() {
       useStore.getState().setStreaming(false);
       await useStore.getState().persistCurrent();
       if (useStore.getState().config.soundEnabled) {
-        try {
-          const ctx = new AudioContext();
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain); gain.connect(ctx.destination);
-          osc.frequency.setValueAtTime(880, ctx.currentTime);
-          gain.gain.setValueAtTime(0.1, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-          osc.start(); osc.stop(ctx.currentTime + 0.3);
-        } catch { /* yoksay */ }
+        const { playReady } = await import("@/lib/sounds");
+        playReady();
       }
       fetchFollowUps();
     }
@@ -571,6 +567,7 @@ export function CoderView() {
     if (!store.activeModel()) { store.setSettingsOpen(true); return; }
     if (!store.currentId) store.newChat(incognito);
     setPendingCommit(null);
+    if (store.config.soundEnabled) import("@/lib/sounds").then((m) => m.playSend());
 
     /* slash command algıla */
     const detected = findAgentByCommand(text);
@@ -923,7 +920,9 @@ export function CoderView() {
 
           {/* Terminal */}
           {terminalOpen && (
-            <RealTerminal onClose={() => setTerminalOpen(false)} />
+            <ErrorBoundary variant="inline" label="Terminal çöktü">
+              <RealTerminal onClose={() => setTerminalOpen(false)} />
+            </ErrorBoundary>
           )}
 
           {/* Composer */}
@@ -1179,13 +1178,15 @@ export function CoderView() {
         {editorOpen && (
           editorFile ? (
             <div className="w-[520px] shrink-0 flex flex-col min-h-0 overflow-hidden">
-              <EditorPanel
-                file={editorFile}
-                onClose={() => setEditorOpen(false)}
-                onAskAI={(text, context) => {
-                  useStore.getState().setPendingInput(context);
-                }}
-              />
+              <ErrorBoundary variant="inline" label="Editör çöktü">
+                <EditorPanel
+                  file={editorFile}
+                  onClose={() => setEditorOpen(false)}
+                  onAskAI={(text, context) => {
+                    useStore.getState().setPendingInput(context);
+                  }}
+                />
+              </ErrorBoundary>
             </div>
           ) : (
             <div className="w-[520px] shrink-0 flex flex-col min-h-0 overflow-hidden border-l border-line/60 bg-[#0e0e13]">
@@ -1233,8 +1234,8 @@ function UsageBadge({ chat }: { chat: { totalInTokens?: number; totalOutTokens?:
 
   return (
     <div
-      className="hidden md:flex items-center gap-1.5 text-[10px] text-muted/70 font-mono px-2 py-1 rounded-lg border border-line/40 mr-1"
-      title={`Girdi: ${tokenIn.toLocaleString()} · Çıktı: ${tokenOut.toLocaleString()} token`}
+      className="flex items-center gap-1.5 text-[10px] text-muted/70 font-mono px-2 py-1 rounded-lg border border-line/40 mr-1"
+      title={`Girdi: ${tokenIn.toLocaleString()} · Çıktı: ${tokenOut.toLocaleString()} token${cost ? ` · ~$${cost.toFixed(4)}` : ""}`}
     >
       <span>{total.toLocaleString()} tok</span>
       {cost !== null && hasPrice && (
@@ -1247,26 +1248,3 @@ function UsageBadge({ chat }: { chat: { totalInTokens?: number; totalOutTokens?:
   );
 }
 
-/* Parses the first code-fence with an embedded file path from AI output.
-   Supports: ```lang:path  |  ```lang file=path  |  ```lang title="path" */
-function extractFirstFileFence(md: string): EditorFile | null {
-  return extractAllFileFences(md)[0] ?? null;
-}
-
-/* Same parser but returns every match, dedup'd by path (last wins). */
-function extractAllFileFences(md: string): EditorFile[] {
-  const re = /```(\w+)(?::([^\s\n`]+)|[ \t]+(?:file|title)=["']?([^\s"'\n`]+)["']?)/g;
-  const map = new Map<string, EditorFile>();
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(md)) !== null) {
-    const path = (m[2] ?? m[3] ?? "").trim();
-    if (!path || (!path.includes("/") && !path.includes("."))) continue;
-    const fenceEnd = m.index + m[0].length;
-    const nlIdx = md.indexOf("\n", fenceEnd);
-    if (nlIdx === -1) continue;
-    const closeIdx = md.indexOf("\n```", nlIdx);
-    const content = closeIdx === -1 ? md.slice(nlIdx + 1) : md.slice(nlIdx + 1, closeIdx);
-    map.set(path, { path, content, language: detectLanguage(path) });
-  }
-  return Array.from(map.values());
-}

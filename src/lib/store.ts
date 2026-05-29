@@ -22,23 +22,47 @@ import { createClient } from "./supabase/client";
 const CONFIG_KEY = "craftai_config";
 const CHATS_KEY = "craftai_chats";
 const SNIPPETS_KEY = "craftai_snippets";
+const GUEST_KEY = "craftai_guest";
+
+/* Guest mode: API keys/tokens live in sessionStorage so they vanish on
+   browser/tab close. Useful on shared machines. The flag itself is in
+   sessionStorage too, so a clean tab starts in normal mode. */
+function isGuestMode(): boolean {
+  if (typeof window === "undefined") return false;
+  try { return sessionStorage.getItem(GUEST_KEY) === "1"; } catch { return false; }
+}
+function getStore(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try { return isGuestMode() ? window.sessionStorage : window.localStorage; } catch { return null; }
+}
+export function setGuestMode(on: boolean) {
+  if (typeof window === "undefined") return;
+  try {
+    if (on) sessionStorage.setItem(GUEST_KEY, "1");
+    else sessionStorage.removeItem(GUEST_KEY);
+  } catch { /* ignore */ }
+}
+export { isGuestMode };
 
 function loadSnippets(): Snippet[] {
-  if (typeof window === "undefined") return [];
-  try { return JSON.parse(localStorage.getItem(SNIPPETS_KEY) || "[]"); } catch { return []; }
+  const store = getStore();
+  if (!store) return [];
+  try { return JSON.parse(store.getItem(SNIPPETS_KEY) || "[]"); } catch { return []; }
 }
 function saveSnippets(s: Snippet[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(SNIPPETS_KEY, JSON.stringify(s));
+  const store = getStore();
+  if (!store) return;
+  store.setItem(SNIPPETS_KEY, JSON.stringify(s));
 }
 
 const uid = () =>
   Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
 function loadConfig(): Config {
-  if (typeof window === "undefined") return DEFAULT_CONFIG;
+  const store = getStore();
+  if (!store) return DEFAULT_CONFIG;
   try {
-    const raw = localStorage.getItem(CONFIG_KEY);
+    const raw = store.getItem(CONFIG_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       const merged = { ...DEFAULT_CONFIG, ...parsed };
@@ -64,17 +88,19 @@ function loadConfig(): Config {
 }
 
 function loadLocalChats(): Chat[] {
-  if (typeof window === "undefined") return [];
+  const store = getStore();
+  if (!store) return [];
   try {
-    return JSON.parse(localStorage.getItem(CHATS_KEY) || "[]");
+    return JSON.parse(store.getItem(CHATS_KEY) || "[]");
   } catch {
     return [];
   }
 }
 
 function saveLocalChats(chats: Chat[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(
+  const store = getStore();
+  if (!store) return;
+  store.setItem(
     CHATS_KEY,
     JSON.stringify(chats.filter((c) => !c.incognito)),
   );
@@ -233,8 +259,9 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   config: loadConfig(),
   saveConfig: (c) => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(CONFIG_KEY, JSON.stringify(c));
+    const store = getStore();
+    if (store) {
+      store.setItem(CONFIG_KEY, JSON.stringify(c));
       applyTheme(c.theme);
     }
     set({ config: c });

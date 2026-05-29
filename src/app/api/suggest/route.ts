@@ -1,7 +1,18 @@
+import type { NextRequest } from "next/server";
+import { checkLimit } from "@/lib/rate-limit";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const limited = checkLimit(req, "suggest", 20, 60_000);
+  if (limited) {
+    return Response.json(limited.body, {
+      status: limited.status,
+      headers: { "Retry-After": String(limited.retryAfter) },
+    });
+  }
+
   const { messages, baseUrl, model, apiKey } = await req.json();
   if (!baseUrl || !model || !apiKey || !messages?.length) {
     return Response.json({ suggestions: [] });
