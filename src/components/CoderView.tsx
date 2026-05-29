@@ -42,6 +42,7 @@ import { MultiCommitBar } from "./MultiCommitBar";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { EmptyChat } from "./EmptyChat";
 import { ExportMenu } from "./ExportMenu";
+import { VoiceButton } from "./VoiceButton";
 
 const RealTerminal = dynamic(() => import("./RealTerminal").then((m) => m.RealTerminal), {
   ssr: false,
@@ -1029,6 +1030,17 @@ export function CoderView() {
                   className="flex-1 bg-transparent resize-none outline-none text-[15px] leading-relaxed max-h-[240px] py-1 placeholder:text-muted/45"
                 />
 
+                {!streaming && (
+                  <VoiceButton
+                    onTranscript={(text, isFinal) => {
+                      /* interim: replace tail; final: append + space */
+                      setInput((cur) => {
+                        if (isFinal) return (cur + (cur && !cur.endsWith(" ") ? " " : "") + text).trimStart();
+                        return cur;
+                      });
+                    }}
+                  />
+                )}
                 {streaming ? (
                   <button onClick={stop} className="shrink-0 w-9 h-9 rounded-xl bg-red hover:bg-red/80 text-white grid place-items-center transition-colors" title="Durdur">
                     <Square size={13} />
