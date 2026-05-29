@@ -40,6 +40,7 @@ import { RightPanel } from "./RightPanel";
 
 import { MultiCommitBar } from "./MultiCommitBar";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { EmptyChat } from "./EmptyChat";
 
 const RealTerminal = dynamic(() => import("./RealTerminal").then((m) => m.RealTerminal), {
   ssr: false,
@@ -817,16 +818,12 @@ export function CoderView() {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto">
             {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center px-6 pb-16 select-none pointer-events-none">
-                <div className="w-12 h-12 rounded-2xl brand-gradient grid place-items-center text-white text-xl mb-4 shadow-lg shadow-brand/20">
-                  ◈
-                </div>
-                <h2 className="text-xl font-extrabold tracking-tight mb-1">Ne üzerinde çalışalım?</h2>
-                <p className="text-sm text-muted/60 max-w-xs leading-relaxed">
-                  Dosya ekle, kod yapıştır veya bir soru sor.<br />
-                  <span className="text-muted/40 text-xs">/ ile agent seç · @ ile dosya mention</span>
-                </p>
-              </div>
+              <EmptyChat
+                hasModel={config.models.length > 0}
+                hasRepo={!!repo}
+                onAddModel={() => setSettingsOpen(true)}
+                onPrompt={(text) => setInput(text)}
+              />
             ) : (
               <div className="max-w-3xl mx-auto px-5 py-6">
                 {messages.map((m, i) => {
@@ -1182,17 +1179,37 @@ function UsageBadge({ chat }: { chat: { totalInTokens?: number; totalOutTokens?:
   const activeModel = config.models.find((m) => m.id === config.activeModelId);
   const cost = activeModel ? calculateCost(activeModel.model, tokenIn, tokenOut) : null;
   const hasPrice = activeModel ? getModelPrice(activeModel.model) !== null : false;
+  /* % of context window used by the *input* (chat history) */
+  const pct = config.maxContext > 0 ? Math.min(100, (tokenIn / config.maxContext) * 100) : 0;
+  const warn = pct >= 80;
+  const danger = pct >= 95;
 
   return (
     <div
-      className="flex items-center gap-1.5 text-[10px] text-muted/70 font-mono px-2 py-1 rounded-lg border border-line/40 mr-1"
-      title={`Girdi: ${tokenIn.toLocaleString()} · Çıktı: ${tokenOut.toLocaleString()} token${cost ? ` · ~$${cost.toFixed(4)}` : ""}`}
+      className={`flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded-lg border mr-1 transition-colors ${
+        danger ? "border-red/40 bg-red/5 text-red"
+        : warn ? "border-amber-400/40 bg-amber-400/5 text-amber-400"
+        : "border-line/40 text-muted/70"
+      }`}
+      title={
+        `Girdi: ${tokenIn.toLocaleString()} · Çıktı: ${tokenOut.toLocaleString()} token` +
+        `\nBağlam penceresi: ${pct.toFixed(0)}% (${tokenIn.toLocaleString()}/${config.maxContext.toLocaleString()})` +
+        (cost ? `\nTahmini maliyet: ~$${cost.toFixed(4)}` : "")
+      }
     >
+      {/* mini progress dot */}
+      <span className="relative w-3 h-3" aria-hidden>
+        <span className="absolute inset-0 rounded-full bg-current opacity-15" />
+        <span
+          className="absolute inset-0 rounded-full bg-current"
+          style={{ clipPath: `inset(${100 - pct}% 0 0 0)` }}
+        />
+      </span>
       <span>{total.toLocaleString()} tok</span>
       {cost !== null && hasPrice && (
         <>
-          <span className="text-muted/40">·</span>
-          <span className="text-brand/80">{formatCost(cost)}</span>
+          <span className="opacity-40">·</span>
+          <span className={danger || warn ? "" : "text-brand/80"}>{formatCost(cost)}</span>
         </>
       )}
     </div>
