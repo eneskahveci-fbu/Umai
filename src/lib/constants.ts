@@ -1,4 +1,4 @@
-import type { Config, Provider, ResponseStyle } from "./types";
+import type { Config, Provider, ResponseStyle, Skill } from "./types";
 
 export interface Preset {
   label: string;
@@ -82,6 +82,102 @@ export const DEFAULT_SYSTEM_PROMPT =
 
 export const SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT;
 
+/**
+ * Varsayılan skill dosyaları — Skills butonu (SkillsPanel → "Dosyalar" sekmesi)
+ * içinde hazır gelir. Her biri bağımsız bir onay kutusuyla açılıp kapatılabilir
+ * (çoklu seçim). Aktif olanlar her yeni sohbette sistem prompt'una "[Referans
+ * dosyalar]" bölümü olarak otomatik eklenir. İçerikleri bu projenin (Next.js 16 +
+ * React 19 + TypeScript + Tailwind v4 + Zustand) kod tabanına göre hazırlanmıştır.
+ */
+export const DEFAULT_SKILLS: Skill[] = [
+  {
+    id: "default_ts",
+    title: "TypeScript Kuralları",
+    fileName: "typescript-kurallari.md",
+    source: "file",
+    enabled: true,
+    usageCount: 0,
+    createdAt: 1735680000000,
+    tags: ["typescript", "tip-güvenliği"],
+    content:
+      "# TypeScript Kuralları\n\n" +
+      "- `strict` mod açıktır; `any` kullanma. Gerçekten bilinmiyorsa `unknown` kullan ve daralt.\n" +
+      "- Tip ve arayüzleri `import type { ... }` ile içe aktar (bu proje böyle yapıyor).\n" +
+      "- Veri yapıları için `src/lib/types.ts` içindeki mevcut arayüzleri (Skill, Config, ChatMessage, Project...) yeniden kullan; kopya tip üretme.\n" +
+      "- Fonksiyon dönüş tiplerini ve public API imzalarını açıkça yaz.\n" +
+      "- `null`/`undefined` durumlarını optional chaining (`?.`) ve nullish coalescing (`??`) ile güvenli ele al.\n" +
+      "- Sabit değer kümeleri için union literal tip kullan (örn. `\"manual\" | \"file\"`).",
+  },
+  {
+    id: "default_next_react",
+    title: "Next.js 16 & React 19 Pratikleri",
+    fileName: "nextjs-react-pratikleri.md",
+    source: "file",
+    enabled: true,
+    usageCount: 0,
+    createdAt: 1735680001000,
+    tags: ["nextjs", "react", "app-router"],
+    content:
+      "# Next.js 16 & React 19 Pratikleri\n\n" +
+      "- Bu sürüm standart Next.js'ten farklıdır; framework API'si gerektiren kod yazmadan önce `node_modules/next/dist/docs/` altındaki ilgili rehberi oku (bkz. AGENTS.md).\n" +
+      "- App Router kullanılır. Varsayılan Server Component'tir; tarayıcı API'si, state veya event handler gerekiyorsa dosyanın başına `\"use client\"` ekle.\n" +
+      "- Hook kurallarına uy: hook'ları koşulsuz, bileşenin en üst seviyesinde çağır.\n" +
+      "- Global durum için Zustand (`@/lib/store`) kullan; mevcut store action'larını (`addSkill`, `toggleSkill`, `saveConfig`...) tercih et.\n" +
+      "- API rotaları `src/app/api/.../route.ts` içinde; streaming için `ReadableStream` + SSE (`data: ...\\n\\n`) desenini koru.",
+  },
+  {
+    id: "default_tailwind_ui",
+    title: "Tailwind & UI Tutarlılığı",
+    fileName: "tailwind-ui-tutarliligi.md",
+    source: "file",
+    enabled: true,
+    usageCount: 0,
+    createdAt: 1735680002000,
+    tags: ["tailwind", "ui", "erişilebilirlik"],
+    content:
+      "# Tailwind & UI Tutarlılığı\n\n" +
+      "- Tailwind CSS v4 kullanılır. Inline style yerine utility sınıfları kullan.\n" +
+      "- Projenin tasarım token'larını kullan: `bg-bg`, `bg-surface`, `bg-bgsoft`, `text-ink`, `text-muted`, `border-line` ve vurgu için `amber-400`.\n" +
+      "- Yeni bileşenleri mevcut yapıyla uyumlu yap: yuvarlatılmış köşeler (`rounded-xl`/`rounded-2xl`), ince kenarlıklar, `transition-colors`.\n" +
+      "- Erişilebilirlik: butonlara `title`/`aria-label`, modallara `role=\"dialog\"` ve `aria-modal`, klavye ile kapatma (Esc) ekle.\n" +
+      "- İkonlar için `lucide-react` kullan; boyutu `size={...}` ile ver.",
+  },
+  {
+    id: "default_security",
+    title: "Güvenlik & Gizlilik",
+    fileName: "guvenlik-gizlilik.md",
+    source: "file",
+    enabled: true,
+    usageCount: 0,
+    createdAt: 1735680003000,
+    tags: ["güvenlik", "gizlilik"],
+    content:
+      "# Güvenlik & Gizlilik\n\n" +
+      "- API anahtarları ve GitHub token'ları yalnızca tarayıcıda (localStorage / guest modda sessionStorage) tutulur; sunucuda saklama, log'lama veya repoya yazma.\n" +
+      "- Gizli bilgileri koda gömme; ortam değişkenlerini (`process.env`) kullan ve `.env.example`'ı güncel tut.\n" +
+      "- API rotalarında origin ve rate-limit kontrollerini (mevcut `checkOrigin`, `checkRate`) koru.\n" +
+      "- Kullanıcı girdisini doğrula; HTML üretirken XSS'e karşı kaçışla (`&`, `<`, `>`).\n" +
+      "- Dış kaynaklı içeriği (LLM çıktısı, dosya, repo) güvenilmez kabul et; komut/SQL/path enjeksiyonuna karşı dikkatli ol.",
+  },
+  {
+    id: "default_response_format",
+    title: "Türkçe Yanıt & Kod Bloğu Formatı",
+    fileName: "yanit-formati.md",
+    source: "file",
+    enabled: true,
+    usageCount: 0,
+    createdAt: 1735680004000,
+    tags: ["dil", "format", "markdown"],
+    content:
+      "# Türkçe Yanıt & Kod Bloğu Formatı\n\n" +
+      "- Yanıtları Türkçe ve markdown formatında ver.\n" +
+      "- Kod bloklarını her zaman dilini belirterek yaz.\n" +
+      "- Bir dosyanın içeriğini yazarken code-fence'i `dil:dosya/yolu` biçiminde başlat (örn. ` ```ts:src/lib/utils.ts `); böylece editörde otomatik açılabilir.\n" +
+      "- Önce kısa bir açıklama, sonra kod; gereksiz tekrar ve dolgu metinden kaçın.\n" +
+      "- Adım adım düşün ve değişiklikleri net, uygulanabilir parçalar halinde sun.",
+  },
+];
+
 export const DEFAULT_CONFIG: Config = {
   models: [],
   activeModelId: null,
@@ -93,7 +189,7 @@ export const DEFAULT_CONFIG: Config = {
   theme: "dark",
   style: "normal",
   memories: [],
-  skills: [],
+  skills: DEFAULT_SKILLS,
   projects: [],
   activeProjectId: null,
   followUps: true,
