@@ -67,11 +67,53 @@ html.light {
 html,
 body {
   height: 100%;
+  /* iOS rubber-band scroll lock for app pages — re-enabled inside scrollable
+     containers via overflow-y:auto */
+  overscroll-behavior-y: none;
 }
 body {
   background: var(--color-bg);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  /* Disable iOS tap highlight; we render our own :active states */
+  -webkit-tap-highlight-color: transparent;
+  /* Pleasant text rendering on macOS / iOS */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── iOS / dynamic viewport helpers ─────────────────────────────────────
+   iOS Safari's URL bar steals viewport height with `100vh`. `100dvh` is
+   the dynamic viewport that resizes as the bar shows/hides. We override
+   Tailwind's h-screen / min-h-screen so existing markup picks up the
+   fix automatically. */
+.h-screen { height: 100dvh; }
+.min-h-screen { min-height: 100dvh; }
+
+/* Safe area helpers — pin to true edge but respect the notch / home bar.
+   Used by composer, banners, modals. */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.pt-safe { padding-top: env(safe-area-inset-top); }
+.pl-safe { padding-left: env(safe-area-inset-left); }
+.pr-safe { padding-right: env(safe-area-inset-right); }
+
+/* iOS Safari auto-zooms whenever a form control's computed font-size is
+   below 16px. Force 16px on small viewports; on desktop they shrink back
+   via the `sm:` overrides each component already uses. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Touch devices: kill sticky :hover after tap, ensure 44px-ish hit area
+   on common icon buttons via touch-action manipulation */
+@media (hover: none) {
+  /* No sticky hover state — components that animate on hover only need it
+     on devices that actually hover */
+  *:hover { transition: none !important; }
 }
 
 /* ─── Scrollbar ─── */
@@ -198,6 +240,16 @@ html.light .prose-chat :not(pre) > code {
 
 /* ─── Global smooth scrolling + branded focus ring ─── */
 html { scroll-behavior: smooth; }
+
+/* PWA fullscreen (iOS standalone) — give the body the actual safe height */
+@media all and (display-mode: standalone) {
+  html, body { height: 100dvh; }
+}
+
+/* Mobile composer & terminals don't need text selection on their chrome.
+   Disabling on whole UI shells but keep messages/code blocks selectable. */
+.no-select { -webkit-user-select: none; user-select: none; }
+.prose-chat, pre, code, textarea, input { -webkit-user-select: text; user-select: text; }
 
 /* Use the active accent for any tabbable element's focus-visible state.
    The :where() wrapper keeps specificity low so component styles always win. */
