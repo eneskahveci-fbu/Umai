@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Code2, Copy, Search, Trash2, X } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { useModalA11y } from "@/lib/useModalA11y";
 
 export function SnippetsPanel() {
   const open = useStore((s) => s.snippetsOpen);
@@ -14,6 +15,8 @@ export function SnippetsPanel() {
   const [search, setSearch] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  useModalA11y(modalRef, open, () => setOpen(false));
 
   if (!open) return null;
 
@@ -43,7 +46,11 @@ export function SnippetsPanel() {
       onClick={() => setOpen(false)}
     >
       <div
-        className="w-full max-w-3xl h-[80vh] bg-surface border border-line rounded-2xl shadow-2xl shadow-black/40 flex flex-col"
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Snippet kütüphanesi"
+        className="w-full max-w-3xl h-[80dvh] bg-surface border border-line rounded-2xl shadow-2xl shadow-black/40 flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-line/60 shrink-0">

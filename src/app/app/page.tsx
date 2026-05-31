@@ -10,6 +10,7 @@ import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { SkillsPanel } from "@/components/SkillsPanel";
+import { SnippetsPanel } from "@/components/SnippetsPanel";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { useStore } from "@/lib/store";
@@ -93,6 +94,7 @@ export default function AppPage() {
         <CommandPalette />
         <KeyboardShortcuts />
         <SkillsPanel />
+        <SnippetsPanel />
         <ToastContainer />
         <OfflineBanner />
         <OnboardingTour />
