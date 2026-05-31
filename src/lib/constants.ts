@@ -23,23 +23,47 @@ export const PRESETS: Record<Provider, Preset> = {
   openrouter: {
     label: "🔀 OpenRouter",
     baseUrl: "https://openrouter.ai/api/v1",
-    model: "meta-llama/llama-3.3-70b-instruct:free",
+    model: "deepseek/deepseek-chat-v3-0324:free",
     keyHint: "OpenRouter anahtarı (sk-or-...)",
   },
   groq: {
-    label: "Groq (Ücretsiz)",
+    label: "⚡ Groq (Ücretsiz)",
     baseUrl: "https://api.groq.com/openai/v1",
     model: "llama-3.3-70b-versatile",
     keyHint: "gsk_...",
   },
   gemini: {
-    label: "Google Gemini (Ücretsiz)",
+    label: "✨ Google Gemini (Ücretsiz)",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
     model: "gemini-2.5-flash",
     keyHint: "AIza...",
   },
+  mistral: {
+    label: "🌬️ Mistral",
+    baseUrl: "https://api.mistral.ai/v1",
+    model: "mistral-large-latest",
+    keyHint: "Mistral anahtarı",
+  },
+  cerebras: {
+    label: "🧠 Cerebras (Hızlı)",
+    baseUrl: "https://api.cerebras.ai/v1",
+    model: "llama-3.3-70b",
+    keyHint: "csk-...",
+  },
+  together: {
+    label: "🤝 Together AI",
+    baseUrl: "https://api.together.xyz/v1",
+    model: "Qwen/Qwen2.5-Coder-32B-Instruct",
+    keyHint: "Together anahtarı",
+  },
+  xai: {
+    label: "𝕏 xAI (Grok)",
+    baseUrl: "https://api.x.ai/v1",
+    model: "grok-2-latest",
+    keyHint: "xai-...",
+  },
   ollama: {
-    label: "Ollama (Yerel / Ücretsiz)",
+    label: "💻 Ollama (Yerel / Ücretsiz)",
     baseUrl: "http://localhost:11434/v1",
     model: "qwen2.5-coder:7b",
     keyHint: "ollama (boş bırakılabilir)",
@@ -48,8 +72,73 @@ export const PRESETS: Record<Provider, Preset> = {
     label: "⚙️ Özel (manuel URL)",
     baseUrl: "",
     model: "",
-    keyHint: "ucun gerektiriyorsa anahtar",
+    keyHint: "gerekliyse API anahtarı",
   },
+};
+
+/**
+ * Her sağlayıcı için önerilen / güncel model listesi. SettingsModal'daki
+ * "Model adı" alanına bir <datalist> olarak bağlanır; kullanıcı listeden hızlıca
+ * seçebilir veya elle yazabilir. Listenin ilk elemanı o sağlayıcının varsayılanıdır
+ * (PRESETS[provider].model ile aynı). OpenAI uyumlu uçlar olduğu için isimler
+ * sağlayıcının API'sinde geçerli model kimlikleriyle eşleşmelidir.
+ */
+export const PROVIDER_MODELS: Record<Provider, string[]> = {
+  hf: [
+    "Qwen/Qwen2.5-Coder-32B-Instruct",
+    "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+    "deepseek-ai/DeepSeek-V3-0324",
+    "deepseek-ai/DeepSeek-R1",
+    "meta-llama/Llama-3.3-70B-Instruct",
+    "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+  ],
+  deepseek: ["deepseek-chat", "deepseek-reasoner"],
+  openrouter: [
+    "deepseek/deepseek-chat-v3-0324:free",
+    "deepseek/deepseek-r1:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "google/gemini-2.0-flash-exp:free",
+    "qwen/qwen-2.5-coder-32b-instruct",
+    "anthropic/claude-3.7-sonnet",
+    "openai/gpt-4o-mini",
+    "x-ai/grok-2-1212",
+  ],
+  groq: [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "qwen-2.5-coder-32b",
+    "deepseek-r1-distill-llama-70b",
+    "moonshotai/kimi-k2-instruct",
+  ],
+  gemini: [
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash",
+  ],
+  mistral: [
+    "mistral-large-latest",
+    "codestral-latest",
+    "mistral-small-latest",
+    "open-mistral-nemo",
+  ],
+  cerebras: ["llama-3.3-70b", "qwen-3-32b", "llama3.1-8b"],
+  together: [
+    "Qwen/Qwen2.5-Coder-32B-Instruct",
+    "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    "deepseek-ai/DeepSeek-V3",
+    "mistralai/Mixtral-8x7B-Instruct-v0.1",
+  ],
+  xai: ["grok-2-latest", "grok-2-vision-latest", "grok-beta"],
+  ollama: [
+    "qwen2.5-coder:7b",
+    "qwen2.5-coder:14b",
+    "qwen2.5-coder:32b",
+    "llama3.3:70b",
+    "deepseek-r1:7b",
+    "gemma3:12b",
+  ],
+  custom: [],
 };
 
 export const STYLE_LABELS: Record<ResponseStyle, { label: string; prompt: string }> = {

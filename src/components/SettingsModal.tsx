@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
-import { PRESETS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS } from "@/lib/constants";
+import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS } from "@/lib/constants";
 import type { Provider, ResponseStyle } from "@/lib/types";
 
 export function SettingsModal() {
@@ -232,7 +232,10 @@ export function SettingsModal() {
                 <select value={provider} onChange={(e) => onProvider(e.target.value as Provider)} className="input-mono">{(Object.keys(PRESETS) as Provider[]).map((p) => <option key={p} value={p}>{PRESETS[p].label}</option>)}</select>
                 <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Görünen ad (opsiyonel)" className="input-mono" />
                 <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="Base URL" className="input-mono" />
-                <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="Model adı" className="input-mono" />
+                <input value={model} onChange={(e) => setModel(e.target.value)} list="model-suggestions" placeholder="Model adı — listeden seç veya elle yaz" className="input-mono" />
+                <datalist id="model-suggestions">
+                  {(PROVIDER_MODELS[provider] ?? []).map((m) => <option key={m} value={m} />)}
+                </datalist>
                 <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={`API anahtarı — ${PRESETS[provider].keyHint}`} className="input-mono" />
                 <button onClick={submitModel} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-brand hover:bg-branddim text-white text-sm font-semibold"><Plus size={15} /> Model Ekle</button>
               </div>
