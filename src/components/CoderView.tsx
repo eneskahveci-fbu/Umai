@@ -652,7 +652,10 @@ export function CoderView() {
         </div>
       )}
       {/* Header */}
-      <div className="h-12 shrink-0 flex items-center gap-2 px-3 border-b border-line/60 bg-surface/60 backdrop-blur-sm">
+      <div
+        className="h-12 shrink-0 flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 border-b border-line/60 bg-surface/60 backdrop-blur-sm overflow-x-auto scrollbar-none"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
         <button
           onClick={() => setSidebarOpen(true)}
           title="Yan panel (Ctrl+B)"
@@ -943,7 +946,10 @@ export function CoderView() {
           )}
 
           {/* Composer */}
-          <div className="shrink-0 bg-gradient-to-t from-bg via-bg to-transparent pt-2 pb-4">
+          <div
+            className="shrink-0 bg-gradient-to-t from-bg via-bg to-transparent pt-2"
+            style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+          >
             <div className="max-w-3xl mx-auto px-5 relative">
 
               {/* Slash menu */}

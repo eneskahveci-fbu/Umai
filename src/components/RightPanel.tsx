@@ -82,7 +82,7 @@ export function RightPanel(props: RightPanelProps) {
             <button
               key={t.id}
               onClick={() => setActive(t.id)}
-              className={`flex items-center gap-1.5 px-2.5 h-7 rounded-lg text-[11px] font-semibold transition-colors ${
+              className={`flex items-center gap-1.5 px-3 h-9 sm:h-7 rounded-lg text-[11px] font-semibold transition-colors min-w-0 ${
                 isActive
                   ? "bg-bg text-ink shadow-sm"
                   : "text-muted/70 hover:text-ink hover:bg-bgsoft/60"
@@ -97,8 +97,9 @@ export function RightPanel(props: RightPanelProps) {
         {active && active !== "artifact" && (
           <button
             onClick={closeActive}
+            aria-label="Bu sekmeyi kapat"
             title="Bu sekmeyi kapat"
-            className="text-muted/40 hover:text-ink p-1 rounded transition-colors"
+            className="text-muted/40 hover:text-ink w-8 h-8 grid place-items-center rounded-lg hover:bg-bgsoft transition-colors"
           >
             <X size={13} />
           </button>

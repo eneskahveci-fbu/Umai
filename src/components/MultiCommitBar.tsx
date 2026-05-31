@@ -120,7 +120,11 @@ export function MultiCommitBar({
           {files.length} dosya bulundu — {toCommit.length} seçili
         </span>
         <div className="flex-1" />
-        <button onClick={onClose} className="text-muted hover:text-ink p-0.5 rounded transition-colors">
+        <button
+          onClick={onClose}
+          aria-label="Kapat"
+          className="text-muted hover:text-ink w-7 h-7 grid place-items-center rounded-lg hover:bg-bgsoft transition-colors"
+        >
           <X size={13} />
         </button>
       </div>

@@ -7,7 +7,10 @@
   --color-surface2: #1c1c26;
   --color-line: #28283a;
   --color-ink: #ececf1;
-  --color-muted: #9a9ab0;
+  /* Muted bumped from #9a9ab0 → #a8a8be (~4.7:1 vs #0e0e13, meets WCAG AA
+     for normal text). Opacity variants (text-muted/40, /50) used as
+     decorative labels — readable at large/bold weights only. */
+  --color-muted: #a8a8be;
   --color-brand: #7c5cff;
   --color-branddim: #6a4be0;
   --color-accent: #a78bfa;
