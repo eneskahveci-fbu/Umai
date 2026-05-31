@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { useModalA11y } from "@/lib/useModalA11y";
 import {
   BookMarked, Check, FileText, FileUp, Folder, GitBranch,
   Pencil, Plus, RotateCcw, Search, Sparkles, Trash2, X, Zap,
@@ -24,6 +25,8 @@ export function SkillsPanel() {
 
   const [tab, setTab] = useState<Tab>("skills");
   const [search, setSearch] = useState("");
+  const modalRef = useRef<HTMLDivElement>(null);
+  useModalA11y(modalRef, open, () => setOpen(false));
 
   if (!open) return null;
 
@@ -45,7 +48,11 @@ export function SkillsPanel() {
       onClick={() => setOpen(false)}
     >
       <div
-        className="w-full max-w-3xl h-[82vh] bg-surface border border-line rounded-2xl shadow-2xl shadow-black/40 flex flex-col"
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Skills"
+        className="w-full max-w-3xl h-[82dvh] bg-surface border border-line rounded-2xl shadow-2xl shadow-black/40 flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

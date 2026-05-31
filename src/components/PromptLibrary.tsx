@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { BookOpen, X } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { useModalA11y } from "@/lib/useModalA11y";
 import { PROMPT_TEMPLATES } from "@/lib/constants";
 
 const CATEGORIES = [
@@ -21,6 +22,8 @@ export function PromptLibrary() {
 
   const [activeCategory, setActiveCategory] = useState("Tümü");
   const [search, setSearch] = useState("");
+  const modalRef = useRef<HTMLDivElement>(null);
+  useModalA11y(modalRef, open, () => setOpen(false));
 
   if (!open) return null;
 
@@ -50,7 +53,11 @@ export function PromptLibrary() {
       onClick={() => setOpen(false)}
     >
       <div
-        className="w-full max-w-2xl mx-4 bg-surface border border-line rounded-2xl shadow-2xl flex flex-col max-h-[80vh]"
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Prompt şablonları"
+        className="w-full max-w-2xl mx-4 bg-surface border border-line rounded-2xl shadow-2xl flex flex-col max-h-[80dvh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
