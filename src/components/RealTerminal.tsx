@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { FolderOpen, Loader2, Power, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
+import { Cloud, FolderOpen, Loader2, Power, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
 import { getUnsupportedReason, getWebContainer, isSupported, mountDefaults, needsApiKey } from "@/lib/webcontainer";
 import {
   dirHandleToTree,
@@ -12,6 +12,17 @@ import {
   setMounted,
 } from "@/lib/localfs";
 import { useStore } from "@/lib/store";
+
+/* Build a "create new Codespace" deep-link for the connected repo.
+   Free GitHub accounts get 60h/month. The link opens in a new tab so
+   the user keeps craft.ai mounted; on iOS it lands in github.com which
+   has its own PWA-friendly terminal. */
+function codespaceUrl(owner: string, repo: string, branch?: string): string {
+  const u = new URL("https://github.com/codespaces/new");
+  u.searchParams.set("repo", `${owner}/${repo}`);
+  if (branch) u.searchParams.set("ref", branch);
+  return u.toString();
+}
 
 type Status = "idle" | "booting" | "ready" | "error" | "needs-key";
 
@@ -25,6 +36,8 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
   const apiKey = useStore((s) => s.config.webcontainerApiKey);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const addToast = useStore((s) => s.addToast);
+  const repo = useStore((s) => s.repo);
+  const codespaceHref = repo ? codespaceUrl(repo.owner, repo.repo, repo.branch) : null;
 
   useEffect(() => {
     const fn = () => setMountedFolder(getMountedName());
@@ -182,15 +195,32 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
           </button>
         )}
         <div className="flex-1" />
+        {codespaceHref && (
+          <a
+            href={codespaceHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`GitHub Codespaces'te aç (${repo!.owner}/${repo!.repo})`}
+            className="text-muted/50 hover:text-ink w-7 h-7 grid place-items-center rounded transition-colors"
+          >
+            <Cloud size={11} />
+          </a>
+        )}
         <button
           onClick={mountFolder}
           disabled={mounting}
+          aria-label="Yerel klasör mount et"
           title={mountedFolder ? "Başka klasör seç" : "Yerel klasör mount et"}
-          className="text-muted/50 hover:text-ink p-1 rounded transition-colors disabled:opacity-30"
+          className="text-muted/50 hover:text-ink w-7 h-7 grid place-items-center rounded transition-colors disabled:opacity-30"
         >
           {mounting ? <Loader2 size={11} className="animate-spin" /> : <FolderOpen size={11} />}
         </button>
-        <button onClick={restart} title="Yeniden başlat" className="text-muted/50 hover:text-ink p-1 rounded transition-colors">
+        <button
+          onClick={restart}
+          aria-label="Terminali yeniden başlat"
+          title="Yeniden başlat"
+          className="text-muted/50 hover:text-ink w-7 h-7 grid place-items-center rounded transition-colors"
+        >
           <RefreshCw size={11} />
         </button>
         <button onClick={onClose} title="Kapat" className="text-muted/50 hover:text-ink p-1 rounded transition-colors">
@@ -214,7 +244,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
               </a>
               {" "}üzerinden ücretsiz al → Ayarlar → Gelişmiş&apos;e yapıştır.
             </p>
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center justify-center gap-2 flex-wrap">
               <button
                 onClick={() => setSettingsOpen(true)}
                 className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-white hover:bg-branddim transition-colors font-semibold"
@@ -222,6 +252,17 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
                 <SettingsIcon size={11} />
                 Key&apos;i ayarla
               </button>
+              {codespaceHref && (
+                <a
+                  href={codespaceHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-bgsoft hover:bg-line/30 text-muted hover:text-ink transition-colors font-semibold"
+                >
+                  <Cloud size={11} />
+                  Codespaces&apos;te aç
+                </a>
+              )}
               <button onClick={restart} className="text-[11px] px-3 py-1.5 rounded-lg bg-bgsoft hover:bg-line/30 transition-colors text-muted">
                 Tekrar dene
               </button>
@@ -233,9 +274,29 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
           <div className="text-center max-w-md">
             <p className="text-xs text-red mb-2">Terminal başlatılamadı</p>
             <p className="text-[11px] text-muted/60 leading-relaxed mb-3">{errMsg}</p>
-            <button onClick={restart} className="text-[11px] px-3 py-1.5 rounded-lg bg-brand/10 text-brand hover:bg-brand/20 transition-colors">
-              Tekrar dene
-            </button>
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              {codespaceHref ? (
+                <a
+                  href={codespaceHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-white hover:bg-branddim transition-colors font-semibold"
+                >
+                  <Cloud size={11} />
+                  Codespaces&apos;te aç
+                </a>
+              ) : (
+                <span className="text-[10px] text-muted/50 italic">
+                  Mobilde gerçek terminal için bir GitHub deposu bağla → tek tıkla Codespaces
+                </span>
+              )}
+              <button
+                onClick={restart}
+                className="text-[11px] px-3 py-1.5 rounded-lg bg-bgsoft hover:bg-line/30 text-muted transition-colors"
+              >
+                Tekrar dene
+              </button>
+            </div>
           </div>
         </div>
       ) : status === "booting" ? (
