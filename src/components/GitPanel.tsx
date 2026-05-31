@@ -62,7 +62,7 @@ export function GitPanel({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="w-72 shrink-0 flex flex-col border-l border-line/60 bg-surface/40 overflow-hidden">
+    <div className="w-full h-full flex flex-col bg-surface/40 overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-line/60 shrink-0">
         <span className="text-xs font-bold text-muted/70 uppercase tracking-wide">Git İşlemleri</span>
         <button onClick={onClose} className="text-muted/40 hover:text-muted transition-colors">

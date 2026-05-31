@@ -62,7 +62,10 @@ export function Sidebar() {
   /* ── Collapsed icon-only ── */
   if (!sidebarOpen) {
     return (
-      <aside className="fixed top-0 left-0 z-40 h-full w-14 hidden md:flex flex-col bg-surface border-r border-line/60">
+      <aside
+        className="fixed top-0 left-0 z-40 h-full w-14 hidden md:flex flex-col bg-surface border-r border-line/60"
+        style={{ paddingLeft: "env(safe-area-inset-left)" }}
+      >
         <div className="h-14 flex items-center justify-center border-b border-line/60 shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
@@ -115,7 +118,13 @@ export function Sidebar() {
 
   /* ── Expanded ── */
   return (
-    <aside className="fixed top-0 left-0 z-40 h-full w-64 flex flex-col bg-surface border-r border-line/60">
+    <aside
+      className="fixed top-0 left-0 z-40 h-full w-[min(80vw,16rem)] md:w-64 flex flex-col bg-surface border-r border-line/60"
+      style={{
+        paddingLeft: "env(safe-area-inset-left)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
+    >
       {/* Header */}
       <div className="h-14 px-4 flex items-center justify-between border-b border-line/60 shrink-0">
         <div className="flex items-center gap-2.5 font-extrabold text-base">

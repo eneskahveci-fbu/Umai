@@ -22,8 +22,8 @@ export function ArtifactPanel() {
 
   return (
     <div
-      className={`shrink-0 border-l border-line bg-surface flex flex-col transition-all ${
-        expanded ? "fixed inset-0 z-50" : "w-[520px]"
+      className={`shrink-0 border-line bg-surface flex flex-col transition-all ${
+        expanded ? "fixed inset-0 z-50" : "w-full h-full"
       }`}
     >
       <div className="h-12 shrink-0 flex items-center justify-between px-4 border-b border-line">

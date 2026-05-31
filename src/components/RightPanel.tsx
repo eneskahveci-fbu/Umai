@@ -63,7 +63,16 @@ export function RightPanel(props: RightPanelProps) {
   };
 
   return (
-    <div className="w-[540px] shrink-0 flex flex-col min-h-0 border-l border-line/60 bg-bg/60">
+    <div
+      className="
+        fixed inset-x-0 bottom-0 top-12 z-30 bg-bg
+        md:static md:inset-auto md:z-auto md:w-[min(50vw,540px)] md:shrink-0
+        flex flex-col min-h-0 border-line/60
+        border-t md:border-t-0 md:border-l
+        animate-in slide-in-from-bottom-4 md:animate-none duration-200
+      "
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
       {/* Tab strip */}
       <div className="h-10 shrink-0 flex items-center gap-0.5 px-2 border-b border-line/60 bg-surface/40">
         {tabs.filter((t) => t.available).map((t) => {
