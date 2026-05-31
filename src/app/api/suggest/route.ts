@@ -43,8 +43,13 @@ export async function POST(req: NextRequest) {
         stream: false,
       }),
     });
-    const data = await res.json();
-    const text: string = data.choices?.[0]?.message?.content || "";
+    /* Many provider error pages are HTML; guard before .json() so a bad
+       upstream doesn't crash this handler. */
+    if (!res.ok) return Response.json({ suggestions: [] });
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("json")) return Response.json({ suggestions: [] });
+    const data = await res.json().catch(() => null);
+    const text: string = data?.choices?.[0]?.message?.content || "";
     const suggestions = text
       .split("\n")
       .map((l) => l.replace(/^\d+[.)]\s*/, "").trim())

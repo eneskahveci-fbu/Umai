@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useModalA11y } from "@/lib/useModalA11y";
 import {
   Brain,
   Check,
@@ -43,6 +44,8 @@ export function SettingsModal() {
 
   const [tab, setTab] = useState<"model" | "github" | "general" | "advanced">("model");
   const [search, setSearch] = useState("");
+  const modalRef = useRef<HTMLDivElement>(null);
+  useModalA11y(modalRef, open, () => setOpen(false));
   const [guestMode, setGuestModeState] = useState(() =>
     typeof window === "undefined" ? false : isGuestMode(),
   );
@@ -126,9 +129,17 @@ export function SettingsModal() {
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setOpen(false)}>
-      <div className="w-full max-w-lg rounded-2xl border border-line bg-surface p-6 max-h-[92vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+        className="w-full max-w-lg rounded-2xl border border-line bg-surface p-6 max-h-[92dvh] overflow-auto"
+        onClick={(e) => e.stopPropagation()}
+        style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+      >
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-bold">Ayarlar</h3>
+          <h3 id="settings-title" className="text-lg font-bold">Ayarlar</h3>
           <button onClick={() => setOpen(false)} className="text-muted hover:text-ink p-1 rounded-lg hover:bg-bgsoft"><X size={18} /></button>
         </div>
 

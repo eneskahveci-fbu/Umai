@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowRight, Check, GitBranch, MessageSquare, Settings, X } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { useModalA11y } from "@/lib/useModalA11y";
 
 interface Step {
   icon: ReactNode;
@@ -20,6 +21,12 @@ export function OnboardingTour() {
 
   const [step, setStep] = useState(0);
   const [visible, setVisible] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const dismiss = () => {
+    setOnboardingDone(true);
+    setVisible(false);
+  };
+  useModalA11y(modalRef, visible, dismiss);
 
   /* Show on first run only — defer one tick so the rest of the UI has
      mounted (the spotlight feels weirder on a blank screen). */
@@ -88,17 +95,16 @@ export function OnboardingTour() {
   const cur = steps[step];
   const isLast = step === total - 1;
 
-  const dismiss = () => {
-    setOnboardingDone(true);
-    setVisible(false);
-  };
-
   return (
     <div
       className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
       onClick={dismiss}
     >
       <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="onboarding-title"
         className="w-full max-w-md rounded-2xl border border-line bg-surface shadow-2xl shadow-brand/10 animate-in zoom-in-95 fade-in duration-200"
         onClick={(e) => e.stopPropagation()}
       >
@@ -119,7 +125,7 @@ export function OnboardingTour() {
           <div className="w-12 h-12 rounded-2xl bg-bgsoft grid place-items-center mb-4 shadow-sm">
             {cur.icon}
           </div>
-          <h3 className="text-lg font-extrabold mb-1.5">{cur.title}</h3>
+          <h3 id="onboarding-title" className="text-lg font-extrabold mb-1.5">{cur.title}</h3>
           <p className="text-sm text-muted/80 leading-relaxed">{cur.body}</p>
         </div>
 
