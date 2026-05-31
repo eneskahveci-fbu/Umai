@@ -248,10 +248,6 @@ interface StoreState {
   setDiffModal: (m: { original: string; newCode: string; language: string; path?: string } | null) => void;
 
   // compare view
-  compareModelA: string | null;
-  compareModelB: string | null;
-  setCompareModelA: (id: string | null) => void;
-  setCompareModelB: (id: string | null) => void;
 }
 
 export const useStore = create<StoreState>()((set, get) => ({
@@ -835,10 +831,6 @@ export const useStore = create<StoreState>()((set, get) => ({
   diffModal: null,
   setDiffModal: (m) => set({ diffModal: m }),
 
-  compareModelA: null,
-  compareModelB: null,
-  setCompareModelA: (id) => set({ compareModelA: id }),
-  setCompareModelB: (id) => set({ compareModelB: id }),
 }));
 
 function safeName(s: string) {

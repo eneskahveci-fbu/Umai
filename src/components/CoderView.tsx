@@ -322,6 +322,27 @@ export function CoderView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.activeRepo, config.activeGithubId, config.cliMode]);
 
+  /* CodeBlock emits this when the user types a path into its "Diff" prompt.
+     We look it up in the currently attached files and seed the modal's
+     "original" side. Without this listener the diff against an existing
+     file always rendered as if the file were empty. */
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ path: string; newCode: string; language: string }>).detail;
+      if (!detail?.path) return;
+      const match = attachedFiles.find((f) => f.path === detail.path);
+      if (!match) return;
+      useStore.getState().setDiffModal({
+        original: match.content,
+        newCode: detail.newCode,
+        language: detail.language,
+        path: detail.path,
+      });
+    };
+    window.addEventListener("craftai:diff-request", handler);
+    return () => window.removeEventListener("craftai:diff-request", handler);
+  }, [attachedFiles]);
+
   useEffect(() => {
     if (!config.autoTerminal) return;
     import("@/lib/webcontainer").then(({ isSupported }) => {

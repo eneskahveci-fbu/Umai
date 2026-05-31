@@ -11,6 +11,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { SkillsPanel } from "@/components/SkillsPanel";
 import { SnippetsPanel } from "@/components/SnippetsPanel";
+import { DiffModal } from "@/components/DiffModal";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { useStore } from "@/lib/store";
@@ -95,6 +96,7 @@ export default function AppPage() {
         <KeyboardShortcuts />
         <SkillsPanel />
         <SnippetsPanel />
+        <DiffModal />
         <ToastContainer />
         <OfflineBanner />
         <OnboardingTour />
