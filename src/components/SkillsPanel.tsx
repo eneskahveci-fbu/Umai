@@ -23,7 +23,15 @@ export function SkillsPanel() {
   const resetSkillProgress = useStore((s) => s.resetSkillProgress);
   const addToast = useStore((s) => s.addToast);
 
-  const [tab, setTab] = useState<Tab>("skills");
+  const [tab, setTab] = useState<Tab>(() => {
+    /* Boş "Skills" sekmesiyle açılıp panel boş görünmesin: içerik olan ilk
+       sekmeyi seç. Varsayılan skill dosyaları "file" türünde olduğundan
+       genelde "Dosyalar" sekmesi açılır. */
+    const hasManual = skills.some((s) => s.source === "manual");
+    const hasFiles = skills.some((s) => s.source === "file");
+    if (!hasManual && hasFiles) return "files";
+    return "skills";
+  });
   const [search, setSearch] = useState("");
   const modalRef = useRef<HTMLDivElement>(null);
   useModalA11y(modalRef, open, () => setOpen(false));
