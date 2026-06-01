@@ -23,9 +23,6 @@ const CONFIG_KEY = "craftai_config";
 const CHATS_KEY = "craftai_chats";
 const SNIPPETS_KEY = "craftai_snippets";
 const GUEST_KEY = "craftai_guest";
-/* Varsayılan skill dosyalarının mevcut kullanıcılara bir kez eklendiğini
-   işaretler. Böylece kullanıcı bir default'u silerse tekrar geri gelmez. */
-const DEFAULT_SKILLS_FLAG = "craftai_default_skills_v1";
 
 /* Guest mode: API keys/tokens live in sessionStorage so they vanish on
    browser/tab close. Useful on shared machines. The flag itself is in
@@ -58,6 +55,25 @@ function saveSnippets(s: Snippet[]) {
   store.setItem(SNIPPETS_KEY, JSON.stringify(s));
 }
 
+/* Kullanıcının açıkça sildiği varsayılan skill id'leri burada tutulur. Böylece
+   varsayılanları her açılışta "kendi kendini onaran" şekilde geri yükleyebiliriz
+   ama kullanıcının bilerek sildikleri geri gelmez. */
+const REMOVED_DEFAULTS_KEY = "craftai_removed_default_skills";
+
+function getRemovedDefaults(store: Storage): Set<string> {
+  try { return new Set(JSON.parse(store.getItem(REMOVED_DEFAULTS_KEY) || "[]")); } catch { return new Set(); }
+}
+function addRemovedDefault(id: string) {
+  const store = getStore();
+  if (!store) return;
+  if (!DEFAULT_SKILLS.some((s) => s.id === id)) return; // sadece varsayılanları izle
+  try {
+    const set = getRemovedDefaults(store);
+    set.add(id);
+    store.setItem(REMOVED_DEFAULTS_KEY, JSON.stringify([...set]));
+  } catch { /* yok say */ }
+}
+
 const uid = () =>
   Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
@@ -82,25 +98,20 @@ function loadConfig(): Config {
           createdAt: Date.now() - (merged.memories.length - i) * 1000,
         }));
       }
-      /* Varsayılan skill dosyalarını mevcut kullanıcılara bir kez ekle.
-         Kullanıcının kendi skill'leri ve aç/kapa tercihleri korunur. */
-      if (store.getItem(DEFAULT_SKILLS_FLAG) !== "1") {
-        const existing = Array.isArray(merged.skills) ? merged.skills : [];
-        const existingIds = new Set(existing.map((s: Skill) => s.id));
-        const missing = DEFAULT_SKILLS.filter((s) => !existingIds.has(s.id));
-        if (missing.length) {
-          merged.skills = [...missing, ...existing];
-          /* Kalıcı olması için hemen yaz; kullanıcı hiçbir değişiklik yapmasa
-             da yeniden yüklemede skill'ler kaybolmaz. */
-          try { store.setItem(CONFIG_KEY, JSON.stringify(merged)); } catch { /* yok say */ }
-        }
-        try { store.setItem(DEFAULT_SKILLS_FLAG, "1"); } catch { /* yok say */ }
+      /* Kendi kendini onaran tohumlama: kullanıcının SİLMEDİĞİ tüm varsayılan
+         skill dosyalarını her yüklemede garanti altına al. Mevcut skill'ler,
+         sıraları ve aç/kapa tercihleri korunur; yalnızca eksik olan varsayılanlar
+         eklenir. Böylece eski bir "bayrak" yüzünden takılıp kalma sorunu olmaz. */
+      const existing: Skill[] = Array.isArray(merged.skills) ? merged.skills : [];
+      const existingIds = new Set(existing.map((s) => s.id));
+      const removed = getRemovedDefaults(store);
+      const missing = DEFAULT_SKILLS.filter((s) => !existingIds.has(s.id) && !removed.has(s.id));
+      if (missing.length) {
+        merged.skills = [...missing, ...existing];
+        try { store.setItem(CONFIG_KEY, JSON.stringify(merged)); } catch { /* yok say */ }
       }
       return merged;
     }
-    /* Hiç kayıt yok (yeni kullanıcı): DEFAULT_CONFIG zaten varsayılan skill'leri
-       içeriyor; yeniden ekleme yapılmaması için bayrağı işaretle. */
-    try { store.setItem(DEFAULT_SKILLS_FLAG, "1"); } catch { /* yok say */ }
   } catch {
     /* yok say */
   }
@@ -430,6 +441,7 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
   removeSkill: (id) => {
     const config = get().config;
+    addRemovedDefault(id);
     get().saveConfig({
       ...config,
       skills: (config.skills ?? []).filter((s) => s.id !== id),
