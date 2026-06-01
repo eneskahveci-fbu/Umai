@@ -1,4 +1,5 @@
 import { DEFAULT_SYSTEM_PROMPT, STYLE_LABELS } from "@/lib/constants";
+import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { CODER_TOOLS } from "@/lib/tools";
 import type { ChatMessage, MemoryItem, Provider, ResponseStyle } from "@/lib/types";
 
@@ -266,6 +267,8 @@ export async function POST(req: Request) {
   }
 
   let sysPrompt = body.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+  /* Eklenen her model, içinde çalıştığı platformun tüm özelliklerini bilsin. */
+  sysPrompt += `\n\n${PLATFORM_KNOWLEDGE}`;
   if (body.projectPrompt) sysPrompt += `\n\n[Proje talimatları]: ${body.projectPrompt}`;
   const styleKey = body.style || "normal";
   const stylePrompt = STYLE_LABELS[styleKey]?.prompt;

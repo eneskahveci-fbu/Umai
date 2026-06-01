@@ -1,19 +1,27 @@
-/* Register the service worker once on production builds. Dev mode skipped
-   to avoid cache battles with Next.js' HMR. */
+/* Service worker artık KULLANILMIYOR. Eski sürüm gezinme HTML'ini önbelleğe
+   alıp bayat uygulama sunuyordu. Bu fonksiyon yeni SW kaydetmez; bunun yerine
+   mevcut tüm kayıtları düşürür ve cache'leri temizler ki kullanıcılar bayat
+   paketten kurtulsun. (public/sw.js de kendini unregister eden bir kill-switch.) */
 
 export function registerServiceWorker() {
   if (typeof window === "undefined") return;
   if (!("serviceWorker" in navigator)) return;
-  if (process.env.NODE_ENV !== "production") return;
 
-  const onLoad = () => {
-    navigator.serviceWorker
-      .register("/sw.js", { scope: "/" })
-      .catch(() => { /* registration failures are not user-visible */ });
+  const cleanup = async () => {
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    } catch { /* yok say */ }
+    try {
+      if (typeof caches !== "undefined") {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+    } catch { /* yok say */ }
   };
 
-  if (document.readyState === "complete") onLoad();
-  else window.addEventListener("load", onLoad, { once: true });
+  if (document.readyState === "complete") cleanup();
+  else window.addEventListener("load", cleanup, { once: true });
 }
 
 /* Lightweight online/offline notifier — emits a `craftai:online` /
