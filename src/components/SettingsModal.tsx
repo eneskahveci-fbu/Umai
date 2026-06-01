@@ -87,12 +87,86 @@ export function SettingsModal() {
   const [repoInput, setRepoInput] = useState("");
   const [testing, setTesting] = useState(false);
   const [memInput, setMemInput] = useState("");
+  /* Sağlayıcıdan anahtarla canlı çekilen model listesi + durum */
+  const [fetchedModels, setFetchedModels] = useState<string[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+
+  /* Anahtar girildiğinde modelleri otomatik (debounce'lu) çek. Anahtara göre
+     gerçek model listesini getirir; böylece model adı tahminden kaynaklı
+     "geçersiz model/anahtar" hataları oluşmaz. */
+  useEffect(() => {
+    if (!open || tab !== "model") return;
+    const key = apiKey.trim();
+    const url = baseUrl.trim();
+    if (!url || (key.length > 0 && key.length < 8)) return;
+    if (provider !== "ollama" && provider !== "custom" && key.length === 0) return;
+    const t = setTimeout(() => {
+      fetch("/api/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baseUrl: url, apiKey: key, provider }),
+      })
+        .then((r) => r.json().catch(() => ({})))
+        .then((data) => {
+          if (!Array.isArray(data.models)) return;
+          const models: string[] = data.models;
+          setFetchedModels(models);
+          if (models.length && !models.includes(model.trim())) {
+            const preferred = (PROVIDER_MODELS[provider] ?? []).find((m) => models.includes(m));
+            setModel(preferred || models[0]);
+          }
+        })
+        .catch(() => { /* sessiz; manuel "Yenile" butonu var */ });
+    }, 700);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiKey, baseUrl, provider, open, tab]);
 
   if (!open) return null;
 
   const onProvider = (p: Provider) => {
     setProvider(p);
+    setFetchedModels([]);
     if (p !== "custom") { setBaseUrl(PRESETS[p].baseUrl); setModel(PRESETS[p].model); }
+  };
+
+  /* Girilen anahtar + Base URL ile sağlayıcının desteklediği gerçek modelleri
+     çeker. Model adını tahmin etmek yerine anahtara göre listelediğimizden
+     "model bulunamadı / geçersiz" hataları önlenir. */
+  const loadModels = async (opts?: { silent?: boolean }) => {
+    if (!baseUrl.trim()) { if (!opts?.silent) addToast("Önce Base URL gir.", "error"); return; }
+    setLoadingModels(true);
+    try {
+      const res = await fetch("/api/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baseUrl: baseUrl.trim(), apiKey: apiKey.trim(), provider }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !Array.isArray(data.models)) {
+        if (!opts?.silent) addToast(data.error || "Modeller alınamadı.", "error");
+        setFetchedModels([]);
+        return;
+      }
+      const models: string[] = data.models;
+      setFetchedModels(models);
+      if (models.length) {
+        /* Mevcut model bu anahtarla erişilebilir değilse, ilk geçerli modele
+           otomatik düzelt; varsa önerilen (PRESET) modeli tercih et. */
+        if (!models.includes(model.trim())) {
+          const preferred = (PROVIDER_MODELS[provider] ?? []).find((m) => models.includes(m));
+          setModel(preferred || models[0]);
+        }
+        if (!opts?.silent) addToast(`${models.length} model bulundu.`, "success");
+      } else if (!opts?.silent) {
+        addToast("Bu anahtarla model bulunamadı.", "info");
+      }
+    } catch (err) {
+      if (!opts?.silent) addToast(`Hata: ${(err as Error).message}`, "error");
+      setFetchedModels([]);
+    } finally {
+      setLoadingModels(false);
+    }
   };
 
   const submitModel = () => {
@@ -232,11 +306,28 @@ export function SettingsModal() {
                 <select value={provider} onChange={(e) => onProvider(e.target.value as Provider)} className="input-mono">{(Object.keys(PRESETS) as Provider[]).map((p) => <option key={p} value={p}>{PRESETS[p].label}</option>)}</select>
                 <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Görünen ad (opsiyonel)" className="input-mono" />
                 <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="Base URL" className="input-mono" />
-                <input value={model} onChange={(e) => setModel(e.target.value)} list="model-suggestions" placeholder="Model adı — listeden seç veya elle yaz" className="input-mono" />
-                <datalist id="model-suggestions">
-                  {(PROVIDER_MODELS[provider] ?? []).map((m) => <option key={m} value={m} />)}
-                </datalist>
                 <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={`API anahtarı — ${PRESETS[provider].keyHint}`} className="input-mono" />
+                {fetchedModels.length > 0 ? (
+                  <select value={model} onChange={(e) => setModel(e.target.value)} className="input-mono">
+                    {!fetchedModels.includes(model) && model && <option value={model}>{model}</option>}
+                    {fetchedModels.map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                ) : (
+                  <>
+                    <input value={model} onChange={(e) => setModel(e.target.value)} list="model-suggestions" placeholder="Model adı — anahtar girince otomatik dolar" className="input-mono" />
+                    <datalist id="model-suggestions">
+                      {(PROVIDER_MODELS[provider] ?? []).map((m) => <option key={m} value={m} />)}
+                    </datalist>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => loadModels()}
+                  disabled={loadingModels}
+                  className="flex items-center justify-center gap-1.5 py-2 rounded-xl border border-line hover:border-brand text-xs font-semibold text-muted hover:text-ink transition-colors disabled:opacity-50"
+                >
+                  {loadingModels ? "Modeller yükleniyor…" : fetchedModels.length > 0 ? `↻ Modelleri yenile (${fetchedModels.length})` : "↻ Anahtarla modelleri getir"}
+                </button>
                 <button onClick={submitModel} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-brand hover:bg-branddim text-white text-sm font-semibold"><Plus size={15} /> Model Ekle</button>
               </div>
             </div>
