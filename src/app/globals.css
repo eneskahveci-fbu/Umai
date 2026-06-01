@@ -373,3 +373,13 @@ html { scroll-behavior: smooth; }
 .animate-modal-content {
   animation: modal-content 0.2s ease-out;
 }
+
+/* Yatay kaydırılabilir şeritlerde (örn. modal sekmeleri) kaydırma çubuğunu
+   gizle — iOS/Safari dahil. Erişilebilirlik için kaydırma yine çalışır. */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

@@ -52,15 +52,19 @@ export function SkillsPanel() {
 
   return (
     <div
-      className="fixed inset-0 z-[55] bg-bg/80 backdrop-blur-sm grid place-items-center px-4 animate-modal-bg"
+      className="fixed inset-0 z-[55] bg-bg/80 backdrop-blur-sm grid place-items-center px-3 sm:px-4 animate-modal-bg"
       onClick={() => setOpen(false)}
+      style={{
+        paddingTop: "max(0.75rem, env(safe-area-inset-top))",
+        paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
+      }}
     >
       <div
         ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-label="Skills"
-        className="w-full max-w-3xl h-[82dvh] bg-surface border border-line rounded-2xl shadow-2xl shadow-black/40 flex flex-col"
+        className="w-full max-w-3xl h-[82dvh] max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line rounded-2xl shadow-2xl shadow-black/40 flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -84,13 +88,13 @@ export function SkillsPanel() {
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex items-center gap-1 px-3 py-2 border-b border-line/40 shrink-0">
+        {/* Tabs — dar iOS ekranlarında yatay kaydırılabilir, taşma olmaz */}
+        <div className="flex items-center gap-1 px-3 py-2 border-b border-line/40 shrink-0 overflow-x-auto no-scrollbar">
           {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 ${
                 tab === t.id
                   ? "bg-amber-400/10 text-amber-400"
                   : "text-muted hover:text-ink hover:bg-bgsoft"
@@ -192,19 +196,19 @@ function SkillsTab({
 
   return (
     <>
-      <div className="px-5 py-3 border-b border-line/40 shrink-0 space-y-2">
-        <div className="flex gap-2">
+      <div className="px-4 sm:px-5 py-3 border-b border-line/40 shrink-0 space-y-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Başlık (opsiyonel)"
-            className="flex-1 bg-bgsoft/60 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 ring-amber-400/40 placeholder:text-muted/35"
+            className="flex-1 min-w-0 bg-bgsoft/60 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 ring-amber-400/40 placeholder:text-muted/35"
           />
           <input
             value={tagsRaw}
             onChange={(e) => setTagsRaw(e.target.value)}
             placeholder="etiketler, virgül"
-            className="w-44 bg-bgsoft/60 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 ring-amber-400/40 placeholder:text-muted/35"
+            className="w-full sm:w-44 bg-bgsoft/60 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 ring-amber-400/40 placeholder:text-muted/35"
           />
         </div>
         <div className="flex gap-2">
