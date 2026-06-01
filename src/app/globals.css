@@ -73,6 +73,10 @@ body {
   /* iOS rubber-band scroll lock for app pages — re-enabled inside scrollable
      containers via overflow-y:auto */
   overscroll-behavior-y: none;
+  /* Hiçbir içerik görünen alanı yatayda aşmasın — iOS'ta sağ kenardan taşma /
+     "zoom" görüntüsünü kökten engeller. */
+  max-width: 100%;
+  overflow-x: hidden;
 }
 body {
   background: var(--color-bg);
