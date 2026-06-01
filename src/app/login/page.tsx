@@ -66,7 +66,12 @@ export default function LoginPage() {
       return;
     }
     writeAttempts({ count: 0, lockUntil: 0 });
-    router.push("/app");
+    /* router.push yerine replace: /login geçmişe eklenmesin ki giriş sonrası
+       geri tuşu tekrar /login'e (ve oradan tarayıcıdan çıkışa) düşmesin.
+       refresh() ile sunucu yeni auth çerezini okuyup /app'i doğru render eder;
+       böylece yenileme middleware tarafından /login'e geri atılmaz. */
+    router.replace("/app");
+    router.refresh();
   };
 
   return (
