@@ -266,7 +266,7 @@ export async function POST(req: Request) {
   if (apiKey) upstreamHeaders["Authorization"] = `Bearer ${apiKey}`;
 
   if (provider === "openrouter") {
-    upstreamHeaders["HTTP-Referer"] = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://craft-coder.vercel.app";
+    upstreamHeaders["HTTP-Referer"] = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://craft-ai-web.vercel.app";
     upstreamHeaders["X-Title"] = "craft.ai";
   }
 

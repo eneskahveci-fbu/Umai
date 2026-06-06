@@ -387,3 +387,23 @@ html { scroll-behavior: smooth; }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* ─── FAQ details/summary açılış animasyonu ─── */
+details[open] > summary ~ * {
+  animation: faq-open 0.2s ease-out;
+}
+@keyframes faq-open {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Shimmer loading efekti ─── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, var(--color-surface) 25%, var(--color-surface2) 50%, var(--color-surface) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
