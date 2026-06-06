@@ -7,54 +7,121 @@ import {
   MessageSquare,
   ShieldCheck,
   VenetianMask,
+  Zap,
+  Brain,
+  Globe,
+  Terminal,
+  ChevronDown,
 } from "lucide-react";
 
 const FEATURES = [
   {
     icon: <MessageSquare size={20} />,
-    title: "Sohbet & Gizli Sohbet",
-    desc: "Kaydedilen normal sohbet ya da hiçbir yere yazılmayan gizli sohbet.",
+    title: "Sohbet & Gizli Mod",
+    desc: "Kaydedilen normal sohbet ya da hiçbir yere yazılmayan gizli sohbet. Gizli modda geçmiş, sunucu veya localStorage'a dokunmaz.",
   },
   {
     icon: <Boxes size={20} />,
-    title: "Çoklu model",
-    desc: "Birden fazla model API'si ekle; üst bardan istediğini seçip onunla çalış.",
+    title: "Çoklu Model",
+    desc: "Birden fazla model API'si ekle; üst bardan istediğini seçip onunla çalış. Her model ayrı ayarlanabilir.",
   },
   {
     icon: <Code2 size={20} />,
-    title: "Coder sekmesi",
-    desc: "GitHub deposuna bağlan, dosyaları gez, içeriği sohbete gönderip kod sor.",
+    title: "Coder Sekmesi",
+    desc: "GitHub deposuna bağlan, dosyaları gez, içeriği sohbete gönderip kod sor. Diff görünümü ile değişiklikleri karşılaştır.",
   },
   {
     icon: <GitBranch size={20} />,
-    title: "Çoklu GitHub hesabı",
-    desc: "Birden fazla token ekle, özel depolara eriş, repo'lar arası geçiş yap.",
+    title: "Çoklu GitHub Hesabı",
+    desc: "Birden fazla token ekle, özel depolara eriş, repo'lar arası geçiş yap. Tek tıkla commit & push.",
   },
   {
     icon: <VenetianMask size={20} />,
-    title: "Gizlilik",
-    desc: "Anahtarların tarayıcında kalır. İstersen Supabase ile cihazlar arası senkron.",
+    title: "Gizlilik Önce",
+    desc: "Anahtarların tarayıcında kalır, sunucuya gönderilmez. İstersen Supabase ile cihazlar arası güvenli senkron.",
   },
   {
     icon: <ShieldCheck size={20} />,
-    title: "Geçmiş senkron",
-    desc: "Giriş yaparsan sohbet geçmişin Supabase'de saklanır ve her yerden açılır.",
+    title: "Geçmiş Senkron",
+    desc: "Giriş yaparsan sohbet geçmişin Supabase'de saklanır ve her cihazdan açılır. Offline modda yerel çalışır.",
+  },
+  {
+    icon: <Brain size={20} />,
+    title: "Skills & Bellek",
+    desc: "Sık kullandığın prompt'ları Skill olarak kaydet. Model her yanıtta bunları bağlam olarak alır.",
+  },
+  {
+    icon: <Zap size={20} />,
+    title: "Hızlı Komutlar",
+    desc: "⌘K komut paleti, / slash menüsü ve @ mention ile dosyaları ve snippet'ları anında ekle.",
+  },
+  {
+    icon: <Globe size={20} />,
+    title: "PWA Desteği",
+    desc: "Tarayıcıdan yükle, masaüstü gibi çalıştır. Offline banner, service worker ve hızlı yükleme.",
   },
 ];
 
 const PROVIDERS = [
-  "🤗 Hugging Face",
-  "🐋 DeepSeek",
-  "🔀 OpenRouter",
-  "🦙 Ollama",
-  "⚡ vLLM / LM Studio",
-  "⚙️ Özel uç",
+  { label: "🤗 Hugging Face", desc: "Ücretsiz inference" },
+  { label: "🐋 DeepSeek", desc: "Uygun maliyetli" },
+  { label: "🔀 OpenRouter", desc: "100+ model" },
+  { label: "🦙 Ollama", desc: "Yerel model" },
+  { label: "⚡ Groq", desc: "Ultra hızlı" },
+  { label: "🧠 Anthropic", desc: "Claude serisi" },
+  { label: "✨ Google Gemini", desc: "Multimodal" },
+  { label: "🌟 Mistral", desc: "Açık kaynak" },
+  { label: "⚙️ vLLM / LM Studio", desc: "Kendi sunucun" },
+];
+
+const HOW_IT_WORKS = [
+  {
+    step: "1",
+    title: "API Anahtarını Ekle",
+    desc: "Ayarlardan OpenAI-uyumlu herhangi bir sağlayıcının API anahtarını ekle. Anahtar yalnızca tarayıcında saklanır.",
+    icon: <Terminal size={22} />,
+  },
+  {
+    step: "2",
+    title: "Sohbet Et veya Kod Yaz",
+    desc: "Chat sekmesinde soru sor, Coder sekmesinde GitHub deposunu aç — dosyaları okuyup kod üret.",
+    icon: <MessageSquare size={22} />,
+  },
+  {
+    step: "3",
+    title: "Deploy Et",
+    desc: "Oluşturulan kodu diff'le karşılaştır, tek tıkla GitHub'a commit at ve canlıya al.",
+    icon: <Zap size={22} />,
+  },
+];
+
+const FAQS = [
+  {
+    q: "Craft.AI ücretsiz mi?",
+    a: "Evet, tamamen ücretsiz ve açık kaynak. Kendi API anahtarını getir (BYOK) modeliyle çalışır; craft.ai herhangi bir model ücreti almaz.",
+  },
+  {
+    q: "Hangi modeller destekleniyor?",
+    a: "OpenAI-uyumlu herhangi bir uç desteklenir: Hugging Face, DeepSeek, OpenRouter, Groq, Anthropic, Google Gemini, Mistral, Ollama, vLLM ve daha fazlası.",
+  },
+  {
+    q: "Verilerim nerede saklanıyor?",
+    a: "API anahtarların yalnızca tarayıcında (localStorage veya gizli modda sessionStorage) saklanır. Sohbet geçmişi için isteğe bağlı Supabase entegrasyonu var; kullanmak zorunda değilsin.",
+  },
+  {
+    q: "GitHub entegrasyonu nasıl çalışıyor?",
+    a: "Coder sekmesinde GitHub personal access token'ınla giriş yaparsın. Repo'ları gezebilir, dosya içeriklerini sohbete gönderebilir, kod değişikliklerini commit edebilirsin.",
+  },
+  {
+    q: "Mobilde çalışıyor mu?",
+    a: "Evet. PWA olarak yüklediğinde masaüstü uygulaması gibi çalışır. iOS ve Android'de tam destek var.",
+  },
 ];
 
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://craft-coder.vercel.app";
+  process.env.NEXT_PUBLIC_SITE_URL || "https://craft-ai-web.vercel.app";
 
-const JSON_LD = {
+const JSON_LD_APP = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   name: "Craft.AI",
@@ -70,6 +137,23 @@ const JSON_LD = {
     name: "Enes Kahveci",
     email: "eneskahveci.bs@gmail.com",
   },
+  featureList: [
+    "Çoklu model desteği",
+    "GitHub Coder entegrasyonu",
+    "Gizli sohbet modu",
+    "PWA desteği",
+    "Supabase senkron",
+  ],
+};
+
+const JSON_LD_FAQ = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQS.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
 };
 
 export default function Home() {
@@ -77,10 +161,15 @@ export default function Home() {
     <div className="min-h-screen flex flex-col">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_APP) }}
       />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_FAQ) }}
+      />
+
       {/* NAV */}
-      <nav className="sticky top-0 z-50 backdrop-blur bg-bg/70 border-b border-line">
+      <nav className="sticky top-0 z-50 backdrop-blur bg-bg/80 border-b border-line/60">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 font-extrabold text-xl">
             <span className="w-7 h-7 rounded-lg brand-gradient grid place-items-center text-white text-sm">
@@ -90,12 +179,12 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-3">
             <a
-              href="https://github.com/eneskahveci-sdo/craft-ai"
+              href="https://gitlab.com/eneskahveci.bs/craft-ai-web"
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden sm:inline text-sm text-muted hover:text-ink"
+              className="hidden sm:inline text-sm text-muted hover:text-ink transition-colors"
             >
-              GitHub
+              GitLab
             </a>
             <Link
               href="/app"
@@ -108,21 +197,27 @@ export default function Home() {
       </nav>
 
       {/* HERO */}
-      <header className="relative max-w-6xl mx-auto px-6 pt-28 pb-20 text-center overflow-hidden">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgba(124,92,255,0.12),transparent)]" />
+      <header className="relative max-w-6xl mx-auto px-6 pt-24 pb-20 text-center overflow-hidden w-full">
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_70%_55%_at_50%_0%,rgba(124,92,255,0.15),transparent)]" />
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_40%_30%_at_80%_60%,rgba(70,212,224,0.06),transparent)]" />
+
         <span className="inline-flex items-center gap-2 text-sm text-muted border border-line/60 bg-surface/80 backdrop-blur-sm px-4 py-1.5 rounded-full mb-8">
-          <span className="w-2 h-2 rounded-full bg-brand animate-pulse" /> model bağımsız · açık kaynak
+          <span className="w-2 h-2 rounded-full bg-green animate-pulse" />
+          model bağımsız · açık kaynak · ücretsiz
         </span>
+
         <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-tight">
           Terminalin ve tarayıcın için
           <br />
           <span className="brand-text">AI kod asistanı</span>
         </h1>
+
         <p className="text-lg text-muted max-w-2xl mx-auto mt-6 leading-relaxed">
-          craft.ai; dosyalarını okur, kod yazar, GitHub deponu gezer — hem de
-          istediğin modelle. Hugging Face, DeepSeek, OpenRouter ya da kendi
-          yerel modelin: hepsi tek bir akışta.
+          craft.ai; dosyalarını okur, kod yazar, GitHub deposunu gezer — hem de
+          istediğin modelle. Hugging Face, DeepSeek, Groq, Anthropic ya da
+          kendi yerel modelin: hepsi tek bir akışta.
         </p>
+
         <div className="flex gap-3 justify-center mt-10 flex-wrap">
           <Link
             href="/app"
@@ -131,18 +226,60 @@ export default function Home() {
             ⚡ Hemen Başla
           </Link>
           <a
-            href="https://github.com/eneskahveci-sdo/craft-ai"
+            href="https://gitlab.com/eneskahveci.bs/craft-ai-web"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 border border-line hover:border-brand/50 px-7 py-3.5 rounded-2xl font-semibold transition-all duration-200"
           >
-            ★ GitHub&apos;da Gör
+            ☁ GitLab&apos;da Gör
           </a>
+        </div>
+
+        {/* Stats */}
+        <div className="flex flex-wrap justify-center gap-8 mt-14">
+          {[
+            { val: "9+", label: "Desteklenen sağlayıcı" },
+            { val: "100%", label: "Ücretsiz & açık kaynak" },
+            { val: "0", label: "Sunucuya gönderilen anahtar" },
+          ].map((s) => (
+            <div key={s.label} className="text-center">
+              <div className="text-3xl font-extrabold brand-text">{s.val}</div>
+              <div className="text-xs text-muted mt-1">{s.label}</div>
+            </div>
+          ))}
         </div>
       </header>
 
-      {/* FEATURES */}
+      {/* NASIL ÇALIŞIR */}
       <section className="max-w-6xl mx-auto px-6 py-16 w-full">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-extrabold mb-3">Nasıl çalışır?</h2>
+          <p className="text-muted max-w-xl mx-auto">Dakikalar içinde kurulum yok, indirme yok — tarayıcıda hemen başla.</p>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-6">
+          {HOW_IT_WORKS.map((step) => (
+            <div key={step.step} className="relative rounded-2xl border border-line bg-surface p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="w-8 h-8 rounded-full brand-gradient grid place-items-center text-white font-bold text-sm flex-shrink-0">
+                  {step.step}
+                </span>
+                <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand grid place-items-center">
+                  {step.icon}
+                </div>
+              </div>
+              <h3 className="font-bold text-lg mb-2">{step.title}</h3>
+              <p className="text-muted text-sm leading-relaxed">{step.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* FEATURES */}
+      <section className="max-w-6xl mx-auto px-6 py-8 w-full">
+        <div className="text-center mb-10">
+          <h2 className="text-3xl font-extrabold mb-3">Tüm özellikler</h2>
+          <p className="text-muted">Bir AI asistanından beklediğin her şey ve daha fazlası.</p>
+        </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {FEATURES.map((f) => (
             <div
@@ -160,22 +297,70 @@ export default function Home() {
       </section>
 
       {/* PROVIDERS */}
-      <section className="max-w-6xl mx-auto px-6 py-12 w-full text-center">
-        <h2 className="text-2xl font-extrabold mb-2">İstediğin modelle çalış</h2>
-        <p className="text-muted mb-8">OpenAI-uyumlu her uç desteklenir.</p>
+      <section className="max-w-6xl mx-auto px-6 py-14 w-full text-center">
+        <h2 className="text-3xl font-extrabold mb-3">İstediğin modelle çalış</h2>
+        <p className="text-muted mb-8 max-w-xl mx-auto">
+          OpenAI-uyumlu her uç desteklenir. API anahtarın tarayıcında kalır, biz görmeyiz.
+        </p>
         <div className="flex flex-wrap gap-3 justify-center">
           {PROVIDERS.map((p) => (
-            <span
-              key={p}
-              className="px-5 py-2.5 rounded-full border border-line bg-surface text-sm font-medium"
+            <div
+              key={p.label}
+              className="group flex flex-col items-center px-5 py-3 rounded-2xl border border-line bg-surface hover:border-brand/40 transition-all duration-200"
             >
-              {p}
-            </span>
+              <span className="text-sm font-semibold">{p.label}</span>
+              <span className="text-xs text-muted mt-0.5">{p.desc}</span>
+            </div>
           ))}
         </div>
       </section>
 
-      {/* FOOTER + GELİŞTİRİCİ */}
+      {/* CTA BANNER */}
+      <section className="max-w-6xl mx-auto px-6 py-10 w-full">
+        <div className="relative rounded-3xl overflow-hidden border border-brand/20 bg-surface p-10 text-center">
+          <div className="absolute inset-0 -z-0 bg-[radial-gradient(ellipse_60%_80%_at_50%_50%,rgba(124,92,255,0.08),transparent)]" />
+          <h2 className="text-3xl font-extrabold mb-3 relative">
+            Hemen dene — kurulum yok
+          </h2>
+          <p className="text-muted mb-7 max-w-lg mx-auto relative">
+            Tarayıcını aç, API anahtarını ekle ve kodlamaya başla. Ücretsiz, açık kaynak, gizliliğe saygılı.
+          </p>
+          <Link
+            href="/app"
+            className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-white font-semibold px-8 py-3.5 rounded-2xl shadow-lg shadow-brand/20 transition-all duration-200 relative"
+          >
+            ⚡ Uygulamayı Aç <ArrowRight size={16} />
+          </Link>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="max-w-3xl mx-auto px-6 py-14 w-full">
+        <div className="text-center mb-10">
+          <h2 className="text-3xl font-extrabold mb-3">Sık sorulan sorular</h2>
+        </div>
+        <div className="space-y-3">
+          {FAQS.map((faq) => (
+            <details
+              key={faq.q}
+              className="group rounded-2xl border border-line bg-surface overflow-hidden"
+            >
+              <summary className="flex items-center justify-between px-6 py-4 cursor-pointer font-semibold text-sm list-none hover:text-brand transition-colors">
+                {faq.q}
+                <ChevronDown
+                  size={16}
+                  className="text-muted transition-transform duration-200 group-open:rotate-180 flex-shrink-0 ml-3"
+                />
+              </summary>
+              <p className="px-6 pb-5 text-sm text-muted leading-relaxed">
+                {faq.a}
+              </p>
+            </details>
+          ))}
+        </div>
+      </section>
+
+      {/* FOOTER */}
       <footer className="border-t border-line mt-auto">
         <div className="max-w-6xl mx-auto px-6 py-12 text-center">
           <div className="flex items-center justify-center gap-2 font-extrabold text-lg mb-3">
@@ -195,17 +380,25 @@ export default function Home() {
             <div className="text-lg font-bold brand-text">Enes Kahveci</div>
             <a
               href="mailto:eneskahveci.bs@gmail.com"
-              className="text-sm text-muted hover:text-brand"
+              className="text-sm text-muted hover:text-brand transition-colors"
             >
               eneskahveci.bs@gmail.com
             </a>
           </div>
 
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 mt-6 text-xs text-muted/70">
-            <Link href="/privacy" className="hover:text-brand">Gizlilik Politikası</Link>
-            <Link href="/terms" className="hover:text-brand">Kullanım Şartları</Link>
-            <Link href="/cookies" className="hover:text-brand">Çerez Politikası</Link>
-            <a href="mailto:eneskahveci.bs@gmail.com" className="hover:text-brand">İletişim</a>
+            <Link href="/privacy" className="hover:text-brand transition-colors">Gizlilik Politikası</Link>
+            <Link href="/terms" className="hover:text-brand transition-colors">Kullanım Şartları</Link>
+            <Link href="/cookies" className="hover:text-brand transition-colors">Çerez Politikası</Link>
+            <a
+              href="https://gitlab.com/eneskahveci.bs/craft-ai-web"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-brand transition-colors"
+            >
+              GitLab
+            </a>
+            <a href="mailto:eneskahveci.bs@gmail.com" className="hover:text-brand transition-colors">İletişim</a>
           </div>
           <p className="text-xs text-muted/60 mt-4">© 2026 Enes Kahveci · Tüm hakları saklıdır.</p>
         </div>

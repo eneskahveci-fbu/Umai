@@ -21,13 +21,21 @@ export const metadata: Metadata = {
   description:
     "OpenAI-uyumlu herhangi bir modelle çalışan AI kod asistanı. Sohbet, gizli sohbet, geçmiş senkron ve GitHub deposuna bağlı Coder sekmesi.",
   keywords: [
-    "AI",
-    "kod asistanı",
+    "AI kod asistanı",
+    "yapay zeka",
     "Hugging Face",
     "DeepSeek",
     "OpenRouter",
+    "Anthropic Claude",
+    "Google Gemini",
+    "Groq",
+    "Ollama",
     "chat",
     "code assistant",
+    "GitHub Coder",
+    "ücretsiz AI",
+    "model bağımsız",
+    "craft ai",
   ],
   authors: [{ name: "Enes Kahveci", url: "mailto:eneskahveci.bs@gmail.com" }],
   alternates: {
@@ -58,7 +66,7 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://craft-coder.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://craft-ai-web.vercel.app"),
 };
 
 export const viewport = {
