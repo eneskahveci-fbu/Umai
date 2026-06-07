@@ -122,6 +122,14 @@ function loadConfig(): Config {
         merged.activeModelId = POLLINATIONS_DEFAULT_MODEL.id;
         try { store.setItem(CONFIG_KEY, JSON.stringify(merged)); } catch { /* yok say */ }
       }
+      /* Eski Pollinations profillerinde openai-fast → openai migrate et */
+      if (Array.isArray(merged.models)) {
+        merged.models = merged.models.map((m: ModelProfile) =>
+          m.provider === "pollinations" && m.model === "openai-fast"
+            ? { ...m, model: "openai" }
+            : m
+        );
+      }
       return merged;
     }
   } catch {
