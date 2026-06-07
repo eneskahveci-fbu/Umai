@@ -41,7 +41,7 @@ export function OnboardingTour() {
   const steps: Step[] = [
     {
       icon: <span className="text-2xl">◈</span>,
-      title: "Craft.AI'a hoş geldin",
+      title: "Craft.Coder'a hoş geldin",
       body: (
         <>
           Bu, kendi <strong className="text-ink">API anahtarınla</strong> çalışan bir AI kod asistanı.

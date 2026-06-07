@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "Craft.AI — AI kod asistanı";
+export const alt = "Craft.Coder — AI kod asistanı";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -56,7 +56,7 @@ export default function OpengraphImage() {
               display: "flex",
             }}
           >
-            craft
+            Craft
             <span
               style={{
                 background: "linear-gradient(120deg, #c8a87e, #e0caa8)",
@@ -64,7 +64,7 @@ export default function OpengraphImage() {
                 color: "transparent",
               }}
             >
-              .ai
+              .Coder
             </span>
           </div>
         </div>

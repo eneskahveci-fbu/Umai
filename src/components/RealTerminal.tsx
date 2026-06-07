@@ -15,7 +15,7 @@ import { useStore } from "@/lib/store";
 
 /* Build a "create new Codespace" deep-link for the connected repo.
    Free GitHub accounts get 60h/month. The link opens in a new tab so
-   the user keeps craft.ai mounted; on iOS it lands in github.com which
+   the user keeps Craft.Coder mounted; on iOS it lands in github.com which
    has its own PWA-friendly terminal. */
 function codespaceUrl(owner: string, repo: string, branch?: string): string {
   const u = new URL("https://github.com/codespaces/new");
@@ -102,7 +102,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
         await mountDefaults(wc);
       }
 
-      term.writeln("\x1b[1;35m▲ craft.ai sandbox\x1b[0m — Node.js + busybox-shell hazır");
+      term.writeln("\x1b[1;35m▲ Craft.Coder sandbox\x1b[0m — Node.js + busybox-shell hazır");
       term.writeln("\x1b[2mDeneyin: \x1b[36mls\x1b[2m, \x1b[36mnode -v\x1b[2m, \x1b[36mnpm init -y\x1b[0m\n");
 
       const proc = await wc.spawn("jsh", { terminal: { cols: term.cols, rows: term.rows } });

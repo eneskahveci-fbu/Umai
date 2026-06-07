@@ -105,6 +105,18 @@ export function SettingsModal() {
   const [repoInput, setRepoInput] = useState("");
   const [testing, setTesting] = useState(false);
   const [memInput, setMemInput] = useState("");
+  /* Local drafts for large text fields — saved on blur to avoid calling
+     saveConfig on every keystroke (which triggers re-renders and focus loss). */
+  const [systemPromptDraft, setSystemPromptDraft] = useState(() => config.systemPrompt);
+  const [rulesFileDraft, setRulesFileDraft] = useState(() => config.rulesFile);
+  /* Sync drafts when modal opens so stale state isn't shown */
+  useEffect(() => {
+    if (open) {
+      setSystemPromptDraft(config.systemPrompt);
+      setRulesFileDraft(config.rulesFile);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
   /* Sağlayıcıdan anahtarla canlı çekilen model listesi + durum */
   const [fetchedModels, setFetchedModels] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -262,7 +274,7 @@ export function SettingsModal() {
         </div>
 
         <div className="flex gap-1 mb-5 border-b border-line">
-          {([["model", "Model"], ["github", "GitHub"], ["general", "Genel"], ["advanced", "Gelişmiş"], ["mcp", "MCP"]] as const).map(([key, lbl]) => {
+          {([["model", "Model"], ["github", "Git"], ["general", "Genel"], ["advanced", "Gelişmiş"], ["mcp", "MCP"]] as const).map(([key, lbl]) => {
             const hit = matchingTabs.has(key);
             return (
               <button
@@ -506,8 +518,9 @@ export function SettingsModal() {
                 Coder'da her istekte sistem promptuna eklenir. Teknoloji tercihlerin, kod stili, kısıtlamalar.
               </p>
               <textarea
-                value={config.rulesFile}
-                onChange={(e) => saveConfig({ ...config, rulesFile: e.target.value })}
+                value={rulesFileDraft}
+                onChange={(e) => setRulesFileDraft(e.target.value)}
+                onBlur={() => saveConfig({ ...config, rulesFile: rulesFileDraft })}
                 rows={5}
                 placeholder={"Örn:\n- TypeScript strict mode kullan\n- Tailwind CSS tercih et\n- Yorum satırı yazma\n- Her fonksiyon max 20 satır"}
                 className="input-mono !text-xs leading-relaxed w-full"
@@ -570,7 +583,7 @@ export function SettingsModal() {
             {/* Sistem promptu */}
             <div>
               <h4 className="text-sm font-bold mb-1">Sistem Promptu</h4>
-              <textarea value={config.systemPrompt} onChange={(e) => saveConfig({ ...config, systemPrompt: e.target.value })} rows={4} className="input-mono !text-xs leading-relaxed" />
+              <textarea value={systemPromptDraft} onChange={(e) => setSystemPromptDraft(e.target.value)} onBlur={() => saveConfig({ ...config, systemPrompt: systemPromptDraft })} rows={4} className="input-mono !text-xs leading-relaxed" />
               <button onClick={() => saveConfig({ ...config, systemPrompt: DEFAULT_SYSTEM_PROMPT })} className="text-xs text-muted hover:text-brand mt-1">Varsayılana sıfırla</button>
             </div>
 
@@ -863,7 +876,7 @@ export function SettingsModal() {
 
             <div className="p-3 bg-brand/5 border border-brand/20 rounded-xl text-xs text-muted space-y-1.5">
               <div className="font-semibold text-brand">MCP nedir?</div>
-              <p>Model Context Protocol, Anthropic tarafından geliştirilen bir standarttır. Kendi araçlarını (veritabanı sorgu, dosya okuma, API çağrısı vb.) craft.ai&apos;ya bağlayarak AI&apos;ın bunları otomatik kullanmasını sağlar.</p>
+              <p>Model Context Protocol, Anthropic tarafından geliştirilen bir standarttır. Kendi araçlarını (veritabanı sorgu, dosya okuma, API çağrısı vb.) Craft.Coder&apos;a bağlayarak AI&apos;ın bunları otomatik kullanmasını sağlar.</p>
               <p>Aktif sunucuların araçları, araç kullanımı açıkken her sohbette AI&apos;a sunulur.</p>
             </div>
           </section>

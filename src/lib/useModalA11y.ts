@@ -8,7 +8,7 @@
 
    Returns nothing; safe to call when isOpen is false (it just no-ops). */
 
-import { useEffect, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 const FOCUSABLE = [
   "a[href]",
@@ -24,6 +24,12 @@ export function useModalA11y(
   isOpen: boolean,
   onClose: () => void,
 ) {
+  /* Keep onClose in a ref so the effect below doesn't need it as a dep.
+     Without this, a new arrow-function prop every render re-fires the
+     effect, resetting the 30ms focus timer and stealing focus mid-typing. */
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -41,7 +47,7 @@ export function useModalA11y(
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab" || !root) return;
@@ -66,5 +72,6 @@ export function useModalA11y(
       document.removeEventListener("keydown", onKey);
       previouslyFocused?.focus?.();
     };
-  }, [isOpen, onClose, ref]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, ref]);
 }

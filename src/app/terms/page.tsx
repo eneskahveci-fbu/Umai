@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Kullanım Şartları — craft.ai",
+  title: "Kullanım Şartları — Craft.Coder",
   description:
-    "craft.ai hizmetini kullanırken uymanız gereken kullanım şartları ve koşullar.",
+    "Craft.Coder hizmetini kullanırken uymanız gereken kullanım şartları ve koşullar.",
 };
 
 export default function TermsPage() {
@@ -35,7 +35,7 @@ export default function TermsPage() {
         </div>
 
         <div className="text-sm leading-relaxed text-muted [&_strong]:text-ink mb-6 p-4 rounded-xl border border-line bg-surface">
-          Bu şartlar, craft.ai hizmetini kullanmanız için geçerlidir. Hizmeti
+          Bu şartlar, Craft.Coder hizmetini kullanmanız için geçerlidir. Hizmeti
           kullanarak bu şartları kabul etmiş sayılırsınız. Kabul etmiyorsanız
           lütfen hizmeti kullanmayın.
         </div>
@@ -43,16 +43,16 @@ export default function TermsPage() {
         <div>
           <Section title="1. Hizmet Tanımı">
             <p>
-              craft.ai (<strong>&quot;Hizmet&quot;</strong>), Enes Kahveci
+              Craft.Coder (<strong>&quot;Hizmet&quot;</strong>), Enes Kahveci
               tarafından geliştirilen ve işletilen bir yapay zeka kodlama
               asistanı web uygulamasıdır. Hizmet; üçüncü taraf AI API
               sağlayıcılarına (DeepSeek, Hugging Face, OpenRouter vb.) bağlantı
               sağlayan bir arayüz sunar.
             </p>
             <p className="mt-2">
-              <strong>Önemli:</strong> craft.ai bir AI modeli işletmez.
+              <strong>Önemli:</strong> Craft.Coder bir AI modeli işletmez.
               Mesajlarınız seçtiğiniz üçüncü taraf AI sağlayıcısına iletilir.
-              craft.ai, bu sağlayıcıların ürettiği içerikten sorumlu değildir.
+              Craft.Coder, bu sağlayıcıların ürettiği içerikten sorumlu değildir.
             </p>
           </Section>
 
@@ -66,7 +66,7 @@ export default function TermsPage() {
               </li>
               <li>
                 Kendi adınıza geçerli bir API anahtarı edinmekten siz
-                sorumlusunuz. craft.ai API anahtarı sağlamaz.
+                sorumlusunuz. Craft.Coder API anahtarı sağlamaz.
               </li>
               <li>
                 Hesap oluşturursanız, doğru ve güncel bilgi vermeyi kabul
@@ -121,7 +121,7 @@ export default function TermsPage() {
 
           <Section title="4. Üçüncü Taraf AI API Kullanımı">
             <p>
-              craft.ai aracılığıyla üçüncü taraf AI sağlayıcılarına
+              Craft.Coder aracılığıyla üçüncü taraf AI sağlayıcılarına
               bağlandığınızda, o sağlayıcının kullanım şartlarını da kabul etmiş
               sayılırsınız:
             </p>
@@ -144,7 +144,7 @@ export default function TermsPage() {
             </ul>
             <p className="mt-3">
               Her sağlayıcının içerik politikasına uymakla yükümlüsünüz.
-              craft.ai, sağlayıcıların ürettiği yanıtların doğruluğunu,
+              Craft.Coder, sağlayıcıların ürettiği yanıtların doğruluğunu,
               güncelliğini veya uygunluğunu garanti etmez.
             </p>
           </Section>
@@ -171,21 +171,21 @@ export default function TermsPage() {
 
           <Section title="6. Fikri Mülkiyet">
             <p>
-              craft.ai uygulamasının kaynak kodu MIT lisansı altında
-              yayımlanmaktadır. craft.ai adı, logosu ve markası Enes
+              Craft.Coder uygulamasının kaynak kodu MIT lisansı altında
+              yayımlanmaktadır. Craft.Coder adı, logosu ve markası Enes
               Kahveci&apos;ye aittir.
             </p>
             <p className="mt-2">
               Siz kullanıcı olarak, hizmet aracılığıyla oluşturduğunuz
               içeriklerin (sohbet geçmişi, üretilen kodlar vb.) tüm haklarını
-              saklı tutarsınız. craft.ai bu içerikleri pazarlama amacıyla
+              saklı tutarsınız. Craft.Coder bu içerikleri pazarlama amacıyla
               kullanmaz.
             </p>
           </Section>
 
           <Section title="7. Hizmetin Sürekliliği ve Değişiklikler">
             <p>
-              craft.ai, hizmeti önceden haber vermeksizin geçici veya kalıcı
+              Craft.Coder, hizmeti önceden haber vermeksizin geçici veya kalıcı
               olarak değiştirme, askıya alma veya sonlandırma hakkını saklı tutar.
               Bu durumlarda herhangi bir tazminat yükümlülüğümüz bulunmamaktadır.
             </p>
@@ -202,7 +202,7 @@ export default function TermsPage() {
             </p>
             <ul>
               <li>
-                craft.ai, hizmet kesintilerinden, veri kayıplarından veya AI
+                Craft.Coder, hizmet kesintilerinden, veri kayıplarından veya AI
                 yanıtlarının hatalı olmasından kaynaklanan doğrudan ya da dolaylı
                 zararlardan sorumlu değildir.
               </li>
@@ -212,7 +212,7 @@ export default function TermsPage() {
               </li>
               <li>
                 Üçüncü taraf AI sağlayıcılarının ürettiği yanlış, yanıltıcı
-                veya zararlı içeriklerden craft.ai sorumlu tutulamaz.
+                veya zararlı içeriklerden Craft.Coder sorumlu tutulamaz.
               </li>
               <li>
                 Doğrudan veya dolaylı zararlara ilişkin toplam sorumluluğumuz
