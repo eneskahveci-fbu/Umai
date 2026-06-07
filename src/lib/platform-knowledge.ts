@@ -35,7 +35,7 @@ AGENTS (slash komutları)
 
 AYARLAR (⚙️) — 4 sekme
 - Model: "+ Yeni Model Ekle" ile sağlayıcı seç, görünen ad (opsiyonel), Base URL (sağlayıcıya göre otomatik dolar), API anahtarı yapıştır; anahtar girilince o anahtarla erişilebilen GERÇEK modeller otomatik listelenir ("↻ modelleri getir/yenile"). Sağlayıcılar: Hugging Face, DeepSeek, OpenRouter, Groq, Google Gemini, Mistral, Cerebras, Together AI, xAI (Grok), Ollama (yerel), Özel. Her modelin yanında: aktif yap, test et (▶), düzenle (✎), sil (🗑). Birden fazla model eklenebilir; eklenen modeller kullanıcı silmedikçe kalıcıdır.
-- GitHub: Çoklu hesap (kullanıcı adı + token), depolar (sahip/depo[:dal]), CLI modu (otomatik bağlan, terminali otomatik aç), ".rules" proje kuralları.
+- Git: Çoklu GitHub/GitLab hesabı (kullanıcı adı + token), depolar (sahip/depo[:dal]), CLI modu (otomatik bağlan, terminali otomatik aç), ".rules" proje kuralları.
 - Genel: Tema (koyu/açık), yanıt stili (Normal/Kısa/Detaylı/Kod odaklı/Resmi), bellek (sohbetler arası hatırlanacak notlar), sistem promptu, takip soruları, web arama, bağlam penceresi (token).
 - Gelişmiş: Misafir mod (anahtarlar sekme kapanınca silinir), WebContainer API key (gerçek terminal), yazı tipi boyutu, vurgu rengi, bildirim sesi, istatistikler.
 

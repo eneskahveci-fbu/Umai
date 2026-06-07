@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     "GitHub Coder",
     "ücretsiz AI",
     "model bağımsız",
-    "craft ai",
+    "Craft.Coder",
   ],
   authors: [{ name: "Enes Kahveci", url: "mailto:eneskahveci.bs@gmail.com" }],
   alternates: {
