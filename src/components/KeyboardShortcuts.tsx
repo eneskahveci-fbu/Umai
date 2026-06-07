@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { Keyboard, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Command, Keyboard, Monitor, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 
 interface Shortcut { keys: string[]; label: string; }
@@ -10,11 +10,12 @@ const GROUPS: { title: string; items: Shortcut[] }[] = [
   {
     title: "Genel",
     items: [
-      { keys: ["Ctrl", "N"], label: "Yeni oturum" },
-      { keys: ["Ctrl", "B"], label: "Yan paneli aç/kapat" },
-      { keys: ["Ctrl", "K"], label: "Komut paleti" },
-      { keys: ["Ctrl", ","], label: "Ayarlar" },
-      { keys: ["Ctrl", "/"], label: "Bu yardım penceresi" },
+      { keys: ["mod", "N"], label: "Yeni oturum" },
+      { keys: ["mod", "B"], label: "Yan paneli aç/kapat" },
+      { keys: ["mod", "K"], label: "Komut paleti" },
+      { keys: ["mod", ","], label: "Ayarlar" },
+      { keys: ["mod", "/"], label: "Bu yardım penceresi" },
+      { keys: ["?"], label: "Kısayollar (klavyeden)" },
     ],
   },
   {
@@ -39,9 +40,23 @@ const GROUPS: { title: string; items: Shortcut[] }[] = [
   },
 ];
 
+const MAC_KEY = "craftai_mac_mode";
+
 export function KeyboardShortcuts() {
   const open = useStore((s) => s.shortcutsOpen);
   const setOpen = useStore((s) => s.setShortcutsOpen);
+  const [macMode, setMacMode] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const saved = localStorage.getItem(MAC_KEY);
+    if (saved !== null) return saved === "1";
+    return navigator.platform.toUpperCase().includes("MAC");
+  });
+
+  const toggleMac = () => {
+    const next = !macMode;
+    setMacMode(next);
+    if (typeof window !== "undefined") localStorage.setItem(MAC_KEY, next ? "1" : "0");
+  };
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -62,13 +77,18 @@ export function KeyboardShortcuts() {
 
   if (!open) return null;
 
+  const resolveKey = (k: string) => {
+    if (k === "mod") return macMode ? "⌘" : "Ctrl";
+    return k;
+  };
+
   return (
     <div
       className="fixed inset-0 z-[55] bg-bg/75 backdrop-blur-sm grid place-items-center px-4 animate-modal-bg"
       onClick={() => setOpen(false)}
     >
       <div
-        className="w-full max-w-lg bg-surface border border-line rounded-2xl shadow-2xl shadow-black/40 max-h-[80vh] flex flex-col"
+        className="w-full max-w-lg bg-surface border border-line rounded-2xl shadow-2xl shadow-black/40 max-h-[88dvh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-line/60 shrink-0">
@@ -78,12 +98,27 @@ export function KeyboardShortcuts() {
             </div>
             <h2 className="font-bold text-base">Klavye Kısayolları</h2>
           </div>
-          <button
-            onClick={() => setOpen(false)}
-            className="w-7 h-7 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
-          >
-            <X size={14} />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Mac / Windows toggle */}
+            <button
+              onClick={toggleMac}
+              title={macMode ? "Windows moduna geç" : "Mac moduna geç"}
+              className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg border transition-colors ${
+                macMode
+                  ? "border-brand/40 bg-brand/8 text-brand"
+                  : "border-line text-muted hover:border-brand/30 hover:text-ink"
+              }`}
+            >
+              {macMode ? <Command size={11} /> : <Monitor size={11} />}
+              {macMode ? "Mac" : "Win"}
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              className="w-7 h-7 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
         </div>
 
         <div className="overflow-y-auto px-5 py-4 space-y-5">
@@ -96,7 +131,7 @@ export function KeyboardShortcuts() {
                 {g.items.map((sc, i) => (
                   <div
                     key={i}
-                    className="flex items-center justify-between gap-3 px-2 py-1.5 rounded-lg hover:bg-bgsoft/50 transition-colors"
+                    className="flex items-center justify-between gap-3 px-2 py-2 sm:py-1.5 rounded-lg hover:bg-bgsoft/50 active:bg-bgsoft transition-colors"
                   >
                     <span className="text-sm text-muted">{sc.label}</span>
                     <div className="flex items-center gap-1 shrink-0">
@@ -105,7 +140,7 @@ export function KeyboardShortcuts() {
                           key={j}
                           className="px-1.5 py-0.5 text-[11px] font-mono font-semibold bg-bgsoft border border-line/80 rounded text-ink/80 min-w-[22px] text-center"
                         >
-                          {k}
+                          {resolveKey(k)}
                         </kbd>
                       ))}
                     </div>
@@ -116,8 +151,16 @@ export function KeyboardShortcuts() {
           ))}
         </div>
 
-        <div className="px-5 py-3 border-t border-line/60 text-[11px] text-muted/50 text-center shrink-0">
-          Mac'te Ctrl yerine ⌘ kullan
+        <div className="px-5 py-3 border-t border-line/60 shrink-0 flex items-center justify-between">
+          <span className="text-[11px] text-muted/50">
+            {macMode ? "Mac klavyesi için ⌘ kullanılıyor" : "Windows klavyesi için Ctrl kullanılıyor"}
+          </span>
+          <button
+            onClick={toggleMac}
+            className="text-[11px] text-brand/70 hover:text-brand transition-colors"
+          >
+            {macMode ? "Windows&apos;a geç →" : "Mac&apos;e geç →"}
+          </button>
         </div>
       </div>
     </div>

@@ -104,10 +104,10 @@ function ComposerButton({
     <button
       onClick={onClick}
       title={title}
-      className={`flex items-center gap-1.5 text-[12px] px-2 py-1.5 rounded-lg transition-colors ${
+      className={`flex items-center gap-1.5 text-[12px] px-2 py-2 sm:py-1.5 rounded-lg transition-colors active:scale-95 ${
         active
           ? "text-brand bg-brand/10"
-          : "text-muted hover:text-ink hover:bg-bgsoft"
+          : "text-muted hover:text-ink hover:bg-bgsoft active:bg-bgsoft"
       }`}
     >
       {children}
@@ -1155,7 +1155,7 @@ export function CoderView() {
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) readFileIntoInput(f); e.target.value = ""; }} />
 
               {/* Textarea — geniş, butonsuz */}
-              <div className="flex items-end gap-2 bg-surface border border-line rounded-2xl px-4 py-2.5 focus-within:border-brand/50 focus-within:shadow-[0_0_0_3px_rgba(124,92,255,0.08)] transition-all">
+              <div className="flex items-end gap-2 bg-surface border border-line rounded-2xl px-4 py-3 sm:py-2.5 focus-within:border-brand/50 focus-within:shadow-[0_0_0_3px_rgba(124,92,255,0.08)] transition-all">
                 <textarea
                   ref={taRef}
                   value={input}
@@ -1184,7 +1184,7 @@ export function CoderView() {
                       ? `${attachedFiles.length} dosya eklendi — sor veya / yaz…`
                       : "Mesajınızı yazın…"
                   }
-                  className="flex-1 bg-transparent resize-none outline-none text-[15px] leading-relaxed max-h-[240px] py-1 placeholder:text-muted/45"
+                  className="flex-1 bg-transparent resize-none outline-none text-[15px] sm:text-[15px] leading-relaxed max-h-[240px] py-1 placeholder:text-muted/45"
                 />
 
                 {!streaming && (
@@ -1199,14 +1199,14 @@ export function CoderView() {
                   />
                 )}
                 {streaming ? (
-                  <button onClick={stop} className="shrink-0 w-9 h-9 rounded-xl bg-red hover:bg-red/80 text-white grid place-items-center transition-colors" title="Durdur">
+                  <button onClick={stop} className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-red hover:bg-red/80 active:bg-red/70 text-white grid place-items-center transition-colors" title="Durdur">
                     <Square size={13} />
                   </button>
                 ) : (
                   <button
                     onClick={send}
                     disabled={!input.trim() && pendingImages.length === 0 && attachedFiles.length === 0}
-                    className="shrink-0 w-9 h-9 rounded-xl bg-brand hover:bg-branddim text-white grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-brand hover:bg-branddim active:bg-branddim text-white grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     <ArrowUp size={17} />
                   </button>
