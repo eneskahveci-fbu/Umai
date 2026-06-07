@@ -67,7 +67,7 @@ export function OnboardingTour() {
       },
     },
     {
-      icon: <GitBranch size={22} className="text-purple-400" />,
+      icon: <GitBranch size={22} className="text-brand" />,
       title: "2. (Opsiyonel) GitHub bağla",
       body: hasGithub ? (
         <>GitHub hesabı bağlı. <Check size={13} className="inline text-green" /></>
@@ -79,7 +79,7 @@ export function OnboardingTour() {
       ),
     },
     {
-      icon: <MessageSquare size={22} className="text-amber-400" />,
+      icon: <MessageSquare size={22} className="text-brand" />,
       title: "3. İlk sorunu sor",
       body: (
         <>

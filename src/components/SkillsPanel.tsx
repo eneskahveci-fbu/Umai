@@ -52,7 +52,7 @@ export function SkillsPanel() {
 
   return (
     <div
-      className="fixed inset-0 z-[55] bg-bg/80 backdrop-blur-sm grid place-items-center px-3 sm:px-4 animate-modal-bg"
+      className="fixed inset-0 z-[55] bg-black/50 backdrop-blur-sm grid place-items-center px-3 sm:px-4 animate-modal-bg"
       onClick={() => setOpen(false)}
       style={{
         paddingTop: "max(0.75rem, env(safe-area-inset-top))",
@@ -70,8 +70,8 @@ export function SkillsPanel() {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-line/60 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-amber-400/10 border border-amber-400/20 grid place-items-center">
-              <Zap size={14} className="text-amber-400" />
+            <div className="w-7 h-7 rounded-lg bg-brand/10 border border-brand/20 grid place-items-center">
+              <Zap size={14} className="text-brand" />
             </div>
             <div>
               <h2 className="font-bold text-base leading-tight">Customize Skills</h2>
@@ -96,14 +96,14 @@ export function SkillsPanel() {
               onClick={() => setTab(t.id)}
               className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 ${
                 tab === t.id
-                  ? "bg-amber-400/10 text-amber-400"
+                  ? "bg-brand/10 text-brand"
                   : "text-muted hover:text-ink hover:bg-bgsoft"
               }`}
             >
               <t.icon size={12} />
               <span>{t.label}</span>
               <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                tab === t.id ? "bg-amber-400/15 text-amber-400/80" : "bg-bgsoft text-muted/50"
+                tab === t.id ? "bg-brand/15 text-brand/80" : "bg-bgsoft text-muted/50"
               }`}>{t.count}</span>
             </button>
           ))}
@@ -202,13 +202,13 @@ function SkillsTab({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Başlık (opsiyonel)"
-            className="flex-1 min-w-0 bg-bgsoft/60 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 ring-amber-400/40 placeholder:text-muted/35"
+            className="flex-1 min-w-0 bg-bgsoft/60 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 ring-brand/40 placeholder:text-muted/35"
           />
           <input
             value={tagsRaw}
             onChange={(e) => setTagsRaw(e.target.value)}
             placeholder="etiketler, virgül"
-            className="w-full sm:w-44 bg-bgsoft/60 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 ring-amber-400/40 placeholder:text-muted/35"
+            className="w-full sm:w-44 bg-bgsoft/60 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 ring-brand/40 placeholder:text-muted/35"
           />
         </div>
         <div className="flex gap-2">
@@ -218,7 +218,7 @@ function SkillsTab({
             onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) save(); }}
             placeholder="Eğitim seti — örn. 'TypeScript strict mode kullan, any yasak'… (Ctrl+Enter ile ekle)"
             rows={3}
-            className="flex-1 bg-bgsoft/60 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 ring-amber-400/40 placeholder:text-muted/35 resize-none"
+            className="flex-1 bg-bgsoft/60 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 ring-brand/40 placeholder:text-muted/35 resize-none"
           />
           <button
             onClick={save}
@@ -500,19 +500,19 @@ function SkillCard({
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full bg-bgsoft rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none focus:ring-1 ring-amber-400/40"
+          className="w-full bg-bgsoft rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none focus:ring-1 ring-brand/40"
         />
         <input
           value={tagsRaw}
           onChange={(e) => setTagsRaw(e.target.value)}
           placeholder="etiketler, virgül"
-          className="w-full bg-bgsoft rounded-lg px-2.5 py-1.5 text-[11px] outline-none focus:ring-1 ring-amber-400/40"
+          className="w-full bg-bgsoft rounded-lg px-2.5 py-1.5 text-[11px] outline-none focus:ring-1 ring-brand/40"
         />
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
           rows={5}
-          className="w-full bg-bgsoft rounded-lg px-2.5 py-2 text-xs outline-none focus:ring-1 ring-amber-400/40 resize-none font-mono"
+          className="w-full bg-bgsoft rounded-lg px-2.5 py-2 text-xs outline-none focus:ring-1 ring-brand/40 resize-none font-mono"
         />
         <div className="flex justify-end gap-1.5">
           <button onClick={onCancelEdit} className="text-[11px] px-2.5 py-1 rounded-lg text-muted hover:text-ink hover:bg-bgsoft transition-colors">İptal</button>
@@ -549,7 +549,7 @@ function SkillCard({
           <div className="flex items-center gap-1.5 flex-wrap mb-1">
             <span className="text-xs font-semibold truncate">{skill.title}</span>
             {skill.source === "file" && (
-              <code className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan/10 text-cyan/80">file</code>
+              <code className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand/10 text-brand/80">file</code>
             )}
             {skill.tags.map((t) => (
               <code key={t} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-400/80">{t}</code>
