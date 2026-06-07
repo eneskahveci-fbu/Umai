@@ -584,7 +584,7 @@ export function SettingsModal() {
             <div>
               <h4 className="text-sm font-bold mb-1">Sistem Promptu</h4>
               <textarea value={systemPromptDraft} onChange={(e) => setSystemPromptDraft(e.target.value)} onBlur={() => saveConfig({ ...config, systemPrompt: systemPromptDraft })} rows={4} className="input-mono !text-xs leading-relaxed" />
-              <button onClick={() => saveConfig({ ...config, systemPrompt: DEFAULT_SYSTEM_PROMPT })} className="text-xs text-muted hover:text-brand mt-1">Varsayılana sıfırla</button>
+              <button onClick={() => { saveConfig({ ...config, systemPrompt: DEFAULT_SYSTEM_PROMPT }); setSystemPromptDraft(DEFAULT_SYSTEM_PROMPT); }} className="text-xs text-muted hover:text-brand mt-1">Varsayılana sıfırla</button>
             </div>
 
             {/* Togglelar */}
