@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Gizlilik Politikası — craft.ai",
+  title: "Gizlilik Politikası — Craft.Coder",
   description:
-    "craft.ai'nin kişisel verilerinizi nasıl işlediğine dair KVKK ve GDPR uyumlu gizlilik politikası.",
+    "Craft.Coder'nin kişisel verilerinizi nasıl işlediğine dair KVKK ve GDPR uyumlu gizlilik politikası.",
 };
 
 export default function PrivacyPage() {
@@ -52,7 +52,7 @@ export default function PrivacyPage() {
 
           <Section title="2. İşlenen Kişisel Veriler">
             <p>
-              craft.ai farklı işlevler için farklı veriler işler. Aşağıda hangi
+              Craft.Coder farklı işlevler için farklı veriler işler. Aşağıda hangi
               verilerin, hangi amaçla ve hangi hukuki dayanak ile işlendiği
               açıklanmaktadır.
             </p>
@@ -101,9 +101,9 @@ export default function PrivacyPage() {
 
           <Section title="3. Üçüncü Taraf Veri İşleyiciler">
             <p>
-              craft.ai, hizmet sunumunda aşağıdaki üçüncü taraf sağlayıcıları
+              Craft.Coder, hizmet sunumunda aşağıdaki üçüncü taraf sağlayıcıları
               kullanmaktadır. Sohbet mesajlarınız, seçtiğiniz AI sağlayıcısına{" "}
-              <strong>craft.ai sunucusu üzerinden</strong> iletilir. Bu iletim
+              <strong>Craft.Coder sunucusu üzerinden</strong> iletilir. Bu iletim
               sırasında mesajlar sunucuda <strong>kalıcı olarak saklanmaz</strong>.
             </p>
 
@@ -174,9 +174,9 @@ export default function PrivacyPage() {
 
             <p className="mt-4 text-sm">
               Her API sağlayıcısının kendi gizlilik politikasını incelemenizi öneririz.
-              API anahtarınızı craft.ai&apos;ye kaydettiğinizde, bu anahtar{" "}
+              API anahtarınızı Craft.Coder&apos;ye kaydettiğinizde, bu anahtar{" "}
               <strong>yalnızca tarayıcınızın yerel deposunda (localStorage)</strong>{" "}
-              saklanır ve craft.ai sunucusuna gönderilmez.
+              saklanır ve Craft.Coder sunucusuna gönderilmez.
             </p>
           </Section>
 
@@ -254,7 +254,7 @@ export default function PrivacyPage() {
 
           <Section title="8. Çerezler">
             <p>
-              craft.ai yalnızca zorunlu çerezler kullanmaktadır. Ayrıntılar için{" "}
+              Craft.Coder yalnızca zorunlu çerezler kullanmaktadır. Ayrıntılar için{" "}
               <Link href="/cookies" className="text-brand hover:underline">
                 Çerez Politikamıza
               </Link>{" "}

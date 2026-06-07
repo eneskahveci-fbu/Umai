@@ -113,8 +113,8 @@ const HOW_IT_WORKS = [
 
 const FAQS = [
   {
-    q: "Craft.AI ücretsiz mi?",
-    a: "Evet, tamamen ücretsiz ve açık kaynak. Kendi API anahtarını getir (BYOK) modeliyle çalışır; craft.ai herhangi bir model ücreti almaz.",
+    q: "Craft.Coder ücretsiz mi?",
+    a: "Evet, tamamen ücretsiz ve açık kaynak. Kendi API anahtarını getir (BYOK) modeliyle çalışır; Craft.Coder herhangi bir model ücreti almaz.",
   },
   {
     q: "Hangi modeller destekleniyor?",
@@ -140,7 +140,7 @@ const SITE_URL =
 const JSON_LD_APP = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "Craft.AI",
+  name: "Craft.Coder",
   description:
     "OpenAI-uyumlu herhangi bir modelle çalışan AI kod asistanı. Sohbet, gizli sohbet, geçmiş senkron ve GitHub deposuna bağlı Coder sekmesi.",
   url: SITE_URL,
@@ -219,7 +219,7 @@ export default function Home() {
         </h1>
 
         <p className="text-lg text-muted max-w-2xl mx-auto mt-6 leading-relaxed">
-          craft.ai dosyalarını okur, kod yazar, GitHub ve GitLab depolarını gezer — istediğin modelle.
+          Craft.Coder dosyalarını okur, kod yazar, GitHub ve GitLab depolarını gezer — istediğin modelle.
           Hugging Face, DeepSeek, Groq, Anthropic ya da kendi yerel modelin: hepsi tek arayüzde.
         </p>
 

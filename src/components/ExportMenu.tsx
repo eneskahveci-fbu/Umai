@@ -37,10 +37,10 @@ export function ExportMenu({ chatId }: { chatId: string }) {
 </head>
 <body>
 <h1>${chat.title}</h1>
-<div class="meta">craft.ai sohbeti · ${new Date(chat.created_at).toLocaleString("tr-TR")}</div>
+<div class="meta">Craft.Coder sohbeti · ${new Date(chat.created_at).toLocaleString("tr-TR")}</div>
 ${chat.messages.map((m) => `
 <div class="msg">
-  <div class="role ${m.role}">${m.role === "user" ? "Sen" : "craft.ai"}</div>
+  <div class="role ${m.role}">${m.role === "user" ? "Sen" : "Craft.Coder"}</div>
   <div class="content">${(m.content || "").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
 </div>`).join("")}
 </body>

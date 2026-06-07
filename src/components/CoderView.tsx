@@ -130,6 +130,7 @@ function ThinkingModeToggle() {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, right: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const current = THINKING_LEVELS.find((l) => l.key === thinkingMode) ?? THINKING_LEVELS[1];
 
   const handleOpen = () => {
@@ -143,7 +144,10 @@ function ThinkingModeToggle() {
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (!btnRef.current?.contains(e.target as Node)) setOpen(false);
+      if (
+        !btnRef.current?.contains(e.target as Node) &&
+        !dropdownRef.current?.contains(e.target as Node)
+      ) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
     document.addEventListener("mousedown", onDown);
@@ -156,6 +160,7 @@ function ThinkingModeToggle() {
 
   const dropdown = open ? (
     <div
+      ref={dropdownRef}
       style={{ top: pos.top, right: pos.right, position: "fixed", zIndex: 9999 }}
       className="bg-surface border border-line rounded-xl shadow-2xl shadow-black/50 p-1 min-w-[140px] animate-fade-in"
     >
@@ -785,7 +790,7 @@ export function CoderView() {
       if (useStore.getState().config.soundEnabled) {
         const { playReady, notifyReady } = await import("@/lib/sounds");
         playReady();
-        notifyReady("craft.ai", "Yanıt hazır.");
+        notifyReady("Craft.Coder", "Yanıt hazır.");
       }
       fetchFollowUps();
     }
@@ -920,7 +925,7 @@ export function CoderView() {
           <div className="w-6 h-6 rounded-md bg-brand/15 border border-brand/25 grid place-items-center">
             <Code2 size={13} className="text-brand" />
           </div>
-          <span className="text-sm font-semibold text-ink">craft<span className="brand-text">.coder</span></span>
+          <span className="text-sm font-semibold text-ink">Craft<span className="brand-text">.Coder</span></span>
           {repo && (
             <span className="hidden sm:flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-bgsoft border border-line/60 text-muted/70 font-mono">
               {repo.owner}/{repo.repo}

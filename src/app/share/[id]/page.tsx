@@ -11,7 +11,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const sb = await createClient();
   if (!sb) return { title: "Paylaşılan Sohbet" };
   const { data } = await sb.from("shared_chats").select("title").eq("id", id).single();
-  return { title: data?.title ? `${data.title} — craft.ai` : "Paylaşılan Sohbet — craft.ai" };
+  return { title: data?.title ? `${data.title} — Craft.Coder` : "Paylaşılan Sohbet — Craft.Coder" };
 }
 
 export default async function SharedChatPage({ params }: Props) {
@@ -37,7 +37,7 @@ export default async function SharedChatPage({ params }: Props) {
         <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 font-extrabold text-lg">
             <svg width="22" height="22" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="6" fill="#c8a87e" fillOpacity="0.1"/><path d="M14 5L22 10.5V17.5L14 23L6 17.5V10.5L14 5Z" stroke="#c8a87e" strokeWidth="1.6" strokeLinejoin="round" fill="none"/><circle cx="14" cy="14" r="2.8" fill="#c8a87e" fillOpacity="0.85"/></svg>
-            <span className="text-ink">craft</span><span className="brand-text">.ai</span>
+            <span className="text-ink">Craft</span><span className="brand-text">.Coder</span>
           </Link>
           <Link href="/app" className="text-xs px-3 py-1.5 rounded-xl bg-brand hover:bg-branddim text-[#111110] font-semibold transition-colors">
             Uygulamayı Aç
@@ -53,7 +53,7 @@ export default async function SharedChatPage({ params }: Props) {
           {messages.map((m, i) => (
             <div key={i} className={`rounded-2xl px-5 py-4 ${m.role === "user" ? "bg-brand/10 border border-brand/20" : "bg-surface border border-line/60"}`}>
               <div className="text-[10px] font-bold uppercase tracking-widest mb-2 text-muted/60">
-                {m.role === "user" ? "Kullanıcı" : "craft.ai"}
+                {m.role === "user" ? "Kullanıcı" : "Craft.Coder"}
               </div>
               <pre className="whitespace-pre-wrap text-sm leading-relaxed font-sans">{m.content}</pre>
             </div>
@@ -62,7 +62,7 @@ export default async function SharedChatPage({ params }: Props) {
 
         <div className="mt-10 text-center">
           <Link href="/app" className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-white font-semibold px-6 py-3 rounded-2xl transition-colors">
-            ⚡ craft.ai ile kendi sohbetini başlat
+            ⚡ Craft.Coder ile kendi sohbetini başlat
           </Link>
         </div>
       </main>
