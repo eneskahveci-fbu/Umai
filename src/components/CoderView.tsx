@@ -589,12 +589,15 @@ export function CoderView() {
           if (manualSkills.length) sysContent += `\n\n[Eğitim seti]:\n${manualSkills.map((s) => `### ${s.title}\n${s.content}`).join("\n\n")}`;
           if (fileSkills.length) sysContent += `\n\n[Referans dosyalar]:\n${fileSkills.map((s) => `--- ${s.fileName || s.title} ---\n${s.content}`).join("\n\n")}`;
         }
-        const polBody = JSON.stringify({
-          model: active.model,
+        const makePolBody = (modelName: string) => JSON.stringify({
+          model: modelName,
           messages: [{ role: "system", content: sysContent }, ...apiMessages],
           stream: true,
         });
-        const RETRY_DELAYS = [5000, 10000, 20000];
+        /* Retry sequence: try selected model up to 3 times with backoff,
+           then fall back to "openai" (least busy) if a different model was chosen. */
+        const RETRY_DELAYS = [4000, 8000];
+        let polModel = active.model;
         let attempt = 0;
         // eslint-disable-next-line no-constant-condition
         while (true) {
@@ -602,16 +605,24 @@ export function CoderView() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             signal: coderAbort.signal,
-            body: polBody,
+            body: makePolBody(polModel),
           });
-          if (res.status !== 429 || attempt >= RETRY_DELAYS.length) break;
-          const wait = RETRY_DELAYS[attempt++];
-          addToast(`Pollinations yoğun, ${wait / 1000}s sonra yeniden deneniyor... (${attempt}/${RETRY_DELAYS.length})`, "info");
-          await new Promise<void>((resolve) => {
-            const t = setTimeout(resolve, wait);
-            coderAbort.signal.addEventListener("abort", () => clearTimeout(t), { once: true });
-          });
-          if (coderAbort.signal.aborted) throw new DOMException("Aborted", "AbortError");
+          if (res.status !== 429) break;
+          if (attempt < RETRY_DELAYS.length) {
+            const wait = RETRY_DELAYS[attempt++];
+            addToast(`Pollinations yoğun, ${wait / 1000}s sonra yeniden deneniyor... (${attempt}/${RETRY_DELAYS.length + 1})`, "info");
+            await new Promise<void>((resolve) => {
+              const t = setTimeout(resolve, wait);
+              coderAbort.signal.addEventListener("abort", () => clearTimeout(t), { once: true });
+            });
+            if (coderAbort.signal.aborted) throw new DOMException("Aborted", "AbortError");
+          } else if (polModel !== "openai") {
+            polModel = "openai";
+            attempt = 0;
+            addToast("openai-fast doldu — openai modeline geçiliyor...", "info");
+          } else {
+            break;
+          }
         }
       } else {
         res = await fetch("/api/chat", {
