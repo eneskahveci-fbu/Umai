@@ -208,7 +208,7 @@ export function MessageBubble({
 
         {/* Eylem butonları */}
         {message.content && !editing && (
-          <div className="flex items-center gap-0.5 mt-2.5 opacity-0 group-hover/msg:opacity-100 transition-opacity duration-200">
+          <div className="flex items-center gap-0.5 mt-2.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 transition-opacity duration-200">
             <ActionBtn onClick={copyMessage} icon={copied ? <Check size={13} /> : <Copy size={13} />} label={copied ? "Kopyalandı" : "Kopyala"} />
             {isUser && onEdit && (
               <ActionBtn onClick={startEdit} icon={<Pencil size={13} />} label="Düzenle" />
