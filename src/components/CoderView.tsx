@@ -496,7 +496,21 @@ export function CoderView() {
     const repoIsGitLab = isGitLabRepo(activeRepo);
 
     try {
-      const activeSkills = (store.config.skills ?? []).filter((s) => s.enabled);
+      const allEnabledSkills = (store.config.skills ?? []).filter((s) => s.enabled);
+      /* Relevance scoring: compare skill text against the last user message.
+         If ≤5 skills, include all; otherwise pick top-5 by keyword overlap. */
+      const activeSkills = (() => {
+        if (allEnabledSkills.length <= 5) return allEnabledSkills;
+        const lastUserText = (chat?.messages.findLast?.((m) => m.role === "user")?.content ?? "").toLowerCase();
+        const queryWords = new Set(lastUserText.split(/\W+/).filter((w) => w.length > 3));
+        if (queryWords.size === 0) return allEnabledSkills.slice(0, 5);
+        const scored = allEnabledSkills.map((s) => {
+          const haystack = (s.title + " " + s.content + " " + (s.tags ?? []).join(" ")).toLowerCase().split(/\W+/);
+          const hits = haystack.filter((w) => queryWords.has(w)).length;
+          return { skill: s, hits };
+        });
+        return scored.sort((a, b) => b.hits - a.hits).slice(0, 5).map((x) => x.skill);
+      })();
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
