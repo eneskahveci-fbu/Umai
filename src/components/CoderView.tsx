@@ -127,12 +127,23 @@ function ThinkingModeToggle() {
   const thinkingMode = useStore((s) => s.thinkingMode);
   const setThinkingMode = useStore((s) => s.setThinkingMode);
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, right: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
   const current = THINKING_LEVELS.find((l) => l.key === thinkingMode) ?? THINKING_LEVELS[1];
+
+  const handleOpen = () => {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    }
+    setOpen((o) => !o);
+  };
 
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen((o) => !o)}
+        ref={btnRef}
+        onClick={handleOpen}
         title="Düşünce derinliği"
         className="flex items-center gap-1.5 text-[12px] px-2 py-1.5 rounded-lg transition-colors font-semibold text-brand bg-brand/10 hover:bg-brand/15"
       >
@@ -142,7 +153,8 @@ function ThinkingModeToggle() {
       </button>
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 z-50 bg-surface border border-line rounded-xl shadow-xl p-1 min-w-[130px] animate-fade-in"
+          style={{ top: pos.top, right: pos.right }}
+          className="fixed z-[70] bg-surface border border-line rounded-xl shadow-xl p-1 min-w-[130px] animate-fade-in"
           onMouseLeave={() => setOpen(false)}
         >
           <div className="text-[9px] font-bold uppercase tracking-widest text-muted/50 px-2 pt-1 pb-1.5">Düşünce Derinliği</div>
