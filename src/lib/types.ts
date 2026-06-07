@@ -149,7 +149,7 @@ export interface Config {
   rulesFile: string;
   fontScale: "sm" | "base" | "lg";
   soundEnabled: boolean;
-  accentColor: "purple" | "blue" | "green" | "orange";
+  accentColor: "amber" | "green" | "orange";
   maxContext: number;
   webcontainerApiKey: string;
   mcpServers?: McpServer[];

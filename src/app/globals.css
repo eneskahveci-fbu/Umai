@@ -27,9 +27,7 @@
   --font-scale: 1;
 }
 .accent-amber  { --accent: #c8a87e; --color-brand: #c8a87e; --color-branddim: #b09060; }
-.accent-purple { --accent: #7c5cff; --color-brand: #7c5cff; --color-branddim: #6a4be0; }
-.accent-blue   { --accent: #3b82f6; --color-brand: #3b82f6; --color-branddim: #2563eb; }
-.accent-green  { --accent: #22c55e; --color-brand: #22c55e; --color-branddim: #16a34a; }
+.accent-green  { --accent: #3ddc84; --color-brand: #3ddc84; --color-branddim: #2abc6a; }
 .accent-orange { --accent: #f97316; --color-brand: #f97316; --color-branddim: #ea580c; }
 
 .font-sm   { --font-scale: 0.9; }

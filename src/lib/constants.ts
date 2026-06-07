@@ -414,7 +414,7 @@ export const DEFAULT_CONFIG: Config = {
   rulesFile: "",
   fontScale: "base",
   soundEnabled: false,
-  accentColor: "purple",
+  accentColor: "amber",
   maxContext: 8192,
   webcontainerApiKey: "",
   mcpServers: [],

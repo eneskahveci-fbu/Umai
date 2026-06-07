@@ -112,6 +112,10 @@ function loadConfig(): Config {
         merged.skills = [...missing, ...existing];
         try { store.setItem(CONFIG_KEY, JSON.stringify(merged)); } catch { /* yok say */ }
       }
+      /* Eski purple/blue accent renkleri amber'e migrate et */
+      if (merged.accentColor === "purple" || merged.accentColor === "blue") {
+        merged.accentColor = "amber";
+      }
       /* Eğer hiç model yoksa, ücretsiz Pollinations modelini tohum olarak ekle */
       if (!Array.isArray(merged.models) || merged.models.length === 0) {
         merged.models = [POLLINATIONS_DEFAULT_MODEL];
@@ -856,7 +860,7 @@ export const useStore = create<StoreState>()((set, get) => ({
         return `<div class="msg ${cls}"><div class="role">${label}</div><pre>${escaped}</pre></div>`;
       })
       .join("\n");
-    const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${chat.title} — craft.ai</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#0e0e13;color:#ececf1;padding:2rem;max-width:800px;margin:auto}.msg{padding:1rem;border-radius:12px;margin-bottom:1rem}.user{background:#1c1c26;border:1px solid #28283a}.assistant{background:#14141b;border:1px solid #28283a}.role{font-size:.75rem;font-weight:700;color:#7c5cff;margin-bottom:.5rem;text-transform:uppercase}pre{white-space:pre-wrap;font-size:.9rem;line-height:1.6}h1{text-align:center;margin-bottom:2rem;background:linear-gradient(120deg,#9d7bff,#c4b1ff);-webkit-background-clip:text;background-clip:text;color:transparent}footer{text-align:center;margin-top:2rem;font-size:.75rem;color:#9a9ab0}</style></head><body><h1>${chat.title}</h1>${msgs}<footer>craft.ai ile oluşturuldu</footer></body></html>`;
+    const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${chat.title} — craft.ai</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#111110;color:#f0ebe0;padding:2rem;max-width:800px;margin:auto}.msg{padding:1rem;border-radius:12px;margin-bottom:1rem}.user{background:#1b1a17;border:1px solid #2e2a24}.assistant{background:#181714;border:1px solid #2e2a24}.role{font-size:.75rem;font-weight:700;color:#c8a87e;margin-bottom:.5rem;text-transform:uppercase}pre{white-space:pre-wrap;font-size:.9rem;line-height:1.6}h1{text-align:center;margin-bottom:2rem;background:linear-gradient(120deg,#c8a87e,#e0caa8);-webkit-background-clip:text;background-clip:text;color:transparent}footer{text-align:center;margin-top:2rem;font-size:.75rem;color:#9a9080}</style></head><body><h1>${chat.title}</h1>${msgs}<footer>craft.ai ile oluşturuldu</footer></body></html>`;
     download(html, `${safeName(chat.title)}.html`, "text/html");
   },
 

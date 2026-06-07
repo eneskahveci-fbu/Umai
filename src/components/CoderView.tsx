@@ -1202,7 +1202,7 @@ export function CoderView() {
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) readFileIntoInput(f); e.target.value = ""; }} />
 
               {/* Textarea — geniş, butonsuz */}
-              <div className="flex items-end gap-2 bg-surface border border-line rounded-2xl px-4 py-3 sm:py-2.5 focus-within:border-brand/50 focus-within:shadow-[0_0_0_3px_rgba(124,92,255,0.08)] transition-all">
+              <div className="flex items-end gap-2 bg-surface border border-line rounded-2xl px-4 py-3 sm:py-2.5 focus-within:border-brand/50 focus-within:shadow-[0_0_0_3px_rgba(200,168,126,0.12)] transition-all">
                 <textarea
                   ref={taRef}
                   value={input}
