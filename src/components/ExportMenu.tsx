@@ -11,6 +11,45 @@ export function ExportMenu({ chatId }: { chatId: string }) {
   const exportChatHtml = useStore((s) => s.exportChatHtml);
   const exportChatJson = useStore((s) => s.exportChatJson);
   const copyChatMarkdown = useStore((s) => s.copyChatMarkdown);
+  const chats = useStore((s) => s.chats);
+
+  const exportPdf = () => {
+    const chat = chats.find((c) => c.id === chatId);
+    if (!chat) return;
+    const html = `<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8"/>
+<title>${chat.title}</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 24px; color: #1a1a2e; line-height: 1.6; }
+  h1 { font-size: 1.4rem; margin-bottom: 8px; }
+  .meta { font-size: 0.75rem; color: #666; margin-bottom: 32px; }
+  .msg { margin-bottom: 20px; }
+  .role { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #999; margin-bottom: 4px; }
+  .role.user { color: #6d4aff; }
+  .content { background: #f5f5f7; border-radius: 8px; padding: 12px 16px; white-space: pre-wrap; font-size: 0.9rem; }
+  pre { background: #f0f0f4; border-radius: 6px; padding: 10px 14px; overflow-x: auto; font-size: 0.8rem; }
+  @media print { body { margin: 20px; } }
+</style>
+</head>
+<body>
+<h1>${chat.title}</h1>
+<div class="meta">craft.ai sohbeti · ${new Date(chat.created_at).toLocaleString("tr-TR")}</div>
+${chat.messages.map((m) => `
+<div class="msg">
+  <div class="role ${m.role}">${m.role === "user" ? "Sen" : "craft.ai"}</div>
+  <div class="content">${(m.content || "").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+</div>`).join("")}
+</body>
+</html>`;
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 400);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -44,6 +83,7 @@ export function ExportMenu({ chatId }: { chatId: string }) {
           <Item icon={<FileText size={12} />} label="Markdown indir (.md)"   onClick={run(() => exportChat(chatId))} />
           <Item icon={<FileJson size={12} />} label="JSON indir (.json)"      onClick={run(() => exportChatJson(chatId))} />
           <Item icon={<Code size={12} />}      label="HTML indir (.html)"     onClick={run(() => exportChatHtml(chatId))} />
+          <Item icon={<Download size={12} />}  label="PDF olarak yazdır"      onClick={run(() => exportPdf())} />
           <div className="my-1 h-px bg-line/40" />
           <Item icon={<Clipboard size={12} />} label="Markdown'ı kopyala"    onClick={run(() => copyChatMarkdown(chatId))} />
         </div>

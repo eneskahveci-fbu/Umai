@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS } from "@/lib/constants";
+import { calculateCost, formatCost } from "@/lib/pricing";
 import type { Provider, ResponseStyle } from "@/lib/types";
 
 export function SettingsModal() {
@@ -692,39 +693,73 @@ export function SettingsModal() {
               </div>
             </div>
 
-            {/* Bildirim sesi */}
+            {/* Bildirim sesi + Browser bildirimi */}
             <div>
-              <h4 className="text-sm font-bold mb-2">Bildirim Sesi</h4>
-              <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={config.soundEnabled}
-                  onChange={() => saveConfig({ ...config, soundEnabled: !config.soundEnabled })}
-                  className="accent-brand"
-                />
-                <div>
-                  <div className="text-sm font-semibold">AI yanıt sesini aç</div>
-                  <div className="text-xs text-muted mt-0.5">Yanıt tamamlanınca kısa bir bip sesi çalar.</div>
-                </div>
-              </label>
+              <h4 className="text-sm font-bold mb-2">Bildirimler</h4>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={config.soundEnabled}
+                    onChange={() => saveConfig({ ...config, soundEnabled: !config.soundEnabled })}
+                    className="accent-brand"
+                  />
+                  <div>
+                    <div className="text-sm font-semibold">Ses bildirimi</div>
+                    <div className="text-xs text-muted mt-0.5">Yanıt tamamlanınca kısa bir bip sesi çalar.</div>
+                  </div>
+                </label>
+                <button
+                  onClick={async () => {
+                    if (!("Notification" in window)) { addToast("Bu tarayıcı bildirimleri desteklemiyor.", "error"); return; }
+                    const perm = await Notification.requestPermission();
+                    if (perm === "granted") addToast("Bildirimler açık — sekme arka plandayken uyarı alacaksın.", "success");
+                    else addToast("Bildirim izni verilmedi.", "error");
+                  }}
+                  className="flex items-center gap-3 p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 text-sm text-left transition-colors"
+                >
+                  <span className="text-lg">🔔</span>
+                  <div>
+                    <div className="text-sm font-semibold">Tarayıcı bildirimi aç</div>
+                    <div className="text-xs text-muted mt-0.5">Sekme arka planda iken yanıt hazır olunca bildirim gelir.</div>
+                  </div>
+                </button>
+              </div>
             </div>
 
             {/* İstatistikler */}
             <div>
-              <h4 className="text-sm font-bold mb-2">İstatistikler</h4>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: "Toplam Oturum", value: chats.length },
-                  { label: "Toplam Mesaj", value: chats.reduce((n, c) => n + c.messages.length, 0) },
-                  { label: "Toplam Token (giriş)", value: chats.reduce((n, c) => n + (c.totalInTokens ?? 0), 0).toLocaleString() },
-                  { label: "Toplam Token (çıkış)", value: chats.reduce((n, c) => n + (c.totalOutTokens ?? 0), 0).toLocaleString() },
-                ].map(({ label, value }) => (
-                  <div key={label} className="bg-bgsoft border border-line rounded-xl px-3 py-2.5">
-                    <div className="text-xs text-muted">{label}</div>
-                    <div className="text-lg font-bold mt-0.5">{value}</div>
+              <h4 className="text-sm font-bold mb-2">İstatistikler & Harcama</h4>
+              {(() => {
+                const totalIn = chats.reduce((n, c) => n + (c.totalInTokens ?? 0), 0);
+                const totalOut = chats.reduce((n, c) => n + (c.totalOutTokens ?? 0), 0);
+                const activeModel = config.models.find((m) => m.id === config.activeModelId);
+                const totalCost = activeModel ? calculateCost(activeModel.model, totalIn, totalOut) : null;
+                return (
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { label: "Toplam Oturum", value: chats.length },
+                      { label: "Toplam Mesaj", value: chats.reduce((n, c) => n + c.messages.length, 0) },
+                      { label: "Giriş Token", value: totalIn.toLocaleString() },
+                      { label: "Çıkış Token", value: totalOut.toLocaleString() },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="bg-bgsoft border border-line rounded-xl px-3 py-2.5">
+                        <div className="text-xs text-muted">{label}</div>
+                        <div className="text-lg font-bold mt-0.5">{value}</div>
+                      </div>
+                    ))}
+                    {totalCost !== null && (
+                      <div className="col-span-2 bg-brand/5 border border-brand/20 rounded-xl px-3 py-2.5 flex items-center justify-between">
+                        <div>
+                          <div className="text-xs text-muted">Tahmini API Maliyeti</div>
+                          <div className="text-xs text-muted/60 mt-0.5">(aktif model · tüm oturumlar)</div>
+                        </div>
+                        <div className="text-xl font-bold text-brand">{formatCost(totalCost)}</div>
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
             </div>
           </section>
         )}

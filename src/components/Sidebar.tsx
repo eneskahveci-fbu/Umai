@@ -46,7 +46,14 @@ export function Sidebar() {
   const history = chats
     .filter((c) => !c.incognito)
     .filter((c) => (activeProject ? c.projectId === activeProject : true))
-    .filter((c) => search ? c.title.toLowerCase().includes(search.toLowerCase()) : true)
+    .filter((c) => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      if (c.title.toLowerCase().includes(q)) return true;
+      return c.messages.some((m) =>
+        typeof m.content === "string" && m.content.toLowerCase().includes(q)
+      );
+    })
     .sort((a, b) => b.created_at - a.created_at);
 
   const startRename = (id: string, title: string) => {
