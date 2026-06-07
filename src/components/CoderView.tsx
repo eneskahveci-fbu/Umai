@@ -583,8 +583,9 @@ export function CoderView() {
       useStore.getState().setStreaming(false);
       await useStore.getState().persistCurrent();
       if (useStore.getState().config.soundEnabled) {
-        const { playReady } = await import("@/lib/sounds");
+        const { playReady, notifyReady } = await import("@/lib/sounds");
         playReady();
+        notifyReady("craft.ai", "Yanıt hazır.");
       }
       fetchFollowUps();
     }
@@ -917,6 +918,28 @@ export function CoderView() {
 
         {/* Main: chat */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+
+          {/* Token budget warning banner */}
+          {current && config.maxContext > 0 && (() => {
+            const tokenIn = current.totalInTokens ?? 0;
+            const pct = Math.min(100, (tokenIn / config.maxContext) * 100);
+            if (pct < 80) return null;
+            const isDanger = pct >= 95;
+            return (
+              <div className={`shrink-0 flex items-center gap-2 px-4 py-2 text-xs font-semibold border-b ${
+                isDanger
+                  ? "bg-red/5 border-red/20 text-red"
+                  : "bg-amber-400/5 border-amber-400/20 text-amber-400"
+              }`}>
+                <span>{isDanger ? "⛔" : "⚠️"}</span>
+                <span>
+                  Bağlam dolumu {pct.toFixed(0)}% — {isDanger
+                    ? "Limit aşılmak üzere, yeni sohbet başlatmanı öneririm."
+                    : "Sohbet uzuyor, yakında limit dolabilir."}
+                </span>
+              </div>
+            );
+          })()}
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto">

@@ -49,3 +49,23 @@ export function playError() {
 export function playSend() {
   tone(660, 50, 0, "sine", 0.06);
 }
+
+/** Tab arka plandayken browser notification gönderir. */
+export async function notifyReady(title: string, body?: string) {
+  if (typeof window === "undefined") return;
+  if (document.visibilityState === "visible") return;
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "denied") return;
+  if (Notification.permission === "default") {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") return;
+  }
+  try {
+    new Notification(title, {
+      body,
+      icon: "/icon",
+      tag: "craftai-ready",
+      renotify: true,
+    });
+  } catch { /* yok say */ }
+}
