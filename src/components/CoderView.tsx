@@ -331,6 +331,7 @@ export function CoderView() {
   useEffect(() => { searchOnRef.current = searchOn; }, [searchOn]);
   const [repoSearch, setRepoSearch] = useState("");
   const [connecting, setConnecting] = useState(false);
+  const connectingRef = useRef(false);
   const [fetchingFile, setFetchingFile] = useState<string | null>(null);
   const [editorFile, setEditorFile] = useState<EditorFile | null>(null);
   const [pendingCommit, setPendingCommit] = useState<EditorFile[] | null>(null);
@@ -378,6 +379,8 @@ export function CoderView() {
   }, [input]);
 
   const connectRepo = async () => {
+    if (connectingRef.current) return;
+    connectingRef.current = true;
     const store = useStore.getState();
     const activeRepo = store.config.activeRepo || "";
     setConnecting(true);
@@ -400,12 +403,22 @@ export function CoderView() {
     } catch (e) {
       addToast(`Depo bağlantısı başarısız: ${(e as Error).message}`, "error");
     } finally {
+      connectingRef.current = false;
       setConnecting(false);
     }
   };
 
+  const prevActiveRepoRef = useRef(config.activeRepo);
   useEffect(() => {
-    if (config.cliMode && config.activeRepo && !tree) connectRepo();
+    if (!config.activeRepo) return;
+    const repoChanged = prevActiveRepoRef.current !== config.activeRepo;
+    prevActiveRepoRef.current = config.activeRepo;
+    // Clear stale tree when repo switches, then always reconnect
+    if (repoChanged && tree) {
+      setTree(null);
+      setRepo(null);
+    }
+    if (!tree || repoChanged) connectRepo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.activeRepo, config.activeGithubId, config.activeGitlabId, config.cliMode]);
 
@@ -1082,12 +1095,19 @@ export function CoderView() {
                 <div className="px-3 py-6 text-center">
                   <FolderGit2 size={22} className="mx-auto mb-2 text-muted/20" />
                   <p className="text-[10px] text-muted/40 leading-relaxed mb-2">
-                    {connecting ? "Yükleniyor…" : "GitHub deposu bağla"}
+                    {connecting ? "Yükleniyor…" : config.activeRepo ? config.activeRepo : "Depo seç veya ekle"}
                   </p>
                   {!connecting && (
-                    <button onClick={() => setSettingsOpen(true)} className="text-[10px] px-2 py-1 rounded-lg bg-brand/10 border border-brand/25 text-brand font-medium hover:bg-brand/20 transition-colors">
-                      Ayarlar
-                    </button>
+                    <div className="flex flex-col gap-1.5 items-center">
+                      {config.activeRepo ? (
+                        <button onClick={connectRepo} className="text-[10px] px-3 py-1.5 rounded-lg bg-brand text-white font-semibold hover:bg-branddim transition-colors flex items-center gap-1">
+                          <FolderGit2 size={10} /> Bağlan
+                        </button>
+                      ) : null}
+                      <button onClick={() => setSettingsOpen(true)} className="text-[10px] px-2 py-1 rounded-lg bg-brand/10 border border-brand/25 text-brand font-medium hover:bg-brand/20 transition-colors">
+                        Ayarlar
+                      </button>
+                    </div>
                   )}
                   <div className="mt-4 pt-3 border-t border-line/30">
                     <button onClick={() => fileRef.current?.click()} className="text-[10px] text-muted/60 hover:text-ink transition-colors flex items-center gap-1 mx-auto">
