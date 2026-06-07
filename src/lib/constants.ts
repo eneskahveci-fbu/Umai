@@ -1,4 +1,4 @@
-import type { Config, Provider, ResponseStyle, Skill } from "./types";
+import type { Config, ModelProfile, Provider, ResponseStyle, Skill } from "./types";
 
 export interface Preset {
   label: string;
@@ -382,7 +382,7 @@ export const DEFAULT_SKILLS: Skill[] = [
   },
 ];
 
-export const POLLINATIONS_DEFAULT_MODEL: import("./types").ModelProfile = {
+export const POLLINATIONS_DEFAULT_MODEL: ModelProfile = {
   id: "craft-default-pollinations",
   label: "✦ Craft Default (Ücretsiz)",
   provider: "pollinations",
