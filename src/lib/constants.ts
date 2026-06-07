@@ -391,6 +391,8 @@ export const DEFAULT_CONFIG: Config = {
   activeModelId: DEFAULT_POLLINATIONS_MODEL.id,
   githubAccounts: [],
   activeGithubId: null,
+  gitlabAccounts: [],
+  activeGitlabId: null,
   repos: ["eneskahveci-sdo/craft-ai"],
   activeRepo: "eneskahveci-sdo/craft-ai",
   systemPrompt: DEFAULT_SYSTEM_PROMPT,

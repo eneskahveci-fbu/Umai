@@ -67,6 +67,12 @@ export interface GitHubAccount {
   token: string;
 }
 
+export interface GitLabAccount {
+  id: string;
+  username: string;
+  token: string;
+}
+
 export type ResponseStyle = "normal" | "concise" | "detailed" | "code" | "formal";
 
 export interface Project {
@@ -111,6 +117,8 @@ export interface Config {
   activeModelId: string | null;
   githubAccounts: GitHubAccount[];
   activeGithubId: string | null;
+  gitlabAccounts: GitLabAccount[];
+  activeGitlabId: string | null;
   repos: string[];
   activeRepo: string | null;
   systemPrompt: string;

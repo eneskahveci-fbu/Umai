@@ -6,6 +6,7 @@ import { useStore } from "@/lib/store";
 import type { EditorFile } from "@/lib/editor";
 import { getMountedHandle, getMountedName, writeBackToDir } from "@/lib/localfs";
 import { getWebContainer, isSupported as wcSupported, needsApiKey, writeFile as wcWriteFile } from "@/lib/webcontainer";
+import { isGitLabRepo } from "@/lib/gitlab";
 
 export function MultiCommitBar({
   files,
@@ -79,30 +80,60 @@ export function MultiCommitBar({
 
   const commit = async () => {
     if (!repo) { addToast("Depo bağlı değil", "error"); return; }
-    const activeGithub = useStore.getState().activeGithub();
-    if (!activeGithub?.token) { addToast("GitHub token yok", "error"); return; }
     if (toCommit.length === 0) { addToast("Hiç dosya seçilmedi", "error"); return; }
+    const store = useStore.getState();
+    const activeRepo = store.config.activeRepo || "";
+    const gitLab = isGitLabRepo(activeRepo);
+    const commitMsg = message.trim() || `Update ${toCommit.length} files`;
 
     setCommitting(true);
     try {
-      const res = await fetch("/api/github/batch-write", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          owner: repo.owner,
-          repo: repo.repo,
-          branch: repo.branch,
-          message: message.trim() || `Update ${toCommit.length} files`,
-          token: activeGithub.token,
-          files: toCommit.map((f) => ({ path: f.path, content: f.content })),
-        }),
-      });
-      if (!res.ok) {
-        const { error } = await res.json().catch(() => ({ error: "Bilinmeyen hata" }));
-        throw new Error(error);
+      if (gitLab) {
+        const activeGitlab = store.activeGitlab();
+        if (!activeGitlab?.token) throw new Error("GitLab token yok — Ayarlar → Depolar'dan ekle");
+        // GitLab: commit her dosyayı tek tek
+        for (const f of toCommit) {
+          const res = await fetch("/api/gitlab/write", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              namespace: repo.owner,
+              repo: repo.repo,
+              branch: repo.branch,
+              path: f.path,
+              content: f.content,
+              message: commitMsg,
+              token: activeGitlab.token,
+            }),
+          });
+          if (!res.ok) {
+            const { error } = await res.json().catch(() => ({ error: "Bilinmeyen hata" }));
+            throw new Error(error);
+          }
+        }
+        addToast(`✓ ${toCommit.length} dosya GitLab'a commit'lendi`, "success");
+      } else {
+        const activeGithub = store.activeGithub();
+        if (!activeGithub?.token) throw new Error("GitHub token yok — Ayarlar → Depolar'dan ekle");
+        const res = await fetch("/api/github/batch-write", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            owner: repo.owner,
+            repo: repo.repo,
+            branch: repo.branch,
+            message: commitMsg,
+            token: activeGithub.token,
+            files: toCommit.map((f) => ({ path: f.path, content: f.content })),
+          }),
+        });
+        if (!res.ok) {
+          const { error } = await res.json().catch(() => ({ error: "Bilinmeyen hata" }));
+          throw new Error(error);
+        }
+        const { sha } = await res.json();
+        addToast(`✓ ${toCommit.length} dosya commit'lendi (${sha.slice(0, 7)})`, "success");
       }
-      const { sha } = await res.json();
-      addToast(`✓ ${toCommit.length} dosya commit'lendi (${sha.slice(0, 7)})`, "success");
       setDone(true);
       setTimeout(onClose, 2000);
     } catch (e) {
