@@ -65,7 +65,6 @@ export async function notifyReady(title: string, body?: string) {
       body,
       icon: "/icon",
       tag: "craftai-ready",
-      renotify: true,
     });
   } catch { /* yok say */ }
 }

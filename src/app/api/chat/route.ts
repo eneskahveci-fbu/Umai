@@ -317,6 +317,12 @@ export async function POST(req: Request) {
     upstreamHeaders["X-Title"] = "craft.ai";
   }
 
+  if (provider === "anthropic") {
+    upstreamHeaders["anthropic-version"] = "2023-06-01";
+    upstreamHeaders["x-api-key"] = apiKey;
+    delete upstreamHeaders["Authorization"];
+  }
+
   let sysPrompt = body.systemPrompt || DEFAULT_SYSTEM_PROMPT;
   /* Eklenen her model, içinde çalıştığı platformun tüm özelliklerini bilsin. */
   sysPrompt += `\n\n${PLATFORM_KNOWLEDGE}`;
