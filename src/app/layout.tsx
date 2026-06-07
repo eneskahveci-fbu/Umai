@@ -71,8 +71,8 @@ export const metadata: Metadata = {
 
 export const viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#0e0e13" },
-    { media: "(prefers-color-scheme: light)", color: "#f5f5f7" },
+    { media: "(prefers-color-scheme: dark)", color: "#111110" },
+    { media: "(prefers-color-scheme: light)", color: "#f4f0e8" },
   ],
   colorScheme: "dark light",
   width: "device-width",
@@ -96,11 +96,12 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* iOS PWA meta */}
+        {/* PWA */}
+        <link rel="manifest" href="/manifest.json" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Craft.AI" />
+        <meta name="apple-mobile-web-app-title" content="craft.ai" />
         <link rel="apple-touch-icon" href="/icon" />
         {/* Tema flash'ını önle (private-mode safe) */}
         <script

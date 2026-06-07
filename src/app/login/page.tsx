@@ -118,8 +118,12 @@ export default function LoginPage() {
       </div>
 
       <Link href="/" className="flex items-center gap-2.5 font-extrabold text-xl mb-10 group">
-        <span className="w-9 h-9 rounded-xl brand-gradient grid place-items-center text-white shadow-lg shadow-brand/25 group-hover:shadow-brand/40 transition-shadow">◆</span>
-        craft<span className="brand-text">.ai</span>
+        <svg width="36" height="36" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+          <rect width="28" height="28" rx="7" fill="#c8a87e" fillOpacity="0.12" />
+          <path d="M14 5L22 10.5V17.5L14 23L6 17.5V10.5L14 5Z" stroke="#c8a87e" strokeWidth="1.6" strokeLinejoin="round" fill="none" />
+          <circle cx="14" cy="14" r="2.8" fill="#c8a87e" fillOpacity="0.85" />
+        </svg>
+        <span className="text-ink">craft</span><span className="brand-text">.ai</span>
       </Link>
 
       <div className="w-full max-w-[380px]">
@@ -142,7 +146,7 @@ export default function LoginPage() {
               <button
                 key={m}
                 onClick={() => { setMode(m); setError(""); setSuccess(""); setFieldErrors({}); }}
-                className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition-colors ${mode === m ? "bg-brand text-white" : "text-muted hover:text-ink"}`}
+                className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition-colors ${mode === m ? "bg-brand text-[#111110]" : "text-muted hover:text-ink"}`}
               >
                 {m === "login" ? "Giriş Yap" : "Kayıt Ol"}
               </button>
@@ -197,7 +201,7 @@ export default function LoginPage() {
             <button
               onClick={submit}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-branddim disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm mt-1"
+              className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-branddim disabled:opacity-50 disabled:cursor-not-allowed text-[#111110] font-semibold py-3 rounded-xl transition-colors text-sm mt-1"
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : <>{mode === "login" ? "Giriş Yap" : "Hesap Oluştur"} <ArrowRight size={15} /></>}
             </button>

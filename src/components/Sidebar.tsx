@@ -21,6 +21,15 @@ import { useStore } from "@/lib/store";
 import { AuthButton } from "./AuthButton";
 import { AccordionSection } from "./Accordion";
 
+function SidebarLogo({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <path d="M14 4L23 9.5V18.5L14 24L5 18.5V9.5L14 4Z" stroke="#c8a87e" strokeWidth="1.7" strokeLinejoin="round" fill="none" />
+      <circle cx="14" cy="14" r="2.8" fill="#c8a87e" fillOpacity="0.9" />
+    </svg>
+  );
+}
+
 export function Sidebar() {
   const chats = useStore((s) => s.chats);
   const currentId = useStore((s) => s.currentId);
@@ -109,9 +118,9 @@ export function Sidebar() {
           <button
             onClick={() => setSidebarOpen(true)}
             title="Paneli aç (Ctrl+B)"
-            className="w-9 h-9 rounded-xl brand-gradient grid place-items-center text-white shadow-sm shadow-brand/30 hover:shadow-brand/50 transition-shadow"
+            className="w-9 h-9 rounded-xl bg-brand/10 border border-brand/30 grid place-items-center hover:bg-brand/15 transition-colors"
           >
-            <span className="text-sm font-bold">◆</span>
+            <SidebarLogo size={20} />
           </button>
         </div>
 
@@ -119,7 +128,7 @@ export function Sidebar() {
           <button
             onClick={() => newChat(false)}
             title="Yeni oturum (Ctrl+N)"
-            className="w-full h-9 rounded-xl bg-brand hover:bg-branddim text-white grid place-items-center transition-colors"
+            className="w-full h-9 rounded-xl bg-brand hover:bg-branddim text-[#111110] grid place-items-center transition-colors"
           >
             <Plus size={16} />
           </button>
@@ -166,11 +175,9 @@ export function Sidebar() {
     >
       {/* Header */}
       <div className="h-14 px-4 flex items-center justify-between border-b border-line/60 shrink-0">
-        <div className="flex items-center gap-2.5 font-extrabold text-base">
-          <span className="w-7 h-7 rounded-lg brand-gradient grid place-items-center text-white text-sm shadow-sm shadow-brand/30">
-            ◈
-          </span>
-          {"Craft"}<span className="brand-text">.Coder</span>
+        <div className="flex items-center gap-2 font-extrabold text-base tracking-tight">
+          <SidebarLogo size={22} />
+          <span className="text-ink">craft</span><span className="brand-text">.ai</span>
         </div>
         <button
           onClick={() => setSidebarOpen(false)}
@@ -185,7 +192,7 @@ export function Sidebar() {
       <div className="px-3 py-3 border-b border-line/60 shrink-0">
         <button
           onClick={() => newChat(false)}
-          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-brand hover:bg-branddim text-white font-semibold text-sm transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-brand hover:bg-branddim text-[#111110] font-semibold text-sm transition-colors"
         >
           <Plus size={15} /> Yeni Oturum
         </button>

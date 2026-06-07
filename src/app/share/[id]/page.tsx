@@ -36,10 +36,10 @@ export default async function SharedChatPage({ params }: Props) {
       <nav className="sticky top-0 z-50 backdrop-blur bg-bg/80 border-b border-line/60">
         <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 font-extrabold text-lg">
-            <span className="w-6 h-6 rounded-md brand-gradient grid place-items-center text-white text-xs">◆</span>
-            craft<span className="brand-text">.ai</span>
+            <svg width="22" height="22" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="6" fill="#c8a87e" fillOpacity="0.1"/><path d="M14 5L22 10.5V17.5L14 23L6 17.5V10.5L14 5Z" stroke="#c8a87e" strokeWidth="1.6" strokeLinejoin="round" fill="none"/><circle cx="14" cy="14" r="2.8" fill="#c8a87e" fillOpacity="0.85"/></svg>
+            <span className="text-ink">craft</span><span className="brand-text">.ai</span>
           </Link>
-          <Link href="/app" className="text-xs px-3 py-1.5 rounded-xl bg-brand hover:bg-branddim text-white font-semibold transition-colors">
+          <Link href="/app" className="text-xs px-3 py-1.5 rounded-xl bg-brand hover:bg-branddim text-[#111110] font-semibold transition-colors">
             Uygulamayı Aç
           </Link>
         </div>

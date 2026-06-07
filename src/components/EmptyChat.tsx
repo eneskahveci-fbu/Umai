@@ -19,8 +19,11 @@ const SAMPLE_PROMPTS = [
 export function EmptyChat({ hasModel, hasRepo, onAddModel, onPrompt }: EmptyChatProps) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 py-10 select-none">
-      <div className="w-14 h-14 rounded-2xl brand-gradient grid place-items-center text-white text-2xl mb-5 shadow-lg shadow-brand/25">
-        ◈
+      <div className="w-14 h-14 rounded-2xl bg-brand/10 border border-brand/25 grid place-items-center mb-5 shadow-lg shadow-brand/10">
+        <svg width="32" height="32" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+          <path d="M14 3L24 9V19L14 25L4 19V9L14 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none" className="text-brand" />
+          <circle cx="14" cy="14" r="3.2" fill="currentColor" className="text-brand" fillOpacity="0.8" />
+        </svg>
       </div>
 
       <h2 className="text-2xl font-extrabold tracking-tight mb-1.5">Ne üzerinde çalışalım?</h2>
