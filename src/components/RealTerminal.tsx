@@ -34,6 +34,9 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
   const [mounting, setMounting] = useState(false);
   const cleanupRef = useRef<(() => void) | null>(null);
   const apiKey = useStore((s) => s.config.webcontainerApiKey);
+  const appTheme = useStore((s) => s.config.theme);
+  const appThemeRef = useRef(appTheme);
+  useEffect(() => { appThemeRef.current = appTheme; }, [appTheme]);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const addToast = useStore((s) => s.addToast);
   const repo = useStore((s) => s.repo);
@@ -66,16 +69,19 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
       ]);
       await import("@xterm/xterm/css/xterm.css");
 
+      const isLight = appThemeRef.current === "light";
       const term = new Terminal({
         convertEol: true,
         cursorBlink: true,
         fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
         fontSize: 13,
         theme: {
-          background: "#0a0a0d",
+          background: isLight ? "#211d16" : "#0e0d0a",
           foreground: "#f0ebe0",
           cursor: "#c8a87e",
           selectionBackground: "#c8a87e40",
+          black: "#1c1917",
+          brightBlack: "#4a4540",
         },
       });
       const fit = new FitAddon();
@@ -168,14 +174,17 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="h-64 shrink-0 border-t border-line/60 bg-[#0a0a0d] flex flex-col">
-      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-line/40 bg-surface/40 shrink-0">
+    <div
+      className="h-64 shrink-0 border-t border-line/60 flex flex-col"
+      style={{ backgroundColor: appTheme === "light" ? "#211d16" : "#0e0d0a" }}
+    >
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-line/30 bg-black/20 shrink-0">
         <Power size={11} className={
           status === "ready" ? "text-green" :
           status === "booting" ? "text-amber-400 animate-pulse" :
-          status === "error" ? "text-red" : "text-muted/40"
+          status === "error" ? "text-red" : "text-white/30"
         } />
-        <span className="text-[11px] font-mono text-muted/70">
+        <span className="text-[11px] font-mono text-white/50">
           Terminal · {
             status === "ready" ? "hazır" :
             status === "booting" ? "başlatılıyor…" :
@@ -201,7 +210,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
             target="_blank"
             rel="noopener noreferrer"
             title={`GitHub Codespaces'te aç (${repo!.owner}/${repo!.repo})`}
-            className="text-muted/50 hover:text-ink w-7 h-7 grid place-items-center rounded transition-colors"
+            className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors"
           >
             <Cloud size={11} />
           </a>
@@ -211,7 +220,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
           disabled={mounting}
           aria-label="Yerel klasör mount et"
           title={mountedFolder ? "Başka klasör seç" : "Yerel klasör mount et"}
-          className="text-muted/50 hover:text-ink w-7 h-7 grid place-items-center rounded transition-colors disabled:opacity-30"
+          className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors disabled:opacity-30"
         >
           {mounting ? <Loader2 size={11} className="animate-spin" /> : <FolderOpen size={11} />}
         </button>
@@ -219,19 +228,19 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
           onClick={restart}
           aria-label="Terminali yeniden başlat"
           title="Yeniden başlat"
-          className="text-muted/50 hover:text-ink w-7 h-7 grid place-items-center rounded transition-colors"
+          className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors"
         >
           <RefreshCw size={11} />
         </button>
-        <button onClick={onClose} title="Kapat" className="text-muted/50 hover:text-ink p-1 rounded transition-colors">
+        <button onClick={onClose} title="Kapat" className="text-white/40 hover:text-white/80 p-1 rounded transition-colors">
           <X size={12} />
         </button>
       </div>
       {status === "needs-key" ? (
         <div className="flex-1 grid place-items-center px-6">
           <div className="text-center max-w-md">
-            <p className="text-xs font-semibold text-ink mb-2">WebContainer API key gerekli</p>
-            <p className="text-[11px] text-muted/60 leading-relaxed mb-3">
+            <p className="text-xs font-semibold text-white/80 mb-2">WebContainer API key gerekli</p>
+            <p className="text-[11px] text-white/40 leading-relaxed mb-3">
               Gerçek terminal bu domain&apos;de çalışmak için ücretsiz bir API key istiyor.
               <br />
               <a
@@ -257,13 +266,13 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
                   href={codespaceHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-bgsoft hover:bg-line/30 text-muted hover:text-ink transition-colors font-semibold"
+                  className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white/70 hover:text-white/90 transition-colors font-semibold"
                 >
                   <Cloud size={11} />
                   Codespaces&apos;te aç
                 </a>
               )}
-              <button onClick={restart} className="text-[11px] px-3 py-1.5 rounded-lg bg-bgsoft hover:bg-line/30 transition-colors text-muted">
+              <button onClick={restart} className="text-[11px] px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 transition-colors text-white/60">
                 Tekrar dene
               </button>
             </div>
@@ -273,7 +282,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
         <div className="flex-1 grid place-items-center px-6">
           <div className="text-center max-w-md">
             <p className="text-xs text-red mb-2">Terminal başlatılamadı</p>
-            <p className="text-[11px] text-muted/60 leading-relaxed mb-3">{errMsg}</p>
+            <p className="text-[11px] text-white/40 leading-relaxed mb-3">{errMsg}</p>
             <div className="flex items-center justify-center gap-2 flex-wrap">
               {codespaceHref ? (
                 <a
@@ -286,13 +295,13 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
                   Codespaces&apos;te aç
                 </a>
               ) : (
-                <span className="text-[10px] text-muted/50 italic">
+                <span className="text-[10px] text-white/30 italic">
                   Mobilde gerçek terminal için bir GitHub deposu bağla → tek tıkla Codespaces
                 </span>
               )}
               <button
                 onClick={restart}
-                className="text-[11px] px-3 py-1.5 rounded-lg bg-bgsoft hover:bg-line/30 text-muted transition-colors"
+                className="text-[11px] px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white/60 transition-colors"
               >
                 Tekrar dene
               </button>
@@ -301,7 +310,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
         </div>
       ) : status === "booting" ? (
         <div className="flex-1 grid place-items-center">
-          <div className="flex items-center gap-2 text-xs text-muted/60">
+          <div className="flex items-center gap-2 text-xs text-white/40">
             <Loader2 size={13} className="animate-spin" />
             WebContainer başlatılıyor (ilk açılışta 5-10 sn sürebilir)…
           </div>

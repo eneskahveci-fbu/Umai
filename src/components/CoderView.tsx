@@ -573,16 +573,30 @@ export function CoderView() {
           if (manualSkills.length) sysContent += `\n\n[Eğitim seti]:\n${manualSkills.map((s) => `### ${s.title}\n${s.content}`).join("\n\n")}`;
           if (fileSkills.length) sysContent += `\n\n[Referans dosyalar]:\n${fileSkills.map((s) => `--- ${s.fileName || s.title} ---\n${s.content}`).join("\n\n")}`;
         }
-        res = await fetch(`${active.baseUrl}/chat/completions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: coderAbort.signal,
-          body: JSON.stringify({
-            model: active.model,
-            messages: [{ role: "system", content: sysContent }, ...apiMessages],
-            stream: true,
-          }),
+        const polBody = JSON.stringify({
+          model: active.model,
+          messages: [{ role: "system", content: sysContent }, ...apiMessages],
+          stream: true,
         });
+        const RETRY_DELAYS = [5000, 10000, 20000];
+        let attempt = 0;
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          res = await fetch(`${active.baseUrl}/chat/completions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: coderAbort.signal,
+            body: polBody,
+          });
+          if (res.status !== 429 || attempt >= RETRY_DELAYS.length) break;
+          const wait = RETRY_DELAYS[attempt++];
+          addToast(`Pollinations yoğun, ${wait / 1000}s sonra yeniden deneniyor... (${attempt}/${RETRY_DELAYS.length})`, "info");
+          await new Promise<void>((resolve) => {
+            const t = setTimeout(resolve, wait);
+            coderAbort.signal.addEventListener("abort", () => clearTimeout(t), { once: true });
+          });
+          if (coderAbort.signal.aborted) throw new DOMException("Aborted", "AbortError");
+        }
       } else {
         res = await fetch("/api/chat", {
           method: "POST",
