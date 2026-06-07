@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { Brain, Check, ChevronDown, ChevronRight, Copy, Loader2, Pencil, RefreshCw, ThumbsDown, ThumbsUp, Wrench } from "lucide-react";
+import { BookMarked, Brain, Check, ChevronDown, ChevronRight, Copy, Loader2, Pencil, RefreshCw, ThumbsDown, ThumbsUp, Wrench, X } from "lucide-react";
 import type { ChatMessage } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { CodeBlock } from "./CodeBlock";
@@ -81,6 +81,25 @@ export function MessageBubble({
   const [thinkingOpen, setThinkingOpen] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const rateMessage = useStore((s) => s.rateMessage);
+  const addSkill = useStore((s) => s.addSkill);
+  const addToast = useStore((s) => s.addToast);
+  const [skillSaveOpen, setSkillSaveOpen] = useState(false);
+  const [skillTitle, setSkillTitle] = useState("");
+  const [skillContent, setSkillContent] = useState("");
+
+  const openSkillSave = () => {
+    const firstLine = message.content.split("\n")[0].replace(/^#+\s*/, "").slice(0, 72);
+    setSkillTitle(firstLine || "AI Yanıtı");
+    setSkillContent(message.content.slice(0, 4000));
+    setSkillSaveOpen(true);
+  };
+
+  const saveSkill = () => {
+    if (!skillTitle.trim()) return;
+    addSkill({ title: skillTitle.trim(), content: skillContent, tags: [], enabled: true, source: "ai" });
+    addToast("Skill kaydedildi", "success");
+    setSkillSaveOpen(false);
+  };
 
   const copyMessage = async () => {
     try {
@@ -236,8 +255,57 @@ export function MessageBubble({
                 >
                   <ThumbsDown size={12} />
                 </button>
+                <div className="w-px h-3.5 bg-line/60 mx-0.5" />
+                <button
+                  onClick={openSkillSave}
+                  className="flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg transition-colors text-muted hover:text-amber-400 hover:bg-bgsoft"
+                  title="Skill olarak kaydet"
+                >
+                  <BookMarked size={12} />
+                  <span>Skill</span>
+                </button>
               </>
             )}
+          </div>
+        )}
+
+        {/* Skill kaydet mini modal */}
+        {skillSaveOpen && (
+          <div className="mt-3 border border-amber-400/25 bg-amber-400/4 rounded-xl p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-amber-400 flex items-center gap-1.5">
+                <BookMarked size={11} /> Skill olarak kaydet
+              </span>
+              <button onClick={() => setSkillSaveOpen(false)} className="text-muted hover:text-ink transition-colors">
+                <X size={12} />
+              </button>
+            </div>
+            <input
+              value={skillTitle}
+              onChange={(e) => setSkillTitle(e.target.value)}
+              placeholder="Skill başlığı…"
+              className="w-full bg-bgsoft border border-line/60 rounded-lg px-2.5 py-1.5 text-[12px] outline-none focus:border-amber-400/50"
+              onKeyDown={(e) => { if (e.key === "Enter") saveSkill(); if (e.key === "Escape") setSkillSaveOpen(false); }}
+              autoFocus
+            />
+            <textarea
+              value={skillContent}
+              onChange={(e) => setSkillContent(e.target.value)}
+              rows={3}
+              className="w-full bg-bgsoft border border-line/60 rounded-lg px-2.5 py-1.5 text-[11px] font-mono outline-none focus:border-amber-400/50 resize-none"
+            />
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setSkillSaveOpen(false)} className="text-[11px] px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink transition-colors">
+                İptal
+              </button>
+              <button
+                onClick={saveSkill}
+                disabled={!skillTitle.trim()}
+                className="text-[11px] px-3 py-1 rounded-lg bg-amber-400/90 text-black font-semibold hover:bg-amber-400 disabled:opacity-40 transition-colors"
+              >
+                Kaydet
+              </button>
+            </div>
           </div>
         )}
       </div>

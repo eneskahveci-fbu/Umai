@@ -170,6 +170,175 @@ async function execSearchFiles(ctx: RepoCtx, args: { query: string }): Promise<s
   return matches.length ? matches.join("\n") : "(eşleşme yok)";
 }
 
+async function execSearchCode(ctx: RepoCtx, args: { query: string; extension?: string }): Promise<string> {
+  if (!args.query) return "Hata: query boş";
+  if (ctx.provider === "gitlab") {
+    const proj = encodeGlProject(ctx.owner, ctx.repo);
+    const q = encodeURIComponent(args.query);
+    const res = await fetch(
+      `https://gitlab.com/api/v4/projects/${proj}/search?scope=blobs&search=${q}&ref=${encodeURIComponent(ctx.branch)}&per_page=20`,
+      { headers: glHeaders(ctx.token) },
+    );
+    if (!res.ok) return `Hata: ${res.status}`;
+    const data = await res.json() as { filename: string; path: string; data: string; startline: number }[];
+    if (!data.length) return "(eşleşme yok)";
+    return data
+      .filter((r) => !args.extension || r.path.endsWith(`.${args.extension}`))
+      .slice(0, 15)
+      .map((r) => `${r.path}:${r.startline}\n  ${r.data.trim().slice(0, 120)}`)
+      .join("\n\n");
+  }
+  const q = encodeURIComponent(`${args.query} repo:${ctx.owner}/${ctx.repo}${args.extension ? ` extension:${args.extension}` : ""}`);
+  const res = await fetch(`https://api.github.com/search/code?q=${q}&per_page=15`, {
+    headers: { ...ghHeaders(ctx.token), Accept: "application/vnd.github+json" },
+  });
+  if (!res.ok) return `Hata: ${res.status} — ${await res.text().catch(() => "")}`;
+  const data = await res.json() as { items?: { path: string; html_url: string }[] };
+  if (!data.items?.length) return "(eşleşme yok)";
+  return data.items.map((r) => r.path).join("\n");
+}
+
+async function execWriteFile(ctx: RepoCtx, args: { path: string; content: string; commit_message: string }): Promise<string> {
+  if (!args.path || !args.content) return "Hata: path ve content zorunlu";
+  const msg = args.commit_message || `chore: update ${args.path}`;
+  if (ctx.provider === "gitlab") {
+    const proj = encodeGlProject(ctx.owner, ctx.repo);
+    const encoded = encodeURIComponent(args.path);
+    /* check if file exists */
+    const check = await fetch(
+      `https://gitlab.com/api/v4/projects/${proj}/repository/files/${encoded}?ref=${encodeURIComponent(ctx.branch)}`,
+      { headers: glHeaders(ctx.token) },
+    );
+    const method = check.ok ? "PUT" : "POST";
+    const res = await fetch(
+      `https://gitlab.com/api/v4/projects/${proj}/repository/files/${encoded}`,
+      {
+        method,
+        headers: { ...glHeaders(ctx.token), "Content-Type": "application/json" },
+        body: JSON.stringify({ branch: ctx.branch, content: args.content, commit_message: msg, encoding: "text" }),
+      },
+    );
+    if (!res.ok) return `Hata: ${res.status} — ${await res.text().catch(() => "")}`;
+    return `✅ ${args.path} başarıyla ${method === "PUT" ? "güncellendi" : "oluşturuldu"} (branch: ${ctx.branch})`;
+  }
+  /* GitHub: get existing SHA for update */
+  const checkRes = await fetch(
+    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/contents/${encodeURIComponent(args.path)}?ref=${ctx.branch}`,
+    { headers: ghHeaders(ctx.token) },
+  );
+  const sha = checkRes.ok ? ((await checkRes.json()) as { sha?: string }).sha : undefined;
+  const content64 = Buffer.from(args.content, "utf-8").toString("base64");
+  const body: Record<string, unknown> = { message: msg, content: content64, branch: ctx.branch };
+  if (sha) body.sha = sha;
+  const res = await fetch(
+    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/contents/${encodeURIComponent(args.path)}`,
+    { method: "PUT", headers: { ...ghHeaders(ctx.token), "Content-Type": "application/json" }, body: JSON.stringify(body) },
+  );
+  if (!res.ok) return `Hata: ${res.status} — ${await res.text().catch(() => "")}`;
+  return `✅ ${args.path} başarıyla ${sha ? "güncellendi" : "oluşturuldu"} (branch: ${ctx.branch})`;
+}
+
+async function execListBranches(ctx: RepoCtx): Promise<string> {
+  if (ctx.provider === "gitlab") {
+    const proj = encodeGlProject(ctx.owner, ctx.repo);
+    const res = await fetch(
+      `https://gitlab.com/api/v4/projects/${proj}/repository/branches?per_page=30`,
+      { headers: glHeaders(ctx.token) },
+    );
+    if (!res.ok) return `Hata: ${res.status}`;
+    const data = await res.json() as { name: string; default?: boolean }[];
+    return data.map((b) => `${b.name}${b.default ? " (varsayılan)" : ""}`).join("\n");
+  }
+  const res = await fetch(
+    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/branches?per_page=30`,
+    { headers: ghHeaders(ctx.token) },
+  );
+  if (!res.ok) return `Hata: ${res.status}`;
+  const data = await res.json() as { name: string }[];
+  return data.map((b) => b.name).join("\n");
+}
+
+async function execCreateBranch(ctx: RepoCtx, args: { name: string; from?: string }): Promise<string> {
+  const sourceBranch = args.from || ctx.branch;
+  if (ctx.provider === "gitlab") {
+    const proj = encodeGlProject(ctx.owner, ctx.repo);
+    const res = await fetch(`https://gitlab.com/api/v4/projects/${proj}/repository/branches`, {
+      method: "POST",
+      headers: { ...glHeaders(ctx.token), "Content-Type": "application/json" },
+      body: JSON.stringify({ branch: args.name, ref: sourceBranch }),
+    });
+    if (!res.ok) return `Hata: ${res.status} — ${await res.text().catch(() => "")}`;
+    return `✅ Dal oluşturuldu: ${args.name} (kaynak: ${sourceBranch})`;
+  }
+  /* GitHub: get source SHA */
+  const refRes = await fetch(
+    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/ref/heads/${encodeURIComponent(sourceBranch)}`,
+    { headers: ghHeaders(ctx.token) },
+  );
+  if (!refRes.ok) return `Hata: kaynak dal bulunamadı (${sourceBranch})`;
+  const refData = await refRes.json() as { object?: { sha: string } };
+  const sha = refData.object?.sha;
+  if (!sha) return "Hata: kaynak dal SHA alınamadı";
+  const res = await fetch(`https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/refs`, {
+    method: "POST",
+    headers: { ...ghHeaders(ctx.token), "Content-Type": "application/json" },
+    body: JSON.stringify({ ref: `refs/heads/${args.name}`, sha }),
+  });
+  if (!res.ok) return `Hata: ${res.status} — ${await res.text().catch(() => "")}`;
+  return `✅ Dal oluşturuldu: ${args.name} (kaynak: ${sourceBranch})`;
+}
+
+async function execGetCommitHistory(ctx: RepoCtx, args: { limit?: string; path?: string }): Promise<string> {
+  const limit = Math.min(30, parseInt(args.limit ?? "10", 10) || 10);
+  if (ctx.provider === "gitlab") {
+    const proj = encodeGlProject(ctx.owner, ctx.repo);
+    const pathQ = args.path ? `&path=${encodeURIComponent(args.path)}` : "";
+    const res = await fetch(
+      `https://gitlab.com/api/v4/projects/${proj}/repository/commits?ref_name=${encodeURIComponent(ctx.branch)}&per_page=${limit}${pathQ}`,
+      { headers: glHeaders(ctx.token) },
+    );
+    if (!res.ok) return `Hata: ${res.status}`;
+    const data = await res.json() as { short_id: string; title: string; author_name: string; created_at: string }[];
+    return data.map((c) => `${c.short_id} ${c.created_at.slice(0, 10)} [${c.author_name}] ${c.title}`).join("\n");
+  }
+  const pathQ = args.path ? `&path=${encodeURIComponent(args.path)}` : "";
+  const res = await fetch(
+    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/commits?sha=${ctx.branch}&per_page=${limit}${pathQ}`,
+    { headers: ghHeaders(ctx.token) },
+  );
+  if (!res.ok) return `Hata: ${res.status}`;
+  const data = await res.json() as { sha: string; commit: { message: string; author: { name: string; date: string } } }[];
+  return data.map((c) => `${c.sha.slice(0, 7)} ${c.commit.author.date.slice(0, 10)} [${c.commit.author.name}] ${c.commit.message.split("\n")[0]}`).join("\n");
+}
+
+/* SOUL.md / .craft.md — OpenClaw-inspired project context file */
+async function fetchSoulFile(ctx: RepoCtx): Promise<string | null> {
+  const candidates = ["SOUL.md", ".craft.md", ".craftai.md", "AGENTS.md"];
+  for (const candidate of candidates) {
+    try {
+      if (ctx.provider === "gitlab") {
+        const proj = encodeGlProject(ctx.owner, ctx.repo);
+        const encoded = encodeURIComponent(candidate);
+        const res = await fetch(
+          `https://gitlab.com/api/v4/projects/${proj}/repository/files/${encoded}/raw?ref=${encodeURIComponent(ctx.branch)}`,
+          { headers: glHeaders(ctx.token) },
+        );
+        if (res.ok) return await res.text();
+      } else {
+        const res = await fetch(
+          `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/contents/${candidate}?ref=${ctx.branch}`,
+          { headers: ghHeaders(ctx.token) },
+        );
+        if (res.ok) {
+          const data = await res.json() as { content: string };
+          return Buffer.from(data.content, "base64").toString("utf-8");
+        }
+      }
+    } catch { /* devam et */ }
+  }
+  return null;
+}
+
 async function fetchMcpTools(server: McpServerConfig): Promise<{ name: string; description: string; parameters: object }[]> {
   try {
     const res = await fetch(`${server.url}/tools/list`, {
@@ -209,18 +378,16 @@ async function executeTool(
   mcpServers?: McpServerConfig[],
 ): Promise<string> {
   try {
-    if (name === "list_files") {
-      if (!ctx) return "Hata: repo bağlı değil.";
-      return await execListFiles(ctx, args as { filter?: string });
-    }
-    if (name === "read_file") {
-      if (!ctx) return "Hata: repo bağlı değil.";
-      return await execReadFile(ctx, args as { path: string });
-    }
-    if (name === "search_files") {
-      if (!ctx) return "Hata: repo bağlı değil.";
-      return await execSearchFiles(ctx, args as { query: string });
-    }
+    if (!ctx && ["list_files","read_file","search_files","search_code","write_file","list_branches","create_branch","get_commit_history"].includes(name))
+      return "Hata: repo bağlı değil. Kullanıcıya bir repo bağlamasını söyle.";
+    if (name === "list_files") return await execListFiles(ctx!, args as { filter?: string });
+    if (name === "read_file") return await execReadFile(ctx!, args as { path: string });
+    if (name === "search_files") return await execSearchFiles(ctx!, args as { query: string });
+    if (name === "search_code") return await execSearchCode(ctx!, args as { query: string; extension?: string });
+    if (name === "write_file") return await execWriteFile(ctx!, args as { path: string; content: string; commit_message: string });
+    if (name === "list_branches") return await execListBranches(ctx!);
+    if (name === "create_branch") return await execCreateBranch(ctx!, args as { name: string; from?: string });
+    if (name === "get_commit_history") return await execGetCommitHistory(ctx!, args as { limit?: string; path?: string });
     /* Try MCP servers for unknown tools */
     for (const srv of (mcpServers ?? [])) {
       if (!srv.enabled) continue;
@@ -404,11 +571,17 @@ export async function POST(req: Request) {
     sysPrompt += `\n\n[Web arama sonuçları]:\n${body.searchContext}`;
   }
   if (body.tools && body.repoCtx) {
+    /* SOUL.md — OpenClaw-inspired project context file */
+    const soulContent = await fetchSoulFile(body.repoCtx).catch(() => null);
+    if (soulContent) {
+      sysPrompt += `\n\n[Proje bağlamı — SOUL.md]:\n${soulContent.slice(0, 6000)}`;
+    }
     sysPrompt +=
       `\n\n[Araç kullanımı]: Bağlı repo: ${body.repoCtx.owner}/${body.repoCtx.repo}:${body.repoCtx.branch}. ` +
-      `list_files, read_file, search_files araçlarını kullanarak repo'yu keşfedebilirsin. ` +
-      `Cevap vermeden önce gerekli dosyaları oku. Aynı dosyayı tekrar tekrar okuma. ` +
-      `Çok dosya yerine en kritik 1-3 dosyayı oku.`;
+      `Kullanabileceğin araçlar: list_files, read_file, search_files, search_code (içerik arar), ` +
+      `write_file (dosya yaz/güncelle + commit), list_branches, create_branch, get_commit_history. ` +
+      `Cevap vermeden önce gerekli dosyaları oku. write_file ile kod değişikliği yapabilirsin — kullanıcı onay vermişse kullan. ` +
+      `Aynı dosyayı tekrar okuma. En kritik 1-3 dosyayı oku.`;
   }
 
   /* Tool-use disabled: simple passthrough */
