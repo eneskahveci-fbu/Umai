@@ -14,6 +14,21 @@ import {
   ChevronDown,
 } from "lucide-react";
 
+function LogoMark({ size = 28 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <rect width="28" height="28" rx="7" fill="#c8a87e" fillOpacity="0.12" />
+      <path
+        d="M14 5L22 10.5V17.5L14 23L6 17.5V10.5L14 5Z"
+        stroke="#c8a87e"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <circle cx="14" cy="14" r="2.8" fill="#c8a87e" fillOpacity="0.85" />
+    </svg>
+  );
+}
 
 const FEATURES = [
   {
@@ -170,18 +185,16 @@ export default function Home() {
       />
 
       {/* NAV */}
-      <nav className="sticky top-0 z-50 backdrop-blur bg-bg/80 border-b border-line/60">
+      <nav className="sticky top-0 z-50 backdrop-blur-md bg-bg/85 border-b border-line/40">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-extrabold text-xl">
-            <span className="w-7 h-7 rounded-lg brand-gradient grid place-items-center text-white text-sm">
-              ◆
-            </span>
-            craft<span className="brand-text">.ai</span>
+          <div className="flex items-center gap-2.5 font-extrabold text-xl tracking-tight">
+            <LogoMark size={28} />
+            <span className="text-ink">craft</span><span className="brand-text">.ai</span>
           </div>
           <div className="flex items-center gap-3">
             <Link
               href="/app"
-              className="flex items-center gap-1.5 bg-brand hover:bg-branddim text-white font-semibold px-4 py-2 rounded-xl text-sm transition-colors"
+              className="flex items-center gap-1.5 bg-brand hover:bg-branddim text-[#111110] font-semibold px-4 py-2 rounded-xl text-sm transition-colors shadow-sm shadow-brand/20"
             >
               Uygulamayı Aç <ArrowRight size={15} />
             </Link>
@@ -191,37 +204,36 @@ export default function Home() {
 
       {/* HERO */}
       <header className="relative max-w-6xl mx-auto px-6 pt-24 pb-20 text-center overflow-hidden w-full">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_70%_55%_at_50%_0%,rgba(124,92,255,0.15),transparent)]" />
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_40%_30%_at_80%_60%,rgba(70,212,224,0.06),transparent)]" />
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_65%_50%_at_50%_0%,rgba(200,168,126,0.12),transparent)]" />
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_35%_25%_at_85%_65%,rgba(200,168,126,0.05),transparent)]" />
 
-        <span className="inline-flex items-center gap-2 text-sm text-muted border border-line/60 bg-surface/80 backdrop-blur-sm px-4 py-1.5 rounded-full mb-8">
+        <span className="inline-flex items-center gap-2 text-sm text-muted border border-line bg-surface/70 backdrop-blur-sm px-4 py-1.5 rounded-full mb-8">
           <span className="w-2 h-2 rounded-full bg-green animate-pulse" />
           model bağımsız · açık kaynak · ücretsiz
         </span>
 
         <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-tight">
-          Terminalin ve tarayıcın için
+          Kod için tasarlanmış
           <br />
-          <span className="brand-text">AI kod asistanı</span>
+          <span className="brand-text">AI asistanın</span>
         </h1>
 
         <p className="text-lg text-muted max-w-2xl mx-auto mt-6 leading-relaxed">
-          craft.ai; dosyalarını okur, kod yazar, GitHub ve GitLab depolarını gezer — hem de
-          istediğin modelle. Hugging Face, DeepSeek, Groq, Anthropic ya da
-          kendi yerel modelin: hepsi tek bir akışta.
+          craft.ai dosyalarını okur, kod yazar, GitHub ve GitLab depolarını gezer — istediğin modelle.
+          Hugging Face, DeepSeek, Groq, Anthropic ya da kendi yerel modelin: hepsi tek arayüzde.
         </p>
 
         <div className="flex gap-3 justify-center mt-10 flex-wrap">
           <Link
             href="/app"
-            className="flex items-center gap-2 bg-brand hover:bg-branddim text-white font-semibold px-7 py-3.5 rounded-2xl shadow-lg shadow-brand/20 hover:shadow-brand/30 transition-all duration-200"
+            className="flex items-center gap-2 bg-brand hover:bg-branddim text-[#111110] font-semibold px-8 py-3.5 rounded-2xl shadow-lg shadow-brand/20 hover:shadow-brand/30 transition-all duration-200"
           >
-            ⚡ Hemen Başla
+            Hemen Başla <ArrowRight size={16} />
           </Link>
         </div>
 
         {/* Stats */}
-        <div className="flex flex-wrap justify-center gap-8 mt-14">
+        <div className="flex flex-wrap justify-center gap-10 mt-14">
           {[
             { val: "9+", label: "Desteklenen sağlayıcı" },
             { val: "100%", label: "Ücretsiz & açık kaynak" },
@@ -245,7 +257,7 @@ export default function Home() {
           {HOW_IT_WORKS.map((step) => (
             <div key={step.step} className="relative rounded-2xl border border-line bg-surface p-6">
               <div className="flex items-center gap-3 mb-4">
-                <span className="w-8 h-8 rounded-full brand-gradient grid place-items-center text-white font-bold text-sm flex-shrink-0">
+                <span className="w-8 h-8 rounded-full brand-gradient grid place-items-center text-[#111110] font-bold text-sm flex-shrink-0">
                   {step.step}
                 </span>
                 <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand grid place-items-center">
@@ -303,7 +315,7 @@ export default function Home() {
       {/* CTA BANNER */}
       <section className="max-w-6xl mx-auto px-6 py-10 w-full">
         <div className="relative rounded-3xl overflow-hidden border border-brand/20 bg-surface p-10 text-center">
-          <div className="absolute inset-0 -z-0 bg-[radial-gradient(ellipse_60%_80%_at_50%_50%,rgba(124,92,255,0.08),transparent)]" />
+          <div className="absolute inset-0 -z-0 bg-[radial-gradient(ellipse_60%_80%_at_50%_50%,rgba(200,168,126,0.07),transparent)]" />
           <h2 className="text-3xl font-extrabold mb-3 relative">
             Hemen dene — kurulum yok
           </h2>
@@ -312,9 +324,9 @@ export default function Home() {
           </p>
           <Link
             href="/app"
-            className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-white font-semibold px-8 py-3.5 rounded-2xl shadow-lg shadow-brand/20 transition-all duration-200 relative"
+            className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-[#111110] font-semibold px-8 py-3.5 rounded-2xl shadow-lg shadow-brand/20 transition-all duration-200 relative"
           >
-            ⚡ Uygulamayı Aç <ArrowRight size={16} />
+            Uygulamayı Aç <ArrowRight size={16} />
           </Link>
         </div>
       </section>
@@ -349,10 +361,8 @@ export default function Home() {
       <footer className="border-t border-line mt-auto">
         <div className="max-w-6xl mx-auto px-6 py-12 text-center">
           <div className="flex items-center justify-center gap-2 font-extrabold text-lg mb-3">
-            <span className="w-6 h-6 rounded-md brand-gradient grid place-items-center text-white text-xs">
-              ◆
-            </span>
-            craft<span className="brand-text">.ai</span>
+            <LogoMark size={22} />
+            <span className="text-ink">craft</span><span className="brand-text">.ai</span>
           </div>
           <p className="text-sm text-muted">
             Terminal &amp; web tabanlı AI kod asistanı · MIT Lisansı

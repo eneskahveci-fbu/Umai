@@ -128,7 +128,7 @@ export function MessageBubble({
     <div className="group/msg flex gap-3.5 py-5">
       <div
         className={`shrink-0 w-8 h-8 rounded-xl grid place-items-center text-sm font-bold shadow-sm ${
-          isUser ? "bg-blue/90 text-white" : "brand-gradient text-white"
+          isUser ? "bg-blue/90 text-white" : "bg-brand/10 border border-brand/25 text-brand"
         }`}
       >
         {isUser ? "S" : "✦"}
@@ -194,7 +194,7 @@ export function MessageBubble({
               <div className="flex gap-2">
                 <button
                   onClick={submitEdit}
-                  className="text-xs px-3.5 py-1.5 rounded-lg bg-brand text-white font-semibold hover:bg-branddim transition-colors"
+                  className="text-xs px-3.5 py-1.5 rounded-lg bg-brand text-[#111110] font-semibold hover:bg-branddim transition-colors"
                 >
                   Gönder
                 </button>

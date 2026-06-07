@@ -13,8 +13,8 @@ export default function CookiesPage() {
       <nav className="sticky top-0 z-50 backdrop-blur bg-bg/70 border-b border-line">
         <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 font-extrabold">
-            <span className="w-6 h-6 rounded-md brand-gradient grid place-items-center text-white text-xs">
-              ◆
+            <span className="w-6 h-6 rounded-md bg-brand/10 border border-brand/25 grid place-items-center text-brand text-xs">
+              ◇
             </span>
             craft<span className="brand-text">.ai</span>
           </Link>

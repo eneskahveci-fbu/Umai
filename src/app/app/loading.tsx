@@ -22,10 +22,10 @@ export default function AppLoading() {
         <div className="flex-1 grid place-items-center">
           <div className="flex flex-col items-center gap-3">
             <div
-              className="w-10 h-10 rounded-xl brand-gradient grid place-items-center text-white animate-pulse"
+              className="w-10 h-10 rounded-xl bg-brand/10 border border-brand/25 grid place-items-center animate-pulse"
               aria-hidden="true"
             >
-              <span className="text-base font-extrabold">◆</span>
+              <svg width="20" height="20" viewBox="0 0 28 28" fill="none"><path d="M14 4L23 9.5V18.5L14 24L5 18.5V9.5L14 4Z" stroke="#c8a87e" strokeWidth="1.8" strokeLinejoin="round" fill="none"/><circle cx="14" cy="14" r="3" fill="#c8a87e" fillOpacity="0.8"/></svg>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="typing-dot" aria-hidden="true" />
