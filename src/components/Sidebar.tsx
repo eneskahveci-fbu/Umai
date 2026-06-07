@@ -8,10 +8,12 @@ import {
   FolderPlus,
   MessageSquare,
   Pencil,
+  Pin,
   Plus,
   Search,
   Settings,
   Share2,
+  Tag,
   Trash2,
   X,
 } from "lucide-react";
@@ -29,6 +31,8 @@ export function Sidebar() {
   const renameChat = useStore((s) => s.renameChat);
   const exportChat = useStore((s) => s.exportChat);
   const exportChatHtml = useStore((s) => s.exportChatHtml);
+  const tagChat = useStore((s) => s.tagChat);
+  const pinChat = useStore((s) => s.pinChat);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const sidebarOpen = useStore((s) => s.sidebarOpen);
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
@@ -78,7 +82,11 @@ export function Sidebar() {
         typeof m.content === "string" && m.content.toLowerCase().includes(q)
       );
     })
-    .sort((a, b) => b.created_at - a.created_at);
+    .sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return b.created_at - a.created_at;
+    });
 
   const startRename = (id: string, title: string) => {
     setEditingId(id);
@@ -301,7 +309,19 @@ export function Sidebar() {
                       {c.title}
                     </span>
                   )}
+                  {c.pinned && <Pin size={9} className="text-brand/60 shrink-0" />}
+                  {c.tags && c.tags.length > 0 && (
+                    <span className="text-[9px] px-1 py-0.5 rounded bg-brand/10 text-brand/70 font-mono shrink-0 max-w-[60px] truncate">
+                      {c.tags[0]}
+                    </span>
+                  )}
                   <div className="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0">
+                    <ActionIcon title={c.pinned ? "Sabitlemeyi kaldır" : "Sabitle"} onClick={(e) => { e.stopPropagation(); pinChat(c.id, !c.pinned); }}>
+                      <Pin size={10} className={c.pinned ? "text-brand" : ""} />
+                    </ActionIcon>
+                    <ActionIcon title="Etiket ekle" onClick={(e) => { e.stopPropagation(); const tag = window.prompt("Etiket (virgülle ayır):", c.tags?.join(", ") ?? ""); if (tag !== null) tagChat(c.id, tag.split(",").map(t => t.trim()).filter(Boolean)); }}>
+                      <Tag size={10} />
+                    </ActionIcon>
                     <ActionIcon title="Yeniden adlandır" onClick={(e) => { e.stopPropagation(); startRename(c.id, c.title); }}>
                       <Pencil size={10} />
                     </ActionIcon>

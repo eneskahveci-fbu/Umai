@@ -36,6 +36,8 @@ export interface Chat {
   projectId?: string;
   totalInTokens?: number;
   totalOutTokens?: number;
+  tags?: string[];
+  pinned?: boolean;
 }
 
 export type Provider =
