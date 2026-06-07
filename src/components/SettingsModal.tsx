@@ -299,11 +299,11 @@ export function SettingsModal() {
             </div>
             
             {/* Gemini API Info */}
-            <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-              <div className="text-xs text-blue-400 font-semibold mb-1">💡 Gemini API Hakkında</div>
-              <p className="text-xs text-blue-300 leading-relaxed">
-                Google Gemini ücretsiz olarak kullanılabilir. 
-                <a href="https://ai.google.dev/pricing" target="_blank" rel="noopener noreferrer" className="text-blue-200 hover:text-blue-100 underline"> ai.google.dev</a>'den API anahtarı alabilirsin. 
+            <div className="mb-4 p-3 bg-brand/8 border border-brand/25 rounded-lg">
+              <div className="text-xs text-brand font-semibold mb-1">💡 Gemini API Hakkında</div>
+              <p className="text-xs text-muted leading-relaxed">
+                Google Gemini ücretsiz olarak kullanılabilir.
+                <a href="https://ai.google.dev/pricing" target="_blank" rel="noopener noreferrer" className="text-brand hover:text-branddim underline"> ai.google.dev</a>'den API anahtarı alabilirsin.
                 Günde 1.5 milyon istek sınırı var.
               </p>
             </div>
@@ -863,8 +863,8 @@ export function SettingsModal() {
               </div>
             </div>
 
-            <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl text-xs text-blue-400/80 space-y-1.5">
-              <div className="font-semibold text-blue-400">MCP nedir?</div>
+            <div className="p-3 bg-brand/5 border border-brand/20 rounded-xl text-xs text-muted space-y-1.5">
+              <div className="font-semibold text-brand">MCP nedir?</div>
               <p>Model Context Protocol, Anthropic tarafından geliştirilen bir standarttır. Kendi araçlarını (veritabanı sorgu, dosya okuma, API çağrısı vb.) craft.ai&apos;ya bağlayarak AI&apos;ın bunları otomatik kullanmasını sağlar.</p>
               <p>Aktif sunucuların araçları, araç kullanımı açıkken her sohbette AI&apos;a sunulur.</p>
             </div>

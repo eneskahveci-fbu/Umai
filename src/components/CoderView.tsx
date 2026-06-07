@@ -796,7 +796,7 @@ export function CoderView() {
             <span className="hidden sm:flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-bgsoft border border-line/60 text-muted/70 font-mono">
               {repo.owner}/{repo.repo}
               <span className="text-muted/40">:</span>
-              <span className="text-cyan">{repo.branch}</span>
+              <span className="text-brand/80">{repo.branch}</span>
             </span>
           )}
         </div>
@@ -861,7 +861,7 @@ export function CoderView() {
             <button
               onClick={() => setPrModalOpen(true)}
               title="PR / MR inceleme"
-              className="w-8 h-8 rounded-lg grid place-items-center transition-colors text-muted hover:text-pink-400 hover:bg-pink-400/10"
+              className="w-8 h-8 rounded-lg grid place-items-center transition-colors text-muted hover:text-brand hover:bg-brand/10"
             >
               <GitPullRequest size={14} />
             </button>
@@ -869,7 +869,7 @@ export function CoderView() {
           <button
             onClick={() => useStore.getState().setSkillsOpen(true)}
             title="Skills — her sohbete eklenen bağlam"
-            className="w-8 h-8 rounded-lg grid place-items-center transition-colors text-muted hover:text-amber-400 hover:bg-amber-400/10"
+            className="w-8 h-8 rounded-lg grid place-items-center transition-colors text-muted hover:text-brand hover:bg-brand/10"
           >
             <Zap size={14} />
           </button>
@@ -1388,7 +1388,7 @@ export function CoderView() {
           <div className="w-full max-w-sm bg-surface border border-line rounded-2xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <GitPullRequest size={16} className="text-pink-400" />
+                <GitPullRequest size={16} className="text-brand" />
                 <h3 className="font-bold text-sm">PR / MR İnceleme</h3>
               </div>
               <button onClick={() => setPrModalOpen(false)} className="text-muted hover:text-ink"><X size={16} /></button>

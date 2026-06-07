@@ -42,16 +42,20 @@ pre, code, .font-mono { font-size: calc(0.8rem * var(--font-scale)); }
 
 /* ─── Light tema ─── */
 html.light {
-  --color-bg: #f4f0e8;
-  --color-bgsoft: #ede8de;
-  --color-surface: #faf7f2;
-  --color-surface2: #e5e0d5;
-  --color-line: #cec7bb;
+  --color-bg: #f2ece0;
+  --color-bgsoft: #e8e1d4;
+  --color-surface: #f8f3e8;
+  --color-surface2: #dfd8cc;
+  --color-line: #c4baa8;
   --color-ink: #1c1917;
-  --color-muted: #6e6358;
-  --color-brand: #8a6940;
-  --color-branddim: #7a5e38;
-  --color-accent: #a07840;
+  --color-muted: #6b5e50;
+  --color-brand: #7a5c30;
+  --color-branddim: #6a4e28;
+  --color-accent: #9a7040;
+  --color-cyan: #2c8c8c;
+  --color-yellow: #a07828;
+  --color-green: #2a8040;
+  --color-red: #c04040;
 }
 
 /* ─── Gradyanlar ─── */
@@ -188,7 +192,8 @@ body {
   font-size: 13.5px;
 }
 html.light .prose-chat pre {
-  background: #f0f0f4;
+  background: #e8e2d4;
+  border-color: var(--color-line);
 }
 .prose-chat pre code {
   background: transparent !important;

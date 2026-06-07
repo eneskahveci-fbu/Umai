@@ -84,7 +84,7 @@ export function KeyboardShortcuts() {
 
   return (
     <div
-      className="fixed inset-0 z-[55] bg-bg/75 backdrop-blur-sm grid place-items-center px-4 animate-modal-bg"
+      className="fixed inset-0 z-[55] bg-black/50 backdrop-blur-sm grid place-items-center px-4 animate-modal-bg"
       onClick={() => setOpen(false)}
     >
       <div

@@ -258,7 +258,7 @@ export function MessageBubble({
                 <div className="w-px h-3.5 bg-line/60 mx-0.5" />
                 <button
                   onClick={openSkillSave}
-                  className="flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg transition-colors text-muted hover:text-amber-400 hover:bg-bgsoft"
+                  className="flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg transition-colors text-muted hover:text-brand hover:bg-bgsoft"
                   title="Skill olarak kaydet"
                 >
                   <BookMarked size={12} />
@@ -271,9 +271,9 @@ export function MessageBubble({
 
         {/* Skill kaydet mini modal */}
         {skillSaveOpen && (
-          <div className="mt-3 border border-amber-400/25 bg-amber-400/4 rounded-xl p-3 space-y-2">
+          <div className="mt-3 border border-brand/25 bg-brand/5 rounded-xl p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-amber-400 flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold text-brand flex items-center gap-1.5">
                 <BookMarked size={11} /> Skill olarak kaydet
               </span>
               <button onClick={() => setSkillSaveOpen(false)} className="text-muted hover:text-ink transition-colors">
@@ -284,7 +284,7 @@ export function MessageBubble({
               value={skillTitle}
               onChange={(e) => setSkillTitle(e.target.value)}
               placeholder="Skill başlığı…"
-              className="w-full bg-bgsoft border border-line/60 rounded-lg px-2.5 py-1.5 text-[12px] outline-none focus:border-amber-400/50"
+              className="w-full bg-bgsoft border border-line/60 rounded-lg px-2.5 py-1.5 text-[12px] outline-none focus:border-brand/50"
               onKeyDown={(e) => { if (e.key === "Enter") saveSkill(); if (e.key === "Escape") setSkillSaveOpen(false); }}
               autoFocus
             />
@@ -292,7 +292,7 @@ export function MessageBubble({
               value={skillContent}
               onChange={(e) => setSkillContent(e.target.value)}
               rows={3}
-              className="w-full bg-bgsoft border border-line/60 rounded-lg px-2.5 py-1.5 text-[11px] font-mono outline-none focus:border-amber-400/50 resize-none"
+              className="w-full bg-bgsoft border border-line/60 rounded-lg px-2.5 py-1.5 text-[11px] font-mono outline-none focus:border-brand/50 resize-none"
             />
             <div className="flex gap-2 justify-end">
               <button onClick={() => setSkillSaveOpen(false)} className="text-[11px] px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink transition-colors">
@@ -301,7 +301,7 @@ export function MessageBubble({
               <button
                 onClick={saveSkill}
                 disabled={!skillTitle.trim()}
-                className="text-[11px] px-3 py-1 rounded-lg bg-amber-400/90 text-black font-semibold hover:bg-amber-400 disabled:opacity-40 transition-colors"
+                className="text-[11px] px-3 py-1 rounded-lg bg-brand text-[#111110] font-semibold hover:bg-branddim disabled:opacity-40 transition-colors"
               >
                 Kaydet
               </button>
