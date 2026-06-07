@@ -18,7 +18,7 @@ import type {
   ToolCallRecord,
   TreeNode,
 } from "./types";
-import { DEFAULT_CONFIG, DEFAULT_SKILLS } from "./constants";
+import { DEFAULT_CONFIG, DEFAULT_SKILLS, POLLINATIONS_DEFAULT_MODEL } from "./constants";
 import { createClient } from "./supabase/client";
 
 const CONFIG_KEY = "craftai_config";
@@ -81,7 +81,7 @@ const uid = () =>
 
 function loadConfig(): Config {
   const store = getStore();
-  if (!store) return DEFAULT_CONFIG;
+  if (!store) return { ...DEFAULT_CONFIG, models: [POLLINATIONS_DEFAULT_MODEL], activeModelId: POLLINATIONS_DEFAULT_MODEL.id };
   try {
     const raw = store.getItem(CONFIG_KEY);
     if (raw) {
@@ -110,6 +110,12 @@ function loadConfig(): Config {
       const missing = DEFAULT_SKILLS.filter((s) => !existingIds.has(s.id) && !removed.has(s.id));
       if (missing.length) {
         merged.skills = [...missing, ...existing];
+        try { store.setItem(CONFIG_KEY, JSON.stringify(merged)); } catch { /* yok say */ }
+      }
+      /* Eğer hiç model yoksa, ücretsiz Pollinations modelini tohum olarak ekle */
+      if (!Array.isArray(merged.models) || merged.models.length === 0) {
+        merged.models = [POLLINATIONS_DEFAULT_MODEL];
+        merged.activeModelId = POLLINATIONS_DEFAULT_MODEL.id;
         try { store.setItem(CONFIG_KEY, JSON.stringify(merged)); } catch { /* yok say */ }
       }
       return merged;

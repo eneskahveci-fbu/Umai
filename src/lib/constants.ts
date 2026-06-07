@@ -68,6 +68,12 @@ export const PRESETS: Record<Provider, Preset> = {
     model: "grok-2-latest",
     keyHint: "xai-...",
   },
+  pollinations: {
+    label: "✦ Pollinations (Ücretsiz · Gömülü)",
+    baseUrl: "https://text.pollinations.ai/openai",
+    model: "openai",
+    keyHint: "(API anahtarı gerekmez)",
+  },
   ollama: {
     label: "💻 Ollama (Yerel / Ücretsiz)",
     baseUrl: "http://localhost:11434/v1",
@@ -145,6 +151,14 @@ export const PROVIDER_MODELS: Record<Provider, string[]> = {
     "mistralai/Mixtral-8x7B-Instruct-v0.1",
   ],
   xai: ["grok-2-latest", "grok-2-vision-latest", "grok-beta"],
+  pollinations: [
+    "openai",
+    "openai-large",
+    "openai-fast",
+    "qwen-coder",
+    "mistral",
+    "llama",
+  ],
   ollama: [
     "qwen2.5-coder:7b",
     "qwen2.5-coder:14b",
@@ -367,6 +381,15 @@ export const DEFAULT_SKILLS: Skill[] = [
       "- \"Tamamlandı\" demeden önce derleme/lint/test'in temiz olduğundan emin ol; hedeflenen davranışı gözlemle.",
   },
 ];
+
+export const POLLINATIONS_DEFAULT_MODEL: import("./types").ModelProfile = {
+  id: "craft-default-pollinations",
+  label: "✦ Craft Default (Ücretsiz)",
+  provider: "pollinations",
+  baseUrl: "https://text.pollinations.ai/openai",
+  model: "openai",
+  apiKey: "",
+};
 
 export const DEFAULT_CONFIG: Config = {
   models: [],

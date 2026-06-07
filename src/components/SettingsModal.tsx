@@ -116,7 +116,7 @@ export function SettingsModal() {
     const key = apiKey.trim();
     const url = baseUrl.trim();
     if (!url || (key.length > 0 && key.length < 8)) return;
-    if (provider !== "ollama" && provider !== "custom" && key.length === 0) return;
+    if (provider !== "ollama" && provider !== "custom" && provider !== "pollinations" && key.length === 0) return;
     const t = setTimeout(() => {
       fetch("/api/models", {
         method: "POST",
