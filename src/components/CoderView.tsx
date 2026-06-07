@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowDown,
   ArrowUp,
@@ -139,6 +140,43 @@ function ThinkingModeToggle() {
     setOpen((o) => !o);
   };
 
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!btnRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const dropdown = open ? (
+    <div
+      style={{ top: pos.top, right: pos.right, position: "fixed", zIndex: 9999 }}
+      className="bg-surface border border-line rounded-xl shadow-2xl shadow-black/50 p-1 min-w-[140px] animate-fade-in"
+    >
+      <div className="text-[9px] font-bold uppercase tracking-widest text-muted/50 px-2 pt-1 pb-1.5">Düşünce Derinliği</div>
+      {THINKING_LEVELS.map((l) => (
+        <button
+          key={l.key}
+          onClick={() => { setThinkingMode(l.key); setOpen(false); }}
+          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[12px] transition-colors ${
+            thinkingMode === l.key
+              ? "bg-brand/15 text-brand font-semibold"
+              : "text-muted hover:text-ink hover:bg-bgsoft"
+          }`}
+        >
+          <span>{l.label}</span>
+          {thinkingMode === l.key && <span className="text-[9px] text-brand/60">●</span>}
+        </button>
+      ))}
+    </div>
+  ) : null;
+
   return (
     <div className="relative">
       <button
@@ -151,29 +189,7 @@ function ThinkingModeToggle() {
         <span className="hidden sm:inline">{current.label}</span>
         <span className="sm:hidden">{current.short}</span>
       </button>
-      {open && (
-        <div
-          style={{ top: pos.top, right: pos.right }}
-          className="fixed z-[70] bg-surface border border-line rounded-xl shadow-xl p-1 min-w-[130px] animate-fade-in"
-          onMouseLeave={() => setOpen(false)}
-        >
-          <div className="text-[9px] font-bold uppercase tracking-widest text-muted/50 px-2 pt-1 pb-1.5">Düşünce Derinliği</div>
-          {THINKING_LEVELS.map((l) => (
-            <button
-              key={l.key}
-              onClick={() => { setThinkingMode(l.key); setOpen(false); }}
-              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[12px] transition-colors ${
-                thinkingMode === l.key
-                  ? "bg-brand/15 text-brand font-semibold"
-                  : "text-muted hover:text-ink hover:bg-bgsoft"
-              }`}
-            >
-              <span>{l.label}</span>
-              {thinkingMode === l.key && <span className="text-[9px] text-brand/60">●</span>}
-            </button>
-          ))}
-        </div>
-      )}
+      {typeof document !== "undefined" && createPortal(dropdown, document.body)}
     </div>
   );
 }
