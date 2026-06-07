@@ -14,6 +14,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 
+
 const FEATURES = [
   {
     icon: <MessageSquare size={20} />,
@@ -28,11 +29,11 @@ const FEATURES = [
   {
     icon: <Code2 size={20} />,
     title: "Coder Sekmesi",
-    desc: "GitHub deposuna bağlan, dosyaları gez, içeriği sohbete gönderip kod sor. Diff görünümü ile değişiklikleri karşılaştır.",
+    desc: "GitLab deposuna bağlan, dosyaları gez, içeriği sohbete gönderip kod sor. Diff görünümü ile değişiklikleri karşılaştır.",
   },
   {
     icon: <GitBranch size={20} />,
-    title: "Çoklu GitHub Hesabı",
+    title: "Çoklu Repo Desteği",
     desc: "Birden fazla token ekle, özel depolara eriş, repo'lar arası geçiş yap. Tek tıkla commit & push.",
   },
   {
@@ -84,13 +85,13 @@ const HOW_IT_WORKS = [
   {
     step: "2",
     title: "Sohbet Et veya Kod Yaz",
-    desc: "Chat sekmesinde soru sor, Coder sekmesinde GitHub deposunu aç — dosyaları okuyup kod üret.",
+    desc: "Chat sekmesinde soru sor, Coder sekmesinde deposunu aç — dosyaları okuyup kod üret.",
     icon: <MessageSquare size={22} />,
   },
   {
     step: "3",
     title: "Deploy Et",
-    desc: "Oluşturulan kodu diff'le karşılaştır, tek tıkla GitHub'a commit at ve canlıya al.",
+    desc: "Oluşturulan kodu diff'le karşılaştır, tek tıkla commit at ve canlıya al.",
     icon: <Zap size={22} />,
   },
 ];
@@ -109,8 +110,8 @@ const FAQS = [
     a: "API anahtarların yalnızca tarayıcında (localStorage veya gizli modda sessionStorage) saklanır. Sohbet geçmişi için isteğe bağlı Supabase entegrasyonu var; kullanmak zorunda değilsin.",
   },
   {
-    q: "GitHub entegrasyonu nasıl çalışıyor?",
-    a: "Coder sekmesinde GitHub personal access token'ınla giriş yaparsın. Repo'ları gezebilir, dosya içeriklerini sohbete gönderebilir, kod değişikliklerini commit edebilirsin.",
+    q: "Coder entegrasyonu nasıl çalışıyor?",
+    a: "Coder sekmesinde GitLab ya da uyumlu bir servisin personal access token'ınla giriş yaparsın. Repo'ları gezebilir, dosya içeriklerini sohbete gönderebilir, kod değişikliklerini commit edebilirsin.",
   },
   {
     q: "Mobilde çalışıyor mu?",
@@ -119,7 +120,7 @@ const FAQS = [
 ];
 
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://craft-ai-web.vercel.app";
+  process.env.NEXT_PUBLIC_SITE_URL || "https://craft-coder.vercel.app";
 
 const JSON_LD_APP = {
   "@context": "https://schema.org",
@@ -139,7 +140,7 @@ const JSON_LD_APP = {
   },
   featureList: [
     "Çoklu model desteği",
-    "GitHub Coder entegrasyonu",
+    "Coder entegrasyonu",
     "Gizli sohbet modu",
     "PWA desteği",
     "Supabase senkron",
@@ -178,14 +179,6 @@ export default function Home() {
             craft<span className="brand-text">.ai</span>
           </div>
           <div className="flex items-center gap-3">
-            <a
-              href="https://gitlab.com/eneskahveci.bs/craft-ai-web"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden sm:inline text-sm text-muted hover:text-ink transition-colors"
-            >
-              GitLab
-            </a>
             <Link
               href="/app"
               className="flex items-center gap-1.5 bg-brand hover:bg-branddim text-white font-semibold px-4 py-2 rounded-xl text-sm transition-colors"
@@ -225,14 +218,6 @@ export default function Home() {
           >
             ⚡ Hemen Başla
           </Link>
-          <a
-            href="https://gitlab.com/eneskahveci.bs/craft-ai-web"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 border border-line hover:border-brand/50 px-7 py-3.5 rounded-2xl font-semibold transition-all duration-200"
-          >
-            ☁ GitLab&apos;da Gör
-          </a>
         </div>
 
         {/* Stats */}
@@ -390,14 +375,6 @@ export default function Home() {
             <Link href="/privacy" className="hover:text-brand transition-colors">Gizlilik Politikası</Link>
             <Link href="/terms" className="hover:text-brand transition-colors">Kullanım Şartları</Link>
             <Link href="/cookies" className="hover:text-brand transition-colors">Çerez Politikası</Link>
-            <a
-              href="https://gitlab.com/eneskahveci.bs/craft-ai-web"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-brand transition-colors"
-            >
-              GitLab
-            </a>
             <a href="mailto:eneskahveci.bs@gmail.com" className="hover:text-brand transition-colors">İletişim</a>
           </div>
           <p className="text-xs text-muted/60 mt-4">© 2026 Enes Kahveci · Tüm hakları saklıdır.</p>
