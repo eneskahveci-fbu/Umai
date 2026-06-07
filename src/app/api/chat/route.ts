@@ -313,18 +313,15 @@ export async function POST(req: Request) {
 
   const upstreamHeaders: Record<string, string> = {
     "Content-Type": "application/json",
+    ...(provider === "anthropic"
+      ? { "anthropic-version": "2023-06-01", "x-api-key": apiKey }
+      : { Authorization: `Bearer ${apiKey}` }),
   };
   if (apiKey) upstreamHeaders["Authorization"] = `Bearer ${apiKey}`;
 
   if (provider === "openrouter") {
     upstreamHeaders["HTTP-Referer"] = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://craft-ai-web.vercel.app";
     upstreamHeaders["X-Title"] = "craft.ai";
-  }
-
-  if (provider === "anthropic") {
-    upstreamHeaders["anthropic-version"] = "2023-06-01";
-    upstreamHeaders["x-api-key"] = apiKey;
-    delete upstreamHeaders["Authorization"];
   }
 
   let sysPrompt = body.systemPrompt || DEFAULT_SYSTEM_PROMPT;
