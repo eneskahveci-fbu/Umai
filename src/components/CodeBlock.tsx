@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BookmarkPlus, Check, ChevronDown, ChevronUp, Copy, Eye, GitCompareArrows } from "lucide-react";
+import { BookmarkPlus, Check, ChevronDown, ChevronUp, Copy, Eye, GitCompareArrows, Play } from "lucide-react";
 import { useStore } from "@/lib/store";
 
 const COLLAPSE_LINE_THRESHOLD = 30;
@@ -33,6 +33,7 @@ export function CodeBlock({
     .trim();
 
   const isPreviewable = ["html", "svg", "htm", "mermaid"].includes(lang);
+  const isRunnable = ["bash", "sh", "shell", "zsh"].includes(lang);
 
   const getText = () => preRef.current?.textContent || "";
 
@@ -64,6 +65,13 @@ export function CodeBlock({
     setTimeout(() => setSaved(false), 1800);
   };
 
+  const runInTerminal = () => {
+    const code = getText().trim();
+    if (!code) return;
+    window.dispatchEvent(new CustomEvent("craftai:terminal-run", { detail: { command: code } }));
+    useStore.getState().addToast("Terminal'e gönderildi", "success");
+  };
+
   const showDiff = () => {
     const newCode = getText();
     /* find an attached file with same language or just take the first */
@@ -93,6 +101,11 @@ export function CodeBlock({
           {isPreviewable && (
             <button onClick={preview} className="flex items-center gap-1 hover:text-brand transition-colors">
               <Eye size={12} /> Önizle
+            </button>
+          )}
+          {isRunnable && (
+            <button onClick={runInTerminal} className="flex items-center gap-1 hover:text-green transition-colors" title="Terminal'de çalıştır">
+              <Play size={12} /> Çalıştır
             </button>
           )}
           <button onClick={showDiff} className="flex items-center gap-1 hover:text-brand transition-colors" title="Bir dosya ile karşılaştır">

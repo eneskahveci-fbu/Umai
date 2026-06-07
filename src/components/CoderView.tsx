@@ -322,6 +322,8 @@ export function CoderView() {
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [searchOn, setSearchOn] = useState(false);
+  const searchOnRef = useRef(false);
+  useEffect(() => { searchOnRef.current = searchOn; }, [searchOn]);
   const [repoSearch, setRepoSearch] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [fetchingFile, setFetchingFile] = useState<string | null>(null);
@@ -430,6 +432,21 @@ export function CoderView() {
     });
   }, [config.autoTerminal]);
 
+  /* Listen for terminal output events — auto-send to AI as follow-up context */
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { command, output } = (e as CustomEvent<{ command: string; output: string }>).detail ?? {};
+      if (!output) return;
+      const msg = `**Terminal çıktısı** (\`${command}\`):\n\`\`\`\n${output}\n\`\`\``;
+      useStore.getState().pushMessage({ role: "user", content: msg });
+      void callApi();
+    };
+    window.addEventListener("craftai:terminal-output", handler);
+    return () => window.removeEventListener("craftai:terminal-output", handler);
+  // callApi is stable (useCallback with no deps that change), safe to omit from deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const attachRepoFile = async (file: TreeFile) => {
     if (attachedFiles.find((f) => f.path === file.path)) {
       setAttachedFiles((prev) => prev.filter((f) => f.path !== file.path));
@@ -511,7 +528,7 @@ export function CoderView() {
         ? AGENTS.find((a) => a.id === messageAgentId) ?? null
         : null;
 
-    const apiMessages = (chat?.messages ?? []).map((m) => {
+    const rawMessages = (chat?.messages ?? []).map((m) => {
       if (m.images?.length) {
         const content: unknown[] = m.images.map((img) => ({ type: "image_url", image_url: { url: img } }));
         content.push({ type: "text", text: m.content });
@@ -519,6 +536,14 @@ export function CoderView() {
       }
       return { role: m.role, content: m.content };
     });
+    /* Context window management: keep last 24 messages to avoid token overflow */
+    const MAX_CTX = 24;
+    const apiMessages = rawMessages.length > MAX_CTX
+      ? [
+          { role: "system" as const, content: `[Bağlam notu: Bu sohbet ${rawMessages.length} mesaj içeriyor. Token sınırı nedeniyle yalnızca son ${MAX_CTX} mesaj gönderiliyor.]` },
+          ...rawMessages.slice(-MAX_CTX),
+        ]
+      : rawMessages;
 
     const activeProject = config.projects.find((p) => p.id === config.activeProjectId);
     const coderSystemPrompt = [
@@ -557,6 +582,18 @@ export function CoderView() {
     const activeRepo = store.config.activeRepo || "";
     const repoIsGitLab = isGitLabRepo(activeRepo);
 
+    /* Web search pre-fetch: when searchOn, fetch Jina results before sending to AI */
+    let webSearchContext = "";
+    if (searchOnRef.current) {
+      const userQuery = lastUserMsg?.content ?? "";
+      try {
+        const wsr = await fetch(`/api/web-search?q=${encodeURIComponent(userQuery)}`, {
+          signal: AbortSignal.timeout(12000),
+        });
+        if (wsr.ok) webSearchContext = await wsr.text();
+      } catch { /* ignore — continue without search */ }
+    }
+
     try {
       const allEnabledSkills = (store.config.skills ?? []).filter((s) => s.enabled);
       /* Relevance scoring: compare skill text against the last user message.
@@ -589,6 +626,7 @@ export function CoderView() {
           if (manualSkills.length) sysContent += `\n\n[Eğitim seti]:\n${manualSkills.map((s) => `### ${s.title}\n${s.content}`).join("\n\n")}`;
           if (fileSkills.length) sysContent += `\n\n[Referans dosyalar]:\n${fileSkills.map((s) => `--- ${s.fileName || s.title} ---\n${s.content}`).join("\n\n")}`;
         }
+        if (webSearchContext) sysContent += `\n\n[Web arama sonuçları]:\n${webSearchContext}`;
         const makePolBody = (modelName: string) => JSON.stringify({
           model: modelName,
           messages: [{ role: "system", content: sysContent }, ...apiMessages],
@@ -642,6 +680,8 @@ export function CoderView() {
               title: s.title, content: s.content, tags: s.tags, source: s.source, fileName: s.fileName,
             })),
             tools: toolsEnabled,
+            webSearch: searchOnRef.current,
+            searchContext: webSearchContext || undefined,
             repoCtx: toolsEnabled && repo ? {
               owner: repo.owner,
               repo: repo.repo,
