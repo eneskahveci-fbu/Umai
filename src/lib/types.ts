@@ -63,6 +63,7 @@ export type Provider =
   | "xai"
   | "ollama"
   | "anthropic"
+  | "pollinations"
   | "custom";
 
 export interface ModelProfile {

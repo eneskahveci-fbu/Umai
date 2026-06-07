@@ -530,15 +530,16 @@ export async function POST(req: Request) {
   const keyless = provider === "pollinations" || provider === "ollama" || provider === "custom";
 
   if (!model) return new Response("Model seçilmedi.", { status: 400 });
-  if (!apiKey && !keyless) return new Response("API anahtarı yok.", { status: 400 });
+  /* pollinations ve ollama API anahtarı gerektirmez */
+  if (!apiKey && provider !== "pollinations" && provider !== "ollama") return new Response("API anahtarı yok.", { status: 400 });
 
-  const upstreamHeaders: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(provider === "anthropic"
-      ? { "anthropic-version": "2023-06-01", "x-api-key": apiKey }
-      : { Authorization: `Bearer ${apiKey}` }),
-  };
-  if (apiKey) upstreamHeaders["Authorization"] = `Bearer ${apiKey}`;
+  const upstreamHeaders: Record<string, string> = { "Content-Type": "application/json" };
+  if (provider === "anthropic") {
+    upstreamHeaders["anthropic-version"] = "2023-06-01";
+    upstreamHeaders["x-api-key"] = apiKey;
+  } else if (apiKey) {
+    upstreamHeaders["Authorization"] = `Bearer ${apiKey}`;
+  }
 
   if (provider === "openrouter") {
     upstreamHeaders["HTTP-Referer"] = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://craft-ai-web.vercel.app";
