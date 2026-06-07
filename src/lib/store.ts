@@ -236,6 +236,8 @@ interface StoreState {
   selectChat: (id: string) => void;
   deleteChat: (id: string) => Promise<void>;
   renameChat: (id: string, title: string) => void;
+  tagChat: (id: string, tags: string[]) => void;
+  pinChat: (id: string, pinned: boolean) => void;
   current: () => Chat | null;
   pushMessage: (m: ChatMessage) => void;
   updateLastContent: (content: string) => void;
@@ -642,6 +644,16 @@ export const useStore = create<StoreState>()((set, get) => ({
     } else {
       saveLocalChats(get().chats);
     }
+  },
+
+  tagChat: (id, tags) => {
+    set((s) => ({ chats: s.chats.map((c) => (c.id === id ? { ...c, tags } : c)) }));
+    saveLocalChats(get().chats);
+  },
+
+  pinChat: (id, pinned) => {
+    set((s) => ({ chats: s.chats.map((c) => (c.id === id ? { ...c, pinned } : c)) }));
+    saveLocalChats(get().chats);
   },
 
   current: () => {
