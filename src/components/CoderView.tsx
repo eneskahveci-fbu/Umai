@@ -11,7 +11,6 @@ import {
   GitBranch,
   ChevronRight,
   Code2,
-  DollarSign,
   File,
   FolderGit2,
   FolderOpen,
