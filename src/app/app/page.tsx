@@ -50,8 +50,8 @@ export default function AppPage() {
     const { theme, accentColor, fontScale } = useStore.getState().config;
     const cl = document.documentElement.classList;
     cl.toggle("light", theme === "light");
-    cl.remove("accent-purple", "accent-blue", "accent-green", "accent-orange");
-    cl.add(`accent-${accentColor ?? "purple"}`);
+    cl.remove("accent-amber", "accent-purple", "accent-blue", "accent-green", "accent-orange");
+    cl.add(`accent-${accentColor ?? "amber"}`);
     cl.remove("font-sm", "font-base", "font-lg");
     cl.add(`font-${fontScale ?? "base"}`);
   }, []);

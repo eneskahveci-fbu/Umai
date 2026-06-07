@@ -7,12 +7,14 @@ import {
   FolderOpen,
   FolderPlus,
   MessageSquare,
+  Moon,
   Pencil,
   Pin,
   Plus,
   Search,
   Settings,
   Share2,
+  Sun,
   Tag,
   Trash2,
   X,
@@ -352,17 +354,35 @@ export function Sidebar() {
       {/* Bottom */}
       <div className="border-t border-line/60 shrink-0">
         <div className="px-3 pt-3 pb-2 space-y-1">
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border border-line/60 hover:border-brand/40 hover:bg-bgsoft text-sm text-muted hover:text-ink transition-colors"
-          >
-            <Settings size={14} /> Ayarlar
-          </button>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="flex-1 flex items-center gap-2.5 px-3 py-2 rounded-xl border border-line/60 hover:border-brand/40 hover:bg-bgsoft text-sm text-muted hover:text-ink transition-colors"
+            >
+              <Settings size={14} /> Ayarlar
+            </button>
+            <ThemeToggle />
+          </div>
           <AuthButton />
         </div>
         <DevCredit />
       </div>
     </aside>
+  );
+}
+
+function ThemeToggle() {
+  const config = useStore((s) => s.config);
+  const toggleTheme = useStore((s) => s.toggleTheme);
+  const isDark = config.theme !== "light";
+  return (
+    <button
+      onClick={toggleTheme}
+      title={isDark ? "Açık temaya geç" : "Koyu temaya geç"}
+      className="flex items-center justify-center w-10 rounded-xl border border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-brand transition-colors shrink-0"
+    >
+      {isDark ? <Sun size={14} /> : <Moon size={14} />}
+    </button>
   );
 }
 

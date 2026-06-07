@@ -171,7 +171,7 @@ export function EditorPanel({
         {selection && onAskAI && (
           <button
             onClick={() => onAskAI(selection, `Dosya: ${file.path}\n\`\`\`${file.language}\n${selection}\n\`\`\``)}
-            className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-colors font-semibold"
+            className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg bg-brand/10 text-brand hover:bg-brand/15 transition-colors font-semibold"
             title="Seçili kodu AI'ya sor"
           >
             <Sparkles size={12} /> AI&apos;ya Sor
