@@ -151,6 +151,7 @@ interface StoreState {
 
   config: Config;
   saveConfig: (c: Config) => void;
+  syncConfig: (userId: string) => Promise<void>;
   addModel: (m: Omit<ModelProfile, "id">) => void;
   updateModel: (id: string, patch: Partial<ModelProfile>) => void;
   removeModel: (id: string) => void;
@@ -311,6 +312,42 @@ export const useStore = create<StoreState>()((set, get) => ({
       applyTheme(c.theme);
     }
     set({ config: c });
+    /* Supabase'e fire-and-forget senkron (giriş yapıldıysa) */
+    const { userId } = get();
+    if (userId) {
+      const sb = createClient();
+      if (sb) {
+        void sb.from("user_config").upsert({
+          user_id: userId,
+          config: c,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    }
+  },
+  syncConfig: async (userId) => {
+    const sb = createClient();
+    if (!sb) return;
+    const { data } = await sb
+      .from("user_config")
+      .select("config")
+      .eq("user_id", userId)
+      .single();
+    if (data?.config) {
+      /* Uzak config var → uygula (farklı tarayıcıdan gelen ayarlar) */
+      const remote = data.config as Config;
+      applyTheme(remote.theme ?? "dark");
+      const store = getStore();
+      if (store) store.setItem(CONFIG_KEY, JSON.stringify(remote));
+      set({ config: remote });
+    } else {
+      /* İlk giriş → yerel config'i Supabase'e kaydet */
+      void sb.from("user_config").upsert({
+        user_id: userId,
+        config: get().config,
+        updated_at: new Date().toISOString(),
+      });
+    }
   },
   addModel: (m) => {
     const model: ModelProfile = { ...m, id: uid() };
