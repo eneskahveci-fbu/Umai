@@ -106,28 +106,47 @@ export function RightPanel(props: RightPanelProps) {
         )}
       </div>
 
-      {/* Active tool */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        {active === "editor" && props.editorFile && (
-          <ErrorBoundary variant="inline" label="Editör çöktü">
-            <EditorPanel
-              file={props.editorFile}
-              onClose={props.onCloseEditor}
-              onAskAI={props.onAskAI}
-            />
-          </ErrorBoundary>
-        )}
-        {active === "git" && (
-          <ErrorBoundary variant="inline" label="Git paneli çöktü">
-            <GitPanel onClose={props.onCloseGit} />
-          </ErrorBoundary>
-        )}
-        {active === "artifact" && props.artifact && (
-          <ErrorBoundary variant="inline" label="Önizleme çöktü">
-            <ArtifactPanel />
-          </ErrorBoundary>
-        )}
-      </div>
+      {/* Active tool — split view when editor + artifact are both open */}
+      {props.editorOpen && props.editorFile && props.artifact ? (
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden border-b border-line/60">
+            <ErrorBoundary variant="inline" label="Editör çöktü">
+              <EditorPanel
+                file={props.editorFile}
+                onClose={props.onCloseEditor}
+                onAskAI={props.onAskAI}
+              />
+            </ErrorBoundary>
+          </div>
+          <div className="h-[45%] shrink-0 overflow-hidden">
+            <ErrorBoundary variant="inline" label="Önizleme çöktü">
+              <ArtifactPanel />
+            </ErrorBoundary>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {active === "editor" && props.editorFile && (
+            <ErrorBoundary variant="inline" label="Editör çöktü">
+              <EditorPanel
+                file={props.editorFile}
+                onClose={props.onCloseEditor}
+                onAskAI={props.onAskAI}
+              />
+            </ErrorBoundary>
+          )}
+          {active === "git" && (
+            <ErrorBoundary variant="inline" label="Git paneli çöktü">
+              <GitPanel onClose={props.onCloseGit} />
+            </ErrorBoundary>
+          )}
+          {active === "artifact" && props.artifact && (
+            <ErrorBoundary variant="inline" label="Önizleme çöktü">
+              <ArtifactPanel />
+            </ErrorBoundary>
+          )}
+        </div>
+      )}
     </div>
   );
 }
