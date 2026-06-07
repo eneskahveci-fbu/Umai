@@ -41,6 +41,7 @@ interface ChatRequest {
   searchContext?: string;
   projectPrompt?: string;
   tools?: boolean;
+  webSearch?: boolean;
   repoCtx?: RepoCtx;
   mcpServers?: McpServerConfig[];
 }
@@ -388,6 +389,28 @@ async function executeTool(
     if (name === "list_branches") return await execListBranches(ctx!);
     if (name === "create_branch") return await execCreateBranch(ctx!, args as { name: string; from?: string });
     if (name === "get_commit_history") return await execGetCommitHistory(ctx!, args as { limit?: string; path?: string });
+    if (name === "web_search") {
+      const query = String(args.query ?? "");
+      try {
+        const res = await fetch(`https://s.jina.ai/${encodeURIComponent(query)}`, {
+          headers: { "Accept": "text/plain", "X-Return-Format": "text" },
+          signal: AbortSignal.timeout(12000),
+        });
+        const text = await res.text();
+        return text.slice(0, 6000) || "Sonuç bulunamadı.";
+      } catch { return "Web araması başarısız oldu."; }
+    }
+    if (name === "read_url") {
+      const url = String(args.url ?? "");
+      try {
+        const res = await fetch(`https://r.jina.ai/${url}`, {
+          headers: { "Accept": "text/plain", "X-Return-Format": "text" },
+          signal: AbortSignal.timeout(15000),
+        });
+        const text = await res.text();
+        return text.slice(0, 8000) || "Sayfa boş döndü.";
+      } catch { return "URL okunamadı."; }
+    }
     /* Try MCP servers for unknown tools */
     for (const srv of (mcpServers ?? [])) {
       if (!srv.enabled) continue;
@@ -591,7 +614,7 @@ export async function POST(req: Request) {
   }
 
   /* Tool-use disabled: simple passthrough */
-  if (!body.tools || !body.repoCtx) {
+  if (!body.tools && !body.webSearch) {
     const messages = [{ role: "system", content: sysPrompt }, ...body.messages];
     let upstream: Response;
     const url = `${baseUrl}/chat/completions`;
@@ -625,8 +648,35 @@ export async function POST(req: Request) {
   const mcpToolDefs = (await Promise.all(
     activeMcpServers.map((srv) => fetchMcpTools(srv)),
   )).flat();
+  const WEB_TOOLS = [
+    {
+      type: "function" as const,
+      function: {
+        name: "web_search",
+        description: "Web'de arama yapar. Güncel bilgi, haber, dökümantasyon veya herhangi bir konu hakkında internette arama yap.",
+        parameters: {
+          type: "object" as const,
+          properties: { query: { type: "string", description: "Arama sorgusu" } },
+          required: ["query"],
+        },
+      },
+    },
+    {
+      type: "function" as const,
+      function: {
+        name: "read_url",
+        description: "Bir web sayfasını okur ve içeriğini döndürür. web_search sonucundaki linkleri okumak için kullan.",
+        parameters: {
+          type: "object" as const,
+          properties: { url: { type: "string", description: "Okunacak URL (tam adres)" } },
+          required: ["url"],
+        },
+      },
+    },
+  ];
   const allTools = [
-    ...CODER_TOOLS,
+    ...(body.tools && body.repoCtx ? CODER_TOOLS : []),
+    ...(body.webSearch ? WEB_TOOLS : []),
     ...mcpToolDefs.map((t) => ({
       type: "function" as const,
       function: { name: t.name, description: t.description, parameters: t.parameters },
@@ -636,7 +686,7 @@ export async function POST(req: Request) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      const MAX_ROUNDS = 6;
+      const MAX_ROUNDS = 25;
       const url = `${baseUrl}/chat/completions`;
       for (let round = 0; round < MAX_ROUNDS; round++) {
         let upstream: Response;

@@ -109,9 +109,34 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
       const writer = proc.input.getWriter();
 
       term.onData((d) => writer.write(d));
+
+      /* Capture output for AI feedback */
+      let outputBuffer = "";
       proc.output.pipeTo(new WritableStream({
-        write: (chunk) => term.write(chunk),
+        write: (chunk) => {
+          term.write(chunk);
+          outputBuffer += chunk;
+          if (outputBuffer.length > 4000) outputBuffer = outputBuffer.slice(-4000);
+        },
       })).catch(() => { /* terminal closed */ });
+
+      /* Listen for AI-generated run-command events */
+      const handleRunCmd = (e: Event) => {
+        const cmd = (e as CustomEvent<{ command: string }>).detail?.command;
+        if (!cmd) return;
+        /* Write command visually then execute */
+        writer.write(cmd + "\n");
+        /* After a brief delay, emit the captured output back to chat */
+        setTimeout(() => {
+          const out = outputBuffer.slice(-2000).trim();
+          if (out) {
+            window.dispatchEvent(new CustomEvent("craftai:terminal-output", {
+              detail: { command: cmd, output: out },
+            }));
+          }
+        }, 3000);
+      };
+      window.addEventListener("craftai:terminal-run", handleRunCmd);
 
       const resize = () => {
         fit.fit();
@@ -124,6 +149,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
       setStatus("ready");
 
       cleanupRef.current = () => {
+        window.removeEventListener("craftai:terminal-run", handleRunCmd);
         window.removeEventListener("resize", resize);
         ro.disconnect();
         try { writer.releaseLock(); } catch { /* ignore */ }
