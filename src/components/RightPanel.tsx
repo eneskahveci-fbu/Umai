@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { FileCode2, GitBranch, Sparkles, X } from "lucide-react";
 import type { EditorFile } from "@/lib/editor";
@@ -36,33 +36,37 @@ export function RightPanel(props: RightPanelProps) {
   const firstAvailable = tabs.find((t) => t.available)?.id ?? null;
   const [active, setActive] = useState<Tool | null>(firstAvailable);
 
-  /* Auto-fallback when the current tool closes */
-  useEffect(() => {
-    if (active && tabs.find((t) => t.id === active)?.available) return;
-    setActive(firstAvailable);
-  }, [tabs, active, firstAvailable]);
+  /* The effective tab: the user's choice when it's still open, otherwise the
+     first available tool. Derived during render so it stays in sync with tab
+     availability without an extra state-syncing effect. */
+  const effectiveActive =
+    active && tabs.find((t) => t.id === active)?.available ? active : firstAvailable;
 
-  /* Auto-switch to newly opened tool */
-  const prevOpen = useRefBag({
+  /* Auto-switch to a tool the moment it transitions from closed → open.
+     The previous-open snapshot is read/written inside the effect (never during
+     render) so concurrent re-renders stay safe. */
+  const prevOpen = useRef({
     editor: props.editorOpen,
     git: props.gitOpen,
     artifact: !!props.artifact,
   });
   useEffect(() => {
-    if (props.editorOpen && !prevOpen.editor) setActive("editor");
-    if (props.gitOpen && !prevOpen.git) setActive("git");
-    if (props.artifact && !prevOpen.artifact) setActive("artifact");
-  }, [props.editorOpen, props.gitOpen, props.artifact, prevOpen]);
+    const cur = { editor: props.editorOpen, git: props.gitOpen, artifact: !!props.artifact };
+    if (cur.editor && !prevOpen.current.editor) setActive("editor");
+    if (cur.git && !prevOpen.current.git) setActive("git");
+    if (cur.artifact && !prevOpen.current.artifact) setActive("artifact");
+    prevOpen.current = cur;
+  }, [props.editorOpen, props.gitOpen, props.artifact]);
 
   if (!firstAvailable) return null;
 
   /* Split view: show editor + preview side-by-side unless user switched to Git */
   const splitView =
-    props.editorOpen && props.editorFile && props.artifact && active !== "git";
+    props.editorOpen && props.editorFile && props.artifact && effectiveActive !== "git";
 
   const closeActive = () => {
-    if (active === "editor") props.onCloseEditor();
-    else if (active === "git") props.onCloseGit();
+    if (effectiveActive === "editor") props.onCloseEditor();
+    else if (effectiveActive === "git") props.onCloseGit();
   };
 
   return (
@@ -83,7 +87,7 @@ export function RightPanel(props: RightPanelProps) {
           /* In split view, editor AND artifact tabs both appear active */
           const isActive = splitView
             ? t.id === "editor" || t.id === "artifact"
-            : t.id === active;
+            : t.id === effectiveActive;
           return (
             <button
               key={t.id}
@@ -101,7 +105,7 @@ export function RightPanel(props: RightPanelProps) {
         })}
         <div className="flex-1" />
         {/* X button: in split view close editor; in single view close active */}
-        {(splitView || (active && active !== "artifact")) && (
+        {(splitView || (effectiveActive && effectiveActive !== "artifact")) && (
           <button
             onClick={splitView ? props.onCloseEditor : closeActive}
             aria-label="Kapat"
@@ -135,7 +139,7 @@ export function RightPanel(props: RightPanelProps) {
       ) : (
         /* Single tool view */
         <div className="flex-1 min-h-0 overflow-hidden">
-          {active === "editor" && props.editorFile && (
+          {effectiveActive === "editor" && props.editorFile && (
             <ErrorBoundary variant="inline" label="Editör çöktü">
               <EditorPanel
                 file={props.editorFile}
@@ -144,12 +148,12 @@ export function RightPanel(props: RightPanelProps) {
               />
             </ErrorBoundary>
           )}
-          {active === "git" && (
+          {effectiveActive === "git" && (
             <ErrorBoundary variant="inline" label="Git paneli çöktü">
               <GitPanel onClose={props.onCloseGit} />
             </ErrorBoundary>
           )}
-          {active === "artifact" && props.artifact && (
+          {effectiveActive === "artifact" && props.artifact && (
             <ErrorBoundary variant="inline" label="Önizleme çöktü">
               <ArtifactPanel />
             </ErrorBoundary>
@@ -158,12 +162,4 @@ export function RightPanel(props: RightPanelProps) {
       )}
     </div>
   );
-}
-
-import { useRef } from "react";
-function useRefBag<T extends Record<string, boolean>>(values: T): T {
-  const ref = useRef<T>(values);
-  const prev = ref.current;
-  ref.current = values;
-  return prev;
 }

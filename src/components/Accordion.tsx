@@ -23,6 +23,9 @@ export function AccordionSection({ id, title, icon, badge, action, defaultOpen =
     if (typeof window === "undefined") return;
     try {
       const raw = localStorage.getItem(storageKey);
+      /* Restoring persisted state on mount must run in an effect (not a lazy
+         initializer) to avoid an SSR/client hydration mismatch. */
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (raw !== null) setOpen(raw === "1");
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps

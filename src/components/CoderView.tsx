@@ -224,12 +224,6 @@ function getAllFiles(node: TreeNode): TreeFile[] {
   return [...node.files, ...Object.values(node.dirs).flatMap(getAllFiles)];
 }
 
-const CODER_SUGGESTIONS = [
-  { icon: "🔍", text: "Bu kodu incele ve iyileştirme öner" },
-  { icon: "🐛", text: "Bu hatayı nasıl düzeltebilirim?" },
-  { icon: "⚡", text: "Bu fonksiyonu daha verimli yaz" },
-  { icon: "✅", text: "Bu kod için unit test yaz" },
-];
 
 let coderAbort: AbortController | null = null;
 
@@ -355,6 +349,9 @@ export function CoderView() {
 
   useEffect(() => {
     if (pendingInput) {
+      /* Drain a one-shot value pushed from the global store into the local
+         composer; this is an external-store sync, so it belongs in an effect. */
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInput(pendingInput);
       setPendingInput(null);
       taRef.current?.focus();
@@ -367,9 +364,10 @@ export function CoderView() {
     import("@/lib/webcontainer").then(({ isSupported }) => setTerminalSupported(isSupported()));
   }, []);
 
+  const lastMessageContent = messages[messages.length - 1]?.content;
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, messages[messages.length - 1]?.content]);
+  }, [messages.length, lastMessageContent]);
 
   useEffect(() => {
     const ta = taRef.current;
@@ -457,6 +455,9 @@ export function CoderView() {
       if (!output) return;
       const msg = `**Terminal çıktısı** (\`${command}\`):\n\`\`\`\n${output}\n\`\`\``;
       useStore.getState().pushMessage({ role: "user", content: msg });
+      /* callApi is a stable useCallback defined below; it's only invoked here
+         from an event handler that fires after mount, so the forward ref is safe. */
+      // eslint-disable-next-line react-hooks/immutability
       void callApi();
     };
     window.addEventListener("craftai:terminal-output", handler);
@@ -577,6 +578,7 @@ export function CoderView() {
     store.setStreaming(true);
     store.setFollowUpSuggestions([]);
     coderAbort = new AbortController();
+    const abortCtl = coderAbort;
 
     const thinkingMode = store.thinkingMode;
     let finalSystemPrompt = coderSystemPrompt;
@@ -658,12 +660,11 @@ export function CoderView() {
         let polModel = polQueue.shift()!;
         let polAttempt = 0;
         const POL_WAIT = 3000;
-        // eslint-disable-next-line no-constant-condition
         while (true) {
           res = await fetch(`${active.baseUrl}/chat/completions`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            signal: coderAbort.signal,
+            signal: abortCtl.signal,
             body: makePolBody(polModel),
           });
           if (res.status !== 429) break;
@@ -672,9 +673,9 @@ export function CoderView() {
             addToast(`Pollinations yoğun, ${POL_WAIT / 1000}s sonra tekrar deneniyor...`, "info");
             await new Promise<void>((resolve) => {
               const t = setTimeout(resolve, POL_WAIT);
-              coderAbort.signal.addEventListener("abort", () => clearTimeout(t), { once: true });
+              abortCtl.signal.addEventListener("abort", () => clearTimeout(t), { once: true });
             });
-            if (coderAbort.signal.aborted) throw new DOMException("Aborted", "AbortError");
+            if (abortCtl.signal.aborted) throw new DOMException("Aborted", "AbortError");
           } else if (polQueue.length > 0) {
             polModel = polQueue.shift()!;
             polAttempt = 0;
@@ -687,7 +688,7 @@ export function CoderView() {
         res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          signal: coderAbort.signal,
+          signal: abortCtl.signal,
           body: JSON.stringify({
             messages: apiMessages,
             baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey,
@@ -826,6 +827,10 @@ export function CoderView() {
       }
       fetchFollowUps();
     }
+  /* callApi reads the rest of its inputs live via useStore.getState() during
+     streaming, so it deliberately keeps a minimal dep set — recreating it on
+     every config change would break in-flight requests. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.systemPrompt, fetchFollowUps]);
 
   const send = async () => {
@@ -1362,6 +1367,8 @@ export function CoderView() {
                 <div className="flex gap-2 mb-2.5 flex-wrap">
                   {pendingImages.map((img, i) => (
                     <div key={i} className="relative group/img">
+                      {/* User-attached preview is a base64 data URI; next/image can't optimize it. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={img} alt="" className="w-16 h-16 object-cover rounded-xl border border-line shadow-sm" />
                       <button onClick={() => setPendingImages((p) => p.filter((_, j) => j !== i))} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red text-white grid place-items-center text-xs opacity-0 group-hover/img:opacity-100 transition-opacity">×</button>
                     </div>
@@ -1618,6 +1625,7 @@ export function CoderView() {
     if (!prNumber || !repo) return;
     setPrLoading(true);
     try {
+      const store = useStore.getState();
       const token = repoIsGitLab ? store.activeGitlab()?.token : store.activeGithub()?.token;
       const res = await fetch("/api/pr-review", {
         method: "POST",

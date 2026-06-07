@@ -47,7 +47,7 @@ export default function AppPage() {
       if (u?.id) void syncConfig(u.id);
     });
     return () => sub.subscription.unsubscribe();
-  }, [setUser, loadChats]);
+  }, [setUser, loadChats, syncConfig]);
 
   useEffect(() => {
     const { theme, accentColor, fontScale } = useStore.getState().config;

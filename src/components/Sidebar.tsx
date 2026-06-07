@@ -41,7 +41,6 @@ export function Sidebar() {
   const deleteChat = useStore((s) => s.deleteChat);
   const renameChat = useStore((s) => s.renameChat);
   const exportChat = useStore((s) => s.exportChat);
-  const exportChatHtml = useStore((s) => s.exportChatHtml);
   const tagChat = useStore((s) => s.tagChat);
   const pinChat = useStore((s) => s.pinChat);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);

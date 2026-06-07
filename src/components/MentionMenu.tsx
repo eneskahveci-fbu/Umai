@@ -19,7 +19,13 @@ export function MentionMenu({ query, items, onSelect, onClose }: Props) {
     ? items.filter((i) => i.path.toLowerCase().includes(q)).slice(0, 8)
     : items.slice(0, 8);
 
-  useEffect(() => { setActive(0); }, [query]);
+  /* Reset the highlighted item whenever the query changes — adjusted during
+     render (React's recommended alternative to a state-syncing effect). */
+  const [prevQuery, setPrevQuery] = useState(query);
+  if (query !== prevQuery) {
+    setPrevQuery(query);
+    setActive(0);
+  }
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

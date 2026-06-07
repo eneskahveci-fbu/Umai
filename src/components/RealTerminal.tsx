@@ -163,6 +163,9 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
   };
 
   useEffect(() => {
+    /* One-time async terminal boot on mount; status updates happen after
+       awaits inside boot(), not synchronously during render. */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     boot();
     return () => { cleanupRef.current?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
