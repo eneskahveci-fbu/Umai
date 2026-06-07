@@ -26,9 +26,9 @@ interface RightPanelProps {
 export function RightPanel(props: RightPanelProps) {
   const tabs = useMemo<{ id: Tool; label: string; icon: typeof FileCode2; available: boolean }[]>(
     () => [
-      { id: "editor",   label: "Editör",  icon: FileCode2, available: props.editorOpen },
-      { id: "git",      label: "Git",     icon: GitBranch, available: props.gitOpen },
-      { id: "artifact", label: "Önizleme", icon: Sparkles, available: !!props.artifact },
+      { id: "editor",   label: "Editör",   icon: FileCode2, available: props.editorOpen },
+      { id: "git",      label: "Git",      icon: GitBranch, available: props.gitOpen },
+      { id: "artifact", label: "Önizleme", icon: Sparkles,  available: !!props.artifact },
     ],
     [props.editorOpen, props.gitOpen, props.artifact],
   );
@@ -36,13 +36,13 @@ export function RightPanel(props: RightPanelProps) {
   const firstAvailable = tabs.find((t) => t.available)?.id ?? null;
   const [active, setActive] = useState<Tool | null>(firstAvailable);
 
-  /* Auto-focus a tool when it opens; auto-fallback when the current one closes */
+  /* Auto-fallback when the current tool closes */
   useEffect(() => {
     if (active && tabs.find((t) => t.id === active)?.available) return;
     setActive(firstAvailable);
   }, [tabs, active, firstAvailable]);
 
-  /* Auto-switch to the newly opened tool (matches the user's intent click) */
+  /* Auto-switch to newly opened tool */
   const prevOpen = useRefBag({
     editor: props.editorOpen,
     git: props.gitOpen,
@@ -56,10 +56,13 @@ export function RightPanel(props: RightPanelProps) {
 
   if (!firstAvailable) return null;
 
+  /* Split view: show editor + preview side-by-side unless user switched to Git */
+  const splitView =
+    props.editorOpen && props.editorFile && props.artifact && active !== "git";
+
   const closeActive = () => {
     if (active === "editor") props.onCloseEditor();
     else if (active === "git") props.onCloseGit();
-    /* artifact closes via its own internal X (sets store) */
   };
 
   return (
@@ -77,7 +80,10 @@ export function RightPanel(props: RightPanelProps) {
       <div className="h-10 shrink-0 flex items-center gap-0.5 px-2 border-b border-line/60 bg-surface/40">
         {tabs.filter((t) => t.available).map((t) => {
           const Icon = t.icon;
-          const isActive = t.id === active;
+          /* In split view, editor AND artifact tabs both appear active */
+          const isActive = splitView
+            ? t.id === "editor" || t.id === "artifact"
+            : t.id === active;
           return (
             <button
               key={t.id}
@@ -94,11 +100,12 @@ export function RightPanel(props: RightPanelProps) {
           );
         })}
         <div className="flex-1" />
-        {active && active !== "artifact" && (
+        {/* X button: in split view close editor; in single view close active */}
+        {(splitView || (active && active !== "artifact")) && (
           <button
-            onClick={closeActive}
-            aria-label="Bu sekmeyi kapat"
-            title="Bu sekmeyi kapat"
+            onClick={splitView ? props.onCloseEditor : closeActive}
+            aria-label="Kapat"
+            title="Kapat"
             className="text-muted/40 hover:text-ink w-8 h-8 grid place-items-center rounded-lg hover:bg-bgsoft transition-colors"
           >
             <X size={13} />
@@ -106,13 +113,14 @@ export function RightPanel(props: RightPanelProps) {
         )}
       </div>
 
-      {/* Active tool — split view when editor + artifact are both open */}
-      {props.editorOpen && props.editorFile && props.artifact ? (
+      {/* Content */}
+      {splitView ? (
+        /* Split: editor top (flex-1) + preview bottom (45%) */
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <div className="flex-1 min-h-0 overflow-hidden border-b border-line/60">
             <ErrorBoundary variant="inline" label="Editör çöktü">
               <EditorPanel
-                file={props.editorFile}
+                file={props.editorFile!}
                 onClose={props.onCloseEditor}
                 onAskAI={props.onAskAI}
               />
@@ -125,6 +133,7 @@ export function RightPanel(props: RightPanelProps) {
           </div>
         </div>
       ) : (
+        /* Single tool view */
         <div className="flex-1 min-h-0 overflow-hidden">
           {active === "editor" && props.editorFile && (
             <ErrorBoundary variant="inline" label="Editör çöktü">
@@ -151,7 +160,6 @@ export function RightPanel(props: RightPanelProps) {
   );
 }
 
-/* Tiny helper to track previous open-states without a deps explosion. */
 import { useRef } from "react";
 function useRefBag<T extends Record<string, boolean>>(values: T): T {
   const ref = useRef<T>(values);
