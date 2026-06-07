@@ -17,24 +17,6 @@ export function AuthButton() {
     );
   }
 
-  const signIn = async () => {
-    const email = window.prompt("E-posta adresin (giriş bağlantısı gönderilecek):");
-    if (!email) return;
-    const sb = createClient();
-    if (!sb) return;
-    setBusy(true);
-    const { error } = await sb.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-    });
-    setBusy(false);
-    alert(
-      error
-        ? `Hata: ${error.message}`
-        : "Giriş bağlantısı e-postana gönderildi. Bağlantıya tıkla.",
-    );
-  };
-
   const signOut = async () => {
     const sb = createClient();
     if (sb) await sb.auth.signOut();
@@ -43,7 +25,7 @@ export function AuthButton() {
   if (userEmail) {
     return (
       <button
-        onClick={signOut}
+        onClick={() => { void signOut(); }}
         className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-line bg-bgsoft hover:border-brand text-sm"
       >
         <User size={15} className="text-brand" />
@@ -55,12 +37,12 @@ export function AuthButton() {
 
   return (
     <button
-      onClick={signIn}
+      onClick={() => { window.location.href = "/login"; }}
       disabled={busy}
       className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-line bg-bgsoft hover:border-brand text-sm font-semibold disabled:opacity-50"
     >
       <LogIn size={15} />
-      {busy ? "Gönderiliyor..." : "E-posta ile giriş"}
+      Giriş Yap / Kayıt Ol
     </button>
   );
 }
