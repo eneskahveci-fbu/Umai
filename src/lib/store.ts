@@ -6,6 +6,7 @@ import type {
   Config,
   GitHubAccount,
   GitLabAccount,
+  McpServer,
   MemoryItem,
   ModelProfile,
   OpenFile,
@@ -211,6 +212,7 @@ interface StoreState {
   current: () => Chat | null;
   pushMessage: (m: ChatMessage) => void;
   updateLastContent: (content: string) => void;
+  updateLastThinking: (thinking: string) => void;
   updateLastTokens: (tokenIn: number, tokenOut: number) => void;
   setLastAgentId: (agentId: string | undefined) => void;
   popLastMessage: () => void;
@@ -284,6 +286,14 @@ interface StoreState {
   // diff modal
   diffModal: { original: string; newCode: string; language: string; path?: string } | null;
   setDiffModal: (m: { original: string; newCode: string; language: string; path?: string } | null) => void;
+
+  // message rating
+  rateMessage: (chatId: string, msgIndex: number, rating: "up" | "down" | null) => void;
+
+  // MCP servers
+  addMcpServer: (s: Omit<McpServer, "id">) => void;
+  removeMcpServer: (id: string) => void;
+  updateMcpServer: (id: string, patch: Partial<McpServer>) => void;
 
   // compare view
 }
@@ -622,6 +632,18 @@ export const useStore = create<StoreState>()((set, get) => ({
       }),
     })),
 
+  updateLastThinking: (thinking) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const messages = c.messages.slice();
+        if (messages.length) {
+          messages[messages.length - 1] = { ...messages[messages.length - 1], thinking };
+        }
+        return { ...c, messages };
+      }),
+    })),
+
   updateLastTokens: (tokenIn, tokenOut) =>
     set((s) => ({
       chats: s.chats.map((c) => {
@@ -903,6 +925,37 @@ export const useStore = create<StoreState>()((set, get) => ({
   /* diff modal */
   diffModal: null,
   setDiffModal: (m) => set({ diffModal: m }),
+
+  /* message rating */
+  rateMessage: (chatId, msgIndex, rating) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== chatId) return c;
+        const messages = c.messages.slice();
+        if (messages[msgIndex]) {
+          messages[msgIndex] = { ...messages[msgIndex], rating: rating ?? undefined };
+        }
+        return { ...c, messages };
+      }),
+    })),
+
+  /* MCP servers */
+  addMcpServer: (s) => {
+    const server: McpServer = { ...s, id: uid() };
+    const config = get().config;
+    get().saveConfig({ ...config, mcpServers: [...(config.mcpServers ?? []), server] });
+  },
+  removeMcpServer: (id) => {
+    const config = get().config;
+    get().saveConfig({ ...config, mcpServers: (config.mcpServers ?? []).filter((s) => s.id !== id) });
+  },
+  updateMcpServer: (id, patch) => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      mcpServers: (config.mcpServers ?? []).map((s) => s.id === id ? { ...s, ...patch } : s),
+    });
+  },
 
 }));
 

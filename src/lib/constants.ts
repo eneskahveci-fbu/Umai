@@ -8,6 +8,12 @@ export interface Preset {
 }
 
 export const PRESETS: Record<Provider, Preset> = {
+  anthropic: {
+    label: "🧠 Anthropic (Claude — Native)",
+    baseUrl: "https://api.anthropic.com/v1",
+    model: "claude-sonnet-4-5",
+    keyHint: "sk-ant-... (Anthropic API anahtarı)",
+  },
   hf: {
     label: "🤗 Hugging Face (router)",
     baseUrl: "https://router.huggingface.co/v1",
@@ -84,6 +90,15 @@ export const PRESETS: Record<Provider, Preset> = {
  * sağlayıcının API'sinde geçerli model kimlikleriyle eşleşmelidir.
  */
 export const PROVIDER_MODELS: Record<Provider, string[]> = {
+  anthropic: [
+    "claude-sonnet-4-5",
+    "claude-opus-4-5",
+    "claude-haiku-4-5-20251001",
+    "claude-3-7-sonnet-20250219",
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-haiku-20241022",
+    "claude-3-opus-20240229",
+  ],
   hf: [
     "Qwen/Qwen2.5-Coder-32B-Instruct",
     "Qwen/Qwen3-Coder-480B-A35B-Instruct",
@@ -379,6 +394,7 @@ export const DEFAULT_CONFIG: Config = {
   accentColor: "purple",
   maxContext: 8192,
   webcontainerApiKey: "",
+  mcpServers: [],
 };
 
 export const DEFAULT_REPO = "eneskahveci-sdo/craft-ai";

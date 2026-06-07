@@ -4,8 +4,9 @@ import { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { Check, ChevronDown, ChevronRight, Copy, Loader2, Pencil, RefreshCw, Wrench, X } from "lucide-react";
+import { Brain, Check, ChevronDown, ChevronRight, Copy, Loader2, Pencil, RefreshCw, ThumbsDown, ThumbsUp, Wrench } from "lucide-react";
 import type { ChatMessage } from "@/lib/types";
+import { useStore } from "@/lib/store";
 import { CodeBlock } from "./CodeBlock";
 import { AGENTS } from "@/lib/agents";
 
@@ -59,6 +60,7 @@ function ActionBtn({ onClick, icon, label }: { onClick: () => void; icon: React.
 export function MessageBubble({
   message,
   index,
+  chatId,
   showRegenerate,
   onRegenerate,
   onContinue,
@@ -66,6 +68,7 @@ export function MessageBubble({
 }: {
   message: ChatMessage;
   index: number;
+  chatId?: string;
   showRegenerate?: boolean;
   onRegenerate?: () => void;
   onContinue?: () => void;
@@ -75,7 +78,9 @@ export function MessageBubble({
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState("");
+  const [thinkingOpen, setThinkingOpen] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const rateMessage = useStore((s) => s.rateMessage);
 
   const copyMessage = async () => {
     try {
@@ -121,6 +126,25 @@ export function MessageBubble({
             </div>
           );
         })()}
+
+        {/* Thinking block */}
+        {message.thinking && (
+          <div className="mb-3 border border-brand/20 rounded-xl overflow-hidden bg-brand/4">
+            <button
+              onClick={() => setThinkingOpen((o) => !o)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-brand/80 hover:text-brand transition-colors"
+            >
+              <Brain size={12} />
+              <span className="font-semibold">Düşünce süreci</span>
+              {thinkingOpen ? <ChevronDown size={11} className="ml-auto" /> : <ChevronRight size={11} className="ml-auto" />}
+            </button>
+            {thinkingOpen && (
+              <div className="px-3 pb-3 text-[11px] text-muted/70 font-mono whitespace-pre-wrap leading-relaxed border-t border-brand/10 pt-2">
+                {message.thinking}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Tool calls */}
         {message.toolCalls?.length ? (
@@ -194,6 +218,25 @@ export function MessageBubble({
             )}
             {showRegenerate && onContinue && (
               <ActionBtn onClick={onContinue} icon={<ChevronRight size={13} />} label="Devam et" />
+            )}
+            {!isUser && chatId && (
+              <>
+                <div className="w-px h-3.5 bg-line/60 mx-0.5" />
+                <button
+                  onClick={() => rateMessage(chatId, index, message.rating === "up" ? null : "up")}
+                  className={`flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg transition-colors ${message.rating === "up" ? "text-green-400 bg-green-400/10" : "text-muted hover:text-green-400 hover:bg-bgsoft"}`}
+                  title="Beğen"
+                >
+                  <ThumbsUp size={12} />
+                </button>
+                <button
+                  onClick={() => rateMessage(chatId, index, message.rating === "down" ? null : "down")}
+                  className={`flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg transition-colors ${message.rating === "down" ? "text-red/80 bg-red/10" : "text-muted hover:text-red/80 hover:bg-bgsoft"}`}
+                  title="Beğenme"
+                >
+                  <ThumbsDown size={12} />
+                </button>
+              </>
             )}
           </div>
         )}

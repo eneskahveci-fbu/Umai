@@ -16,6 +16,16 @@ export interface ChatMessage {
   tokenIn?: number;
   tokenOut?: number;
   toolCalls?: ToolCallRecord[];
+  thinking?: string;
+  rating?: "up" | "down";
+}
+
+export interface McpServer {
+  id: string;
+  name: string;
+  url: string;
+  headers?: Record<string, string>;
+  enabled: boolean;
 }
 
 export interface Snippet {
@@ -51,6 +61,7 @@ export type Provider =
   | "together"
   | "xai"
   | "ollama"
+  | "anthropic"
   | "custom";
 
 export interface ModelProfile {
@@ -139,6 +150,7 @@ export interface Config {
   accentColor: "purple" | "blue" | "green" | "orange";
   maxContext: number;
   webcontainerApiKey: string;
+  mcpServers?: McpServer[];
 }
 
 export interface RepoState {
