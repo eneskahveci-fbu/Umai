@@ -5,6 +5,7 @@ import type {
   ChatMessage,
   Config,
   GitHubAccount,
+  GitLabAccount,
   MemoryItem,
   ModelProfile,
   OpenFile,
@@ -158,6 +159,10 @@ interface StoreState {
   removeGithub: (id: string) => void;
   setActiveGithub: (id: string | null) => void;
   activeGithub: () => GitHubAccount | null;
+  addGitlab: (a: Omit<GitLabAccount, "id">) => void;
+  removeGitlab: (id: string) => void;
+  setActiveGitlab: (id: string | null) => void;
+  activeGitlab: () => GitLabAccount | null;
   addRepo: (repo: string) => void;
   setActiveRepo: (repo: string) => void;
   removeRepo: (repo: string) => void;
@@ -349,6 +354,30 @@ export const useStore = create<StoreState>()((set, get) => ({
   activeGithub: () => {
     const { githubAccounts, activeGithubId } = get().config;
     return githubAccounts.find((a) => a.id === activeGithubId) || null;
+  },
+  addGitlab: (a) => {
+    const acc: GitLabAccount = { ...a, id: uid() };
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      gitlabAccounts: [...(config.gitlabAccounts ?? []), acc],
+      activeGitlabId: config.activeGitlabId ?? acc.id,
+    });
+  },
+  removeGitlab: (id) => {
+    const config = get().config;
+    const gitlabAccounts = (config.gitlabAccounts ?? []).filter((a) => a.id !== id);
+    get().saveConfig({
+      ...config,
+      gitlabAccounts,
+      activeGitlabId:
+        config.activeGitlabId === id ? (gitlabAccounts[0]?.id ?? null) : config.activeGitlabId,
+    });
+  },
+  setActiveGitlab: (id) => get().saveConfig({ ...get().config, activeGitlabId: id }),
+  activeGitlab: () => {
+    const { gitlabAccounts, activeGitlabId } = get().config;
+    return (gitlabAccounts ?? []).find((a) => a.id === activeGitlabId) || null;
   },
   addRepo: (repo) => {
     const config = get().config;

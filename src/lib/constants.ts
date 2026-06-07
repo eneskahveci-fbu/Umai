@@ -358,6 +358,8 @@ export const DEFAULT_CONFIG: Config = {
   activeModelId: null,
   githubAccounts: [],
   activeGithubId: null,
+  gitlabAccounts: [],
+  activeGitlabId: null,
   repos: ["eneskahveci-sdo/craft-ai"],
   activeRepo: "eneskahveci-sdo/craft-ai",
   systemPrompt: DEFAULT_SYSTEM_PROMPT,

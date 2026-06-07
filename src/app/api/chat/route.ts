@@ -11,6 +11,7 @@ interface RepoCtx {
   repo: string;
   branch: string;
   token?: string;
+  provider?: "github" | "gitlab";
 }
 
 interface SkillPayload {
@@ -59,20 +60,44 @@ function checkOrigin(req: Request): boolean {
 
 /* ── Tool execution ── */
 
-async function ghHeaders(token?: string): Promise<Record<string, string>> {
+function ghHeaders(token?: string): Record<string, string> {
   const h: Record<string, string> = { Accept: "application/vnd.github+json" };
   if (token) h["Authorization"] = `Bearer ${token}`;
   return h;
 }
 
+function glHeaders(token?: string): Record<string, string> {
+  const h: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) h["PRIVATE-TOKEN"] = token;
+  return h;
+}
+
+function encodeGlProject(owner: string, repo: string) {
+  return encodeURIComponent(`${owner}/${repo}`);
+}
+
 async function execListFiles(ctx: RepoCtx, args: { filter?: string }): Promise<string> {
+  const filter = args.filter?.toLowerCase();
+  if (ctx.provider === "gitlab") {
+    const proj = encodeGlProject(ctx.owner, ctx.repo);
+    const res = await fetch(
+      `https://gitlab.com/api/v4/projects/${proj}/repository/tree?recursive=true&ref=${encodeURIComponent(ctx.branch)}&per_page=100`,
+      { headers: glHeaders(ctx.token) },
+    );
+    if (!res.ok) return `Hata: ${res.status} ${await res.text()}`;
+    const data = await res.json();
+    const items = (data as { path: string; type: string }[])
+      .filter((t) => t.type === "blob")
+      .map((t) => t.path)
+      .filter((p) => !filter || p.toLowerCase().includes(filter));
+    return items.slice(0, 200).join("\n") || "(eşleşen dosya yok)";
+  }
   const res = await fetch(
     `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/trees/${ctx.branch}?recursive=1`,
-    { headers: await ghHeaders(ctx.token) },
+    { headers: ghHeaders(ctx.token) },
   );
   if (!res.ok) return `Hata: ${res.status} ${await res.text()}`;
   const data = await res.json();
-  const filter = args.filter?.toLowerCase();
   const items = (data.tree as { path: string; type: string }[])
     .filter((t) => t.type === "blob")
     .map((t) => t.path)
@@ -85,9 +110,20 @@ async function execListFiles(ctx: RepoCtx, args: { filter?: string }): Promise<s
 
 async function execReadFile(ctx: RepoCtx, args: { path: string }): Promise<string> {
   if (!args.path) return "Hata: path boş";
+  if (ctx.provider === "gitlab") {
+    const proj = encodeGlProject(ctx.owner, ctx.repo);
+    const encoded = encodeURIComponent(args.path);
+    const res = await fetch(
+      `https://gitlab.com/api/v4/projects/${proj}/repository/files/${encoded}/raw?ref=${encodeURIComponent(ctx.branch)}`,
+      { headers: glHeaders(ctx.token) },
+    );
+    if (!res.ok) return `Hata: ${res.status} — dosya bulunamadı (${args.path})`;
+    const text = await res.text();
+    return text.length > 20_000 ? text.slice(0, 20_000) + "\n\n[... kısaltıldı]" : text;
+  }
   const res = await fetch(
     `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/contents/${encodeURIComponent(args.path)}?ref=${ctx.branch}`,
-    { headers: await ghHeaders(ctx.token) },
+    { headers: ghHeaders(ctx.token) },
   );
   if (!res.ok) return `Hata: ${res.status} — dosya bulunamadı (${args.path})`;
   const data = await res.json();
@@ -98,9 +134,24 @@ async function execReadFile(ctx: RepoCtx, args: { path: string }): Promise<strin
 
 async function execSearchFiles(ctx: RepoCtx, args: { query: string }): Promise<string> {
   if (!args.query) return "Hata: query boş";
+  if (ctx.provider === "gitlab") {
+    const proj = encodeGlProject(ctx.owner, ctx.repo);
+    const res = await fetch(
+      `https://gitlab.com/api/v4/projects/${proj}/repository/tree?recursive=true&ref=${encodeURIComponent(ctx.branch)}&per_page=100`,
+      { headers: glHeaders(ctx.token) },
+    );
+    if (!res.ok) return `Hata: ${res.status}`;
+    const data = await res.json();
+    const q = args.query.toLowerCase();
+    const matches = (data as { path: string; type: string }[])
+      .filter((t) => t.type === "blob" && t.path.toLowerCase().includes(q))
+      .map((t) => t.path)
+      .slice(0, 50);
+    return matches.length ? matches.join("\n") : "(eşleşme yok)";
+  }
   const res = await fetch(
     `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/trees/${ctx.branch}?recursive=1`,
-    { headers: await ghHeaders(ctx.token) },
+    { headers: ghHeaders(ctx.token) },
   );
   if (!res.ok) return `Hata: ${res.status}`;
   const data = await res.json();

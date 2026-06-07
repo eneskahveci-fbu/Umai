@@ -63,6 +63,14 @@ import {
   fetchRepoTree,
   parseRepo,
 } from "@/lib/github";
+import {
+  buildGitLabTree,
+  fetchAllGitLabFiles,
+  fetchGitLabFileContent,
+  fetchGitLabRepoTree,
+  isGitLabRepo,
+  parseGitLabRepo,
+} from "@/lib/gitlab";
 import type { TreeFile, TreeNode } from "@/lib/types";
 import { AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agents";
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
@@ -302,14 +310,24 @@ export function CoderView() {
 
   const connectRepo = async () => {
     const store = useStore.getState();
-    const parsed = parseRepo(store.config.activeRepo || "");
-    if (!parsed) { addToast("Ayarlar'dan bir GitHub deposu ekle.", "error"); return; }
-    const token = store.activeGithub()?.token;
+    const activeRepo = store.config.activeRepo || "";
     setConnecting(true);
     try {
-      const { branch, items } = await fetchRepoTree(parsed.owner, parsed.repo, token);
-      setRepo({ ...parsed, branch });
-      setTree(buildTree(items));
+      if (isGitLabRepo(activeRepo)) {
+        const parsed = parseGitLabRepo(activeRepo);
+        if (!parsed) { addToast("Geçersiz GitLab deposu. Örnek: gitlab.com/namespace/repo", "error"); return; }
+        const token = store.activeGitlab()?.token;
+        const { branch, items } = await fetchGitLabRepoTree(parsed.namespace, parsed.repo, token);
+        setRepo({ owner: parsed.namespace, repo: parsed.repo, branch });
+        setTree(buildGitLabTree(items));
+      } else {
+        const parsed = parseRepo(activeRepo);
+        if (!parsed) { addToast("Ayarlar'dan bir GitHub veya GitLab deposu ekle.", "error"); return; }
+        const token = store.activeGithub()?.token;
+        const { branch, items } = await fetchRepoTree(parsed.owner, parsed.repo, token);
+        setRepo({ ...parsed, branch });
+        setTree(buildTree(items));
+      }
     } catch (e) {
       addToast(`Depo bağlantısı başarısız: ${(e as Error).message}`, "error");
     } finally {
@@ -320,7 +338,7 @@ export function CoderView() {
   useEffect(() => {
     if (config.cliMode && config.activeRepo && !tree) connectRepo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.activeRepo, config.activeGithubId, config.cliMode]);
+  }, [config.activeRepo, config.activeGithubId, config.activeGitlabId, config.cliMode]);
 
   /* CodeBlock emits this when the user types a path into its "Diff" prompt.
      We look it up in the currently attached files and seed the modal's
@@ -358,8 +376,16 @@ export function CoderView() {
     if (!repo) return;
     setFetchingFile(file.path);
     try {
-      const token = useStore.getState().activeGithub()?.token;
-      const content = await fetchFileContent(repo.owner, repo.repo, repo.branch, file.path, token);
+      const store = useStore.getState();
+      const activeRepo = store.config.activeRepo || "";
+      let content: string;
+      if (isGitLabRepo(activeRepo)) {
+        const token = store.activeGitlab()?.token;
+        content = await fetchGitLabFileContent(repo.owner, repo.repo, repo.branch, file.path, token);
+      } else {
+        const token = store.activeGithub()?.token;
+        content = await fetchFileContent(repo.owner, repo.repo, repo.branch, file.path, token);
+      }
       setAttachedFiles((prev) => [...prev, { path: file.path, content }]);
       setEditorFile({ path: file.path, content, language: detectLanguage(file.path) });
       setEditorOpen(true);
@@ -458,7 +484,10 @@ export function CoderView() {
 
     const repo = store.repo;
     const activeGithub = store.activeGithub();
+    const activeGitlab = store.activeGitlab();
     const toolsEnabled = store.toolsEnabled && !!repo;
+    const activeRepo = store.config.activeRepo || "";
+    const repoIsGitLab = isGitLabRepo(activeRepo);
 
     try {
       const activeSkills = (store.config.skills ?? []).filter((s) => s.enabled);
@@ -480,7 +509,8 @@ export function CoderView() {
             owner: repo.owner,
             repo: repo.repo,
             branch: repo.branch,
-            token: activeGithub?.token,
+            token: repoIsGitLab ? activeGitlab?.token : activeGithub?.token,
+            provider: repoIsGitLab ? "gitlab" : "github",
           } : undefined,
         }),
       });
@@ -782,12 +812,17 @@ export function CoderView() {
                     onClick={async () => {
                       setLoadingAll(true);
                       try {
-                        const activeGithub = useStore.getState().activeGithub();
-                        const allItems = [...Object.values(tree.dirs), ...tree.files].length > 0
-                          ? await fetchAllFiles(repo.owner, repo.repo, repo.branch,
-                              [...(useStore.getState().tree ? getTreeItems(useStore.getState().tree!) : [])],
-                              activeGithub?.token)
-                          : [];
+                        const store = useStore.getState();
+                        const activeRepo = store.config.activeRepo || "";
+                        const treeItems = store.tree ? getTreeItems(store.tree) : [];
+                        let allItems: { path: string; content: string }[] = [];
+                        if (isGitLabRepo(activeRepo)) {
+                          const token = store.activeGitlab()?.token;
+                          allItems = await fetchAllGitLabFiles(repo.owner, repo.repo, repo.branch, treeItems, token);
+                        } else {
+                          const token = store.activeGithub()?.token;
+                          allItems = await fetchAllFiles(repo.owner, repo.repo, repo.branch, treeItems, token);
+                        }
                         if (allItems.length > 0) {
                           setAttachedFiles(allItems.map(f => ({ path: f.path, content: f.content })));
                           addToast(`${allItems.length} dosya yüklendi`, "success");

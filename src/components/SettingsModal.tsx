@@ -31,6 +31,9 @@ export function SettingsModal() {
   const addGithub = useStore((s) => s.addGithub);
   const removeGithub = useStore((s) => s.removeGithub);
   const setActiveGithub = useStore((s) => s.setActiveGithub);
+  const addGitlab = useStore((s) => s.addGitlab);
+  const removeGitlab = useStore((s) => s.removeGitlab);
+  const setActiveGitlab = useStore((s) => s.setActiveGitlab);
   const addRepo = useStore((s) => s.addRepo);
   const setActiveRepo = useStore((s) => s.setActiveRepo);
   const removeRepo = useStore((s) => s.removeRepo);
@@ -54,7 +57,7 @@ export function SettingsModal() {
      contains the matching keyword (first hit wins). */
   const SEARCH_INDEX: Record<"model" | "github" | "general" | "advanced", string[]> = {
     model:    ["model", "api", "anahtar", "key", "openai", "anthropic", "huggingface", "hf", "provider", "test"],
-    github:   ["github", "token", "depo", "repo", "branch", "dal", "kullanıcı", "username"],
+    github:   ["github", "gitlab", "token", "depo", "repo", "branch", "dal", "kullanıcı", "username"],
     general:  ["sistem", "prompt", "stil", "style", "tema", "theme", "renk", "color", "accent", "font", "yazı", "ses", "sound", "skill", "memori", "ayar"],
     advanced: ["webcontainer", "key", "context", "max", "guest", "misafir", "kural", "rules", "rulesfile", "gelişmiş"],
   };
@@ -84,6 +87,8 @@ export function SettingsModal() {
   const [editKey, setEditKey] = useState("");
   const [ghUser, setGhUser] = useState("");
   const [ghToken, setGhToken] = useState("");
+  const [glUser, setGlUser] = useState("");
+  const [glToken, setGlToken] = useState("");
   const [repoInput, setRepoInput] = useState("");
   const [testing, setTesting] = useState(false);
   const [memInput, setMemInput] = useState("");
@@ -181,6 +186,13 @@ export function SettingsModal() {
     addGithub({ username: ghUser.trim(), token: ghToken.trim() });
     addToast("GitHub hesabı eklendi.", "success");
     setGhUser(""); setGhToken("");
+  };
+
+  const submitGitlab = () => {
+    if (!glUser.trim() || !glToken.trim()) { addToast("Kullanıcı adı ve token gerekli.", "error"); return; }
+    addGitlab({ username: glUser.trim(), token: glToken.trim() });
+    addToast("GitLab hesabı eklendi.", "success");
+    setGlUser(""); setGlToken("");
   };
 
   const submitRepo = () => {
@@ -334,10 +346,10 @@ export function SettingsModal() {
           </section>
         )}
 
-        {/* GITHUB */}
+        {/* GITHUB + GITLAB */}
         {tab === "github" && (
           <section className="flex flex-col gap-5">
-            {/* Accounts */}
+            {/* GitHub Accounts */}
             <div>
               <h4 className="text-sm font-bold mb-1">GitHub Hesapları</h4>
               <p className="text-xs text-muted mb-2">Birden fazla hesap ekleyebilirsin. Aktif hesap token gerektiren işlemlerde kullanılır.</p>
@@ -402,6 +414,41 @@ export function SettingsModal() {
                 <div className="grid gap-2">
                   <input value={repoInput} onChange={(e) => setRepoInput(e.target.value)} placeholder="sahip/depo veya sahip/depo:dal" className="input-mono" onKeyDown={(e) => { if (e.key === "Enter") submitRepo(); }} />
                   <button onClick={submitRepo} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-line hover:border-brand text-sm font-semibold transition-colors"><Plus size={15} /> Depo Ekle</button>
+                </div>
+              </div>
+            </div>
+
+            {/* GitLab Accounts */}
+            <div>
+              <h4 className="text-sm font-bold mb-1">GitLab Hesapları</h4>
+              <p className="text-xs text-muted mb-2">GitLab personal access token ekle. Aktif hesap GitLab repolarına erişimde kullanılır.</p>
+              {(config.gitlabAccounts ?? []).length > 0 && (
+                <div className="flex flex-col gap-2 mb-3">
+                  {(config.gitlabAccounts ?? []).map((a) => {
+                    const isActive = config.activeGitlabId === a.id;
+                    return (
+                      <div key={a.id} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${isActive ? "border-branddim bg-brand/10" : "border-line bg-bgsoft"}`}>
+                        <button
+                          onClick={() => setActiveGitlab(a.id)}
+                          className={`w-5 h-5 rounded-full grid place-items-center border shrink-0 ${isActive ? "bg-brand border-brand text-white" : "border-muted"}`}
+                        >
+                          {isActive && <Check size={11} />}
+                        </button>
+                        <GitBranch size={13} className={isActive ? "text-brand" : "text-muted"} />
+                        <span className="flex-1 text-sm font-semibold truncate">{a.username}</span>
+                        {isActive && <span className="text-[10px] text-brand font-mono">aktif</span>}
+                        <button onClick={() => removeGitlab(a.id)} className="text-muted hover:text-red p-1 shrink-0"><Trash2 size={13} /></button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50">
+                <div className="text-xs font-bold text-muted uppercase tracking-wide mb-2.5">+ GitLab Hesap Ekle</div>
+                <div className="grid gap-2">
+                  <input value={glUser} onChange={(e) => setGlUser(e.target.value)} placeholder="Kullanıcı adı" className="input-mono" />
+                  <input type="password" value={glToken} onChange={(e) => setGlToken(e.target.value)} placeholder="GitLab token (glpat-...)" className="input-mono" />
+                  <button onClick={submitGitlab} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-line hover:border-brand text-sm font-semibold transition-colors"><Plus size={15} /> Hesap Ekle</button>
                 </div>
               </div>
             </div>
