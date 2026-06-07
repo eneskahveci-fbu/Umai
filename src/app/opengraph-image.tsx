@@ -17,9 +17,9 @@ export default function OpengraphImage() {
           alignItems: "center",
           justifyContent: "center",
           background:
-            "radial-gradient(60% 60% at 50% 20%, rgba(124,92,255,0.45), transparent), #0e0e13",
+            "radial-gradient(60% 60% at 50% 20%, rgba(200,168,126,0.30), transparent), #111110",
           fontFamily: "system-ui, sans-serif",
-          color: "#ececf1",
+          color: "#f0ebe0",
           padding: 64,
         }}
       >
@@ -59,7 +59,7 @@ export default function OpengraphImage() {
             craft
             <span
               style={{
-                background: "linear-gradient(120deg, #9d7bff, #c4b1ff)",
+                background: "linear-gradient(120deg, #c8a87e, #e0caa8)",
                 backgroundClip: "text",
                 color: "transparent",
               }}
@@ -83,7 +83,7 @@ export default function OpengraphImage() {
         <div
           style={{
             fontSize: 24,
-            color: "#9a9ab0",
+            color: "#9a9080",
             textAlign: "center",
             maxWidth: 880,
             lineHeight: 1.4,
@@ -110,10 +110,10 @@ export default function OpengraphImage() {
               style={{
                 padding: "10px 20px",
                 borderRadius: 999,
-                border: "1px solid #28283a",
+                border: "1px solid #2e2a24",
                 background: "rgba(20,20,27,0.6)",
                 fontSize: 20,
-                color: "#ececf1",
+                color: "#f0ebe0",
               }}
             >
               {tag}

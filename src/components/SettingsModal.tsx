@@ -681,17 +681,15 @@ export function SettingsModal() {
               <div className="flex gap-2">
                 {([
                   { k: "amber",  label: "Amber",   color: "bg-[#c8a87e]" },
-                  { k: "blue",   label: "Mavi",    color: "bg-blue-500" },
-                  { k: "green",  label: "Yeşil",   color: "bg-green-500" },
-                  { k: "orange", label: "Turuncu", color: "bg-orange-500" },
-                  { k: "purple", label: "Mor",     color: "bg-purple-500" },
-                ] as { k: "amber" | "purple" | "blue" | "green" | "orange"; label: string; color: string }[]).map(({ k, label, color }) => (
+                  { k: "green",  label: "Yeşil",   color: "bg-[#3ddc84]" },
+                  { k: "orange", label: "Turuncu", color: "bg-[#f97316]" },
+                ] as { k: "amber" | "green" | "orange"; label: string; color: string }[]).map(({ k, label, color }) => (
                   <button
                     key={k}
                     onClick={() => {
                       saveConfig({ ...config, accentColor: k });
                       const cls = document.documentElement.classList;
-                      cls.remove("accent-amber", "accent-purple", "accent-blue", "accent-green", "accent-orange");
+                      cls.remove("accent-amber", "accent-green", "accent-orange");
                       cls.add(`accent-${k}`);
                     }}
                     className={`flex-1 py-2 rounded-lg border text-xs flex items-center justify-center gap-1.5 transition-colors ${

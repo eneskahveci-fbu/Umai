@@ -73,7 +73,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
         fontSize: 13,
         theme: {
           background: "#0a0a0d",
-          foreground: "#ececf1",
+          foreground: "#f0ebe0",
           cursor: "#c8a87e",
           selectionBackground: "#c8a87e40",
         },

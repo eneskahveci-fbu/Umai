@@ -160,7 +160,7 @@ export function EditorPanel({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0e0e13] border-l border-line/60">
+    <div className="flex flex-col h-full bg-[#111110] border-l border-line/60">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-line/60 shrink-0 bg-surface">
         <span className="text-xs font-mono text-muted/70 flex-1 truncate">{file.path}</span>
