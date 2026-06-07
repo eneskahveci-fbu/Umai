@@ -23,6 +23,7 @@ export default function AppPage() {
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
   const setUser = useStore((s) => s.setUser);
   const loadChats = useStore((s) => s.loadChats);
+  const syncConfig = useStore((s) => s.syncConfig);
 
   useEffect(() => {
     if (window.innerWidth >= 768) setSidebarOpen(false);
@@ -37,13 +38,13 @@ export default function AppPage() {
       const u = data.user;
       setUser(u?.id ?? null, u?.email ?? null);
       loadChats(u?.id ?? null);
-      if (u?.id) useStore.getState().syncCloudConfig(u.id);
+      if (u?.id) void syncConfig(u.id);
     });
     const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
       const u = session?.user;
       setUser(u?.id ?? null, u?.email ?? null);
       loadChats(u?.id ?? null);
-      if (u?.id) useStore.getState().syncCloudConfig(u.id);
+      if (u?.id) void syncConfig(u.id);
     });
     return () => sub.subscription.unsubscribe();
   }, [setUser, loadChats]);

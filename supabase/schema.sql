@@ -49,3 +49,16 @@ create policy "shared_chats - select"
 -- Giriş yapmış kullanıcılar oluşturabilir
 create policy "shared_chats - insert"
   on public.shared_chats for insert with check (auth.role() = 'authenticated' or auth.role() = 'anon');
+
+-- ── Kullanıcı config senkronizasyonu (modeller, API anahtarları, skill'ler vb.) ──
+create table if not exists public.user_config (
+  user_id    uuid primary key references auth.users on delete cascade,
+  config     jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.user_config enable row level security;
+
+drop policy if exists "kendi config - all" on public.user_config;
+create policy "kendi config - all"
+  on public.user_config for all using (auth.uid() = user_id);

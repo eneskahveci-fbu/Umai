@@ -180,7 +180,7 @@ interface StoreState {
 
   config: Config;
   saveConfig: (c: Config) => void;
-  syncCloudConfig: (userId: string) => Promise<void>;
+  syncConfig: (userId: string) => Promise<void>;
   addModel: (m: Omit<ModelProfile, "id">) => void;
   updateModel: (id: string, patch: Partial<ModelProfile>) => void;
   removeModel: (id: string) => void;
@@ -341,34 +341,42 @@ export const useStore = create<StoreState>()((set, get) => ({
       applyTheme(c.theme);
     }
     set({ config: c });
-    /* Giriş yapılmışsa değişikliği (debounce'lu) buluta da yaz. */
+    /* Supabase'e fire-and-forget senkron (giriş yapıldıysa) */
     const { userId } = get();
-    if (userId) pushCloudConfig(userId, c);
+    if (userId) {
+      const sb = createClient();
+      if (sb) {
+        void sb.from("user_config").upsert({
+          user_id: userId,
+          config: c,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    }
   },
-  /* Giriş anında çağrılır: buluttaki config'i çekip yerele uygular. Bulutta
-     kayıt yoksa (ilk giriş) mevcut yerel config'i buluta yükler. */
-  syncCloudConfig: async (userId) => {
-    if (isGuestMode()) return;
+  syncConfig: async (userId) => {
     const sb = createClient();
     if (!sb) return;
-    try {
-      const { data } = await sb
-        .from("user_configs")
-        .select("config")
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (data?.config) {
-        const cloud = data.config as Partial<Config>;
-        const merged: Config = { ...DEFAULT_CONFIG, ...get().config, ...cloud };
-        const store = getStore();
-        if (store) store.setItem(CONFIG_KEY, JSON.stringify(merged));
-        applyTheme(merged.theme);
-        set({ config: merged });
-      } else {
-        /* İlk giriş: yereldeki mevcut config'i buluta taşı. */
-        pushCloudConfig(userId, get().config);
-      }
-    } catch { /* sessiz — bulut erişilemezse yerel config kullanılmaya devam eder */ }
+    const { data } = await sb
+      .from("user_config")
+      .select("config")
+      .eq("user_id", userId)
+      .single();
+    if (data?.config) {
+      /* Uzak config var → uygula (farklı tarayıcıdan gelen ayarlar) */
+      const remote = data.config as Config;
+      applyTheme(remote.theme ?? "dark");
+      const store = getStore();
+      if (store) store.setItem(CONFIG_KEY, JSON.stringify(remote));
+      set({ config: remote });
+    } else {
+      /* İlk giriş → yerel config'i Supabase'e kaydet */
+      void sb.from("user_config").upsert({
+        user_id: userId,
+        config: get().config,
+        updated_at: new Date().toISOString(),
+      });
+    }
   },
   addModel: (m) => {
     const model: ModelProfile = { ...m, id: uid() };
