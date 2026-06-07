@@ -32,25 +32,20 @@ drop policy if exists "kendi sohbetleri - delete" on public.chats;
 create policy "kendi sohbetleri - delete"
   on public.chats for delete using (auth.uid() = user_id);
 
--- ─── Hesaba bağlı yapılandırma (modeller, API anahtarları, GitHub token'ları,
--- skill'ler, tercihler). Kullanıcı her tarayıcıdan aynı hesapla girince aynı
--- ayarlara erişir. Satır RLS ile korunur: yalnızca kullanıcının kendisi okur/yazar.
-create table if not exists public.user_configs (
-  user_id     uuid primary key references auth.users on delete cascade,
-  config      jsonb not null default '{}'::jsonb,
-  updated_at  timestamptz not null default now()
+-- Paylaşılan sohbetler (herkese açık, salt okunur)
+create table if not exists public.shared_chats (
+  id          text primary key,
+  title       text not null,
+  messages    jsonb not null default '[]'::jsonb,
+  created_at  timestamptz not null default now()
 );
 
-alter table public.user_configs enable row level security;
+alter table public.shared_chats enable row level security;
 
-drop policy if exists "kendi config - select" on public.user_configs;
-create policy "kendi config - select"
-  on public.user_configs for select using (auth.uid() = user_id);
+-- Herkes okuyabilir
+create policy "shared_chats - select"
+  on public.shared_chats for select using (true);
 
-drop policy if exists "kendi config - insert" on public.user_configs;
-create policy "kendi config - insert"
-  on public.user_configs for insert with check (auth.uid() = user_id);
-
-drop policy if exists "kendi config - update" on public.user_configs;
-create policy "kendi config - update"
-  on public.user_configs for update using (auth.uid() = user_id);
+-- Giriş yapmış kullanıcılar oluşturabilir
+create policy "shared_chats - insert"
+  on public.shared_chats for insert with check (auth.role() = 'authenticated' or auth.role() = 'anon');
