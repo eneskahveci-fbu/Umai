@@ -296,8 +296,8 @@ interface StoreState {
   setOnboardingDone: (b: boolean) => void;
 
   // thinking mode
-  thinkingMode: "fast" | "pro";
-  setThinkingMode: (m: "fast" | "pro") => void;
+  thinkingMode: "low" | "medium" | "high" | "max";
+  setThinkingMode: (m: "low" | "medium" | "high" | "max") => void;
 
   // tool-use
   toolsEnabled: boolean;
@@ -898,11 +898,15 @@ export const useStore = create<StoreState>()((set, get) => ({
     set({ onboardingDone: b });
   },
 
-  /* thinking mode */
-  thinkingMode:
-    (typeof window !== "undefined" &&
-      (localStorage.getItem("craftai_thinking") as "fast" | "pro")) ||
-    "fast",
+  /* thinking mode — migrate old "fast"→"medium", "pro"→"high" */
+  thinkingMode: (() => {
+    if (typeof window === "undefined") return "medium";
+    const raw = localStorage.getItem("craftai_thinking");
+    if (raw === "fast") return "medium";
+    if (raw === "pro") return "high";
+    if (raw === "low" || raw === "medium" || raw === "high" || raw === "max") return raw;
+    return "medium";
+  })() as "low" | "medium" | "high" | "max",
   setThinkingMode: (m) => {
     if (typeof window !== "undefined") localStorage.setItem("craftai_thinking", m);
     set({ thinkingMode: m });

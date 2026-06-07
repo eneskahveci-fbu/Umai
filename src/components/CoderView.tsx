@@ -115,26 +115,53 @@ function ComposerButton({
   );
 }
 
+const THINKING_LEVELS = [
+  { key: "low",    label: "Düşük", short: "D" },
+  { key: "medium", label: "Orta",  short: "O" },
+  { key: "high",   label: "Yüksek", short: "Y" },
+  { key: "max",    label: "Max",   short: "M" },
+] as const;
+
 function ThinkingModeToggle() {
   const thinkingMode = useStore((s) => s.thinkingMode);
   const setThinkingMode = useStore((s) => s.setThinkingMode);
-
-  const cycle = () =>
-    setThinkingMode(thinkingMode === "fast" ? "pro" : "fast");
+  const [open, setOpen] = useState(false);
+  const current = THINKING_LEVELS.find((l) => l.key === thinkingMode) ?? THINKING_LEVELS[1];
 
   return (
-    <button
-      onClick={cycle}
-      title={`Düşünce modu: ${thinkingMode === "pro" ? "Pro" : "Hızlı"} — tıkla değiştir`}
-      className={`flex items-center gap-1.5 text-[12px] px-2 py-1.5 rounded-lg transition-colors font-semibold ${
-        thinkingMode === "pro"
-          ? "text-brand bg-brand/10"
-          : "text-amber-400 bg-amber-400/10"
-      }`}
-    >
-      {thinkingMode === "pro" ? <Brain size={13} /> : <Zap size={13} />}
-      <span>{thinkingMode === "pro" ? "Pro Düşünce" : "Hızlı Düşünce"}</span>
-    </button>
+    <div className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        title="Düşünce derinliği"
+        className="flex items-center gap-1.5 text-[12px] px-2 py-1.5 rounded-lg transition-colors font-semibold text-brand bg-brand/10 hover:bg-brand/15"
+      >
+        <Brain size={13} />
+        <span className="hidden sm:inline">{current.label}</span>
+        <span className="sm:hidden">{current.short}</span>
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-1 z-50 bg-surface border border-line rounded-xl shadow-xl p-1 min-w-[130px] animate-fade-in"
+          onMouseLeave={() => setOpen(false)}
+        >
+          <div className="text-[9px] font-bold uppercase tracking-widest text-muted/50 px-2 pt-1 pb-1.5">Düşünce Derinliği</div>
+          {THINKING_LEVELS.map((l) => (
+            <button
+              key={l.key}
+              onClick={() => { setThinkingMode(l.key); setOpen(false); }}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[12px] transition-colors ${
+                thinkingMode === l.key
+                  ? "bg-brand/15 text-brand font-semibold"
+                  : "text-muted hover:text-ink hover:bg-bgsoft"
+              }`}
+            >
+              <span>{l.label}</span>
+              {thinkingMode === l.key && <span className="text-[9px] text-brand/60">●</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -481,11 +508,17 @@ export function CoderView() {
 
     const thinkingMode = store.thinkingMode;
     let finalSystemPrompt = coderSystemPrompt;
-    if (thinkingMode === "pro") {
+    if (thinkingMode === "medium") {
+      finalSystemPrompt += "\n\n[Düşünme: ORTA] Kısa bir iç değerlendirme yap, ardından net yanıt ver.";
+    } else if (thinkingMode === "high") {
       finalSystemPrompt +=
-        "\n\n[Düşünme modu: PRO] Adım adım analiz et. Önce sorunu içselleştir, " +
-        "olası yaklaşımları kıyasla, edge case'leri düşün, ardından gerekçeli çözümü ver. " +
-        "Daha derin akıl yürütme yap, kısa kesme.";
+        "\n\n[Düşünme: YÜKSEK] Adım adım analiz et. Sorunu içselleştir, " +
+        "olası yaklaşımları kıyasla, edge case'leri düşün, ardından gerekçeli çözümü ver.";
+    } else if (thinkingMode === "max") {
+      finalSystemPrompt +=
+        "\n\n[Düşünme: MAX] En derin analizi yap. Problemi birden fazla açıdan incele, " +
+        "tüm alternatif yaklaşımları değerlendir, olası hataları ve edge case'leri listele, " +
+        "güvenlik ve performans etkilerini değerlendir, ardından en sağlam çözümü tam gerekçesiyle sun. Kısa kesme.";
     }
 
     const repo = store.repo;
@@ -795,7 +828,7 @@ export function CoderView() {
             </button>
           )}
           {incognito && (
-            <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-purple/10 text-purple border border-purple/30">
+            <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-brand/10 text-brand border border-brand/30">
               <VenetianMask size={9} /> Gizli
             </span>
           )}
@@ -820,7 +853,7 @@ export function CoderView() {
           <button
             onClick={() => setGitPanelOpen((v) => !v)}
             title="Git işlemleri (dal, PR)"
-            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${gitPanelOpen ? "text-purple-400 bg-purple-400/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
+            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${gitPanelOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
           >
             <GitBranch size={14} />
           </button>

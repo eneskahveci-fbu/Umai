@@ -74,8 +74,8 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
         theme: {
           background: "#0a0a0d",
           foreground: "#ececf1",
-          cursor: "#7c5cff",
-          selectionBackground: "#7c5cff40",
+          cursor: "#c8a87e",
+          selectionBackground: "#c8a87e40",
         },
       });
       const fit = new FitAddon();

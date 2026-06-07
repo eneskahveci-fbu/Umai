@@ -36,15 +36,14 @@ export default function OpengraphImage() {
               width: 84,
               height: 84,
               borderRadius: 22,
-              background:
-                "linear-gradient(120deg, #7c5cff, #a78bfa 60%, #46d4e0)",
+              background: "linear-gradient(135deg, #c8a87e, #e0caa8)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#fff",
+              color: "#111110",
               fontSize: 48,
               fontWeight: 800,
-              boxShadow: "0 16px 40px rgba(124,92,255,0.35)",
+              boxShadow: "0 16px 40px rgba(200,168,126,0.30)",
             }}
           >
             ◆
