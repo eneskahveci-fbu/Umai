@@ -75,6 +75,7 @@ import {
 import type { TreeFile, TreeNode } from "@/lib/types";
 import { AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agents";
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
+import { STYLE_LABELS } from "@/lib/constants";
 
 declare global {
   interface SpeechRecognition {
@@ -544,36 +545,68 @@ export function CoderView() {
         });
         return scored.sort((a, b) => b.hits - a.hits).slice(0, 5).map((x) => x.skill);
       })();
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: coderAbort.signal,
-        body: JSON.stringify({
-          messages: apiMessages,
-          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey,
-          provider: active.provider, systemPrompt: finalSystemPrompt,
-          style: store.config.style,
-          memories: store.config.memories,
-          skills: activeSkills.map((s) => ({
-            title: s.title, content: s.content, tags: s.tags, source: s.source, fileName: s.fileName,
-          })),
-          tools: toolsEnabled,
-          repoCtx: toolsEnabled && repo ? {
-            owner: repo.owner,
-            repo: repo.repo,
-            branch: repo.branch,
-            token: repoIsGitLab ? activeGitlab?.token : activeGithub?.token,
-            provider: repoIsGitLab ? "gitlab" : "github",
-          } : undefined,
-          mcpServers: (store.config.mcpServers ?? []).filter((s) => s.enabled).map((s) => ({
-            url: s.url,
-            headers: s.headers,
-            enabled: s.enabled,
-          })),
-        }),
-      });
+      /* Pollinations: tarayıcıdan doğrudan çağrı yapılır (her kullanıcı kendi IP'sini kullanır,
+         sunucu IP'si paylaşıldığında oluşan rate-limit sorunu önlenir). CORS açık. */
+      let res: Response;
+      if (active.provider === "pollinations") {
+        let sysContent = finalSystemPrompt;
+        const styleP = STYLE_LABELS[store.config.style]?.prompt;
+        if (styleP) sysContent += `\n\n[Stil]: ${styleP}`;
+        if (store.config.memories?.length) {
+          sysContent += `\n\n[Kullanıcı hakkında bildiklerin]:\n${store.config.memories.map((m) => `- ${m.content}`).join("\n")}`;
+        }
+        if (activeSkills.length) {
+          const fileSkills = activeSkills.filter((s) => s.source === "file");
+          const manualSkills = activeSkills.filter((s) => s.source !== "file");
+          if (manualSkills.length) sysContent += `\n\n[Eğitim seti]:\n${manualSkills.map((s) => `### ${s.title}\n${s.content}`).join("\n\n")}`;
+          if (fileSkills.length) sysContent += `\n\n[Referans dosyalar]:\n${fileSkills.map((s) => `--- ${s.fileName || s.title} ---\n${s.content}`).join("\n\n")}`;
+        }
+        res = await fetch(`${active.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: coderAbort.signal,
+          body: JSON.stringify({
+            model: active.model,
+            messages: [{ role: "system", content: sysContent }, ...apiMessages],
+            stream: true,
+          }),
+        });
+      } else {
+        res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: coderAbort.signal,
+          body: JSON.stringify({
+            messages: apiMessages,
+            baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey,
+            provider: active.provider, systemPrompt: finalSystemPrompt,
+            style: store.config.style,
+            memories: store.config.memories,
+            skills: activeSkills.map((s) => ({
+              title: s.title, content: s.content, tags: s.tags, source: s.source, fileName: s.fileName,
+            })),
+            tools: toolsEnabled,
+            repoCtx: toolsEnabled && repo ? {
+              owner: repo.owner,
+              repo: repo.repo,
+              branch: repo.branch,
+              token: repoIsGitLab ? activeGitlab?.token : activeGithub?.token,
+              provider: repoIsGitLab ? "gitlab" : "github",
+            } : undefined,
+            mcpServers: (store.config.mcpServers ?? []).filter((s) => s.enabled).map((s) => ({
+              url: s.url,
+              headers: s.headers,
+              enabled: s.enabled,
+            })),
+          }),
+        });
+      }
 
-      if (!res.ok || !res.body) throw new Error((await res.text().catch(() => "")) || `${res.status}`);
+      if (!res.ok || !res.body) {
+        const detail = await res.text().catch(() => "");
+        if (res.status === 429) throw new Error(`⏱️ İstek limiti aşıldı [${active.provider} / ${active.model}]: 30-60 saniye bekle ve tekrar dene.`);
+        throw new Error(detail || `Hata ${res.status}`);
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();

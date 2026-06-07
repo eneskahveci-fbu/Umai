@@ -382,7 +382,7 @@ export const DEFAULT_SKILLS: Skill[] = [
   },
 ];
 
-export const POLLINATIONS_DEFAULT_MODEL: import("./types").ModelProfile = {
+export const POLLINATIONS_DEFAULT_MODEL: ModelProfile = {
   id: "craft-default-pollinations",
   label: "✦ Craft Default (Ücretsiz)",
   provider: "pollinations",

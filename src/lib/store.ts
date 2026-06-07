@@ -113,7 +113,7 @@ function loadConfig(): Config {
         try { store.setItem(CONFIG_KEY, JSON.stringify(merged)); } catch { /* yok say */ }
       }
       /* Eski purple/blue accent renkleri amber'e migrate et */
-      if (merged.accentColor === "purple" || merged.accentColor === "blue") {
+      if ((merged.accentColor as string) === "purple" || (merged.accentColor as string) === "blue") {
         merged.accentColor = "amber";
       }
       /* Eğer hiç model yoksa, ücretsiz Pollinations modelini tohum olarak ekle */
