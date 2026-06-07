@@ -787,6 +787,25 @@ export function CoderView() {
       }
       setPendingCommit(autoFiles.length >= 2 ? autoFiles : null);
 
+      /* HTML / SVG / CSS içeren yanıtı canvas'ta otomatik önizle */
+      const directM = /```(html|svg|mermaid)(?::[^\n]*)?\n([\s\S]*?)```/.exec(full);
+      if (directM) {
+        useStore.getState().setArtifact({
+          type: directM[1] as "html" | "svg" | "mermaid",
+          content: directM[2],
+          title: `${directM[1].toUpperCase()} Önizleme`,
+        });
+      } else {
+        const cssM = /```css(?::[^\n]*)?\n([\s\S]*?)```/.exec(full);
+        if (cssM) {
+          useStore.getState().setArtifact({
+            type: "html",
+            content: `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${cssM[1]}</style></head><body></body></html>`,
+            title: "CSS Önizleme",
+          });
+        }
+      }
+
       /* token tahmini */
       const inputText = apiMessages.map((m) => typeof m.content === "string" ? m.content : "").join("\n");
       const tokenIn = estimateTokens(inputText) + estimateTokens(coderSystemPrompt);
@@ -1436,17 +1455,41 @@ export function CoderView() {
                     onClick={() => {
                       const msgs = useStore.getState().current()?.messages ?? [];
                       for (let i = msgs.length - 1; i >= 0; i--) {
-                        const m = /```(html|svg|mermaid)\n([\s\S]*?)\n```/.exec(msgs[i].content);
-                        if (m) {
+                        const content = msgs[i].content;
+                        if (!content) continue;
+                        // html / svg / mermaid — direct preview
+                        const directMatch = /```(?:html|svg|mermaid)(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
+                        if (directMatch) {
+                          const lang = /```(html|svg|mermaid)/.exec(content)?.[1] ?? "html";
                           useStore.getState().setArtifact({
-                            type: m[1] as "html" | "svg" | "mermaid",
-                            content: m[2],
-                            title: `${m[1].toUpperCase()} Önizleme`,
+                            type: lang as "html" | "svg" | "mermaid",
+                            content: directMatch[1],
+                            title: `${lang.toUpperCase()} Önizleme`,
+                          });
+                          return;
+                        }
+                        // css-only → wrap in minimal html page
+                        const cssMatch = /```css(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
+                        if (cssMatch) {
+                          useStore.getState().setArtifact({
+                            type: "html",
+                            content: `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${cssMatch[1]}</style></head><body></body></html>`,
+                            title: "CSS Önizleme",
+                          });
+                          return;
+                        }
+                        // js / javascript → wrap in script tag
+                        const jsMatch = /```(?:javascript|js|jsx|ts|tsx)(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
+                        if (jsMatch) {
+                          useStore.getState().setArtifact({
+                            type: "html",
+                            content: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><script>${jsMatch[1]}<\/script></body></html>`,
+                            title: "JS Önizleme",
                           });
                           return;
                         }
                       }
-                      addToast("Önizlenecek HTML, SVG veya Mermaid kodu bulunamadı", "info");
+                      addToast("Önizlenecek HTML, SVG, CSS veya Mermaid kodu bulunamadı", "info");
                     }}
                     active={!!artifact}
                     title="Canvas önizleme"
