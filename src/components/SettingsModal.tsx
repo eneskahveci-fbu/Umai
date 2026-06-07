@@ -82,13 +82,16 @@ export function SettingsModal() {
     }
     return hits;
   })();
-  /* Auto-jump to the first matching tab when search changes */
-  useEffect(() => {
-    if (!search.trim() || matchingTabs.size === 0) return;
-    const first = (["model", "github", "general", "advanced", "mcp"] as const).find((k) => matchingTabs.has(k));
-    if (first && first !== tab) setTab(first);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+  /* Auto-jump to the first matching tab when the search text changes —
+     adjusted during render rather than in a state-syncing effect. */
+  const [prevSearch, setPrevSearch] = useState(search);
+  if (search !== prevSearch) {
+    setPrevSearch(search);
+    if (search.trim() && matchingTabs.size > 0) {
+      const first = (["model", "github", "general", "advanced", "mcp"] as const).find((k) => matchingTabs.has(k));
+      if (first && first !== tab) setTab(first);
+    }
+  }
   const [provider, setProvider] = useState<Provider>("hf");
   const [label, setLabel] = useState("");
   const [baseUrl, setBaseUrl] = useState(PRESETS.hf.baseUrl);
@@ -108,14 +111,16 @@ export function SettingsModal() {
      saveConfig on every keystroke (which triggers re-renders and focus loss). */
   const [systemPromptDraft, setSystemPromptDraft] = useState(() => config.systemPrompt);
   const [rulesFileDraft, setRulesFileDraft] = useState(() => config.rulesFile);
-  /* Sync drafts when modal opens so stale state isn't shown */
-  useEffect(() => {
+  /* Refresh the drafts when the modal (re)opens so stale text isn't shown —
+     adjusted during render on the open→true transition. */
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) {
       setSystemPromptDraft(config.systemPrompt);
       setRulesFileDraft(config.rulesFile);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }
   /* Sağlayıcıdan anahtarla canlı çekilen model listesi + durum */
   const [fetchedModels, setFetchedModels] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -302,7 +307,7 @@ export function SettingsModal() {
               <div className="text-xs text-brand font-semibold mb-1">💡 Gemini API Hakkında</div>
               <p className="text-xs text-muted leading-relaxed">
                 Google Gemini ücretsiz olarak kullanılabilir.
-                <a href="https://ai.google.dev/pricing" target="_blank" rel="noopener noreferrer" className="text-brand hover:text-branddim underline"> ai.google.dev</a>'den API anahtarı alabilirsin.
+                <a href="https://ai.google.dev/pricing" target="_blank" rel="noopener noreferrer" className="text-brand hover:text-branddim underline"> ai.google.dev</a>&apos;den API anahtarı alabilirsin.
                 Günde 1.5 milyon istek sınırı var.
               </p>
             </div>
@@ -411,7 +416,7 @@ export function SettingsModal() {
             {/* Repositories */}
             <div>
               <h4 className="text-sm font-bold mb-1">Depolar</h4>
-              <p className="text-xs text-muted mb-2">Aktif depo Coder'da otomatik bağlanır. En fazla 12 depo kaydedilir.</p>
+              <p className="text-xs text-muted mb-2">Aktif depo Coder&apos;da otomatik bağlanır. En fazla 12 depo kaydedilir.</p>
               {config.repos.length > 0 && (
                 <div className="flex flex-col gap-2 mb-3">
                   {config.repos.map((r) => {
@@ -491,7 +496,7 @@ export function SettingsModal() {
                 <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
                   <input type="checkbox" checked={config.autoTerminal} onChange={() => saveConfig({ ...config, autoTerminal: !config.autoTerminal })} className="accent-brand mt-0.5" />
                   <div>
-                    <div className="text-sm font-semibold">Terminal'i otomatik aç</div>
+                    <div className="text-sm font-semibold">Terminal&apos;i otomatik aç</div>
                     <div className="text-xs text-muted mt-0.5">Coder sekmesi açılınca terminal panelini otomatik gösterir.</div>
                   </div>
                 </label>
@@ -502,7 +507,7 @@ export function SettingsModal() {
             <div>
               <h4 className="text-sm font-bold mb-1">.rules — Proje Kuralları</h4>
               <p className="text-xs text-muted mb-2">
-                Coder'da her istekte sistem promptuna eklenir. Teknoloji tercihlerin, kod stili, kısıtlamalar.
+                Coder&apos;da her istekte sistem promptuna eklenir. Teknoloji tercihlerin, kod stili, kısıtlamalar.
               </p>
               <textarea
                 value={rulesFileDraft}
@@ -792,7 +797,7 @@ export function SettingsModal() {
           <section className="space-y-5">
             <div>
               <h4 className="text-sm font-bold mb-1">MCP Sunucuları</h4>
-              <p className="text-xs text-muted mb-3">Model Context Protocol — AI'ya harici araçlar bağla (veritabanı, dosya sistemi, API vb.). Sunucu JSON-RPC 2.0 üzerinden HTTP ile erişilebilir olmalı.</p>
+              <p className="text-xs text-muted mb-3">Model Context Protocol — AI&apos;ya harici araçlar bağla (veritabanı, dosya sistemi, API vb.). Sunucu JSON-RPC 2.0 üzerinden HTTP ile erişilebilir olmalı.</p>
 
               {(config.mcpServers ?? []).length > 0 && (
                 <div className="flex flex-col gap-2 mb-4">

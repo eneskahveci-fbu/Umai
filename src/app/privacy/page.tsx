@@ -77,7 +77,7 @@ export default function PrivacyPage() {
                 </tr>
                 <tr>
                   <td>AI sohbet mesajları</td>
-                  <td>Seçilen AI API'ye iletilerek yanıt alınması</td>
+                  <td>Seçilen AI API&apos;ye iletilerek yanıt alınması</td>
                   <td>Sözleşme ifası / Hizmet sunumu</td>
                 </tr>
                 <tr>

@@ -302,8 +302,9 @@ export function MessageBubble({
           <ToolCallGroup calls={message.toolCalls} />
         ) : null}
 
-        {/* Images */}
+        {/* Images — arbitrary user/data-URI sources, so next/image isn't suitable */}
         {message.images?.map((img, i) => (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             key={i}
             src={img}

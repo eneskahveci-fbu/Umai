@@ -367,7 +367,7 @@ function AgentsTab() {
   return (
     <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
       <p className="text-[11px] text-muted/50 mb-2">
-        Yerleşik agent'lar — slash komutla (örn. <code className="font-mono bg-bgsoft px-1 py-0.5 rounded text-amber-400/80">/refactor</code>) tetiklenir.
+        Yerleşik agent&apos;lar — slash komutla (örn. <code className="font-mono bg-bgsoft px-1 py-0.5 rounded text-amber-400/80">/refactor</code>) tetiklenir.
       </p>
       {AGENTS.map((a) => (
         <div key={a.id} className="bg-bgsoft/40 border border-line/60 rounded-xl px-3.5 py-3">
@@ -382,7 +382,7 @@ function AgentsTab() {
               </div>
               <p className="text-[12px] text-muted/70 leading-relaxed mb-2">{a.description}</p>
               <details className="text-[11px]">
-                <summary className="text-muted/50 cursor-pointer hover:text-muted">Sistem prompt'u gör</summary>
+                <summary className="text-muted/50 cursor-pointer hover:text-muted">Sistem prompt&apos;u gör</summary>
                 <pre className="mt-2 text-[11px] font-mono bg-[#0a0a0d] text-muted/70 px-3 py-2 rounded-lg whitespace-pre-wrap leading-relaxed">{a.systemPrompt}</pre>
               </details>
             </div>

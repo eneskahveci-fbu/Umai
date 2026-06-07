@@ -72,6 +72,5 @@ export function useModalA11y(
       document.removeEventListener("keydown", onKey);
       previouslyFocused?.focus?.();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, ref]);
 }

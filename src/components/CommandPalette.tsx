@@ -129,15 +129,28 @@ export function CommandPalette() {
       })
     : actions;
 
-  useEffect(() => {
+  /* Reset the highlighted row when the query changes, and clear search when
+     the palette (re)opens — both adjusted during render rather than in an
+     effect (React's recommended pattern for prop-derived state). */
+  const [prevQuery, setPrevQuery] = useState(query);
+  if (query !== prevQuery) {
+    setPrevQuery(query);
     setSelectedIndex(0);
-  }, [query]);
-
-  useEffect(() => {
+  }
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) {
       setQuery("");
       setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }
+
+  /* Focus the input after the palette opens (genuine post-render side effect). */
+  useEffect(() => {
+    if (open) {
+      const t = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(t);
     }
   }, [open]);
 

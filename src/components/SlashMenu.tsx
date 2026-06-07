@@ -18,7 +18,12 @@ export function SlashMenu({ query, onSelect, onClose }: Props) {
     (a) => a.command.toLowerCase().includes(q) || a.label.toLowerCase().includes(q),
   );
 
-  useEffect(() => { setActive(0); }, [query]);
+  /* Reset highlight when the query changes — adjusted during render. */
+  const [prevQuery, setPrevQuery] = useState(query);
+  if (query !== prevQuery) {
+    setPrevQuery(query);
+    setActive(0);
+  }
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

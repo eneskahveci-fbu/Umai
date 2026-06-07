@@ -37,12 +37,12 @@ export function AuthButton() {
 
   return (
     <button
-      onClick={() => { window.location.href = "/login"; }}
+      onClick={() => { setBusy(true); window.location.href = "/login"; }}
       disabled={busy}
       className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-line bg-bgsoft hover:border-brand text-sm font-semibold disabled:opacity-50"
     >
       <LogIn size={15} />
-      Giriş Yap / Kayıt Ol
+      {busy ? "Yönlendiriliyor…" : "Giriş Yap / Kayıt Ol"}
     </button>
   );
 }
