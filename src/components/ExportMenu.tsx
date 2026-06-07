@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, Clipboard, Code, Download, FileJson, FileText, Share2 } from "lucide-react";
 import { useStore } from "@/lib/store";
 
@@ -88,18 +89,21 @@ ${chat.messages.map((m) => `
         <span className="hidden sm:inline">Dışa aktar</span>
         <ChevronDown size={11} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <div
-          style={{ top: pos.top, right: pos.right }}
-          className="fixed w-52 rounded-xl border border-line/60 bg-surface shadow-xl shadow-black/40 py-1 z-[70] backdrop-blur-sm"
-        >
-          <Item icon={<FileText size={12} />} label="Markdown indir (.md)"   onClick={run(() => exportChat(chatId))} />
-          <Item icon={<FileJson size={12} />} label="JSON indir (.json)"      onClick={run(() => exportChatJson(chatId))} />
-          <Item icon={<Code size={12} />}      label="HTML indir (.html)"     onClick={run(() => exportChatHtml(chatId))} />
-          <Item icon={<Download size={12} />}  label="PDF olarak yazdır"      onClick={run(() => exportPdf())} />
-          <div className="my-1 h-px bg-line/40" />
-          <Item icon={<Clipboard size={12} />} label="Markdown'ı kopyala"    onClick={run(() => copyChatMarkdown(chatId))} />
-        </div>
+      {typeof document !== "undefined" && createPortal(
+        open ? (
+          <div
+            style={{ top: pos.top, right: pos.right, position: "fixed", zIndex: 9999 }}
+            className="w-52 rounded-xl border border-line/60 bg-surface shadow-2xl shadow-black/50 py-1"
+          >
+            <Item icon={<FileText size={12} />} label="Markdown indir (.md)"   onClick={run(() => exportChat(chatId))} />
+            <Item icon={<FileJson size={12} />} label="JSON indir (.json)"      onClick={run(() => exportChatJson(chatId))} />
+            <Item icon={<Code size={12} />}      label="HTML indir (.html)"     onClick={run(() => exportChatHtml(chatId))} />
+            <Item icon={<Download size={12} />}  label="PDF olarak yazdır"      onClick={run(() => exportPdf())} />
+            <div className="my-1 h-px bg-line/40" />
+            <Item icon={<Clipboard size={12} />} label="Markdown'ı kopyala"    onClick={run(() => copyChatMarkdown(chatId))} />
+          </div>
+        ) : null,
+        document.body
       )}
     </div>
   );
