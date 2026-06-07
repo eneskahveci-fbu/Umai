@@ -29,12 +29,12 @@ const FEATURES = [
   {
     icon: <Code2 size={20} />,
     title: "Coder Sekmesi",
-    desc: "GitLab deposuna bağlan, dosyaları gez, içeriği sohbete gönderip kod sor. Diff görünümü ile değişiklikleri karşılaştır.",
+    desc: "GitHub veya GitLab deposuna bağlan, dosyaları gez, içeriği sohbete gönderip kod sor. Diff görünümü ile değişiklikleri karşılaştır.",
   },
   {
     icon: <GitBranch size={20} />,
-    title: "Çoklu Repo Desteği",
-    desc: "Birden fazla token ekle, özel depolara eriş, repo'lar arası geçiş yap. Tek tıkla commit & push.",
+    title: "GitHub & GitLab Desteği",
+    desc: "GitHub ve GitLab token'larını ekle, özel depolara eriş, repo'lar arası geçiş yap. Tek tıkla commit & push.",
   },
   {
     icon: <VenetianMask size={20} />,
@@ -110,8 +110,8 @@ const FAQS = [
     a: "API anahtarların yalnızca tarayıcında (localStorage veya gizli modda sessionStorage) saklanır. Sohbet geçmişi için isteğe bağlı Supabase entegrasyonu var; kullanmak zorunda değilsin.",
   },
   {
-    q: "Coder entegrasyonu nasıl çalışıyor?",
-    a: "Coder sekmesinde GitLab ya da uyumlu bir servisin personal access token'ınla giriş yaparsın. Repo'ları gezebilir, dosya içeriklerini sohbete gönderebilir, kod değişikliklerini commit edebilirsin.",
+    q: "GitHub ve GitLab entegrasyonu nasıl çalışıyor?",
+    a: "Coder sekmesinde GitHub veya GitLab personal access token'ınla giriş yaparsın. Repo'ları gezebilir, dosya içeriklerini sohbete gönderebilir, kod değişikliklerini commit edebilirsin. Her iki platform da aynı anda desteklenir.",
   },
   {
     q: "Mobilde çalışıyor mu?",
@@ -206,7 +206,7 @@ export default function Home() {
         </h1>
 
         <p className="text-lg text-muted max-w-2xl mx-auto mt-6 leading-relaxed">
-          craft.ai; dosyalarını okur, kod yazar, GitHub deposunu gezer — hem de
+          craft.ai; dosyalarını okur, kod yazar, GitHub ve GitLab depolarını gezer — hem de
           istediğin modelle. Hugging Face, DeepSeek, Groq, Anthropic ya da
           kendi yerel modelin: hepsi tek bir akışta.
         </p>
