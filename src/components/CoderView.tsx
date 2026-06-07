@@ -594,11 +594,14 @@ export function CoderView() {
           messages: [{ role: "system", content: sysContent }, ...apiMessages],
           stream: true,
         });
-        /* Retry sequence: try selected model up to 3 times with backoff,
-           then fall back to "openai" (least busy) if a different model was chosen. */
-        const RETRY_DELAYS = [4000, 8000];
-        let polModel = active.model;
-        let attempt = 0;
+        /* Cycle through models on 429: try each for up to 2 attempts before moving on.
+           Order: selected → openai → mistral → llama (least to most likely available) */
+        const startModel = active.model === "openai-fast" ? "openai" : active.model;
+        const POL_FALLBACKS = ["openai", "mistral", "llama"].filter((m) => m !== startModel);
+        const polQueue = [startModel, ...POL_FALLBACKS];
+        let polModel = polQueue.shift()!;
+        let polAttempt = 0;
+        const POL_WAIT = 3000;
         // eslint-disable-next-line no-constant-condition
         while (true) {
           res = await fetch(`${active.baseUrl}/chat/completions`, {
@@ -608,18 +611,18 @@ export function CoderView() {
             body: makePolBody(polModel),
           });
           if (res.status !== 429) break;
-          if (attempt < RETRY_DELAYS.length) {
-            const wait = RETRY_DELAYS[attempt++];
-            addToast(`Pollinations yoğun, ${wait / 1000}s sonra yeniden deneniyor... (${attempt}/${RETRY_DELAYS.length + 1})`, "info");
+          if (polAttempt < 1) {
+            polAttempt++;
+            addToast(`Pollinations yoğun, ${POL_WAIT / 1000}s sonra tekrar deneniyor...`, "info");
             await new Promise<void>((resolve) => {
-              const t = setTimeout(resolve, wait);
+              const t = setTimeout(resolve, POL_WAIT);
               coderAbort.signal.addEventListener("abort", () => clearTimeout(t), { once: true });
             });
             if (coderAbort.signal.aborted) throw new DOMException("Aborted", "AbortError");
-          } else if (polModel !== "openai") {
-            polModel = "openai";
-            attempt = 0;
-            addToast("openai-fast doldu — openai modeline geçiliyor...", "info");
+          } else if (polQueue.length > 0) {
+            polModel = polQueue.shift()!;
+            polAttempt = 0;
+            addToast(`Alternatif model deneniyor: ${polModel}...`, "info");
           } else {
             break;
           }
