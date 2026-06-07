@@ -135,7 +135,18 @@ function loadConfig(): Config {
   } catch {
     /* yok say */
   }
-  return DEFAULT_CONFIG;
+  /* localStorage boşsa (browser gizli mod / temiz oturum): önce bu oturumda
+     kaydedilmiş sessionStorage yedeğine bak; yoksa Pollinations tohumu ile başla. */
+  if (typeof window !== "undefined") {
+    try {
+      const ssRaw = window.sessionStorage.getItem(CONFIG_KEY + "_backup");
+      if (ssRaw) {
+        const parsed = JSON.parse(ssRaw);
+        return { ...DEFAULT_CONFIG, ...parsed };
+      }
+    } catch { /* yok say */ }
+  }
+  return { ...DEFAULT_CONFIG, models: [POLLINATIONS_DEFAULT_MODEL], activeModelId: POLLINATIONS_DEFAULT_MODEL.id };
 }
 
 /* ─── Hesaba bağlı config senkronu ───
@@ -348,6 +359,11 @@ export const useStore = create<StoreState>()((set, get) => ({
     if (store) {
       store.setItem(CONFIG_KEY, JSON.stringify(c));
       applyTheme(c.theme);
+      /* Mirror to sessionStorage so the same incognito session survives page
+         reloads; loadConfig falls back to this key when localStorage is empty. */
+      if (!isGuestMode()) {
+        try { window.sessionStorage.setItem(CONFIG_KEY + "_backup", JSON.stringify(c)); } catch { /* ignore */ }
+      }
     }
     set({ config: c });
     /* Supabase'e fire-and-forget senkron (giriş yapıldıysa) */

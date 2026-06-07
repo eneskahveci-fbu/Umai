@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import Editor, { OnMount, useMonaco } from "@monaco-editor/react";
-import { Check, Copy, GitCommit, Loader2, Sparkles, X } from "lucide-react";
+import { Check, Copy, GitCommit, Loader2, RotateCcw, Sparkles, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { EditorFile } from "@/lib/editor";
 
@@ -165,6 +165,15 @@ export function EditorPanel({
       <div className="flex items-center gap-2 px-3 py-2 border-b border-line/60 shrink-0 bg-surface">
         <span className="text-xs font-mono text-muted/70 flex-1 truncate">{file.path}</span>
         {dirty && <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Kaydedilmemiş değişiklik" />}
+        {dirty && (
+          <button
+            onClick={() => { setValue(file.content); setDirty(false); setShowCommit(false); }}
+            className="text-muted hover:text-red p-1 rounded transition-colors"
+            title="Değişiklikleri geri al"
+          >
+            <RotateCcw size={13} />
+          </button>
+        )}
         <button onClick={copy} className="text-muted hover:text-ink p-1 rounded transition-colors" title="Kopyala">
           {copied ? <Check size={13} className="text-green" /> : <Copy size={13} />}
         </button>
