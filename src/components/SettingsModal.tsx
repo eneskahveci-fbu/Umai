@@ -7,6 +7,7 @@ import {
   Check,
   FolderGit2,
   GitBranch,
+  Loader2,
   Moon,
   Pencil,
   Play,
@@ -46,8 +47,17 @@ export function SettingsModal() {
   const addMemory = useStore((s) => s.addMemory);
   const removeMemory = useStore((s) => s.removeMemory);
   const updateProject = useStore((s) => s.updateProject);
+  const addMcpServer = useStore((s) => s.addMcpServer);
+  const removeMcpServer = useStore((s) => s.removeMcpServer);
+  const updateMcpServer = useStore((s) => s.updateMcpServer);
 
-  const [tab, setTab] = useState<"model" | "github" | "general" | "advanced">("model");
+  const [mcpName, setMcpName] = useState("");
+  const [mcpUrl, setMcpUrl] = useState("");
+  const [mcpHeaderKey, setMcpHeaderKey] = useState("");
+  const [mcpHeaderVal, setMcpHeaderVal] = useState("");
+  const [mcpTesting, setMcpTesting] = useState<string | null>(null);
+
+  const [tab, setTab] = useState<"model" | "github" | "general" | "advanced" | "mcp">("model");
   const [search, setSearch] = useState("");
   const modalRef = useRef<HTMLDivElement>(null);
   useModalA11y(modalRef, open, () => setOpen(false));
@@ -57,11 +67,12 @@ export function SettingsModal() {
 
   /* Keyword index — typing in the search box jumps to whichever tab
      contains the matching keyword (first hit wins). */
-  const SEARCH_INDEX: Record<"model" | "github" | "general" | "advanced", string[]> = {
+  const SEARCH_INDEX: Record<"model" | "github" | "general" | "advanced" | "mcp", string[]> = {
     model:    ["model", "api", "anahtar", "key", "openai", "anthropic", "huggingface", "hf", "provider", "test"],
     github:   ["github", "gitlab", "token", "depo", "repo", "branch", "dal", "kullanıcı", "username"],
     general:  ["sistem", "prompt", "stil", "style", "tema", "theme", "renk", "color", "accent", "font", "yazı", "ses", "sound", "skill", "memori", "ayar"],
     advanced: ["webcontainer", "key", "context", "max", "guest", "misafir", "kural", "rules", "rulesfile", "gelişmiş"],
+    mcp:      ["mcp", "model context", "protocol", "sunucu", "server", "araç", "tool", "entegrasyon"],
   };
   const matchingTabs = (() => {
     const q = search.trim().toLowerCase();
@@ -75,7 +86,7 @@ export function SettingsModal() {
   /* Auto-jump to the first matching tab when search changes */
   useEffect(() => {
     if (!search.trim() || matchingTabs.size === 0) return;
-    const first = (["model", "github", "general", "advanced"] as const).find((k) => matchingTabs.has(k));
+    const first = (["model", "github", "general", "advanced", "mcp"] as const).find((k) => matchingTabs.has(k));
     if (first && first !== tab) setTab(first);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
@@ -251,7 +262,7 @@ export function SettingsModal() {
         </div>
 
         <div className="flex gap-1 mb-5 border-b border-line">
-          {([["model", "Model"], ["github", "GitHub"], ["general", "Genel"], ["advanced", "Gelişmiş"]] as const).map(([key, lbl]) => {
+          {([["model", "Model"], ["github", "GitHub"], ["general", "Genel"], ["advanced", "Gelişmiş"], ["mcp", "MCP"]] as const).map(([key, lbl]) => {
             const hit = matchingTabs.has(key);
             return (
               <button
@@ -773,6 +784,88 @@ export function SettingsModal() {
                   </div>
                 );
               })()}
+            </div>
+          </section>
+        )}
+
+        {/* MCP */}
+        {tab === "mcp" && (
+          <section className="space-y-5">
+            <div>
+              <h4 className="text-sm font-bold mb-1">MCP Sunucuları</h4>
+              <p className="text-xs text-muted mb-3">Model Context Protocol — AI'ya harici araçlar bağla (veritabanı, dosya sistemi, API vb.). Sunucu JSON-RPC 2.0 üzerinden HTTP ile erişilebilir olmalı.</p>
+
+              {(config.mcpServers ?? []).length > 0 && (
+                <div className="flex flex-col gap-2 mb-4">
+                  {(config.mcpServers ?? []).map((srv) => (
+                    <div key={srv.id} className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-line bg-bgsoft">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold truncate">{srv.name}</div>
+                        <div className="text-xs text-muted font-mono truncate">{srv.url}</div>
+                      </div>
+                      <label className="flex items-center gap-1.5 text-xs text-muted cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={srv.enabled}
+                          onChange={() => updateMcpServer(srv.id, { enabled: !srv.enabled })}
+                          className="accent-brand"
+                        />
+                        Aktif
+                      </label>
+                      <button
+                        onClick={async () => {
+                          setMcpTesting(srv.id);
+                          try {
+                            const res = await fetch("/api/mcp", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ action: "list", server: { url: srv.url, headers: srv.headers } }),
+                            });
+                            const data = await res.json() as { tools?: { name: string }[]; error?: string };
+                            if (data.tools) addToast(`${data.tools.length} araç bulundu`, "success");
+                            else addToast(data.error ?? "Bağlanamadı", "error");
+                          } catch { addToast("Bağlantı hatası", "error"); }
+                          finally { setMcpTesting(null); }
+                        }}
+                        disabled={mcpTesting === srv.id}
+                        className="text-xs px-2.5 py-1.5 rounded-lg border border-line text-muted hover:text-brand hover:border-brand transition-colors disabled:opacity-50"
+                      >
+                        {mcpTesting === srv.id ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+                      </button>
+                      <button onClick={() => removeMcpServer(srv.id)} className="text-muted hover:text-red/80 transition-colors"><Trash2 size={14} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="space-y-2 border border-line/60 rounded-xl p-3 bg-bgsoft/40">
+                <div className="text-xs font-semibold text-muted mb-2">Yeni Sunucu Ekle</div>
+                <input value={mcpName} onChange={(e) => setMcpName(e.target.value)} placeholder="Sunucu adı (örn. My DB Tools)" className="input-mono w-full" />
+                <input value={mcpUrl} onChange={(e) => setMcpUrl(e.target.value)} placeholder="URL (örn. http://localhost:3001)" className="input-mono w-full" />
+                <div className="flex gap-2">
+                  <input value={mcpHeaderKey} onChange={(e) => setMcpHeaderKey(e.target.value)} placeholder="Header adı (opsiyonel)" className="input-mono flex-1" />
+                  <input value={mcpHeaderVal} onChange={(e) => setMcpHeaderVal(e.target.value)} placeholder="Değer" className="input-mono flex-1" />
+                </div>
+                <button
+                  onClick={() => {
+                    if (!mcpName.trim() || !mcpUrl.trim()) { addToast("Ad ve URL zorunlu.", "error"); return; }
+                    const headers: Record<string, string> = {};
+                    if (mcpHeaderKey.trim()) headers[mcpHeaderKey.trim()] = mcpHeaderVal.trim();
+                    addMcpServer({ name: mcpName.trim(), url: mcpUrl.trim(), headers: Object.keys(headers).length ? headers : undefined, enabled: true });
+                    setMcpName(""); setMcpUrl(""); setMcpHeaderKey(""); setMcpHeaderVal("");
+                    addToast("MCP sunucusu eklendi.", "success");
+                  }}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-branddim transition-colors"
+                >
+                  <Plus size={14} /> Ekle
+                </button>
+              </div>
+            </div>
+
+            <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl text-xs text-blue-400/80 space-y-1.5">
+              <div className="font-semibold text-blue-400">MCP nedir?</div>
+              <p>Model Context Protocol, Anthropic tarafından geliştirilen bir standarttır. Kendi araçlarını (veritabanı sorgu, dosya okuma, API çağrısı vb.) craft.ai&apos;ya bağlayarak AI&apos;ın bunları otomatik kullanmasını sağlar.</p>
+              <p>Aktif sunucuların araçları, araç kullanımı açıkken her sohbette AI&apos;a sunulur.</p>
             </div>
           </section>
         )}

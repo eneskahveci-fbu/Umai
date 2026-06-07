@@ -8,11 +8,11 @@ export interface Preset {
 }
 
 export const PRESETS: Record<Provider, Preset> = {
-  pollinations: {
-    label: "🌸 Pollinations (Ücretsiz · anahtar gerekmez)",
-    baseUrl: "https://text.pollinations.ai/openai",
-    model: "openai",
-    keyHint: "gerekmez — boş bırak",
+  anthropic: {
+    label: "🧠 Anthropic (Claude — Native)",
+    baseUrl: "https://api.anthropic.com/v1",
+    model: "claude-sonnet-4-5",
+    keyHint: "sk-ant-... (Anthropic API anahtarı)",
   },
   hf: {
     label: "🤗 Hugging Face (router)",
@@ -90,16 +90,14 @@ export const PRESETS: Record<Provider, Preset> = {
  * sağlayıcının API'sinde geçerli model kimlikleriyle eşleşmelidir.
  */
 export const PROVIDER_MODELS: Record<Provider, string[]> = {
-  pollinations: [
-    "openai",
-    "openai-fast",
-    "openai-large",
-    "qwen-coder",
-    "mistral",
-    "llama",
-    "deepseek",
-    "deepseek-reasoning",
-    "gemini",
+  anthropic: [
+    "claude-sonnet-4-5",
+    "claude-opus-4-5",
+    "claude-haiku-4-5-20251001",
+    "claude-3-7-sonnet-20250219",
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-haiku-20241022",
+    "claude-3-opus-20240229",
   ],
   hf: [
     "Qwen/Qwen2.5-Coder-32B-Instruct",
@@ -412,6 +410,7 @@ export const DEFAULT_CONFIG: Config = {
   accentColor: "purple",
   maxContext: 8192,
   webcontainerApiKey: "",
+  mcpServers: [],
 };
 
 export const DEFAULT_REPO = "eneskahveci-sdo/craft-ai";

@@ -15,8 +15,10 @@ import {
   FolderGit2,
   FolderOpen,
   Folder,
+  GitPullRequest,
   Globe,
   Image as ImageIcon,
+  Loader2 as Loader2Icon,
   Mic,
   Palette,
   PanelLeft,
@@ -273,6 +275,9 @@ export function CoderView() {
   const [gitPanelOpen, setGitPanelOpen] = useState(false);
   const [loadingAll, setLoadingAll] = useState(false);
   const [listening, setListening] = useState(false);
+  const [prModalOpen, setPrModalOpen] = useState(false);
+  const [prNumber, setPrNumber] = useState("");
+  const [prLoading, setPrLoading] = useState(false);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -281,6 +286,8 @@ export function CoderView() {
 
   const current = chats.find((c) => c.id === currentId) || null;
   const messages = current?.messages ?? [];
+  const activeRepoStr = config.activeRepo || "";
+  const repoIsGitLab = isGitLabRepo(activeRepoStr);
 
   useEffect(() => {
     if (pendingInput) {
@@ -511,6 +518,11 @@ export function CoderView() {
             token: repoIsGitLab ? activeGitlab?.token : activeGithub?.token,
             provider: repoIsGitLab ? "gitlab" : "github",
           } : undefined,
+          mcpServers: (store.config.mcpServers ?? []).filter((s) => s.enabled).map((s) => ({
+            url: s.url,
+            headers: s.headers,
+            enabled: s.enabled,
+          })),
         }),
       });
 
@@ -549,11 +561,24 @@ export function CoderView() {
               continue;
             }
             const delta = parsed.choices?.[0]?.delta?.content ?? "";
+            const reasoning = (parsed.choices?.[0]?.delta as Record<string, unknown>)?.reasoning as string | undefined;
+            if (reasoning) useStore.getState().updateLastThinking(reasoning);
             if (delta) { full += delta; useStore.getState().updateLastContent(full); }
           } catch { /* parçalı satır */ }
         }
       }
       if (!full) useStore.getState().updateLastContent("_(Model boş yanıt döndürdü.)_");
+
+      /* Extended thinking: <think>...</think> bloklarını ayır */
+      {
+        const thinkMatch = full.match(/^<think>([\s\S]*?)<\/think>\s*/);
+        if (thinkMatch) {
+          const thinking = thinkMatch[1].trim();
+          const cleanContent = full.slice(thinkMatch[0].length).trim();
+          if (cleanContent) useStore.getState().updateLastContent(cleanContent);
+          if (thinking) useStore.getState().updateLastThinking(thinking);
+        }
+      }
 
       /* Skills kullanım sayacını artır (sadece başarılı yanıtta) */
       if (full && activeSkills.length > 0) {
@@ -785,6 +810,15 @@ export function CoderView() {
           >
             <GitBranch size={14} />
           </button>
+          {repo && (
+            <button
+              onClick={() => setPrModalOpen(true)}
+              title="PR / MR inceleme"
+              className="w-8 h-8 rounded-lg grid place-items-center transition-colors text-muted hover:text-pink-400 hover:bg-pink-400/10"
+            >
+              <GitPullRequest size={14} />
+            </button>
+          )}
           <button
             onClick={() => useStore.getState().setSkillsOpen(true)}
             title="Skills — her sohbete eklenen bağlam"
@@ -958,6 +992,7 @@ export function CoderView() {
                       <MessageBubble
                         index={i}
                         message={m}
+                        chatId={current?.id}
                         showRegenerate={isLastAssistant && !streaming}
                         onRegenerate={regenerate}
                         onContinue={isLastAssistant && m.content ? continueLast : undefined}
@@ -1299,8 +1334,73 @@ export function CoderView() {
           artifact={artifact}
         />
       </div>
+
+      {/* PR / MR Review Modal */}
+      {prModalOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setPrModalOpen(false)}>
+          <div className="w-full max-w-sm bg-surface border border-line rounded-2xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <GitPullRequest size={16} className="text-pink-400" />
+                <h3 className="font-bold text-sm">PR / MR İnceleme</h3>
+              </div>
+              <button onClick={() => setPrModalOpen(false)} className="text-muted hover:text-ink"><X size={16} /></button>
+            </div>
+            <p className="text-xs text-muted mb-3">
+              {repoIsGitLab ? "GitLab MR" : "GitHub PR"} numarasını gir. AI diff&apos;i okuyup kod incelemesi yapacak.
+            </p>
+            <input
+              value={prNumber}
+              onChange={(e) => setPrNumber(e.target.value.replace(/\D/g, ""))}
+              placeholder="#123"
+              className="input-mono w-full mb-3"
+              autoFocus
+              onKeyDown={(e) => { if (e.key === "Enter") void handlePrReview(); }}
+            />
+            <button
+              onClick={() => void handlePrReview()}
+              disabled={!prNumber || prLoading}
+              className="w-full flex items-center justify-center gap-2 bg-brand text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-branddim disabled:opacity-50 transition-colors"
+            >
+              {prLoading ? <Loader2Icon size={14} className="animate-spin" /> : <><GitPullRequest size={14} /> İncele</>}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
+
+  async function handlePrReview() {
+    if (!prNumber || !repo) return;
+    setPrLoading(true);
+    try {
+      const token = repoIsGitLab ? store.activeGitlab()?.token : store.activeGithub()?.token;
+      const res = await fetch("/api/pr-review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: repoIsGitLab ? "gitlab" : "github",
+          owner: repo.owner,
+          repo: repo.repo,
+          prNumber: parseInt(prNumber, 10),
+          token,
+        }),
+      });
+      const data = await res.json() as { diff?: string; error?: string };
+      if (!res.ok || !data.diff) {
+        useStore.getState().addToast(data.error ?? "PR bulunamadı", "error");
+        return;
+      }
+      const reviewPrompt = `Aşağıdaki ${repoIsGitLab ? "GitLab MR" : "GitHub PR"} #${prNumber} diff'ini detaylı olarak incele:\n\n\`\`\`diff\n${data.diff}\n\`\`\`\n\nŞu başlıklar altında incele: 🐛 Hatalar, 🔒 Güvenlik, ⚡ Performans, ✅ En İyi Pratikler. Her bulgu için ciddiyet (düşük/orta/yüksek) belirt.`;
+      useStore.getState().setPendingInput(reviewPrompt);
+      setPrModalOpen(false);
+      setPrNumber("");
+    } catch (e) {
+      useStore.getState().addToast((e as Error).message, "error");
+    } finally {
+      setPrLoading(false);
+    }
+  }
 }
 
 function getTreeItems(node: import("@/lib/types").TreeNode): { path: string; type: string }[] {

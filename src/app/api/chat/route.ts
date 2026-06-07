@@ -22,6 +22,12 @@ interface SkillPayload {
   fileName?: string;
 }
 
+interface McpServerConfig {
+  url: string;
+  headers?: Record<string, string>;
+  enabled?: boolean;
+}
+
 interface ChatRequest {
   messages: (ChatMessage | { role: string; content: unknown; tool_calls?: unknown[]; tool_call_id?: string })[];
   baseUrl?: string;
@@ -36,6 +42,7 @@ interface ChatRequest {
   projectPrompt?: string;
   tools?: boolean;
   repoCtx?: RepoCtx;
+  mcpServers?: McpServerConfig[];
 }
 
 const rl = new Map<string, { count: number; reset: number }>();
@@ -163,16 +170,63 @@ async function execSearchFiles(ctx: RepoCtx, args: { query: string }): Promise<s
   return matches.length ? matches.join("\n") : "(eşleşme yok)";
 }
 
+async function fetchMcpTools(server: McpServerConfig): Promise<{ name: string; description: string; parameters: object }[]> {
+  try {
+    const res = await fetch(`${server.url}/tools/list`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(server.headers ?? {}) },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as { result?: { tools?: { name: string; description: string; inputSchema?: object }[] } };
+    return (data?.result?.tools ?? []).map((t) => ({
+      name: t.name,
+      description: t.description,
+      parameters: t.inputSchema ?? { type: "object", properties: {}, required: [] },
+    }));
+  } catch { return []; }
+}
+
+async function callMcpTool(server: McpServerConfig, toolName: string, args: Record<string, unknown>): Promise<string> {
+  try {
+    const res = await fetch(`${server.url}/tools/call`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(server.headers ?? {}) },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: toolName, arguments: args } }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return `MCP hata: ${res.status}`;
+    const data = await res.json() as { result?: { content?: { type: string; text?: string }[] } };
+    return (data?.result?.content ?? []).filter((p) => p.type === "text").map((p) => p.text ?? "").join("\n") || "Sonuç yok";
+  } catch (e) { return `MCP hata: ${(e as Error).message}`; }
+}
+
 async function executeTool(
   name: string,
   args: Record<string, unknown>,
   ctx?: RepoCtx,
+  mcpServers?: McpServerConfig[],
 ): Promise<string> {
-  if (!ctx) return "Hata: repo bağlı değil. Kullanıcıya GitHub deposu bağlamasını söyle.";
   try {
-    if (name === "list_files") return await execListFiles(ctx, args as { filter?: string });
-    if (name === "read_file") return await execReadFile(ctx, args as { path: string });
-    if (name === "search_files") return await execSearchFiles(ctx, args as { query: string });
+    if (name === "list_files") {
+      if (!ctx) return "Hata: repo bağlı değil.";
+      return await execListFiles(ctx, args as { filter?: string });
+    }
+    if (name === "read_file") {
+      if (!ctx) return "Hata: repo bağlı değil.";
+      return await execReadFile(ctx, args as { path: string });
+    }
+    if (name === "search_files") {
+      if (!ctx) return "Hata: repo bağlı değil.";
+      return await execSearchFiles(ctx, args as { query: string });
+    }
+    /* Try MCP servers for unknown tools */
+    for (const srv of (mcpServers ?? [])) {
+      if (!srv.enabled) continue;
+      const result = await callMcpTool(srv, name, args);
+      if (!result.startsWith("MCP hata:")) return result;
+    }
     return `Bilinmeyen araç: ${name}`;
   } catch (e) {
     return `Hata: ${(e as Error).message}`;
@@ -387,9 +441,22 @@ export async function POST(req: Request) {
 
   /* Tool-use loop */
   const repoCtx = body.repoCtx;
+  const activeMcpServers = (body.mcpServers ?? []).filter((s) => s.enabled !== false);
   const convo: ChatRequest["messages"] = [
     { role: "system", content: sysPrompt },
     ...body.messages,
+  ];
+
+  /* Fetch MCP tools in parallel */
+  const mcpToolDefs = (await Promise.all(
+    activeMcpServers.map((srv) => fetchMcpTools(srv)),
+  )).flat();
+  const allTools = [
+    ...CODER_TOOLS,
+    ...mcpToolDefs.map((t) => ({
+      type: "function" as const,
+      function: { name: t.name, description: t.description, parameters: t.parameters },
+    })),
   ];
 
   const encoder = new TextEncoder();
@@ -407,7 +474,7 @@ export async function POST(req: Request) {
               model,
               messages: convo,
               stream: true,
-              tools: CODER_TOOLS,
+              tools: allTools,
               tool_choice: round === MAX_ROUNDS - 1 ? "none" : "auto",
             }),
           });
@@ -444,7 +511,7 @@ export async function POST(req: Request) {
           );
           let args: Record<string, unknown> = {};
           try { args = JSON.parse(tc.arguments || "{}"); } catch { /* invalid */ }
-          const result = await executeTool(tc.name, args, repoCtx);
+          const result = await executeTool(tc.name, args, repoCtx, activeMcpServers);
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: result.slice(0, 400) + (result.length > 400 ? "…" : "") } })}\n\n`),
           );
