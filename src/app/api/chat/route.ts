@@ -602,11 +602,28 @@ export async function POST(req: Request) {
       sysPrompt += `\n\n[Proje bağlamı — SOUL.md]:\n${soulContent.slice(0, 6000)}`;
     }
     sysPrompt +=
-      `\n\n[Araç kullanımı]: Bağlı repo: ${body.repoCtx.owner}/${body.repoCtx.repo}:${body.repoCtx.branch}. ` +
-      `Kullanabileceğin araçlar: list_files, read_file, search_files, search_code (içerik arar), ` +
-      `write_file (dosya yaz/güncelle + commit), list_branches, create_branch, get_commit_history. ` +
-      `Cevap vermeden önce gerekli dosyaları oku. write_file ile kod değişikliği yapabilirsin — kullanıcı onay vermişse kullan. ` +
-      `Aynı dosyayı tekrar okuma. En kritik 1-3 dosyayı oku.`;
+      `\n\n[Ajan modu — Repo: ${body.repoCtx.owner}/${body.repoCtx.repo} (${body.repoCtx.branch})]\n` +
+      `Mevcut araçlar:\n` +
+      `• list_files(filter?) — repo dosya ağacını listele\n` +
+      `• read_file(path) — dosya içeriğini oku\n` +
+      `• search_files(query) — dosya yolunda arama\n` +
+      `• search_code(query, extension?) — dosya İÇERİĞİNDE arama\n` +
+      `• write_file(path, content, commit_message) — dosya yaz + commit\n` +
+      `• list_branches() / create_branch(name, from?) — dal işlemleri\n` +
+      `• get_commit_history(limit?, path?) — commit geçmişi\n` +
+      (body.webSearch ? `• web_search(query) — internette ara\n• read_url(url) — web sayfası oku\n` : "") +
+      `\nÇalışma pratiği:\n` +
+      `— Cevaplamadan önce ilgili dosyaları oku. Bir dosya yetmiyorsa birden fazla oku.\n` +
+      `— list_files veya search_code ile önce yapıyı anla, sonra spesifik dosyalara gir.\n` +
+      `— Değişiklik yapman istendiğinde write_file kullan; kullanıcının onayına gerek yok.\n` +
+      `— Aynı dosyayı tekrar okuma; okuduklarını hatırla.\n` +
+      `— Karmaşık görevde adım adım ilerle: keşfet → analiz et → değiştir → doğrula.`;
+  }
+  if (body.webSearch && !body.repoCtx) {
+    sysPrompt +=
+      `\n\n[Web arama modu]\n` +
+      `Mevcut araçlar: web_search(query), read_url(url)\n` +
+      `Bilgi gerektiren sorularda önce web_search ile ara, sonra ilgili sayfaları read_url ile oku.`;
   }
 
   /* Tool-use disabled: simple passthrough */
