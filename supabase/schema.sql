@@ -31,3 +31,21 @@ create policy "kendi sohbetleri - update"
 drop policy if exists "kendi sohbetleri - delete" on public.chats;
 create policy "kendi sohbetleri - delete"
   on public.chats for delete using (auth.uid() = user_id);
+
+-- Paylaşılan sohbetler (herkese açık, salt okunur)
+create table if not exists public.shared_chats (
+  id          text primary key,
+  title       text not null,
+  messages    jsonb not null default '[]'::jsonb,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.shared_chats enable row level security;
+
+-- Herkes okuyabilir
+create policy "shared_chats - select"
+  on public.shared_chats for select using (true);
+
+-- Giriş yapmış kullanıcılar oluşturabilir
+create policy "shared_chats - insert"
+  on public.shared_chats for insert with check (auth.role() = 'authenticated' or auth.role() = 'anon');

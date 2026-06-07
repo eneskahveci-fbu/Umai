@@ -39,7 +39,31 @@ export function Sidebar() {
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [sharingId, setSharingId] = useState<string | null>(null);
   const editRef = useRef<HTMLInputElement>(null);
+  const addToast = useStore((s) => s.addToast);
+
+  const shareChat = async (chatId: string) => {
+    const chat = chats.find((c) => c.id === chatId);
+    if (!chat) return;
+    setSharingId(chatId);
+    try {
+      const res = await fetch("/api/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: chatId, title: chat.title, messages: chat.messages }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Paylaşım başarısız");
+      const url = `${window.location.origin}/share/${data.shareId}`;
+      await navigator.clipboard.writeText(url).catch(() => { /* yok say */ });
+      addToast("Link kopyalandı!", "success");
+    } catch (e) {
+      addToast(`Paylaşım hatası: ${(e as Error).message}`, "error");
+    } finally {
+      setSharingId(null);
+    }
+  };
 
   const activeProject = config.activeProjectId;
 
@@ -281,7 +305,7 @@ export function Sidebar() {
                     <ActionIcon title="Yeniden adlandır" onClick={(e) => { e.stopPropagation(); startRename(c.id, c.title); }}>
                       <Pencil size={10} />
                     </ActionIcon>
-                    <ActionIcon title="Paylaş" onClick={(e) => { e.stopPropagation(); exportChatHtml(c.id); }}>
+                    <ActionIcon title={sharingId === c.id ? "Paylaşılıyor…" : "Paylaş (link kopyala)"} onClick={(e) => { e.stopPropagation(); if (!sharingId) shareChat(c.id); }}>
                       <Share2 size={10} />
                     </ActionIcon>
                     <ActionIcon title="İndir" onClick={(e) => { e.stopPropagation(); exportChat(c.id); }}>
