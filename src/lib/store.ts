@@ -173,6 +173,63 @@ function applyTheme(theme: "dark" | "light") {
   document.documentElement.classList.toggle("light", theme === "light");
 }
 
+/* ─── Config birleştirme (hesap senkronu) ───
+   Uzak (buluttaki) config ile yereldeki config'i, hiçbir model/hesap/anahtar
+   kaybetmeden birleştirir. Böylece eski/boş bir bulut kaydı, yerelde duran
+   anahtarları ezip "kayboluyor" hissi yaratmaz. */
+function mergeById<T extends { id: string }>(
+  local: T[],
+  remote: T[],
+  pick?: (l: T, r: T) => T,
+): T[] {
+  const map = new Map<string, T>();
+  for (const item of local ?? []) map.set(item.id, item);
+  for (const item of remote ?? []) {
+    const existing = map.get(item.id);
+    map.set(item.id, existing && pick ? pick(existing, item) : item);
+  }
+  return [...map.values()];
+}
+
+function mergeConfigs(local: Config, remote: Partial<Config>): Config {
+  /* Skalar tercihler için uzak (en son senkronlanan cihaz) kazanır. */
+  const base: Config = { ...DEFAULT_CONFIG, ...local, ...remote };
+  /* Diziler: id'ye göre birleştir; çakışmada anahtarı/token'ı dolu olanı koru. */
+  base.models = mergeById(local.models, remote.models ?? [], (l, r) => (r.apiKey ? r : l));
+  base.githubAccounts = mergeById(local.githubAccounts, remote.githubAccounts ?? [], (l, r) => (r.token ? r : l));
+  base.gitlabAccounts = mergeById(local.gitlabAccounts, remote.gitlabAccounts ?? [], (l, r) => (r.token ? r : l));
+  base.skills = mergeById(local.skills, remote.skills ?? []);
+  base.projects = mergeById(local.projects, remote.projects ?? []);
+  base.mcpServers = mergeById(local.mcpServers ?? [], remote.mcpServers ?? []);
+  base.repos = [...new Set([...(remote.repos ?? []), ...(local.repos ?? [])])];
+  /* Aktif id'ler hâlâ listede mevcutsa korunur, değilse ilk öğeye düşülür. */
+  const has = <T extends { id: string }>(arr: T[], id: string | null) => !!id && arr.some((x) => x.id === id);
+  base.activeModelId = has(base.models, base.activeModelId) ? base.activeModelId : (base.models[0]?.id ?? null);
+  base.activeGithubId = has(base.githubAccounts, base.activeGithubId) ? base.activeGithubId : (base.githubAccounts[0]?.id ?? null);
+  base.activeGitlabId = has(base.gitlabAccounts, base.activeGitlabId) ? base.activeGitlabId : (base.gitlabAccounts[0]?.id ?? null);
+  return base;
+}
+
+/* Config'i Supabase'e yazar. Hata olursa (tablo yok / RLS / ağ) bir kez
+   kullanıcıya bildirir; böylece "ayarlarım kayboluyor" sorunu sessiz kalmaz. */
+let cloudPushFailed = false;
+function pushCloudConfig(get: () => StoreState, userId: string, config: Config) {
+  const sb = createClient();
+  if (!sb) return;
+  sb.from("user_config")
+    .upsert({ user_id: userId, config, updated_at: new Date().toISOString() })
+    .then(({ error }: { error: unknown }) => {
+      if (error) {
+        if (!cloudPushFailed) {
+          cloudPushFailed = true;
+          get().addToast("Ayarlar buluta kaydedilemedi — Supabase 'user_config' tablosunu kontrol et.", "error");
+        }
+      } else {
+        cloudPushFailed = false;
+      }
+    });
+}
+
 interface StoreState {
   userId: string | null;
   userEmail: string | null;
@@ -346,41 +403,42 @@ export const useStore = create<StoreState>()((set, get) => ({
       }
     }
     set({ config: c });
-    /* Supabase'e fire-and-forget senkron (giriş yapıldıysa) */
+    /* Supabase'e senkron (giriş yapıldıysa). Hata yutulmaz: kalıcı başarısızlıkta
+       kullanıcı tek seferlik bir uyarı görür (tablo/RLS eksikse "kayboluyor"
+       hissinin sessiz kalmaması için). */
     const { userId } = get();
-    if (userId) {
-      const sb = createClient();
-      if (sb) {
-        void sb.from("user_config").upsert({
-          user_id: userId,
-          config: c,
-          updated_at: new Date().toISOString(),
-        });
-      }
-    }
+    if (userId && !isGuestMode()) pushCloudConfig(get, userId, c);
   },
   syncConfig: async (userId) => {
+    if (isGuestMode()) return;
     const sb = createClient();
     if (!sb) return;
-    const { data } = await sb
-      .from("user_config")
-      .select("config")
-      .eq("user_id", userId)
-      .single();
-    if (data?.config) {
-      /* Uzak config var → uygula (farklı tarayıcıdan gelen ayarlar) */
-      const remote = data.config as Config;
-      applyTheme(remote.theme ?? "dark");
-      const store = getStore();
-      if (store) store.setItem(CONFIG_KEY, JSON.stringify(remote));
-      set({ config: remote });
-    } else {
-      /* İlk giriş → yerel config'i Supabase'e kaydet */
-      void sb.from("user_config").upsert({
-        user_id: userId,
-        config: get().config,
-        updated_at: new Date().toISOString(),
-      });
+    try {
+      const { data, error } = await sb
+        .from("user_config")
+        .select("config")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (error) {
+        get().addToast("Hesap senkronu okunamadı — Supabase 'user_config' tablosunu kontrol et.", "error");
+        return;
+      }
+      const local = get().config;
+      if (data?.config) {
+        /* Uzak config var → yerelle birleştir (anahtar/model kaybetmeden). */
+        const merged = mergeConfigs(local, data.config as Partial<Config>);
+        applyTheme(merged.theme ?? "dark");
+        const store = getStore();
+        if (store) store.setItem(CONFIG_KEY, JSON.stringify(merged));
+        set({ config: merged });
+        /* Birleşmiş hali buluta geri yaz ki tüm cihazlar aynı kümeyi görsün. */
+        pushCloudConfig(get, userId, merged);
+      } else {
+        /* İlk giriş → yerel config'i buluta kaydet. */
+        pushCloudConfig(get, userId, local);
+      }
+    } catch {
+      get().addToast("Hesap senkronu sırasında hata oluştu.", "error");
     }
   },
   addModel: (m) => {
