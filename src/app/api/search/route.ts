@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
         signal: ctrl.signal,
         headers: {
           "User-Agent": `Mozilla/5.0 (compatible; craft.ai/1.0; +${
-            process.env.NEXT_PUBLIC_SITE_URL ?? "https://craft-coder.vercel.app"
+            process.env.NEXT_PUBLIC_SITE_URL || "https://craft-coder.vercel.app"
           })`,
         },
       },

@@ -52,7 +52,7 @@ const PROVIDERS = [
 ];
 
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://craft-coder.vercel.app";
+  process.env.NEXT_PUBLIC_SITE_URL || "https://craft-coder.vercel.app";
 
 const JSON_LD = {
   "@context": "https://schema.org",

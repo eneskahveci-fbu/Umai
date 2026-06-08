@@ -1,4 +1,4 @@
-import type { Config, Provider, ResponseStyle, Skill } from "./types";
+import type { Config, ModelProfile, Provider, ResponseStyle, Skill } from "./types";
 
 export interface Preset {
   label: string;
@@ -8,6 +8,12 @@ export interface Preset {
 }
 
 export const PRESETS: Record<Provider, Preset> = {
+  pollinations: {
+    label: "🌸 Pollinations (Ücretsiz · anahtar gerekmez)",
+    baseUrl: "https://text.pollinations.ai/openai",
+    model: "openai",
+    keyHint: "gerekmez — boş bırak",
+  },
   hf: {
     label: "🤗 Hugging Face (router)",
     baseUrl: "https://router.huggingface.co/v1",
@@ -84,6 +90,17 @@ export const PRESETS: Record<Provider, Preset> = {
  * sağlayıcının API'sinde geçerli model kimlikleriyle eşleşmelidir.
  */
 export const PROVIDER_MODELS: Record<Provider, string[]> = {
+  pollinations: [
+    "openai",
+    "openai-fast",
+    "openai-large",
+    "qwen-coder",
+    "mistral",
+    "llama",
+    "deepseek",
+    "deepseek-reasoning",
+    "gemini",
+  ],
   hf: [
     "Qwen/Qwen2.5-Coder-32B-Instruct",
     "Qwen/Qwen3-Coder-480B-A35B-Instruct",
@@ -353,9 +370,25 @@ export const DEFAULT_SKILLS: Skill[] = [
   },
 ];
 
+/**
+ * Varsayılan, anahtar gerektirmeyen ücretsiz model. Her temiz kurulumda hazır
+ * gelir; böylece kullanıcı hiçbir API anahtarı eklemeden hemen sohbete başlayabilir.
+ * Sabit `id` kullanılır — store, modeller boşaldığında bunu kendi kendine geri
+ * tohumlar (bkz. store.ts). Kullanıcı kendi modelini ekleyince bu kalır, istenirse
+ * silinebilir.
+ */
+export const DEFAULT_POLLINATIONS_MODEL: ModelProfile = {
+  id: "default_pollinations",
+  label: "🌸 Pollinations (Ücretsiz)",
+  provider: "pollinations",
+  baseUrl: PRESETS.pollinations.baseUrl,
+  model: PRESETS.pollinations.model,
+  apiKey: "",
+};
+
 export const DEFAULT_CONFIG: Config = {
-  models: [],
-  activeModelId: null,
+  models: [DEFAULT_POLLINATIONS_MODEL],
+  activeModelId: DEFAULT_POLLINATIONS_MODEL.id,
   githubAccounts: [],
   activeGithubId: null,
   repos: ["eneskahveci-sdo/craft-ai"],

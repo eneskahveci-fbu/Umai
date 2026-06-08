@@ -16,7 +16,7 @@ import type {
   ToolCallRecord,
   TreeNode,
 } from "./types";
-import { DEFAULT_CONFIG, DEFAULT_SKILLS } from "./constants";
+import { DEFAULT_CONFIG, DEFAULT_POLLINATIONS_MODEL, DEFAULT_SKILLS } from "./constants";
 import { createClient } from "./supabase/client";
 
 const CONFIG_KEY = "craftai_config";
@@ -110,12 +110,41 @@ function loadConfig(): Config {
         merged.skills = [...missing, ...existing];
         try { store.setItem(CONFIG_KEY, JSON.stringify(merged)); } catch { /* yok say */ }
       }
+      /* Hiç model yoksa, anahtar gerektirmeyen ücretsiz Pollinations modelini
+         geri tohumla; böylece kullanıcı anahtar eklemeden hemen sohbet edebilir.
+         (Kullanıcı kendi modelini ekleyip bunu silerse liste boş kalmaz, geri
+         gelmez. Tüm modeller silinirse yine çalışan bir varsayılan sağlanır.) */
+      if (!Array.isArray(merged.models) || merged.models.length === 0) {
+        merged.models = [DEFAULT_POLLINATIONS_MODEL];
+        merged.activeModelId = merged.activeModelId ?? DEFAULT_POLLINATIONS_MODEL.id;
+        try { store.setItem(CONFIG_KEY, JSON.stringify(merged)); } catch { /* yok say */ }
+      }
       return merged;
     }
   } catch {
     /* yok say */
   }
   return DEFAULT_CONFIG;
+}
+
+/* ─── Hesaba bağlı config senkronu ───
+   Giriş yapıldığında config (modeller + API anahtarları + GitHub token'ları +
+   skill'ler + tercihler) Supabase'deki `user_configs` tablosuna yazılır ve
+   diğer cihaz/tarayıcılardan aynı hesaba girince geri yüklenir. Böylece
+   "başka tarayıcıdan girince anahtarlar kayboluyor" sorunu çözülür. Satır
+   RLS ile korunur; yalnızca kullanıcının kendisi okuyup yazabilir. Misafir
+   modda senkron yapılmaz (anahtarlar cihazda kalır). */
+let cloudPushTimer: ReturnType<typeof setTimeout> | null = null;
+function pushCloudConfig(userId: string, config: Config) {
+  if (isGuestMode()) return;
+  const sb = createClient();
+  if (!sb) return;
+  if (cloudPushTimer) clearTimeout(cloudPushTimer);
+  cloudPushTimer = setTimeout(() => {
+    sb.from("user_configs")
+      .upsert({ user_id: userId, config, updated_at: new Date().toISOString() })
+      .then(() => { /* sessiz */ });
+  }, 800);
 }
 
 function loadLocalChats(): Chat[] {
@@ -149,6 +178,7 @@ interface StoreState {
 
   config: Config;
   saveConfig: (c: Config) => void;
+  syncCloudConfig: (userId: string) => Promise<void>;
   addModel: (m: Omit<ModelProfile, "id">) => void;
   updateModel: (id: string, patch: Partial<ModelProfile>) => void;
   removeModel: (id: string) => void;
@@ -294,6 +324,34 @@ export const useStore = create<StoreState>()((set, get) => ({
       applyTheme(c.theme);
     }
     set({ config: c });
+    /* Giriş yapılmışsa değişikliği (debounce'lu) buluta da yaz. */
+    const { userId } = get();
+    if (userId) pushCloudConfig(userId, c);
+  },
+  /* Giriş anında çağrılır: buluttaki config'i çekip yerele uygular. Bulutta
+     kayıt yoksa (ilk giriş) mevcut yerel config'i buluta yükler. */
+  syncCloudConfig: async (userId) => {
+    if (isGuestMode()) return;
+    const sb = createClient();
+    if (!sb) return;
+    try {
+      const { data } = await sb
+        .from("user_configs")
+        .select("config")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (data?.config) {
+        const cloud = data.config as Partial<Config>;
+        const merged: Config = { ...DEFAULT_CONFIG, ...get().config, ...cloud };
+        const store = getStore();
+        if (store) store.setItem(CONFIG_KEY, JSON.stringify(merged));
+        applyTheme(merged.theme);
+        set({ config: merged });
+      } else {
+        /* İlk giriş: yereldeki mevcut config'i buluta taşı. */
+        pushCloudConfig(userId, get().config);
+      }
+    } catch { /* sessiz — bulut erişilemezse yerel config kullanılmaya devam eder */ }
   },
   addModel: (m) => {
     const model: ModelProfile = { ...m, id: uid() };

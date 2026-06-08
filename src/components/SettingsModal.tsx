@@ -24,6 +24,7 @@ export function SettingsModal() {
   const open = useStore((s) => s.settingsOpen);
   const setOpen = useStore((s) => s.setSettingsOpen);
   const config = useStore((s) => s.config);
+  const userEmail = useStore((s) => s.userEmail);
   const addModel = useStore((s) => s.addModel);
   const updateModel = useStore((s) => s.updateModel);
   const removeModel = useStore((s) => s.removeModel);
@@ -74,10 +75,10 @@ export function SettingsModal() {
     if (first && first !== tab) setTab(first);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
-  const [provider, setProvider] = useState<Provider>("hf");
+  const [provider, setProvider] = useState<Provider>("pollinations");
   const [label, setLabel] = useState("");
-  const [baseUrl, setBaseUrl] = useState(PRESETS.hf.baseUrl);
-  const [model, setModel] = useState(PRESETS.hf.model);
+  const [baseUrl, setBaseUrl] = useState(PRESETS.pollinations.baseUrl);
+  const [model, setModel] = useState(PRESETS.pollinations.model);
   const [apiKey, setApiKey] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
@@ -99,7 +100,7 @@ export function SettingsModal() {
     const key = apiKey.trim();
     const url = baseUrl.trim();
     if (!url || (key.length > 0 && key.length < 8)) return;
-    if (provider !== "ollama" && provider !== "custom" && key.length === 0) return;
+    if (provider !== "ollama" && provider !== "custom" && provider !== "pollinations" && key.length === 0) return;
     const t = setTimeout(() => {
       fetch("/api/models", {
         method: "POST",
@@ -259,7 +260,19 @@ export function SettingsModal() {
         {/* MODEL */}
         {tab === "model" && (
           <section>
-            <p className="text-xs text-muted mb-3">Birden fazla model ekleyebilirsin. Anahtarlar yalnızca bu tarayıcıda saklanır.</p>
+            <p className="text-xs text-muted mb-3">
+              Birden fazla model ekleyebilirsin.{" "}
+              {userEmail
+                ? "Giriş yaptığın için modeller ve anahtarlar hesabına kaydedilir; her tarayıcıdan aynı hesapla erişilebilir."
+                : "Anahtarlar yalnızca bu tarayıcıda saklanır. Cihazlar arası taşımak için giriş yap."}
+            </p>
+            <div className="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+              <div className="text-xs text-green-400 font-semibold mb-1">🌸 Pollinations — Ücretsiz, anahtar gerekmez</div>
+              <p className="text-xs text-green-300 leading-relaxed">
+                Varsayılan olarak hazır gelir; API anahtarı eklemeden hemen sohbet edebilirsin.
+                Kendi anahtarlı modelini de ekleyebilirsin.
+              </p>
+            </div>
             
             {/* Gemini API Info */}
             <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">

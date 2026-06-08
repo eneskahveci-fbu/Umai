@@ -37,11 +37,13 @@ export default function AppPage() {
       const u = data.user;
       setUser(u?.id ?? null, u?.email ?? null);
       loadChats(u?.id ?? null);
+      if (u?.id) useStore.getState().syncCloudConfig(u.id);
     });
     const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
       const u = session?.user;
       setUser(u?.id ?? null, u?.email ?? null);
       loadChats(u?.id ?? null);
+      if (u?.id) useStore.getState().syncCloudConfig(u.id);
     });
     return () => sub.subscription.unsubscribe();
   }, [setUser, loadChats]);

@@ -39,6 +39,7 @@ export interface Chat {
 }
 
 export type Provider =
+  | "pollinations"
   | "hf"
   | "deepseek"
   | "openrouter"

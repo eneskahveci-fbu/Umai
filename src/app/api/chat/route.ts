@@ -253,13 +253,17 @@ export async function POST(req: Request) {
   const apiKey = body.apiKey || process.env.LLM_API_KEY || "";
   const provider = body.provider || "hf";
 
+  /* Anahtar gerektirmeyen ücretsiz/yerel sağlayıcılar. Bunlar için "API anahtarı
+     yok" hatası verme ve boş Authorization header'ı gönderme. */
+  const keyless = provider === "pollinations" || provider === "ollama" || provider === "custom";
+
   if (!model) return new Response("Model seçilmedi.", { status: 400 });
-  if (!apiKey) return new Response("API anahtarı yok.", { status: 400 });
+  if (!apiKey && !keyless) return new Response("API anahtarı yok.", { status: 400 });
 
   const upstreamHeaders: Record<string, string> = {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${apiKey}`,
   };
+  if (apiKey) upstreamHeaders["Authorization"] = `Bearer ${apiKey}`;
 
   if (provider === "openrouter") {
     upstreamHeaders["HTTP-Referer"] = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://craft-coder.vercel.app";
