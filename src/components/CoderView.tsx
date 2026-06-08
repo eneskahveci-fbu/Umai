@@ -630,6 +630,40 @@ export function CoderView() {
         });
         return scored.sort((a, b) => b.hits - a.hits).slice(0, 5).map((x) => x.skill);
       })();
+      /* Sunucu-proxy üzerinden çağrı (tüm sağlayıcılar için ortak; Pollinations
+         doğrudan tarayıcı çağrısı başarısız olursa yedek olarak da kullanılır.
+         Sunucu Pollinations'ı anahtarsız destekler). */
+      const callViaServer = () => fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: abortCtl.signal,
+        body: JSON.stringify({
+          messages: apiMessages,
+          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey,
+          provider: active.provider, systemPrompt: finalSystemPrompt,
+          style: store.config.style,
+          memories: store.config.memories,
+          skills: activeSkills.map((s) => ({
+            title: s.title, content: s.content, tags: s.tags, source: s.source, fileName: s.fileName,
+          })),
+          tools: toolsEnabled,
+          webSearch: searchOnRef.current,
+          searchContext: webSearchContext || undefined,
+          repoCtx: toolsEnabled && repo ? {
+            owner: repo.owner,
+            repo: repo.repo,
+            branch: repo.branch,
+            token: repoIsGitLab ? activeGitlab?.token : activeGithub?.token,
+            provider: repoIsGitLab ? "gitlab" : "github",
+          } : undefined,
+          mcpServers: (store.config.mcpServers ?? []).filter((s) => s.enabled).map((s) => ({
+            url: s.url,
+            headers: s.headers,
+            enabled: s.enabled,
+          })),
+        }),
+      });
+
       /* Pollinations: tarayıcıdan doğrudan çağrı yapılır (her kullanıcı kendi IP'sini kullanır,
          sunucu IP'si paylaşıldığında oluşan rate-limit sorunu önlenir). CORS açık. */
       let res: Response;
@@ -660,61 +694,43 @@ export function CoderView() {
         let polModel = polQueue.shift()!;
         let polAttempt = 0;
         const POL_WAIT = 3000;
-        while (true) {
-          res = await fetch(`${active.baseUrl}/chat/completions`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            signal: abortCtl.signal,
-            body: makePolBody(polModel),
-          });
-          if (res.status !== 429) break;
-          if (polAttempt < 1) {
-            polAttempt++;
-            addToast(`Pollinations yoğun, ${POL_WAIT / 1000}s sonra tekrar deneniyor...`, "info");
-            await new Promise<void>((resolve) => {
-              const t = setTimeout(resolve, POL_WAIT);
-              abortCtl.signal.addEventListener("abort", () => clearTimeout(t), { once: true });
+        try {
+          while (true) {
+            res = await fetch(`${active.baseUrl}/chat/completions`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              signal: abortCtl.signal,
+              body: makePolBody(polModel),
             });
-            if (abortCtl.signal.aborted) throw new DOMException("Aborted", "AbortError");
-          } else if (polQueue.length > 0) {
-            polModel = polQueue.shift()!;
-            polAttempt = 0;
-            addToast(`Alternatif model deneniyor: ${polModel}...`, "info");
-          } else {
-            break;
+            if (res.status !== 429) break;
+            if (polAttempt < 1) {
+              polAttempt++;
+              addToast(`Pollinations yoğun, ${POL_WAIT / 1000}s sonra tekrar deneniyor...`, "info");
+              await new Promise<void>((resolve) => {
+                const t = setTimeout(resolve, POL_WAIT);
+                abortCtl.signal.addEventListener("abort", () => clearTimeout(t), { once: true });
+              });
+              if (abortCtl.signal.aborted) throw new DOMException("Aborted", "AbortError");
+            } else if (polQueue.length > 0) {
+              polModel = polQueue.shift()!;
+              polAttempt = 0;
+              addToast(`Alternatif model deneniyor: ${polModel}...`, "info");
+            } else {
+              break;
+            }
           }
+          /* Doğrudan çağrı 429 dışı bir hatayla döndüyse (ör. CORS politikası,
+             5xx, kimlik katmanı) sunucu-proxy'ye düş — orada anahtarsız çalışır. */
+          if (!res.ok && res.status !== 429) {
+            res = await callViaServer();
+          }
+        } catch (err) {
+          /* İptal edildiyse yukarı fırlat; ağ/CORS hatasıysa sunucu-proxy'ye düş. */
+          if ((err as Error)?.name === "AbortError") throw err;
+          res = await callViaServer();
         }
       } else {
-        res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: abortCtl.signal,
-          body: JSON.stringify({
-            messages: apiMessages,
-            baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey,
-            provider: active.provider, systemPrompt: finalSystemPrompt,
-            style: store.config.style,
-            memories: store.config.memories,
-            skills: activeSkills.map((s) => ({
-              title: s.title, content: s.content, tags: s.tags, source: s.source, fileName: s.fileName,
-            })),
-            tools: toolsEnabled,
-            webSearch: searchOnRef.current,
-            searchContext: webSearchContext || undefined,
-            repoCtx: toolsEnabled && repo ? {
-              owner: repo.owner,
-              repo: repo.repo,
-              branch: repo.branch,
-              token: repoIsGitLab ? activeGitlab?.token : activeGithub?.token,
-              provider: repoIsGitLab ? "gitlab" : "github",
-            } : undefined,
-            mcpServers: (store.config.mcpServers ?? []).filter((s) => s.enabled).map((s) => ({
-              url: s.url,
-              headers: s.headers,
-              enabled: s.enabled,
-            })),
-          }),
-        });
+        res = await callViaServer();
       }
 
       if (!res.ok || !res.body) {
