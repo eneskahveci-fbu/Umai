@@ -117,28 +117,85 @@ async function execListFiles(ctx: RepoCtx, args: { filter?: string }): Promise<s
   return items.join("\n") || "(eşleşen dosya yok)";
 }
 
-async function execReadFile(ctx: RepoCtx, args: { path: string }): Promise<string> {
-  if (!args.path) return "Hata: path boş";
+/* Bir dosyanın TAM ham içeriğini getirir (kırpma yok). read_file ve str_replace
+   ortak kullanır. İstek başına `cache` ile aynı dosya iki kez çekilmez. */
+async function getFileRaw(
+  ctx: RepoCtx,
+  path: string,
+  cache?: Map<string, string>,
+): Promise<{ ok: true; content: string } | { ok: false; error: string }> {
+  if (cache?.has(path)) return { ok: true, content: cache.get(path)! };
   if (ctx.provider === "gitlab") {
     const proj = encodeGlProject(ctx.owner, ctx.repo);
-    const encoded = encodeURIComponent(args.path);
+    const encoded = encodeURIComponent(path);
     const res = await fetch(
       `https://gitlab.com/api/v4/projects/${proj}/repository/files/${encoded}/raw?ref=${encodeURIComponent(ctx.branch)}`,
       { headers: glHeaders(ctx.token) },
     );
-    if (!res.ok) return `Hata: ${res.status} — dosya bulunamadı (${args.path})`;
+    if (!res.ok) return { ok: false, error: `Hata: ${res.status} — dosya bulunamadı (${path})` };
     const text = await res.text();
-    return text.length > 20_000 ? text.slice(0, 20_000) + "\n\n[... kısaltıldı]" : text;
+    cache?.set(path, text);
+    return { ok: true, content: text };
   }
   const res = await fetch(
-    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/contents/${encodeURIComponent(args.path)}?ref=${ctx.branch}`,
+    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/contents/${encodeURIComponent(path)}?ref=${ctx.branch}`,
     { headers: ghHeaders(ctx.token) },
   );
-  if (!res.ok) return `Hata: ${res.status} — dosya bulunamadı (${args.path})`;
+  if (!res.ok) return { ok: false, error: `Hata: ${res.status} — dosya bulunamadı (${path})` };
   const data = await res.json();
-  if (data.size > 100_000) return `Hata: dosya çok büyük (${data.size} bayt). 100KB üstü desteklenmiyor.`;
+  if (data.size > 100_000) return { ok: false, error: `Hata: dosya çok büyük (${data.size} bayt). 100KB üstü desteklenmiyor.` };
   const content = Buffer.from(data.content, "base64").toString("utf-8");
-  return content.length > 20_000 ? content.slice(0, 20_000) + "\n\n[... kısaltıldı]" : content;
+  cache?.set(path, content);
+  return { ok: true, content };
+}
+
+/* read_file: içeriği SATIR NUMARALARIYLA döner (Claude Code gibi) — modelin
+   düzenlemede satıra atıfta bulunmasını ve isabetini artırır. */
+async function execReadFile(ctx: RepoCtx, args: { path: string }, cache?: Map<string, string>): Promise<string> {
+  if (!args.path) return "Hata: path boş";
+  const r = await getFileRaw(ctx, args.path, cache);
+  if (!r.ok) return r.error;
+  const lines = r.content.split("\n");
+  const numbered = lines.map((l, i) => `${i + 1}\t${l}`).join("\n");
+  if (numbered.length > 20_000) {
+    return numbered.slice(0, 20_000) + "\n\n[... kısaltıldı — belirli bir bölgeyi görmek için search_code kullan]";
+  }
+  return numbered;
+}
+
+/* str_replace: hedefli düzenleme. old_string birebir + benzersiz eşleşmeli. */
+async function execStrReplace(
+  ctx: RepoCtx,
+  args: { path: string; old_string: string; new_string: string; commit_message?: string; replace_all?: boolean | string },
+  cache?: Map<string, string>,
+): Promise<string> {
+  if (!args.path || args.old_string == null || args.new_string == null) {
+    return "Hata: path, old_string ve new_string zorunlu";
+  }
+  if (args.old_string === args.new_string) return "Hata: old_string ve new_string aynı — değişiklik yok";
+  const r = await getFileRaw(ctx, args.path, cache);
+  if (!r.ok) return r.error;
+  const content = r.content;
+  const replaceAll = args.replace_all === true || args.replace_all === "true";
+  const occurrences = content.split(args.old_string).length - 1;
+  if (occurrences === 0) {
+    return `Hata: old_string '${args.path}' içinde bulunamadı. Önce read_file ile mevcut metni kontrol et (satır numarası olmadan, birebir kopyala).`;
+  }
+  if (occurrences > 1 && !replaceAll) {
+    return `Hata: old_string ${occurrences} kez eşleşti. Benzersiz olması için daha fazla bağlam ekle ya da replace_all:true kullan.`;
+  }
+  let updated: string;
+  if (replaceAll) {
+    updated = content.split(args.old_string).join(args.new_string);
+  } else {
+    const idx = content.indexOf(args.old_string);
+    updated = content.slice(0, idx) + args.new_string + content.slice(idx + args.old_string.length);
+  }
+  const msg = args.commit_message || `chore: update ${args.path}`;
+  const writeRes = await execWriteFile(ctx, { path: args.path, content: updated, commit_message: msg });
+  if (writeRes.startsWith("Hata")) return writeRes;
+  cache?.set(args.path, updated); // önbelleği güncel tut
+  return `✅ ${args.path}: ${replaceAll ? occurrences + " eşleşme" : "1 eşleşme"} değiştirildi. ${writeRes}`;
 }
 
 async function execSearchFiles(ctx: RepoCtx, args: { query: string }): Promise<string> {
@@ -378,15 +435,23 @@ async function executeTool(
   args: Record<string, unknown>,
   ctx?: RepoCtx,
   mcpServers?: McpServerConfig[],
+  cache?: Map<string, string>,
 ): Promise<string> {
   try {
-    if (!ctx && ["list_files","read_file","search_files","search_code","write_file","list_branches","create_branch","get_commit_history"].includes(name))
+    if (!ctx && ["list_files","read_file","search_files","search_code","write_file","str_replace","list_branches","create_branch","get_commit_history"].includes(name))
       return "Hata: repo bağlı değil. Kullanıcıya bir repo bağlamasını söyle.";
     if (name === "list_files") return await execListFiles(ctx!, args as { filter?: string });
-    if (name === "read_file") return await execReadFile(ctx!, args as { path: string });
+    if (name === "read_file") return await execReadFile(ctx!, args as { path: string }, cache);
     if (name === "search_files") return await execSearchFiles(ctx!, args as { query: string });
     if (name === "search_code") return await execSearchCode(ctx!, args as { query: string; extension?: string });
-    if (name === "write_file") return await execWriteFile(ctx!, args as { path: string; content: string; commit_message: string });
+    if (name === "str_replace") return await execStrReplace(ctx!, args as { path: string; old_string: string; new_string: string; commit_message?: string; replace_all?: boolean | string }, cache);
+    if (name === "write_file") {
+      const res = await execWriteFile(ctx!, args as { path: string; content: string; commit_message: string });
+      if (!res.startsWith("Hata") && typeof args.path === "string" && typeof args.content === "string") {
+        cache?.set(args.path, args.content); // önbelleği güncel tut
+      }
+      return res;
+    }
     if (name === "list_branches") return await execListBranches(ctx!);
     if (name === "create_branch") return await execCreateBranch(ctx!, args as { name: string; from?: string });
     if (name === "get_commit_history") return await execGetCommitHistory(ctx!, args as { limit?: string; path?: string });
@@ -591,17 +656,19 @@ export async function POST(req: Request) {
       `\n\n[Ajan modu — Repo: ${body.repoCtx.owner}/${body.repoCtx.repo} (${body.repoCtx.branch})]\n` +
       `Mevcut araçlar:\n` +
       `• list_files(filter?) — repo dosya ağacını listele\n` +
-      `• read_file(path) — dosya içeriğini oku\n` +
+      `• read_file(path) — dosya içeriğini oku (SATIR NUMARALARIYLA döner)\n` +
       `• search_files(query) — dosya yolunda arama\n` +
       `• search_code(query, extension?) — dosya İÇERİĞİNDE arama\n` +
-      `• write_file(path, content, commit_message) — dosya yaz + commit\n` +
+      `• str_replace(path, old_string, new_string, commit_message?) — HEDEFLİ düzenleme (tercih et)\n` +
+      `• write_file(path, content, commit_message) — YENİ dosya veya tam değişim\n` +
       `• list_branches() / create_branch(name, from?) — dal işlemleri\n` +
       `• get_commit_history(limit?, path?) — commit geçmişi\n` +
       (body.webSearch ? `• web_search(query) — internette ara\n• read_url(url) — web sayfası oku\n` : "") +
       `\nÇalışma pratiği:\n` +
-      `— Cevaplamadan önce ilgili dosyaları oku. Bir dosya yetmiyorsa birden fazla oku.\n` +
+      `— Cevaplamadan önce ilgili dosyaları oku. Bağımsız okumaları TEK turda birlikte iste (paralel çalışır).\n` +
       `— list_files veya search_code ile önce yapıyı anla, sonra spesifik dosyalara gir.\n` +
-      `— Değişiklik yapman istendiğinde write_file kullan; kullanıcının onayına gerek yok.\n` +
+      `— Var olan dosyada KÜÇÜK değişiklik için str_replace kullan (tüm dosyayı yeniden yazma); old_string ham metin olmalı (satır numarası DEĞİL), birebir ve benzersiz.\n` +
+      `— Yalnızca yeni dosya veya köklü değişimde write_file kullan. Kullanıcının onayına gerek yok.\n` +
       `— Aynı dosyayı tekrar okuma; okuduklarını hatırla.\n` +
       `— Karmaşık görevde adım adım ilerle: keşfet → analiz et → değiştir → doğrula.`;
   }
@@ -690,6 +757,8 @@ export async function POST(req: Request) {
     async start(controller) {
       const MAX_ROUNDS = 25;
       const url = `${baseUrl}/chat/completions`;
+      /* İstek başına dosya-okuma önbelleği: aynı dosya tekrar çekilmez. */
+      const readCache = new Map<string, string>();
       for (let round = 0; round < MAX_ROUNDS; round++) {
         let upstream: Response;
 
@@ -729,23 +798,29 @@ export async function POST(req: Request) {
           })),
         });
 
-        /* Execute and send results */
+        /* Araç çağrılarını yürüt: OKUMALAR paralel (hız), YAZMALAR sıralı
+           (aynı dosyaya eşzamanlı yazıp veri kaybını önlemek için). start
+           olayları önce; tool mesajları orijinal sırada (tool_call_id eşleşir). */
         for (const tc of toolCalls) {
-          /* notify client of tool call */
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "start", id: tc.id, name: tc.name, arguments: tc.arguments } })}\n\n`),
           );
+        }
+        const MUTATING = new Set(["write_file", "str_replace"]);
+        const resultById = new Map<string, string>();
+        const runOne = async (tc: AccumulatedToolCall) => {
           let args: Record<string, unknown> = {};
           try { args = JSON.parse(tc.arguments || "{}"); } catch { /* invalid */ }
-          const result = await executeTool(tc.name, args, repoCtx, activeMcpServers);
+          const result = await executeTool(tc.name, args, repoCtx, activeMcpServers, readCache);
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: result.slice(0, 400) + (result.length > 400 ? "…" : "") } })}\n\n`),
           );
-          convo.push({
-            role: "tool",
-            tool_call_id: tc.id,
-            content: result,
-          });
+          resultById.set(tc.id, result);
+        };
+        await Promise.all(toolCalls.filter((tc) => !MUTATING.has(tc.name)).map(runOne));
+        for (const tc of toolCalls.filter((tc) => MUTATING.has(tc.name))) await runOne(tc);
+        for (const tc of toolCalls) {
+          convo.push({ role: "tool", tool_call_id: tc.id, content: resultById.get(tc.id) ?? "" });
         }
       }
       controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
