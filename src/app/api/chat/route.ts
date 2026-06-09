@@ -1,5 +1,6 @@
-import { DEFAULT_SYSTEM_PROMPT, STYLE_LABELS } from "@/lib/constants";
+import { DEFAULT_SYSTEM_PROMPT } from "@/lib/constants";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
+import { buildContextSections } from "@/lib/prompt";
 import { CODER_TOOLS } from "@/lib/tools";
 import type { ChatMessage, MemoryItem, Provider, ResponseStyle } from "@/lib/types";
 
@@ -569,32 +570,13 @@ export async function POST(req: Request) {
   /* Eklenen her model, içinde çalıştığı platformun tüm özelliklerini bilsin. */
   sysPrompt += `\n\n${PLATFORM_KNOWLEDGE}`;
   if (body.projectPrompt) sysPrompt += `\n\n[Proje talimatları]: ${body.projectPrompt}`;
-  const styleKey = body.style || "normal";
-  const stylePrompt = STYLE_LABELS[styleKey]?.prompt;
-  if (stylePrompt) sysPrompt += `\n\n[Stil]: ${stylePrompt}`;
-  if (body.memories?.length) {
-    sysPrompt += `\n\n[Kullanıcı hakkında bildiklerin]:\n${body.memories.map((m) => `- ${m.content}`).join("\n")}`;
-  }
-  if (body.skills?.length) {
-    const fileSkills = body.skills.filter((s) => s.source === "file");
-    const manualSkills = body.skills.filter((s) => s.source !== "file");
-    if (manualSkills.length) {
-      sysPrompt +=
-        `\n\n[Eğitim seti — bu kurallara her zaman uy]:\n` +
-        manualSkills.map((s) => {
-          const tags = s.tags?.length ? ` (${s.tags.join(", ")})` : "";
-          return `### ${s.title}${tags}\n${s.content}`;
-        }).join("\n\n");
-    }
-    if (fileSkills.length) {
-      sysPrompt +=
-        `\n\n[Referans dosyalar — örnek olarak kullan]:\n` +
-        fileSkills.map((s) => `--- ${s.fileName || s.title} ---\n${s.content}`).join("\n\n");
-    }
-  }
-  if (body.searchContext) {
-    sysPrompt += `\n\n[Web arama sonuçları]:\n${body.searchContext}`;
-  }
+  /* Stil + hafıza + skills + arama bağlamı — istemci ile ortak tek kaynak. */
+  sysPrompt += buildContextSections({
+    style: body.style,
+    memories: body.memories,
+    skills: body.skills,
+    searchContext: body.searchContext,
+  });
   if (body.tools && body.repoCtx) {
     /* SOUL.md — OpenClaw-inspired project context file */
     const soulContent = await fetchSoulFile(body.repoCtx).catch(() => null);

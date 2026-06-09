@@ -1,5 +1,6 @@
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/constants";
-import type { ChatMessage, Provider } from "@/lib/types";
+import { buildContextSections, type SkillLike } from "@/lib/prompt";
+import type { ChatMessage, MemoryItem, Provider, ResponseStyle } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,10 @@ interface OrchestrateRequest {
   apiKey?: string;
   provider?: Provider;
   systemPrompt?: string;
+  style?: ResponseStyle;
+  memories?: MemoryItem[];
+  skills?: SkillLike[];
+  searchContext?: string;
 }
 
 const MAX_AGENTS = 4;
@@ -143,7 +148,14 @@ export async function POST(req: Request) {
   }
 
   const cfg: Cfg = { baseUrl, model, provider, headers: buildHeaders(provider, apiKey, req) };
-  const baseSys = (body.systemPrompt || DEFAULT_SYSTEM_PROMPT);
+  /* Kullanıcı bağlamı (stil + hafıza + skills + arama) /api/chat ile aynı kaynaktan
+     → nihai cevap (birleştirici / tek-ajan) bu kurallara uyar. */
+  const baseSys = (body.systemPrompt || DEFAULT_SYSTEM_PROMPT) + buildContextSections({
+    style: body.style,
+    memories: body.memories,
+    skills: body.skills,
+    searchContext: body.searchContext,
+  });
 
   /* Paylaşılan bağlam: son birkaç mesaj (dosya içerikleri istemci tarafından
      zaten mesajlara enjekte edilmiş olur). Çok uzamasın diye son 6 mesaj. */
