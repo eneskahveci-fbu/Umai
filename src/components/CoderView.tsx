@@ -77,7 +77,7 @@ import {
 import type { TreeFile, TreeNode } from "@/lib/types";
 import { AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agents";
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
-import { STYLE_LABELS } from "@/lib/constants";
+import { buildContextSections } from "@/lib/prompt";
 
 declare global {
   interface SpeechRecognition {
@@ -696,19 +696,14 @@ export function CoderView() {
          sunucu IP'si paylaşıldığında oluşan rate-limit sorunu önlenir). CORS açık. */
       let res: Response;
       if (active.provider === "pollinations" && !teamModeRef.current) {
-        let sysContent = finalSystemPrompt;
-        const styleP = STYLE_LABELS[store.config.style]?.prompt;
-        if (styleP) sysContent += `\n\n[Stil]: ${styleP}`;
-        if (store.config.memories?.length) {
-          sysContent += `\n\n[Kullanıcı hakkında bildiklerin]:\n${store.config.memories.map((m) => `- ${m.content}`).join("\n")}`;
-        }
-        if (activeSkills.length) {
-          const fileSkills = activeSkills.filter((s) => s.source === "file");
-          const manualSkills = activeSkills.filter((s) => s.source !== "file");
-          if (manualSkills.length) sysContent += `\n\n[Eğitim seti]:\n${manualSkills.map((s) => `### ${s.title}\n${s.content}`).join("\n\n")}`;
-          if (fileSkills.length) sysContent += `\n\n[Referans dosyalar]:\n${fileSkills.map((s) => `--- ${s.fileName || s.title} ---\n${s.content}`).join("\n\n")}`;
-        }
-        if (webSearchContext) sysContent += `\n\n[Web arama sonuçları]:\n${webSearchContext}`;
+        /* Bağlam blokları sunucu (/api/chat) ile ORTAK tek kaynaktan gelir →
+           Pollinations kullanıcıları da aynı, eksiksiz bağlamı alır. */
+        const sysContent = finalSystemPrompt + buildContextSections({
+          style: store.config.style,
+          memories: store.config.memories,
+          skills: activeSkills,
+          searchContext: webSearchContext || undefined,
+        });
         /* `referrer`: Pollinations anonim (referrer'sız) istekleri en agresif
            kısıtlar. Sabit bir referrer eklemek daha yüksek limitli kovaya alır. */
         const makePolBody = (modelName: string) => JSON.stringify({
