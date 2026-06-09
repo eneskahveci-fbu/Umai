@@ -52,6 +52,8 @@ export function ArtifactPanel() {
         <iframe
           srcDoc={srcdoc}
           sandbox="allow-scripts allow-modals"
+          allow=""
+          referrerPolicy="no-referrer"
           className="w-full h-full border-0"
           title="Artifact preview"
         />

@@ -9,7 +9,7 @@ interface GitHubTreeItem {
 export function parseRepo(input: string): { owner: string; repo: string } | null {
   const v = input
     .trim()
-    .replace(/^https?:\/\/github\.com\//, "")
+    .replace(/^(?:https?:\/\/)?github\.com\//, "")
     .replace(/\.git$/, "")
     .replace(/\/$/, "");
   const [owner, repo] = v.split("/");
@@ -22,6 +22,15 @@ function ghHeaders(token?: string): Record<string, string> {
   const h: Record<string, string> = { Accept: "application/vnd.github+json" };
   if (token) h.Authorization = `Bearer ${token}`;
   return h;
+}
+
+/** Tüm GitHub isteklerinde ortak: header + 20sn timeout (askıda kalan
+   istekler UI'yi ve sunucu fonksiyonlarını kilitlemesin). */
+const REQ_TIMEOUT = 20_000;
+function ghInit(token?: string, accept?: string): RequestInit {
+  const headers = ghHeaders(token);
+  if (accept) headers.Accept = accept;
+  return { headers, signal: AbortSignal.timeout(REQ_TIMEOUT) };
 }
 
 /** Hesaba ait depoları "owner/repo" listesi olarak getirir. Token varsa özel
@@ -37,7 +46,7 @@ export async function fetchUserRepos(
       ? `https://api.github.com/users/${username}/repos?per_page=100&sort=updated`
       : "";
   if (!url) return [];
-  const res = await fetch(url, { headers: ghHeaders(token) });
+  const res = await fetch(url, ghInit(token));
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
     throw new Error(e.message || `Depolar alınamadı (${res.status})`);
@@ -56,7 +65,7 @@ export async function fetchRepoTree(
 ): Promise<{ branch: string; items: GitHubTreeItem[] }> {
   const infoRes = await fetch(
     `https://api.github.com/repos/${owner}/${repo}`,
-    { headers: ghHeaders(token) },
+    ghInit(token),
   );
   const info = await infoRes.json();
   if (!infoRes.ok) throw new Error(info.message || "Depo bulunamadı");
@@ -64,7 +73,7 @@ export async function fetchRepoTree(
   const branch: string = info.default_branch;
   const treeRes = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,
-    { headers: ghHeaders(token) },
+    ghInit(token),
   );
   const data = await treeRes.json();
   if (!data.tree) throw new Error(data.message || "Dosya ağacı alınamadı");
@@ -83,7 +92,7 @@ export async function fetchFileContent(
   const encoded = path.split("/").map(encodeURIComponent).join("/");
   const res = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/contents/${encoded}?ref=${branch}`,
-    { headers: { ...ghHeaders(token), Accept: "application/vnd.github.raw" } },
+    ghInit(token, "application/vnd.github.raw"),
   );
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.text();
