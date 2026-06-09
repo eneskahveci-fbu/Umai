@@ -398,8 +398,8 @@ export const DEFAULT_CONFIG: Config = {
   activeGithubId: null,
   gitlabAccounts: [],
   activeGitlabId: null,
-  repos: ["eneskahveci-sdo/craft-ai"],
-  activeRepo: "eneskahveci-sdo/craft-ai",
+  repos: ["gitlab.com/eneskahveci.bs/craft-ai-web"],
+  activeRepo: "gitlab.com/eneskahveci.bs/craft-ai-web",
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   theme: "dark",
   style: "normal",
@@ -420,7 +420,7 @@ export const DEFAULT_CONFIG: Config = {
   mcpServers: [],
 };
 
-export const DEFAULT_REPO = "eneskahveci-sdo/craft-ai";
+export const DEFAULT_REPO = "gitlab.com/eneskahveci.bs/craft-ai-web";
 
 export const CODE_REVIEW_PROMPT =
   "Aşağıdaki kodu detaylı şekilde incele. Şu başlıklar altında bulgularını raporla:\n\n" +
