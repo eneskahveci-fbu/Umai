@@ -24,6 +24,30 @@ function ghHeaders(token?: string): Record<string, string> {
   return h;
 }
 
+/** Hesaba ait depoları "owner/repo" listesi olarak getirir. Token varsa özel
+   depolar da gelir; yoksa kullanıcının herkese açık depoları listelenir.
+   Son güncellenene göre sıralı, en fazla 100 depo. */
+export async function fetchUserRepos(
+  token?: string,
+  username?: string,
+): Promise<string[]> {
+  const url = token
+    ? `https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member`
+    : username
+      ? `https://api.github.com/users/${username}/repos?per_page=100&sort=updated`
+      : "";
+  if (!url) return [];
+  const res = await fetch(url, { headers: ghHeaders(token) });
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.message || `Depolar alınamadı (${res.status})`);
+  }
+  const data = (await res.json()) as { full_name?: string }[];
+  return Array.isArray(data)
+    ? data.map((r) => r.full_name).filter((x): x is string => !!x)
+    : [];
+}
+
 /** Deponun varsayılan dalını ve özyinelemeli dosya ağacını getirir. */
 export async function fetchRepoTree(
   owner: string,
