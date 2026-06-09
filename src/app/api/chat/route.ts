@@ -43,6 +43,7 @@ interface ChatRequest {
   projectPrompt?: string;
   tools?: boolean;
   webSearch?: boolean;
+  requireWriteApproval?: boolean;
   repoCtx?: RepoCtx;
   mcpServers?: McpServerConfig[];
 }
@@ -669,6 +670,13 @@ export async function POST(req: Request) {
       `— Yalnızca yeni dosya veya köklü değişimde write_file kullan. Kullanıcının onayına gerek yok.\n` +
       `— Aynı dosyayı tekrar okuma; okuduklarını hatırla.\n` +
       `— Karmaşık görevde adım adım ilerle: keşfet → analiz et → değiştir → doğrula.`;
+    if (body.requireWriteApproval) {
+      sysPrompt +=
+        `\n\n[ÖNEMLİ — Onay modu açık]\n` +
+        `Dosyaları DOĞRUDAN YAZMA/commit ETME (write_file/str_replace KULLANMA). ` +
+        `Bunun yerine değişiklikleri \`\`\`dil:dosya/yolu biçiminde kod bloğu olarak ÖNER; ` +
+        `kullanıcı inceleyip commit arayüzüyle kendisi uygular. Okuma/arama araçlarını serbestçe kullan.`;
+    }
   }
   if (body.webSearch && !body.repoCtx) {
     sysPrompt +=
@@ -741,8 +749,12 @@ export async function POST(req: Request) {
       },
     },
   ];
+  /* Onay modunda yazma araçlarını kaldır → ajan doğrudan commit edemez. */
+  const coderTools = body.requireWriteApproval
+    ? CODER_TOOLS.filter((t) => t.function.name !== "write_file" && t.function.name !== "str_replace")
+    : CODER_TOOLS;
   const allTools = [
-    ...(body.tools && body.repoCtx ? CODER_TOOLS : []),
+    ...(body.tools && body.repoCtx ? coderTools : []),
     ...(body.webSearch ? WEB_TOOLS : []),
     ...mcpToolDefs.map((t) => ({
       type: "function" as const,
