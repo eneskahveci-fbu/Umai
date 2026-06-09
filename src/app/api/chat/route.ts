@@ -1,6 +1,7 @@
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/constants";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { buildContextSections } from "@/lib/prompt";
+import { detectFrameworks, extractDeps, parseGitignore } from "@/lib/projectContext";
 import { CODER_TOOLS } from "@/lib/tools";
 import type { ChatMessage, MemoryItem, Provider, ResponseStyle } from "@/lib/types";
 
@@ -676,6 +677,21 @@ export async function POST(req: Request) {
     const soulContent = await fetchSoulFile(body.repoCtx).catch(() => null);
     if (soulContent) {
       sysPrompt += `\n\n[Proje bağlamı — SOUL.md]:\n${soulContent.slice(0, 6000)}`;
+    }
+    /* Proje profili: framework algılama (package.json) + .gitignore farkındalığı.
+       Tek seferlik, paralel çekim; hata olursa sessiz geçilir. */
+    const [pkgRaw, gitignoreRaw] = await Promise.all([
+      getFileRaw(body.repoCtx, "package.json").then((r) => (r.ok ? r.content : null)).catch(() => null),
+      getFileRaw(body.repoCtx, ".gitignore").then((r) => (r.ok ? r.content : null)).catch(() => null),
+    ]);
+    const frameworks = pkgRaw ? detectFrameworks({ deps: extractDeps(pkgRaw) }) : [];
+    if (frameworks.length || gitignoreRaw) {
+      sysPrompt += `\n\n[Proje profili]`;
+      if (frameworks.length) sysPrompt += `\n• Algılanan teknolojiler: ${frameworks.join(", ")} — bu ekosistemin en iyi pratiklerini uygula.`;
+      if (gitignoreRaw) {
+        const ignored = parseGitignore(gitignoreRaw).slice(0, 30).join(", ");
+        sysPrompt += `\n• .gitignore kalıpları (bunlara dokunma/oluşturma): ${ignored}`;
+      }
     }
     sysPrompt +=
       `\n\n[Ajan modu — Repo: ${body.repoCtx.owner}/${body.repoCtx.repo} (${body.repoCtx.branch})]\n` +
