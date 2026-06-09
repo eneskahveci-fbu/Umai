@@ -1,4 +1,5 @@
 import type { Config, ModelProfile, Provider, ResponseStyle, Skill } from "./types";
+import { DEFAULT_COMMAND_ALLOWLIST } from "./agentActions";
 
 export interface Preset {
   label: string;
@@ -413,6 +414,8 @@ export const DEFAULT_CONFIG: Config = {
   autoTerminal: false,
   inlineCompletion: true,
   requireWriteApproval: false,
+  autoRunCommands: false,
+  commandAllowlist: [...DEFAULT_COMMAND_ALLOWLIST],
   rulesFile: "",
   fontScale: "base",
   soundEnabled: false,

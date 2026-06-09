@@ -688,6 +688,25 @@ export function SettingsModal() {
                     <div className="text-xs text-muted mt-0.5">Açıkken ajan dosyaları doğrudan commit etmez; değişiklikleri kod bloğu olarak önerir, sen commit arayüzüyle uygularsın.</div>
                   </div>
                 </label>
+                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
+                  <input type="checkbox" checked={!!config.autoRunCommands} onChange={() => saveConfig({ ...config, autoRunCommands: !config.autoRunCommands })} className="accent-brand mt-0.5" />
+                  <div>
+                    <div className="text-sm font-semibold">Güvenli oto-çalıştır</div>
+                    <div className="text-xs text-muted mt-0.5">AI&apos;nın önerdiği SADECE izin listesindeki komutlar (npm test, lint vb.) otomatik çalışır; çıktı AI&apos;ya beslenir → kendi hatasını düzeltir. Diğer komutlar elle.</div>
+                  </div>
+                </label>
+                {config.autoRunCommands && (
+                  <div className="ml-7 -mt-1">
+                    <div className="text-xs text-muted mb-1">İzinli komutlar (her satıra bir önek):</div>
+                    <textarea
+                      value={(config.commandAllowlist ?? []).join("\n")}
+                      onChange={(e) => saveConfig({ ...config, commandAllowlist: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })}
+                      rows={4}
+                      className="input-mono !text-xs leading-relaxed w-full"
+                      placeholder="npm test&#10;npm run lint&#10;npx tsc"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
