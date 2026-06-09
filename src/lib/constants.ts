@@ -416,6 +416,8 @@ export const DEFAULT_CONFIG: Config = {
   requireWriteApproval: false,
   autoRunCommands: false,
   commandAllowlist: [...DEFAULT_COMMAND_ALLOWLIST],
+  planApprovalMode: false,
+  blockNetworkTools: false,
   rulesFile: "",
   fontScale: "base",
   soundEnabled: false,
