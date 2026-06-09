@@ -26,6 +26,7 @@ import {
   PanelLeft,
   Paperclip,
   RefreshCw,
+  RotateCcw,
   Search,
   Sparkles,
   Square,
@@ -383,6 +384,9 @@ export function CoderView() {
   const [fetchingFile, setFetchingFile] = useState<string | null>(null);
   const [editorFile, setEditorFile] = useState<EditorFile | null>(null);
   const [pendingCommit, setPendingCommit] = useState<EditorFile[] | null>(null);
+  /* Ajanın bu turda yazdığı dosyaların ESKİ içeriği — "Geri al" için. */
+  const [checkpoints, setCheckpoints] = useState<{ path: string; previous: string }[]>([]);
+  const [undoing, setUndoing] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [gitPanelOpen, setGitPanelOpen] = useState(false);
   const [loadingAll, setLoadingAll] = useState(false);
@@ -567,6 +571,44 @@ export function CoderView() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attachedFiles, tree]);
 
+  /* Geri al: ajanın bu turda değiştirdiği dosyaları eski içerikleriyle yeniden
+     commit eder (revert). EditorPanel/MultiCommitBar ile aynı yazma uçları. */
+  const undoCheckpoints = async () => {
+    if (!repo || checkpoints.length === 0) return;
+    setUndoing(true);
+    const store = useStore.getState();
+    try {
+      for (const cp of checkpoints) {
+        const endpoint = repoIsGitLab ? "/api/gitlab/write" : "/api/github/write";
+        const token = repoIsGitLab ? store.activeGitlab()?.token : store.activeGithub()?.token;
+        const idField = repoIsGitLab ? { namespace: repo.owner } : { owner: repo.owner };
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...idField,
+            repo: repo.repo,
+            branch: repo.branch,
+            path: cp.path,
+            content: cp.previous,
+            message: `revert: ${cp.path}`,
+            token,
+          }),
+        });
+        if (!res.ok) {
+          const { error } = await res.json().catch(() => ({ error: `Hata ${res.status}` }));
+          throw new Error(error);
+        }
+      }
+      addToast(`↩ ${checkpoints.length} dosya eski haline döndürüldü`, "success");
+      setCheckpoints([]);
+    } catch (e) {
+      addToast(`Geri alınamadı: ${(e as Error).message}`, "error");
+    } finally {
+      setUndoing(false);
+    }
+  };
+
   const readFileIntoInput = (f: globalThis.File) => {
     if (f.type.startsWith("image/")) {
       if (f.size > 5_000_000) { addToast("Görsel 5MB'den büyük.", "error"); return; }
@@ -649,6 +691,7 @@ export function CoderView() {
 
     store.pushMessage({ role: "assistant", content: "" });
     store.setStreaming(true);
+    setCheckpoints([]); // yeni tur — önceki turun geri-al noktalarını sıfırla
     store.setFollowUpSuggestions([]);
     coderAbort = new AbortController();
     const abortCtl = coderAbort;
@@ -862,6 +905,16 @@ export function CoderView() {
             /* ajan plan (update_plan) olayı */
             if (parsed.plan_event) {
               useStore.getState().setPlanOnLast(String(parsed.plan_event.plan ?? ""));
+              continue;
+            }
+            /* checkpoint: ajan bir dosyayı değiştirdi → eski içeriği sakla (geri al) */
+            if (parsed.checkpoint_event) {
+              const { path, previous } = parsed.checkpoint_event;
+              if (typeof path === "string" && typeof previous === "string") {
+                setCheckpoints((prev) =>
+                  prev.some((c) => c.path === path) ? prev : [...prev, { path, previous }],
+                );
+              }
               continue;
             }
             const delta = parsed.choices?.[0]?.delta?.content ?? "";
@@ -1339,6 +1392,30 @@ export function CoderView() {
                             onClose={() => setPendingCommit(null)}
                             onOpenInEditor={(f) => { setEditorFile(f); setEditorOpen(true); }}
                           />
+                        </div>
+                      )}
+                      {isLastAssistant && !streaming && checkpoints.length > 0 && repo && (
+                        <div className="ml-11 max-w-2xl mt-2 flex items-center gap-2 px-3 py-2 rounded-xl border border-line bg-bgsoft/50 text-xs">
+                          <RotateCcw size={13} className="text-amber-400 shrink-0" />
+                          <span className="text-muted flex-1 min-w-0 truncate">
+                            Ajan {checkpoints.length} dosyayı değiştirdi
+                            {checkpoints.length === 1 ? ` (${checkpoints[0].path})` : ""}
+                          </span>
+                          <button
+                            onClick={undoCheckpoints}
+                            disabled={undoing}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-400/10 text-amber-400 hover:bg-amber-400/20 font-semibold disabled:opacity-50 transition-colors shrink-0"
+                          >
+                            {undoing ? <Loader2Icon size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                            {undoing ? "Geri alınıyor…" : "Geri Al"}
+                          </button>
+                          <button
+                            onClick={() => setCheckpoints([])}
+                            className="text-muted/50 hover:text-ink p-1 rounded transition-colors shrink-0"
+                            title="Kapat"
+                          >
+                            <X size={12} />
+                          </button>
                         </div>
                       )}
                     </div>
