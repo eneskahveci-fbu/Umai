@@ -838,6 +838,11 @@ export function CoderView() {
               }
               continue;
             }
+            /* ajan plan (update_plan) olayı */
+            if (parsed.plan_event) {
+              useStore.getState().setPlanOnLast(String(parsed.plan_event.plan ?? ""));
+              continue;
+            }
             const delta = parsed.choices?.[0]?.delta?.content ?? "";
             const reasoning = (parsed.choices?.[0]?.delta as Record<string, unknown>)?.reasoning as string | undefined;
             if (reasoning) useStore.getState().updateLastThinking(reasoning);
