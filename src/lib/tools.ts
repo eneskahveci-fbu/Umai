@@ -106,6 +106,20 @@ export const CODER_TOOLS: ToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "update_plan",
+      description: "Çok adımlı bir görev için canlı yapılacaklar listesini (plan) günceller; kullanıcı ilerlemeyi görür. Göreve başlarken tüm adımları yaz, her adım bitince listeyi yeniden gönder. Her satır bir adım: '[ ]' bekliyor, '[~]' devam ediyor, '[x]' tamamlandı. Örn: '[x] Dosyaları incele\\n[~] Bug'ı düzelt\\n[ ] Testi çalıştır'.",
+      parameters: {
+        type: "object",
+        properties: {
+          plan: { type: "string", description: "Her satırda bir adım: '[ ]' / '[~]' / '[x]' durum işaretiyle başlar" },
+        },
+        required: ["plan"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "list_branches",
       description: "Repodaki dalları (branch) listeler.",
       parameters: {
