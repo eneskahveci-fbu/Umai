@@ -412,6 +412,7 @@ export const DEFAULT_CONFIG: Config = {
   cliMode: false,
   autoTerminal: false,
   inlineCompletion: true,
+  requireWriteApproval: false,
   rulesFile: "",
   fontScale: "base",
   soundEnabled: false,
