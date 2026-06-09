@@ -18,6 +18,7 @@ import {
   Folder,
   GitPullRequest,
   Globe,
+  Users,
   Image as ImageIcon,
   Loader2 as Loader2Icon,
   Mic,
@@ -323,6 +324,10 @@ export function CoderView() {
   const [searchOn, setSearchOn] = useState(false);
   const searchOnRef = useRef(false);
   useEffect(() => { searchOnRef.current = searchOn; }, [searchOn]);
+  /* Çoklu-ajan ("Ajan Ekibi") modu: planlayıcı → paralel işçiler → birleştirici. */
+  const [teamMode, setTeamMode] = useState(false);
+  const teamModeRef = useRef(false);
+  useEffect(() => { teamModeRef.current = teamMode; }, [teamMode]);
   const [repoSearch, setRepoSearch] = useState("");
   const [connecting, setConnecting] = useState(false);
   const connectingRef = useRef(false);
@@ -653,7 +658,10 @@ export function CoderView() {
       /* Sunucu-proxy üzerinden çağrı (tüm sağlayıcılar için ortak; Pollinations
          doğrudan tarayıcı çağrısı başarısız olursa yedek olarak da kullanılır.
          Sunucu Pollinations'ı anahtarsız destekler). */
-      const callViaServer = () => fetch("/api/chat", {
+      /* Ajan Ekibi modunda orkestrasyon endpoint'ine git (planlayıcı → paralel
+         işçiler → birleştirici). Aynı gövdeyi alır, aynı OpenAI-uyumlu SSE'yi döner. */
+      const endpoint = teamModeRef.current ? "/api/orchestrate" : "/api/chat";
+      const callViaServer = () => fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: abortCtl.signal,
@@ -687,7 +695,7 @@ export function CoderView() {
       /* Pollinations: tarayıcıdan doğrudan çağrı yapılır (her kullanıcı kendi IP'sini kullanır,
          sunucu IP'si paylaşıldığında oluşan rate-limit sorunu önlenir). CORS açık. */
       let res: Response;
-      if (active.provider === "pollinations") {
+      if (active.provider === "pollinations" && !teamModeRef.current) {
         let sysContent = finalSystemPrompt;
         const styleP = STYLE_LABELS[store.config.style]?.prompt;
         if (styleP) sysContent += `\n\n[Stil]: ${styleP}`;
@@ -1511,6 +1519,14 @@ export function CoderView() {
                     <span>Web</span>
                   </ComposerButton>
                   <ComposerButton
+                    onClick={() => setTeamMode((v) => !v)}
+                    active={teamMode}
+                    title="Ajan Ekibi: görevi alt görevlere böler, paralel ajanlarla çözer, sonuçları birleştirir (seçili modelle çalışır)"
+                  >
+                    <Users size={13} />
+                    <span>Ekip</span>
+                  </ComposerButton>
+                  <ComposerButton
                     onClick={() => {
                       const msgs = useStore.getState().current()?.messages ?? [];
                       for (let i = msgs.length - 1; i >= 0; i--) {
@@ -1617,6 +1633,7 @@ export function CoderView() {
 
                 <div className="flex items-center gap-1.5 text-[11px] text-muted/50 shrink-0">
                   {searchOn && <span className="text-brand font-medium">Web</span>}
+                  {teamMode && <span className="text-brand font-medium">Ekip</span>}
                   {toolsEnabled && <span className="text-green/80 font-medium">Tools</span>}
                   {activeAgent && <span className="text-brand font-medium">{activeAgent.command}</span>}
                 </div>
