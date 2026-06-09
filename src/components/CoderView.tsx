@@ -547,6 +547,26 @@ export function CoderView() {
     }
   };
 
+  /* Komut paletinden (Cmd+P) dosya açma isteği → editörde aç. */
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const path = (e as CustomEvent<{ path: string }>).detail?.path;
+      if (!path) return;
+      const existing = attachedFiles.find((f) => f.path === path);
+      if (existing) {
+        setEditorFile({ path: existing.path, content: existing.content, language: detectLanguage(path) });
+        setEditorOpen(true);
+        return;
+      }
+      const file = tree ? getAllFiles(tree).find((f) => f.path === path) : undefined;
+      if (file) await attachRepoFile(file);
+    };
+    window.addEventListener("craftai:open-file", handler);
+    return () => window.removeEventListener("craftai:open-file", handler);
+  // attachRepoFile kapanışı attachedFiles/tree ile yenilenir; diğerleri stabil
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachedFiles, tree]);
+
   const readFileIntoInput = (f: globalThis.File) => {
     if (f.type.startsWith("image/")) {
       if (f.size > 5_000_000) { addToast("Görsel 5MB'den büyük.", "error"); return; }

@@ -11,8 +11,10 @@ import {
   GitCompareArrows,
   Search,
   Code2,
+  FileText,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import type { TreeNode } from "@/lib/types";
 
 interface PaletteAction {
   id: string;
@@ -23,10 +25,26 @@ interface PaletteAction {
   keywords: string[];
 }
 
+/** Birleşik palet satırı: komut VEYA dosya. */
+interface Row {
+  id: string;
+  label: string;
+  sub?: string;
+  icon: React.ReactNode;
+  shortcut?: string;
+  run: () => void;
+}
+
+function flattenTree(node: TreeNode | null): { name: string; path: string }[] {
+  if (!node) return [];
+  return [...node.files, ...Object.values(node.dirs).flatMap(flattenTree)];
+}
+
 export function CommandPalette() {
   const open = useStore((s) => s.commandPaletteOpen);
   const setOpen = useStore((s) => s.setCommandPaletteOpen);
   const theme = useStore((s) => s.config.theme);
+  const tree = useStore((s) => s.tree);
 
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -120,7 +138,7 @@ export function CommandPalette() {
     },
   ];
 
-  const filtered = query
+  const commandRows: Row[] = (query
     ? actions.filter((a) => {
         const q = query.toLowerCase();
         return (
@@ -128,7 +146,29 @@ export function CommandPalette() {
           a.keywords.some((k) => k.includes(q))
         );
       })
-    : actions;
+    : actions
+  ).map((a) => ({ id: a.id, label: a.label, icon: a.icon, shortcut: a.shortcut, run: a.action }));
+
+  /* Cmd+P tarzı dosya bulucu: en az 1 karakter yazınca repo ağacında ara,
+     seçilince dosyayı editörde aç (CoderView dinler). */
+  const q = query.toLowerCase();
+  const fileRows: Row[] = query.length >= 1
+    ? flattenTree(tree)
+        .filter((f) => f.path.toLowerCase().includes(q))
+        .slice(0, 8)
+        .map((f) => ({
+          id: "file:" + f.path,
+          label: f.name,
+          sub: f.path,
+          icon: <FileText size={16} />,
+          run: () => {
+            window.dispatchEvent(new CustomEvent("craftai:open-file", { detail: { path: f.path } }));
+            setOpen(false);
+          },
+        }))
+    : [];
+
+  const filtered: Row[] = [...commandRows, ...fileRows];
 
   /* Reset the highlighted row when the query changes, and clear search when
      the palette (re)opens — both adjusted during render rather than in an
@@ -158,7 +198,9 @@ export function CommandPalette() {
   // Global Ctrl+K listener
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      /* Ctrl/Cmd+K → komut paleti, Ctrl/Cmd+P → hızlı dosya bulucu (ikisi de
+         aynı paleti açar; dosya araması yazdıkça çalışır). */
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "p")) {
         e.preventDefault();
         setOpen(!useStore.getState().commandPaletteOpen);
       }
@@ -177,7 +219,7 @@ export function CommandPalette() {
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (filtered[selectedIndex]) {
-        filtered[selectedIndex].action();
+        filtered[selectedIndex].run();
       }
     } else if (e.key === "Escape") {
       setOpen(false);
@@ -211,7 +253,7 @@ export function CommandPalette() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Komut ara..."
+            placeholder="Komut veya dosya ara…"
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted/60"
           />
           <kbd className="text-[10px] text-muted border border-line rounded px-1.5 py-0.5 font-mono">
@@ -229,7 +271,7 @@ export function CommandPalette() {
             filtered.map((a, i) => (
               <button
                 key={a.id}
-                onClick={() => a.action()}
+                onClick={() => a.run()}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
                   i === selectedIndex
                     ? "bg-brand/10 text-brand"
@@ -243,7 +285,10 @@ export function CommandPalette() {
                 >
                   {a.icon}
                 </span>
-                <span className="flex-1 text-left">{a.label}</span>
+                <span className="flex-1 text-left min-w-0">
+                  <span className="block truncate">{a.label}</span>
+                  {a.sub && <span className="block truncate text-[11px] text-muted/60 font-mono">{a.sub}</span>}
+                </span>
                 {a.shortcut && (
                   <kbd className="text-[10px] text-muted border border-line rounded px-1.5 py-0.5 font-mono">
                     {a.shortcut}
