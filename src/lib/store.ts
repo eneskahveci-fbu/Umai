@@ -181,7 +181,7 @@ function applyTheme(theme: "dark" | "light") {
 /* Eski/ölü varsayılan GitHub depolarını canlı GitLab deposuna migrate eder.
    Hesap GitLab'a taşındığından, kayıtlı eski repo'lar artık 404 veriyordu. */
 const DEAD_REPOS = new Set(["eneskahveci-sdo/craft-ai"]);
-function migrateRepos(cfg: Config): Config {
+export function migrateRepos(cfg: Config): Config {
   if (!Array.isArray(cfg.repos) || !cfg.repos.some((r) => DEAD_REPOS.has(r))) return cfg;
   const repos = [...new Set(cfg.repos.map((r) => (DEAD_REPOS.has(r) ? DEFAULT_REPO : r)))];
   const activeRepo = cfg.activeRepo && DEAD_REPOS.has(cfg.activeRepo) ? DEFAULT_REPO : cfg.activeRepo;
@@ -206,7 +206,7 @@ function mergeById<T extends { id: string }>(
   return [...map.values()];
 }
 
-function mergeConfigs(local: Config, remote: Partial<Config>): Config {
+export function mergeConfigs(local: Config, remote: Partial<Config>): Config {
   /* Skalar tercihler için uzak (en son senkronlanan cihaz) kazanır. */
   const base: Config = { ...DEFAULT_CONFIG, ...local, ...remote };
   /* Diziler: id'ye göre birleştir; çakışmada anahtarı/token'ı dolu olanı koru. */
