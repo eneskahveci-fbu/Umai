@@ -376,7 +376,7 @@ export function CoderView() {
     ta.style.height = Math.min(ta.scrollHeight, 200) + "px";
   }, [input]);
 
-  const connectRepo = async () => {
+  const connectRepo = async (silent = false) => {
     if (connectingRef.current) return;
     connectingRef.current = true;
     const store = useStore.getState();
@@ -418,7 +418,8 @@ export function CoderView() {
         }
       }
     } catch (e) {
-      addToast(`Depo bağlantısı başarısız: ${(e as Error).message}`, "error");
+      /* Açılıştaki otomatik bağlanmada sessiz kal; sadece elle bağlanınca hata göster. */
+      if (!silent) addToast(`Depo bağlantısı başarısız: ${(e as Error).message}`, "error");
     } finally {
       connectingRef.current = false;
       setConnecting(false);
@@ -435,7 +436,7 @@ export function CoderView() {
       setTree(null);
       setRepo(null);
     }
-    if (!tree || repoChanged) connectRepo();
+    if (!tree || repoChanged) connectRepo(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.activeRepo, config.activeGithubId, config.activeGitlabId, config.cliMode]);
 
@@ -1141,7 +1142,7 @@ export function CoderView() {
                   </button>
                 )}
                 {repo && (
-                  <button onClick={connectRepo} disabled={connecting} title="Yenile" className="text-muted/40 hover:text-brand transition-colors">
+                  <button onClick={() => connectRepo()} disabled={connecting} title="Yenile" className="text-muted/40 hover:text-brand transition-colors">
                     <RefreshCw size={10} className={connecting ? "animate-spin" : ""} />
                   </button>
                 )}
@@ -1175,7 +1176,7 @@ export function CoderView() {
                   {!connecting && (
                     <div className="flex flex-col gap-1.5 items-center">
                       {config.activeRepo ? (
-                        <button onClick={connectRepo} className="text-[10px] px-3 py-1.5 rounded-lg bg-brand text-white font-semibold hover:bg-branddim transition-colors flex items-center gap-1">
+                        <button onClick={() => connectRepo()} className="text-[10px] px-3 py-1.5 rounded-lg bg-brand text-white font-semibold hover:bg-branddim transition-colors flex items-center gap-1">
                           <FolderGit2 size={10} /> Bağlan
                         </button>
                       ) : null}
