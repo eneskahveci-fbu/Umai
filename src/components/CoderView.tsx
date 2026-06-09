@@ -704,6 +704,7 @@ export function CoderView() {
           })),
           tools: toolsEnabled,
           webSearch: searchOnRef.current,
+          requireWriteApproval: store.config.requireWriteApproval,
           searchContext: webSearchContext || undefined,
           repoCtx: toolsEnabled && repo ? {
             owner: repo.owner,

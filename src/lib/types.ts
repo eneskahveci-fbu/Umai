@@ -151,6 +151,9 @@ export interface Config {
   /** Editörde satır içi (ghost text) AI tamamlama. Aktif modelin API kotasını
       kullandığı için kapatılabilir. Tanımsız = açık. */
   inlineCompletion?: boolean;
+  /** Açıksa ajan dosyaları doğrudan yazıp commit edemez; değişiklikleri kod
+      bloğu olarak ÖNERİR, kullanıcı commit arayüzüyle uygular. Tanımsız = kapalı. */
+  requireWriteApproval?: boolean;
   rulesFile: string;
   fontScale: "sm" | "base" | "lg";
   soundEnabled: boolean;
