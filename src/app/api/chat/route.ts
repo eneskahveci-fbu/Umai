@@ -1,6 +1,7 @@
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/constants";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { buildContextSections } from "@/lib/prompt";
+import { pruneMessages } from "@/lib/contextWindow";
 import { detectFrameworks, extractDeps, parseGitignore } from "@/lib/projectContext";
 import { CODER_TOOLS } from "@/lib/tools";
 import type { ChatMessage, MemoryItem, Provider, ResponseStyle } from "@/lib/types";
@@ -829,7 +830,8 @@ export async function POST(req: Request) {
             method: "POST", headers: upstreamHeaders,
             body: JSON.stringify({
               model,
-              messages: convo,
+              /* Bağlam yönetimi: eski/büyük tool çıktılarını kırp (yapı korunur). */
+              messages: pruneMessages(convo, { keepRecent: 8, maxContentChars: 4000 }),
               stream: true,
               tools: allTools,
               tool_choice: round === MAX_ROUNDS - 1 ? "none" : "auto",
