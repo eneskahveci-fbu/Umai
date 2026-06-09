@@ -700,10 +700,13 @@ export function CoderView() {
           if (fileSkills.length) sysContent += `\n\n[Referans dosyalar]:\n${fileSkills.map((s) => `--- ${s.fileName || s.title} ---\n${s.content}`).join("\n\n")}`;
         }
         if (webSearchContext) sysContent += `\n\n[Web arama sonuçları]:\n${webSearchContext}`;
+        /* `referrer`: Pollinations anonim (referrer'sız) istekleri en agresif
+           kısıtlar. Sabit bir referrer eklemek daha yüksek limitli kovaya alır. */
         const makePolBody = (modelName: string) => JSON.stringify({
           model: modelName,
           messages: [{ role: "system", content: sysContent }, ...apiMessages],
           stream: true,
+          referrer: "craft-coder",
         });
         /* Cycle through models on 429: try each for up to 2 attempts before moving on.
            Order: selected → openai → mistral → llama (least to most likely available) */
@@ -754,7 +757,16 @@ export function CoderView() {
 
       if (!res.ok || !res.body) {
         const detail = await res.text().catch(() => "");
-        if (res.status === 429) throw new Error(`⏱️ İstek limiti aşıldı [${active.provider} / ${active.model}]: 30-60 saniye bekle ve tekrar dene.`);
+        if (res.status === 429) {
+          if (active.provider === "pollinations") {
+            throw new Error(
+              `⏱️ Pollinations (ücretsiz) şu an yoğun ve isteğini sınırladı [${active.model}]. ` +
+              `Birkaç dakika sonra tekrar dene **ya da** kesintisiz kullanım için Ayarlar → Modeller'den ücretsiz bir anahtar ekle ` +
+              `(Google Gemini günde 1.5M istek, Groq veya OpenRouter ücretsiz modeller).`,
+            );
+          }
+          throw new Error(`⏱️ İstek limiti aşıldı [${active.provider} / ${active.model}]: 30-60 saniye bekle ve tekrar dene.`);
+        }
         throw new Error(detail || `Hata ${res.status}`);
       }
 
