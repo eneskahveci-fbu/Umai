@@ -95,6 +95,12 @@ export interface Project {
   name: string;
   systemPrompt: string;
   created_at: number;
+  /** Bu proje aktifken kullanılacak model (boşsa global aktif model). */
+  modelId?: string;
+  /** Bu projeye özel örnekleme sıcaklığı (0-2). Tanımsız = sağlayıcı varsayılanı. */
+  temperature?: number;
+  /** Bu projeye özel maksimum yanıt token'ı. Tanımsız = sağlayıcı varsayılanı. */
+  maxTokens?: number;
 }
 
 export interface MemoryItem {

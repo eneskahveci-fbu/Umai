@@ -38,6 +38,8 @@ interface ChatRequest {
   apiKey?: string;
   provider?: Provider;
   systemPrompt?: string;
+  temperature?: number;
+  maxTokens?: number;
   style?: ResponseStyle;
   memories?: MemoryItem[];
   skills?: SkillPayload[];
@@ -652,6 +654,12 @@ export async function POST(req: Request) {
   /* pollinations ve ollama API anahtarı gerektirmez */
   if (!apiKey && provider !== "pollinations" && provider !== "ollama") return new Response("API anahtarı yok.", { status: 400 });
 
+  /* Proje-başına örnekleme parametreleri (temperature/max_tokens). Tanımsızsa
+     sağlayıcı varsayılanı kullanılır. */
+  const sampling: Record<string, unknown> = {};
+  if (typeof body.temperature === "number") sampling.temperature = body.temperature;
+  if (typeof body.maxTokens === "number") sampling.max_tokens = body.maxTokens;
+
   const upstreamHeaders: Record<string, string> = { "Content-Type": "application/json" };
   if (provider === "anthropic") {
     upstreamHeaders["anthropic-version"] = "2023-06-01";
@@ -750,7 +758,7 @@ export async function POST(req: Request) {
     let upstream: Response;
     const url = `${baseUrl}/chat/completions`;
     /* Pollinations için referrer ekle (anonim isteklerin agresif kısıtlanmasını azaltır). */
-    const upstreamBody: Record<string, unknown> = { model, messages, stream: true };
+    const upstreamBody: Record<string, unknown> = { model, messages, stream: true, ...sampling };
     if (provider === "pollinations") upstreamBody.referrer = "craft-coder";
 
     try {
@@ -845,6 +853,7 @@ export async function POST(req: Request) {
               stream: true,
               tools: allTools,
               tool_choice: round === MAX_ROUNDS - 1 ? "none" : "auto",
+              ...sampling,
             }),
           });
         } catch (err) {
