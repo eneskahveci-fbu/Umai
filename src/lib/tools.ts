@@ -30,7 +30,7 @@ export const CODER_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "read_file",
-      description: "Bağlı repodan bir dosyanın içeriğini okur. Dosya yolu repo köküne göre relatif olmalı.",
+      description: "Bağlı repodan bir dosyanın içeriğini okur. İçerik SATIR NUMARALARIYLA döner (referans için). Not: str_replace'te old_string olarak satır numarasını DEĞİL, ham kod metnini kullan. Dosya yolu repo köküne göre relatif olmalı.",
       parameters: {
         type: "object",
         properties: {
@@ -73,7 +73,7 @@ export const CODER_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "write_file",
-      description: "Repoya yeni bir dosya yazar veya var olan dosyayı günceller. Kodu yazdıktan sonra commit eder.",
+      description: "YENİ dosya oluşturur veya bir dosyayı TAMAMEN değiştirir (tüm içerik). Var olan bir dosyada KÜÇÜK değişiklik yapacaksan write_file yerine str_replace kullan — daha hızlı ve ucuz. Yazdıktan sonra commit eder.",
       parameters: {
         type: "object",
         properties: {
@@ -82,6 +82,24 @@ export const CODER_TOOLS: ToolDefinition[] = [
           commit_message: { type: "string", description: "Commit mesajı. Örn: 'feat: add helper utility'" },
         },
         required: ["path", "content", "commit_message"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "str_replace",
+      description: "Var olan bir dosyada HEDEFLİ düzenleme: old_string'i new_string ile değiştirir (tüm dosyayı yeniden yazmaz — daha hızlı, ucuz, güvenli). old_string dosyada BENZERSİZ ve birebir eşleşmeli (girinti/boşluk dahil). Eşleşme yoksa veya birden çoksa hata döner; o zaman daha fazla bağlam ekle. Değişiklik commit edilir.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Repo köküne göre dosya yolu" },
+          old_string: { type: "string", description: "Değiştirilecek MEVCUT metin — ham kod (satır numarası OLMADAN), girinti dahil birebir" },
+          new_string: { type: "string", description: "Yerine yazılacak yeni metin" },
+          commit_message: { type: "string", description: "Commit mesajı (opsiyonel)" },
+          replace_all: { type: "boolean", description: "true ise tüm eşleşmeleri değiştirir (opsiyonel, varsayılan false)" },
+        },
+        required: ["path", "old_string", "new_string"],
       },
     },
   },
