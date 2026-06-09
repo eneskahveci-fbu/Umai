@@ -716,11 +716,15 @@ export function CoderView() {
         let polModel = polQueue.shift()!;
         let polAttempt = 0;
         const POL_WAIT = 3000;
+        /* Opsiyonel ücretsiz Pollinations token'ı (Ayarlar'da model anahtarı
+           alanına yapıştırılırsa) limiti yükseltir; yoksa anonim denenir. */
+        const polHeaders: Record<string, string> = { "Content-Type": "application/json" };
+        if (active.apiKey) polHeaders["Authorization"] = `Bearer ${active.apiKey}`;
         try {
           while (true) {
             res = await fetch(`${active.baseUrl}/chat/completions`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: polHeaders,
               signal: abortCtl.signal,
               body: makePolBody(polModel),
             });
