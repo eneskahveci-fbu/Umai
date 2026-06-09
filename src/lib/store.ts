@@ -372,9 +372,11 @@ interface StoreState {
   pendingInput: string | null;
   setPendingInput: (s: string | null) => void;
 
-  // prompt library
-  promptLibraryOpen: boolean;
-  setPromptLibraryOpen: (b: boolean) => void;
+  // kütüphane (snippet'ler + prompt şablonları, tek modal)
+  libraryOpen: boolean;
+  setLibraryOpen: (b: boolean) => void;
+  libraryTab: "snippets" | "prompts";
+  setLibraryTab: (t: "snippets" | "prompts") => void;
 
   // command palette
   commandPaletteOpen: boolean;
@@ -403,8 +405,6 @@ interface StoreState {
   addSnippet: (s: Omit<Snippet, "id" | "created_at">) => void;
   removeSnippet: (id: string) => void;
   reorderSnippets: (fromId: string, toId: string) => void;
-  snippetsOpen: boolean;
-  setSnippetsOpen: (b: boolean) => void;
 
   // diff modal
   diffModal: { original: string; newCode: string; language: string; path?: string } | null;
@@ -986,8 +986,10 @@ export const useStore = create<StoreState>()((set, get) => ({
   pendingInput: null,
   setPendingInput: (s) => set({ pendingInput: s }),
 
-  promptLibraryOpen: false,
-  setPromptLibraryOpen: (b) => set({ promptLibraryOpen: b }),
+  libraryOpen: false,
+  setLibraryOpen: (b) => set({ libraryOpen: b }),
+  libraryTab: "snippets",
+  setLibraryTab: (t) => set({ libraryTab: t }),
 
   commandPaletteOpen: false,
   setCommandPaletteOpen: (b) => set({ commandPaletteOpen: b }),
@@ -1088,8 +1090,6 @@ export const useStore = create<StoreState>()((set, get) => ({
     saveSnippets(snips);
     set({ snippets: snips });
   },
-  snippetsOpen: false,
-  setSnippetsOpen: (b) => set({ snippetsOpen: b }),
 
   /* diff modal */
   diffModal: null,

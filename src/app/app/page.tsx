@@ -4,13 +4,12 @@ import { useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { CoderView } from "@/components/CoderView";
 import { SettingsModal } from "@/components/SettingsModal";
-import { PromptLibrary } from "@/components/PromptLibrary";
+import { LibraryModal } from "@/components/LibraryModal";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { SkillsPanel } from "@/components/SkillsPanel";
-import { SnippetsPanel } from "@/components/SnippetsPanel";
 import { DiffModal } from "@/components/DiffModal";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OnboardingTour } from "@/components/OnboardingTour";
@@ -94,11 +93,10 @@ export default function AppPage() {
         </main>
 
         <SettingsModal />
-        <PromptLibrary />
+        <LibraryModal />
         <CommandPalette />
         <KeyboardShortcuts />
         <SkillsPanel />
-        <SnippetsPanel />
         <DiffModal />
         <ToastContainer />
         <OfflineBanner />
