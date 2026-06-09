@@ -36,6 +36,12 @@ function glHeaders(token?: string): Record<string, string> {
   return h;
 }
 
+/** Tüm GitLab isteklerinde ortak: header + 20sn timeout. */
+const REQ_TIMEOUT = 20_000;
+function glInit(token?: string): RequestInit {
+  return { headers: glHeaders(token), signal: AbortSignal.timeout(REQ_TIMEOUT) };
+}
+
 /** Hesaba ait projeleri "gitlab.com/namespace/path" listesi olarak getirir.
    Token varsa erişilebilen tüm (özel dahil) projeler, yoksa kullanıcının
    herkese açık projeleri. Son etkinliğe göre sıralı, en fazla 100 proje. */
@@ -49,7 +55,7 @@ export async function fetchGitLabUserRepos(
       ? `https://gitlab.com/api/v4/users/${encodeURIComponent(username)}/projects?per_page=100&order_by=last_activity_at&simple=true`
       : "";
   if (!url) return [];
-  const res = await fetch(url, { headers: glHeaders(token) });
+  const res = await fetch(url, glInit(token));
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
     throw new Error(e.message || `Projeler alınamadı (${res.status})`);
@@ -69,7 +75,7 @@ export async function fetchGitLabRepoTree(
   const proj = encodeProject(namespace, repo);
   const infoRes = await fetch(
     `https://gitlab.com/api/v4/projects/${proj}`,
-    { headers: glHeaders(token) },
+    glInit(token),
   );
   const info = await infoRes.json();
   if (!infoRes.ok) throw new Error(info.message || "Depo bulunamadı");
@@ -80,7 +86,7 @@ export async function fetchGitLabRepoTree(
   while (page <= 10) {
     const treeRes = await fetch(
       `https://gitlab.com/api/v4/projects/${proj}/repository/tree?recursive=true&ref=${encodeURIComponent(branch)}&per_page=100&page=${page}`,
-      { headers: glHeaders(token) },
+      glInit(token),
     );
     if (!treeRes.ok) throw new Error(`Dosya ağacı alınamadı (${treeRes.status})`);
     const data: GitLabTreeItem[] = await treeRes.json();
@@ -106,7 +112,7 @@ export async function fetchGitLabFileContent(
   const encoded = encodeURIComponent(path);
   const res = await fetch(
     `https://gitlab.com/api/v4/projects/${proj}/repository/files/${encoded}/raw?ref=${encodeURIComponent(branch)}`,
-    { headers: glHeaders(token) },
+    glInit(token),
   );
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.text();
