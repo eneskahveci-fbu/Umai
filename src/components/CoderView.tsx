@@ -394,9 +394,28 @@ export function CoderView() {
         const parsed = parseRepo(activeRepo);
         if (!parsed) { addToast("Ayarlar'dan bir GitHub veya GitLab deposu ekle.", "error"); return; }
         const token = store.activeGithub()?.token;
-        const { branch, items } = await fetchRepoTree(parsed.owner, parsed.repo, token);
-        setRepo({ ...parsed, branch });
-        setTree(buildTree(items));
+        try {
+          const { branch, items } = await fetchRepoTree(parsed.owner, parsed.repo, token);
+          setRepo({ ...parsed, branch });
+          setTree(buildTree(items));
+        } catch (ghErr) {
+          /* GitHub'da bulunamadı → aynı namespace/repo'yu GitLab'da dene. Repolar
+             GitLab'a taşındıysa kullanıcı `namespace/repo` yazınca da bağlanır
+             (genel/public repolarda token gerekmez). */
+          const gl = parseGitLabRepo(activeRepo);
+          if (!gl) throw ghErr;
+          try {
+            const gtoken = store.activeGitlab()?.token;
+            const { branch, items } = await fetchGitLabRepoTree(gl.namespace, gl.repo, gtoken);
+            setRepo({ owner: gl.namespace, repo: gl.repo, branch });
+            setTree(buildGitLabTree(items));
+          } catch {
+            /* İkisi de başarısız → GitHub hatasını, yönlendirici ipucuyla göster. */
+            throw new Error(
+              `${(ghErr as Error).message}. GitLab deposuysa "gitlab.com/namespace/repo" biçiminde ekle veya Ayarlar'dan GitLab token'ı tanımla.`,
+            );
+          }
+        }
       }
     } catch (e) {
       addToast(`Depo bağlantısı başarısız: ${(e as Error).message}`, "error");
