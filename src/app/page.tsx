@@ -189,7 +189,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5 font-extrabold text-xl tracking-tight">
             <LogoMark size={28} />
-            <span className="text-ink">craft</span><span className="brand-text">.ai</span>
+            <span className="text-ink">craft</span><span className="brand-text">.coder</span>
           </div>
           <div className="flex items-center gap-3">
             <Link
@@ -362,7 +362,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-6 py-12 text-center">
           <div className="flex items-center justify-center gap-2 font-extrabold text-lg mb-3">
             <LogoMark size={22} />
-            <span className="text-ink">craft</span><span className="brand-text">.ai</span>
+            <span className="text-ink">craft</span><span className="brand-text">.coder</span>
           </div>
           <p className="text-sm text-muted">
             Terminal &amp; web tabanlı AI kod asistanı · MIT Lisansı

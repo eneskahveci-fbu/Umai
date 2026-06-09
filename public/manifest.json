@@ -1,6 +1,6 @@
 {
-  "name": "craft.ai",
-  "short_name": "craft.ai",
+  "name": "Craft.Coder",
+  "short_name": "Craft.Coder",
   "description": "Kod için tasarlanmış AI asistanın",
   "start_url": "/app",
   "display": "standalone",
