@@ -831,7 +831,19 @@ export async function POST(req: Request) {
             resultById.set(tc.id, "Plan güncellendi.");
             return;
           }
+          /* Checkpoint: yazma öncesi eski içeriği yakala (geri al için).
+             getFileRaw readCache'i ısıtır → str_replace tekrar çekmez. */
+          let prevContent: string | undefined;
+          if ((tc.name === "write_file" || tc.name === "str_replace") && repoCtx && typeof args.path === "string") {
+            const old = await getFileRaw(repoCtx, args.path, readCache);
+            if (old.ok) prevContent = old.content;
+          }
           const result = await executeTool(tc.name, args, repoCtx, activeMcpServers, readCache);
+          if (prevContent !== undefined && result.startsWith("✅") && typeof args.path === "string") {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ checkpoint_event: { path: args.path, previous: prevContent } })}\n\n`),
+            );
+          }
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: result.slice(0, 400) + (result.length > 400 ? "…" : "") } })}\n\n`),
           );
