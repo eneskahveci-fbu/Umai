@@ -106,6 +106,37 @@ export const CODER_TOOLS: ToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "delete_file",
+      description: "Bir dosyanın SİLİNMESİNİ ÖNERİR. Doğrudan silmez — kullanıcıya onay olarak sunulur, ancak kullanıcı onaylarsa silinir. Yıkıcı işlem olduğu için yalnızca gerçekten gerektiğinde kullan.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Silinecek dosyanın repo köküne göre yolu" },
+          reason: { type: "string", description: "Neden silinmeli (kullanıcının onay ekranında görünür)" },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "rename_file",
+      description: "Bir dosyanın YENİDEN ADLANDIRILMASINI/TAŞINMASINI ÖNERİR. Doğrudan yapmaz — kullanıcı onayına sunulur. İçerik korunur; onaylanırsa yeni yola yazılıp eski yol silinir.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Mevcut dosya yolu" },
+          new_path: { type: "string", description: "Yeni dosya yolu" },
+          reason: { type: "string", description: "Neden (opsiyonel, onay ekranında görünür)" },
+        },
+        required: ["path", "new_path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "update_plan",
       description: "Çok adımlı bir görev için canlı yapılacaklar listesini (plan) günceller; kullanıcı ilerlemeyi görür. Göreve başlarken tüm adımları yaz, her adım bitince listeyi yeniden gönder. Her satır bir adım: '[ ]' bekliyor, '[~]' devam ediyor, '[x]' tamamlandı. Örn: '[x] Dosyaları incele\\n[~] Bug'ı düzelt\\n[ ] Testi çalıştır'.",
       parameters: {

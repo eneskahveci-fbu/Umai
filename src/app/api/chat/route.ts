@@ -662,6 +662,8 @@ export async function POST(req: Request) {
       `• search_code(query, extension?) — dosya İÇERİĞİNDE arama\n` +
       `• str_replace(path, old_string, new_string, commit_message?) — HEDEFLİ düzenleme (tercih et)\n` +
       `• write_file(path, content, commit_message) — YENİ dosya veya tam değişim\n` +
+      `• delete_file(path, reason?) — dosya silmeyi ÖNERİR (kullanıcı onaylar)\n` +
+      `• rename_file(path, new_path, reason?) — yeniden adlandırmayı ÖNERİR (kullanıcı onaylar)\n` +
       `• list_branches() / create_branch(name, from?) — dal işlemleri\n` +
       `• get_commit_history(limit?, path?) — commit geçmişi\n` +
       `• update_plan(plan) — çok adımlı görevde canlı yapılacaklar listesi\n` +
@@ -672,6 +674,7 @@ export async function POST(req: Request) {
       `— list_files veya search_code ile önce yapıyı anla, sonra spesifik dosyalara gir.\n` +
       `— Var olan dosyada KÜÇÜK değişiklik için str_replace kullan (tüm dosyayı yeniden yazma); old_string ham metin olmalı (satır numarası DEĞİL), birebir ve benzersiz.\n` +
       `— Yalnızca yeni dosya veya köklü değişimde write_file kullan. Kullanıcının onayına gerek yok.\n` +
+      `— Silme/yeniden adlandırma YIKICIDIR: delete_file/rename_file yalnızca ÖNERİR, kullanıcı onaylayana kadar gerçekleşmez; buna güvenip 'sildim' deme.\n` +
       `— Aynı dosyayı tekrar okuma; okuduklarını hatırla.\n` +
       `— Karmaşık görevde adım adım ilerle: keşfet → analiz et → değiştir → doğrula.`;
     if (body.requireWriteApproval) {
@@ -825,6 +828,26 @@ export async function POST(req: Request) {
         const runOne = async (tc: AccumulatedToolCall) => {
           let args: Record<string, unknown> = {};
           try { args = JSON.parse(tc.arguments || "{}"); } catch { /* invalid */ }
+          /* Yıkıcı işlemler (silme/yeniden adlandırma): ASLA doğrudan yapılmaz.
+             Kullanıcı onayına sunulur; istemci onaylarsa uygular. */
+          if (tc.name === "delete_file" || tc.name === "rename_file") {
+            const path = String(args.path ?? "");
+            const newPath = tc.name === "rename_file" ? String(args.new_path ?? "") : undefined;
+            const reason = args.reason ? String(args.reason) : undefined;
+            if (!path || (tc.name === "rename_file" && !newPath)) {
+              const msg = "Hata: gerekli yol(lar) eksik";
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: msg } })}\n\n`));
+              resultById.set(tc.id, msg);
+              return;
+            }
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ pending_action_event: { id: tc.id, kind: tc.name === "delete_file" ? "delete" : "rename", path, newPath, reason } })}\n\n`));
+            const note = tc.name === "delete_file"
+              ? `⏸ '${path}' silme önerisi kullanıcı onayına sunuldu. Kullanıcı onaylayana kadar dosya DURUYOR; buna güvenerek devam etme.`
+              : `⏸ '${path}' → '${newPath}' yeniden adlandırma önerisi kullanıcı onayına sunuldu.`;
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: note } })}\n\n`));
+            resultById.set(tc.id, note);
+            return;
+          }
           /* update_plan: ağ/repo işi yok — planı istemciye ayrı olay olarak yolla. */
           if (tc.name === "update_plan") {
             const plan = String(args.plan ?? "");

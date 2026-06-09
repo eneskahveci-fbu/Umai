@@ -25,9 +25,11 @@ import {
   Palette,
   PanelLeft,
   Paperclip,
+  Check,
   RefreshCw,
   RotateCcw,
   Search,
+  Trash2,
   Sparkles,
   Square,
   Terminal,
@@ -79,6 +81,7 @@ import type { TreeFile, TreeNode } from "@/lib/types";
 import { AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agents";
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
 import { buildContextSections } from "@/lib/prompt";
+import { addPendingAction, removePendingAction, type PendingAction } from "@/lib/agentActions";
 
 declare global {
   interface SpeechRecognition {
@@ -387,6 +390,9 @@ export function CoderView() {
   /* Ajanın bu turda yazdığı dosyaların ESKİ içeriği — "Geri al" için. */
   const [checkpoints, setCheckpoints] = useState<{ path: string; previous: string }[]>([]);
   const [undoing, setUndoing] = useState(false);
+  /* Ajanın önerdiği YIKICI işlemler (sil/yeniden adlandır) — onay bekler. */
+  const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
+  const [resolvingAction, setResolvingAction] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [gitPanelOpen, setGitPanelOpen] = useState(false);
   const [loadingAll, setLoadingAll] = useState(false);
@@ -609,6 +615,43 @@ export function CoderView() {
     }
   };
 
+  /* Yıkıcı işlem önerisini ONAYLA (uygula) veya REDDET. Silme/yeniden adlandırma
+     yalnızca burada, kullanıcı tıklamasıyla gerçekleşir — ajan asla doğrudan yapamaz. */
+  const resolvePendingAction = async (action: PendingAction, approve: boolean) => {
+    if (!approve) { setPendingActions((p) => removePendingAction(p, action.id)); return; }
+    if (!repo) return;
+    setResolvingAction(action.id);
+    const store = useStore.getState();
+    const isGL = repoIsGitLab;
+    const token = isGL ? store.activeGitlab()?.token : store.activeGithub()?.token;
+    const idField = isGL ? { namespace: repo.owner } : { owner: repo.owner };
+    const jbody = (extra: Record<string, unknown>) => JSON.stringify({ ...idField, repo: repo.repo, branch: repo.branch, token, ...extra });
+    const post = async (url: string, extra: Record<string, unknown>) => {
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: jbody(extra) });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({ error: `Hata ${res.status}` }))).error);
+    };
+    try {
+      const delUrl = isGL ? "/api/gitlab/delete" : "/api/github/delete";
+      const writeUrl = isGL ? "/api/gitlab/write" : "/api/github/write";
+      if (action.kind === "delete") {
+        await post(delUrl, { path: action.path, message: `delete: ${action.path}` });
+        addToast(`🗑 ${action.path} silindi`, "success");
+      } else {
+        const content = isGL
+          ? await fetchGitLabFileContent(repo.owner, repo.repo, repo.branch, action.path, token)
+          : await fetchFileContent(repo.owner, repo.repo, repo.branch, action.path, token);
+        await post(writeUrl, { path: action.newPath, content, message: `rename: ${action.path} → ${action.newPath}` });
+        await post(delUrl, { path: action.path, message: `rename: remove ${action.path}` });
+        addToast(`✏ ${action.path} → ${action.newPath}`, "success");
+      }
+      setPendingActions((p) => removePendingAction(p, action.id));
+    } catch (e) {
+      addToast(`İşlem başarısız: ${(e as Error).message}`, "error");
+    } finally {
+      setResolvingAction(null);
+    }
+  };
+
   const readFileIntoInput = (f: globalThis.File) => {
     if (f.type.startsWith("image/")) {
       if (f.size > 5_000_000) { addToast("Görsel 5MB'den büyük.", "error"); return; }
@@ -692,6 +735,7 @@ export function CoderView() {
     store.pushMessage({ role: "assistant", content: "" });
     store.setStreaming(true);
     setCheckpoints([]); // yeni tur — önceki turun geri-al noktalarını sıfırla
+    setPendingActions([]); // ve bekleyen yıkıcı işlem önerilerini
     store.setFollowUpSuggestions([]);
     coderAbort = new AbortController();
     const abortCtl = coderAbort;
@@ -914,6 +958,16 @@ export function CoderView() {
                 setCheckpoints((prev) =>
                   prev.some((c) => c.path === path) ? prev : [...prev, { path, previous }],
                 );
+              }
+              continue;
+            }
+            /* yıkıcı işlem önerisi (sil/yeniden adlandır) → onay bekler */
+            if (parsed.pending_action_event) {
+              const ev = parsed.pending_action_event;
+              if (ev?.kind === "delete" && ev.path) {
+                setPendingActions((prev) => addPendingAction(prev, { id: ev.id, kind: "delete", path: ev.path, reason: ev.reason }));
+              } else if (ev?.kind === "rename" && ev.path && ev.newPath) {
+                setPendingActions((prev) => addPendingAction(prev, { id: ev.id, kind: "rename", path: ev.path, newPath: ev.newPath, reason: ev.reason }));
               }
               continue;
             }
@@ -1392,6 +1446,41 @@ export function CoderView() {
                             onClose={() => setPendingCommit(null)}
                             onOpenInEditor={(f) => { setEditorFile(f); setEditorOpen(true); }}
                           />
+                        </div>
+                      )}
+                      {isLastAssistant && !streaming && pendingActions.length > 0 && repo && (
+                        <div className="ml-11 max-w-2xl mt-2 rounded-xl border border-red/40 bg-red/5 overflow-hidden">
+                          <div className="flex items-center gap-2 px-3 py-2 border-b border-red/20 text-xs">
+                            <Trash2 size={13} className="text-red shrink-0" />
+                            <span className="font-semibold text-red">Onay gerekli — ajan {pendingActions.length} yıkıcı işlem öneriyor</span>
+                          </div>
+                          <div className="divide-y divide-line/40">
+                            {pendingActions.map((a) => (
+                              <div key={a.id} className="flex items-center gap-2 px-3 py-2 text-xs">
+                                <span className="flex-1 min-w-0">
+                                  <span className="block truncate font-mono">
+                                    {a.kind === "delete" ? `Sil: ${a.path}` : `Taşı: ${a.path} → ${a.newPath}`}
+                                  </span>
+                                  {a.reason && <span className="block truncate text-muted/60">{a.reason}</span>}
+                                </span>
+                                <button
+                                  onClick={() => resolvePendingAction(a, true)}
+                                  disabled={resolvingAction === a.id}
+                                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red/15 text-red hover:bg-red/25 font-semibold disabled:opacity-50 transition-colors shrink-0"
+                                >
+                                  {resolvingAction === a.id ? <Loader2Icon size={12} className="animate-spin" /> : <Check size={12} />}
+                                  Onayla
+                                </button>
+                                <button
+                                  onClick={() => resolvePendingAction(a, false)}
+                                  disabled={resolvingAction === a.id}
+                                  className="px-2.5 py-1 rounded-lg text-muted hover:text-ink hover:bg-bgsoft font-semibold disabled:opacity-50 transition-colors shrink-0"
+                                >
+                                  Reddet
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                       {isLastAssistant && !streaming && checkpoints.length > 0 && repo && (
