@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import {
   BookMarked, Brain, Check, ChevronDown, ChevronRight, ChevronUp,
+  Circle, CircleDot, ListChecks,
   Code2, Copy, FileText, FolderOpen, GitBranch, GitCommit, Globe,
   Loader2, Pencil, RefreshCw, Search, ThumbsDown, ThumbsUp, Wrench, X,
 } from "lucide-react";
@@ -117,6 +118,49 @@ function ToolCallCard({ call }: { call: NonNullable<ChatMessage["toolCalls"]>[nu
           </pre>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Ajan plan paneli (update_plan) ─────────────────────────────────── */
+
+function PlanPanel({ plan }: { plan: string }) {
+  const steps = plan
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => {
+      const m = /^\[([ x~\-])\]\s*(.*)$/.exec(l);
+      if (!m) return { status: "pending" as const, text: l.replace(/^[-*]\s*/, "") };
+      const c = m[1];
+      const status = c === "x" ? ("done" as const) : c === "~" || c === "-" ? ("active" as const) : ("pending" as const);
+      return { status, text: m[2] };
+    });
+  if (!steps.length) return null;
+  const done = steps.filter((s) => s.status === "done").length;
+  return (
+    <div className="mb-3 border border-line/60 rounded-xl overflow-hidden bg-bgsoft/40">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-line/40 text-xs">
+        <ListChecks size={13} className="text-brand" />
+        <span className="font-semibold">Plan</span>
+        <span className="text-muted/60 font-mono ml-auto">{done}/{steps.length}</span>
+      </div>
+      <div className="px-3 py-2 space-y-1.5">
+        {steps.map((s, i) => (
+          <div key={i} className="flex items-start gap-2 text-xs">
+            {s.status === "done" ? (
+              <Check size={13} className="text-green shrink-0 mt-0.5" />
+            ) : s.status === "active" ? (
+              <CircleDot size={13} className="text-brand shrink-0 mt-0.5 animate-pulse" />
+            ) : (
+              <Circle size={13} className="text-muted/40 shrink-0 mt-0.5" />
+            )}
+            <span className={s.status === "done" ? "text-muted/60 line-through" : s.status === "active" ? "text-ink font-medium" : "text-muted/80"}>
+              {s.text}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -277,6 +321,9 @@ export function MessageBubble({
             </span>
           </div>
         )}
+
+        {/* Ajan plan paneli */}
+        {message.plan && <PlanPanel plan={message.plan} />}
 
         {/* Thinking block */}
         {message.thinking && (

@@ -18,6 +18,8 @@ export interface ChatMessage {
   toolCalls?: ToolCallRecord[];
   thinking?: string;
   rating?: "up" | "down";
+  /** Ajan görev planı (update_plan aracıyla canlı güncellenen checklist). */
+  plan?: string;
 }
 
 export interface McpServer {
