@@ -153,6 +153,11 @@ export interface Config {
   /** Açıksa ajan dosyaları doğrudan yazıp commit edemez; değişiklikleri kod
       bloğu olarak ÖNERİR, kullanıcı commit arayüzüyle uygular. Tanımsız = kapalı. */
   requireWriteApproval?: boolean;
+  /** Açıksa AI'nın önerdiği SADECE allowlist'teki komutlar otomatik çalışır
+      (çıktı AI'ya beslenir → güvenli oto-düzelt). Tanımsız = kapalı. */
+  autoRunCommands?: boolean;
+  /** Otomatik çalıştırılmasına izin verilen komut önekleri. */
+  commandAllowlist?: string[];
   rulesFile: string;
   fontScale: "sm" | "base" | "lg";
   soundEnabled: boolean;

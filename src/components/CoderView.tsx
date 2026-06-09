@@ -81,7 +81,7 @@ import type { TreeFile, TreeNode } from "@/lib/types";
 import { AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agents";
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
 import { buildContextSections } from "@/lib/prompt";
-import { addPendingAction, removePendingAction, type PendingAction } from "@/lib/agentActions";
+import { addPendingAction, removePendingAction, isCommandAllowed, DEFAULT_COMMAND_ALLOWLIST, type PendingAction } from "@/lib/agentActions";
 
 declare global {
   interface SpeechRecognition {
@@ -1003,6 +1003,18 @@ export function CoderView() {
         setEditorOpen(true);
       }
       setPendingCommit(autoFiles.length >= 2 ? autoFiles : null);
+
+      /* Güvenli oto-çalıştır: yalnızca allowlist'teki komut otomatik terminale
+         gönderilir (çıktı AI'ya beslenir → güvenli oto-düzelt). Diğerleri elle. */
+      if (useStore.getState().config.autoRunCommands) {
+        const allow = useStore.getState().config.commandAllowlist ?? DEFAULT_COMMAND_ALLOWLIST;
+        const bashM = /```(?:bash|sh|shell|zsh)\n([\s\S]*?)```/.exec(full);
+        const cmd = bashM?.[1]?.trim().split("\n")[0]?.trim();
+        if (cmd && isCommandAllowed(cmd, allow)) {
+          window.dispatchEvent(new CustomEvent("craftai:terminal-run", { detail: { command: cmd } }));
+          addToast(`▶ Otomatik çalıştırıldı: ${cmd}`, "info");
+        }
+      }
 
       /* HTML / SVG / CSS içeren yanıtı canvas'ta otomatik önizle */
       const directM = /```(html|svg|mermaid)(?::[^\n]*)?\n([\s\S]*?)```/.exec(full);
