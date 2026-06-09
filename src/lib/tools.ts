@@ -178,6 +178,23 @@ export const CODER_TOOLS: ToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "create_pr",
+      description: "head dalından base dalına bir Pull Request (GitHub) / Merge Request (GitLab) açar. Değişiklikleri ayrı bir dala yazıp sonra bu araçla PR açmak iyi pratiktir. Başlık ve açıklamayı sen üret.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "PR/MR başlığı" },
+          head: { type: "string", description: "Kaynak dal (değişikliklerin olduğu)" },
+          base: { type: "string", description: "Hedef dal (genelde ana dal)" },
+          body: { type: "string", description: "PR/MR açıklaması (markdown, opsiyonel)" },
+        },
+        required: ["title", "head", "base"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "get_commit_history",
       description: "Repodaki son commit'leri listeler.",
       parameters: {

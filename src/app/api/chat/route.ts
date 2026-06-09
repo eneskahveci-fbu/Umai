@@ -199,6 +199,33 @@ async function execStrReplace(
   return `✅ ${args.path}: ${replaceAll ? occurrences + " eşleşme" : "1 eşleşme"} değiştirildi. ${writeRes}`;
 }
 
+/* create_pr: head → base PR (GitHub) / MR (GitLab) açar. */
+async function execCreatePR(ctx: RepoCtx, args: { title: string; head: string; base: string; body?: string }): Promise<string> {
+  if (!args.title || !args.head || !args.base) return "Hata: title, head ve base zorunlu";
+  if (ctx.provider === "gitlab") {
+    const proj = encodeGlProject(ctx.owner, ctx.repo);
+    const res = await fetch(`https://gitlab.com/api/v4/projects/${proj}/merge_requests`, {
+      method: "POST",
+      headers: { ...glHeaders(ctx.token), "Content-Type": "application/json" },
+      body: JSON.stringify({ source_branch: args.head, target_branch: args.base, title: args.title, description: args.body || "" }),
+    });
+    if (!res.ok) return `Hata: ${res.status} — ${(await res.text().catch(() => "")).slice(0, 200)}`;
+    const d = await res.json() as { web_url?: string; iid?: number };
+    return `✅ MR !${d.iid} oluşturuldu: ${d.web_url}`;
+  }
+  const res = await fetch(`https://api.github.com/repos/${ctx.owner}/${ctx.repo}/pulls`, {
+    method: "POST",
+    headers: { ...ghHeaders(ctx.token), "Content-Type": "application/json" },
+    body: JSON.stringify({ title: args.title, body: args.body || "", head: args.head, base: args.base }),
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({})) as { message?: string };
+    return `Hata: ${res.status} — ${e.message || ""}`;
+  }
+  const d = await res.json() as { html_url?: string; number?: number };
+  return `✅ PR #${d.number} oluşturuldu: ${d.html_url}`;
+}
+
 async function execSearchFiles(ctx: RepoCtx, args: { query: string }): Promise<string> {
   if (!args.query) return "Hata: query boş";
   if (ctx.provider === "gitlab") {
@@ -439,7 +466,7 @@ async function executeTool(
   cache?: Map<string, string>,
 ): Promise<string> {
   try {
-    if (!ctx && ["list_files","read_file","search_files","search_code","write_file","str_replace","list_branches","create_branch","get_commit_history"].includes(name))
+    if (!ctx && ["list_files","read_file","search_files","search_code","write_file","str_replace","list_branches","create_branch","create_pr","get_commit_history"].includes(name))
       return "Hata: repo bağlı değil. Kullanıcıya bir repo bağlamasını söyle.";
     if (name === "list_files") return await execListFiles(ctx!, args as { filter?: string });
     if (name === "read_file") return await execReadFile(ctx!, args as { path: string }, cache);
@@ -455,6 +482,7 @@ async function executeTool(
     }
     if (name === "list_branches") return await execListBranches(ctx!);
     if (name === "create_branch") return await execCreateBranch(ctx!, args as { name: string; from?: string });
+    if (name === "create_pr") return await execCreatePR(ctx!, args as { title: string; head: string; base: string; body?: string });
     if (name === "get_commit_history") return await execGetCommitHistory(ctx!, args as { limit?: string; path?: string });
     if (name === "web_search") {
       const query = String(args.query ?? "");
@@ -665,6 +693,7 @@ export async function POST(req: Request) {
       `• delete_file(path, reason?) — dosya silmeyi ÖNERİR (kullanıcı onaylar)\n` +
       `• rename_file(path, new_path, reason?) — yeniden adlandırmayı ÖNERİR (kullanıcı onaylar)\n` +
       `• list_branches() / create_branch(name, from?) — dal işlemleri\n` +
+      `• create_pr(title, head, base, body?) — PR/MR aç (başlık+açıklamayı sen üret)\n` +
       `• get_commit_history(limit?, path?) — commit geçmişi\n` +
       `• update_plan(plan) — çok adımlı görevde canlı yapılacaklar listesi\n` +
       (body.webSearch ? `• web_search(query) — internette ara\n• read_url(url) — web sayfası oku\n` : "") +
