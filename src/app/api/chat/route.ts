@@ -635,11 +635,14 @@ export async function POST(req: Request) {
     const messages = [{ role: "system", content: sysPrompt }, ...body.messages];
     let upstream: Response;
     const url = `${baseUrl}/chat/completions`;
+    /* Pollinations için referrer ekle (anonim isteklerin agresif kısıtlanmasını azaltır). */
+    const upstreamBody: Record<string, unknown> = { model, messages, stream: true };
+    if (provider === "pollinations") upstreamBody.referrer = "craft-coder";
 
     try {
       upstream = await fetch(url, {
         method: "POST", headers: upstreamHeaders,
-        body: JSON.stringify({ model, messages, stream: true }),
+        body: JSON.stringify(upstreamBody),
       });
     } catch (err) {
       return new Response(`Sağlayıcıya bağlanılamadı: ${(err as Error).message}`, { status: 502 });

@@ -18,7 +18,7 @@ import type {
   ToolCallRecord,
   TreeNode,
 } from "./types";
-import { DEFAULT_CONFIG, DEFAULT_SKILLS, POLLINATIONS_DEFAULT_MODEL } from "./constants";
+import { DEFAULT_CONFIG, DEFAULT_REPO, DEFAULT_SKILLS, POLLINATIONS_DEFAULT_MODEL } from "./constants";
 import { createClient } from "./supabase/client";
 
 const CONFIG_KEY = "craftai_config";
@@ -130,7 +130,12 @@ function loadConfig(): Config {
             : m
         );
       }
-      return merged;
+      /* Ölü GitHub deposunu canlı GitLab deposuna migrate et */
+      const migrated = migrateRepos(merged);
+      if (migrated !== merged) {
+        try { store.setItem(CONFIG_KEY, JSON.stringify(migrated)); } catch { /* yok say */ }
+      }
+      return migrated;
     }
   } catch {
     /* yok say */
@@ -193,6 +198,16 @@ function applyTheme(theme: "dark" | "light") {
   document.documentElement.classList.toggle("light", theme === "light");
 }
 
+/* Eski/ölü varsayılan GitHub depolarını canlı GitLab deposuna migrate eder.
+   Hesap GitLab'a taşındığından, kayıtlı eski repo'lar artık 404 veriyordu. */
+const DEAD_REPOS = new Set(["eneskahveci-sdo/craft-ai"]);
+function migrateRepos(cfg: Config): Config {
+  if (!Array.isArray(cfg.repos) || !cfg.repos.some((r) => DEAD_REPOS.has(r))) return cfg;
+  const repos = [...new Set(cfg.repos.map((r) => (DEAD_REPOS.has(r) ? DEFAULT_REPO : r)))];
+  const activeRepo = cfg.activeRepo && DEAD_REPOS.has(cfg.activeRepo) ? DEFAULT_REPO : cfg.activeRepo;
+  return { ...cfg, repos, activeRepo };
+}
+
 /* ─── Config birleştirme (hesap senkronu) ───
    Uzak (buluttaki) config ile yereldeki config'i, hiçbir model/hesap/anahtar
    kaybetmeden birleştirir. Böylece eski/boş bir bulut kaydı, yerelde duran
@@ -227,7 +242,8 @@ function mergeConfigs(local: Config, remote: Partial<Config>): Config {
   base.activeModelId = has(base.models, base.activeModelId) ? base.activeModelId : (base.models[0]?.id ?? null);
   base.activeGithubId = has(base.githubAccounts, base.activeGithubId) ? base.activeGithubId : (base.githubAccounts[0]?.id ?? null);
   base.activeGitlabId = has(base.gitlabAccounts, base.activeGitlabId) ? base.activeGitlabId : (base.gitlabAccounts[0]?.id ?? null);
-  return base;
+  /* Birleşmede uzaktaki ölü repo geri gelmiş olabilir → tekrar migrate et. */
+  return migrateRepos(base);
 }
 
 /* Config'i Supabase'e yazar. Hata olursa (tablo yok / RLS / ağ) bir kez
