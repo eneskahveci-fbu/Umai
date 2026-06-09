@@ -790,6 +790,41 @@ export function SettingsModal() {
               <div>
                 <h4 className="text-sm font-bold mb-1">Proje Promptu: {activeProj.name}</h4>
                 <textarea value={activeProj.systemPrompt} onChange={(e) => updateProject(activeProj.id, { systemPrompt: e.target.value })} rows={3} className="input-mono !text-xs" placeholder="Bu projenin için özel sistem promptu..." />
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  <label className="text-xs">
+                    <span className="text-muted block mb-1">Model</span>
+                    <select
+                      value={activeProj.modelId ?? ""}
+                      onChange={(e) => updateProject(activeProj.id, { modelId: e.target.value || undefined })}
+                      className="w-full bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs outline-none focus:border-brand"
+                    >
+                      <option value="">Varsayılan</option>
+                      {config.models.map((m) => (
+                        <option key={m.id} value={m.id}>{m.label || m.model}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-xs">
+                    <span className="text-muted block mb-1">Sıcaklık</span>
+                    <input
+                      type="number" min={0} max={2} step={0.1}
+                      value={activeProj.temperature ?? ""}
+                      onChange={(e) => updateProject(activeProj.id, { temperature: e.target.value === "" ? undefined : Number(e.target.value) })}
+                      placeholder="varsayılan"
+                      className="w-full bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs outline-none focus:border-brand"
+                    />
+                  </label>
+                  <label className="text-xs">
+                    <span className="text-muted block mb-1">Max token</span>
+                    <input
+                      type="number" min={1} step={256}
+                      value={activeProj.maxTokens ?? ""}
+                      onChange={(e) => updateProject(activeProj.id, { maxTokens: e.target.value === "" ? undefined : Number(e.target.value) })}
+                      placeholder="varsayılan"
+                      className="w-full bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs outline-none focus:border-brand"
+                    />
+                  </label>
+                </div>
               </div>
             )}
 

@@ -695,8 +695,15 @@ export function CoderView() {
 
   const callApi = useCallback(async (overrideAgent?: Agent | null) => {
     const store = useStore.getState();
-    const active = store.activeModel();
+    let active = store.activeModel();
     if (!active) { store.setSettingsOpen(true); return; }
+
+    /* Proje-başına model/örnekleme: aktif projenin ayarları global'i geçersiz kılar. */
+    const activeProjectCfg = store.config.projects.find((p) => p.id === store.config.activeProjectId);
+    if (activeProjectCfg?.modelId) {
+      const override = store.config.models.find((m) => m.id === activeProjectCfg.modelId);
+      if (override) active = override;
+    }
 
     const chat = store.current();
     const lastUserMsg = chat?.messages.findLast?.((m) => m.role === "user");
@@ -818,6 +825,8 @@ export function CoderView() {
           planApprovalMode: store.config.planApprovalMode,
           planApproved: planApprovedRef.current,
           blockNetworkTools: store.config.blockNetworkTools,
+          temperature: activeProjectCfg?.temperature,
+          maxTokens: activeProjectCfg?.maxTokens,
           searchContext: webSearchContext || undefined,
           repoCtx: toolsEnabled && repo ? {
             owner: repo.owner,
