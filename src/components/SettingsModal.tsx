@@ -674,6 +674,13 @@ export function SettingsModal() {
                     <div className="text-xs text-muted mt-0.5">Coder sekmesi açılınca terminal panelini otomatik gösterir.</div>
                   </div>
                 </label>
+                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
+                  <input type="checkbox" checked={config.inlineCompletion !== false} onChange={() => saveConfig({ ...config, inlineCompletion: config.inlineCompletion === false })} className="accent-brand mt-0.5" />
+                  <div>
+                    <div className="text-sm font-semibold">Satır içi AI tamamlama</div>
+                    <div className="text-xs text-muted mt-0.5">Editörde yazarken ghost-text önerisi (Tab ile kabul). Aktif modelin API kotasını kullanır.</div>
+                  </div>
+                </label>
               </div>
             </div>
 

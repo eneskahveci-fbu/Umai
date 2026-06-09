@@ -146,6 +146,9 @@ export interface Config {
   webSearch: boolean;
   cliMode: boolean;
   autoTerminal: boolean;
+  /** Editörde satır içi (ghost text) AI tamamlama. Aktif modelin API kotasını
+      kullandığı için kapatılabilir. Tanımsız = açık. */
+  inlineCompletion?: boolean;
   rulesFile: string;
   fontScale: "sm" | "base" | "lg";
   soundEnabled: boolean;

@@ -411,6 +411,7 @@ export const DEFAULT_CONFIG: Config = {
   webSearch: false,
   cliMode: false,
   autoTerminal: false,
+  inlineCompletion: true,
   rulesFile: "",
   fontScale: "base",
   soundEnabled: false,
