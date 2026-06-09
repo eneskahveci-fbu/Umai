@@ -79,13 +79,14 @@ export function CommandPalette() {
     },
     {
       id: "prompt-library",
-      label: "Prompt kutuphanesi",
+      label: "Kütüphane (şablonlar)",
       icon: <BookOpen size={16} />,
       action: () => {
-        useStore.getState().setPromptLibraryOpen(true);
+        useStore.getState().setLibraryTab("prompts");
+        useStore.getState().setLibraryOpen(true);
         setOpen(false);
       },
-      keywords: ["prompt", "kutuphane", "library", "sablon", "template"],
+      keywords: ["prompt", "kutuphane", "library", "sablon", "template", "snippet"],
     },
     {
       id: "compare-mode",

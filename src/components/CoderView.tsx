@@ -6,7 +6,6 @@ import {
   ArrowDown,
   ArrowUp,
   BookOpen,
-  BookmarkPlus,
   Brain,
   ChevronDown,
   GitBranch,
@@ -19,6 +18,7 @@ import {
   GitPullRequest,
   Globe,
   Users,
+  MoreHorizontal,
   Image as ImageIcon,
   Loader2 as Loader2Icon,
   Mic,
@@ -114,6 +114,55 @@ function ComposerButton({
       }`}
     >
       {children}
+    </button>
+  );
+}
+
+/* "⋯ Daha fazla" — az kullanılan composer eylemlerini tek menüde toplar. */
+function MoreMenu({ active, children }: { active?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        title="Daha fazla"
+        className={`flex items-center gap-1.5 text-[12px] px-2 py-2 sm:py-1.5 rounded-lg transition-colors active:scale-95 ${
+          open || active ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft active:bg-bgsoft"
+        }`}
+      >
+        <MoreHorizontal size={13} />
+      </button>
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          className="absolute bottom-full right-0 mb-1.5 min-w-[170px] bg-surface border border-line rounded-xl shadow-2xl shadow-black/40 p-1 z-30 flex flex-col gap-0.5 animate-modal-bg"
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MoreItem({ onClick, icon, label, active }: { onClick: () => void; icon: React.ReactNode; label: string; active?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2.5 text-[12px] px-2.5 py-2 rounded-lg text-left transition-colors ${
+        active ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
+      }`}
+    >
+      {icon}
+      <span>{label}</span>
     </button>
   );
 }
@@ -444,27 +493,6 @@ export function CoderView() {
     if (!tree || repoChanged) connectRepo(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.activeRepo, config.activeGithubId, config.activeGitlabId, config.cliMode]);
-
-  /* CodeBlock emits this when the user types a path into its "Diff" prompt.
-     We look it up in the currently attached files and seed the modal's
-     "original" side. Without this listener the diff against an existing
-     file always rendered as if the file were empty. */
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ path: string; newCode: string; language: string }>).detail;
-      if (!detail?.path) return;
-      const match = attachedFiles.find((f) => f.path === detail.path);
-      if (!match) return;
-      useStore.getState().setDiffModal({
-        original: match.content,
-        newCode: detail.newCode,
-        language: detail.language,
-        path: detail.path,
-      });
-    };
-    window.addEventListener("craftai:diff-request", handler);
-    return () => window.removeEventListener("craftai:diff-request", handler);
-  }, [attachedFiles]);
 
   useEffect(() => {
     if (!config.autoTerminal) return;
@@ -1523,68 +1551,6 @@ export function CoderView() {
                   </ComposerButton>
                   <ComposerButton
                     onClick={() => {
-                      const msgs = useStore.getState().current()?.messages ?? [];
-                      for (let i = msgs.length - 1; i >= 0; i--) {
-                        const content = msgs[i].content;
-                        if (!content) continue;
-                        // html / svg / mermaid — direct preview
-                        const directMatch = /```(?:html|svg|mermaid)(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
-                        if (directMatch) {
-                          const lang = /```(html|svg|mermaid)/.exec(content)?.[1] ?? "html";
-                          useStore.getState().setArtifact({
-                            type: lang as "html" | "svg" | "mermaid",
-                            content: directMatch[1],
-                            title: `${lang.toUpperCase()} Önizleme`,
-                          });
-                          return;
-                        }
-                        // css-only → wrap in minimal html page
-                        const cssMatch = /```css(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
-                        if (cssMatch) {
-                          useStore.getState().setArtifact({
-                            type: "html",
-                            content: `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${cssMatch[1]}</style></head><body></body></html>`,
-                            title: "CSS Önizleme",
-                          });
-                          return;
-                        }
-                        // js / javascript → wrap in script tag
-                        const jsMatch = /```(?:javascript|js|jsx|ts|tsx)(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
-                        if (jsMatch) {
-                          useStore.getState().setArtifact({
-                            type: "html",
-                            content: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><script>${jsMatch[1]}<\/script></body></html>`,
-                            title: "JS Önizleme",
-                          });
-                          return;
-                        }
-                      }
-                      addToast("Önizlenecek HTML, SVG, CSS veya Mermaid kodu bulunamadı", "info");
-                    }}
-                    active={!!artifact}
-                    title="Canvas önizleme"
-                  >
-                    <Palette size={13} />
-                    <span>Canvas</span>
-                  </ComposerButton>
-                  <ComposerButton onClick={() => useStore.getState().setPromptLibraryOpen(true)} title="Şablonlar">
-                    <BookOpen size={13} />
-                    <span>Şablonlar</span>
-                  </ComposerButton>
-                  <ComposerButton onClick={() => useStore.getState().setSnippetsOpen(true)} title="Snippet kütüphanesi">
-                    <BookmarkPlus size={13} />
-                    <span>Snippets</span>
-                  </ComposerButton>
-                  <ComposerButton
-                    onClick={() => { setSlashQuery("/"); setSlashOpen((o) => !o); }}
-                    active={!!activeAgent || slashOpen}
-                    title="Subagent seç ( / )"
-                  >
-                    <Sparkles size={13} />
-                    <span>{activeAgent ? activeAgent.command : "Agent"}</span>
-                  </ComposerButton>
-                  <ComposerButton
-                    onClick={() => {
                       const store = useStore.getState();
                       if (!store.repo) {
                         addToast("Tool-use için önce bir GitHub deposu bağla", "error");
@@ -1598,6 +1564,48 @@ export function CoderView() {
                     <Wrench size={13} />
                     <span>Tools</span>
                   </ComposerButton>
+                  <MoreMenu active={!!artifact || !!activeAgent}>
+                    <MoreItem
+                      icon={<Palette size={14} />}
+                      label="Canvas önizleme"
+                      active={!!artifact}
+                      onClick={() => {
+                        const msgs = useStore.getState().current()?.messages ?? [];
+                        for (let i = msgs.length - 1; i >= 0; i--) {
+                          const content = msgs[i].content;
+                          if (!content) continue;
+                          const directMatch = /```(?:html|svg|mermaid)(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
+                          if (directMatch) {
+                            const lang = /```(html|svg|mermaid)/.exec(content)?.[1] ?? "html";
+                            useStore.getState().setArtifact({ type: lang as "html" | "svg" | "mermaid", content: directMatch[1], title: `${lang.toUpperCase()} Önizleme` });
+                            return;
+                          }
+                          const cssMatch = /```css(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
+                          if (cssMatch) {
+                            useStore.getState().setArtifact({ type: "html", content: `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${cssMatch[1]}</style></head><body></body></html>`, title: "CSS Önizleme" });
+                            return;
+                          }
+                          const jsMatch = /```(?:javascript|js|jsx|ts|tsx)(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
+                          if (jsMatch) {
+                            useStore.getState().setArtifact({ type: "html", content: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><script>${jsMatch[1]}<\/script></body></html>`, title: "JS Önizleme" });
+                            return;
+                          }
+                        }
+                        addToast("Önizlenecek HTML, SVG, CSS veya Mermaid kodu bulunamadı", "info");
+                      }}
+                    />
+                    <MoreItem
+                      icon={<BookOpen size={14} />}
+                      label="Kütüphane"
+                      onClick={() => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); }}
+                    />
+                    <MoreItem
+                      icon={<Sparkles size={14} />}
+                      label={activeAgent ? `Agent: ${activeAgent.command}` : "Agent ( / )"}
+                      active={!!activeAgent || slashOpen}
+                      onClick={() => { setSlashQuery("/"); setSlashOpen((o) => !o); }}
+                    />
+                  </MoreMenu>
 
                   {typeof window !== "undefined" && "webkitSpeechRecognition" in window && (
                     <button

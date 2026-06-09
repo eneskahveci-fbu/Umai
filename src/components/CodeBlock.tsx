@@ -73,24 +73,18 @@ export function CodeBlock({
   };
 
   const showDiff = () => {
-    const newCode = getText();
-    /* find an attached file with same language or just take the first */
-    const path = window.prompt(
-      "Hangi dosya ile karşılaştır? (yolu yapıştır, boş bırakırsan boş orijinalle karşılaştırır)",
-      "",
-    );
-    useStore.getState().setDiffModal({
-      original: "",
-      newCode,
-      language: lang || "text",
-      path: path || undefined,
-    });
-    /* if user provided a path, try to find content in attached files state — handled in CoderView */
-    if (path) {
-      window.dispatchEvent(new CustomEvent("craftai:diff-request", {
-        detail: { path, newCode, language: lang || "text" },
-      }));
+    /* Editörde açık olan dosyayla karşılaştır — eski window.prompt yerine. */
+    const open = useStore.getState().currentFile;
+    if (!open) {
+      useStore.getState().addToast("Karşılaştırmak için önce editörde bir dosya aç", "info");
+      return;
     }
+    useStore.getState().setDiffModal({
+      original: open.content,
+      newCode: getText(),
+      language: lang || "text",
+      path: open.path,
+    });
   };
 
   return (
@@ -108,7 +102,7 @@ export function CodeBlock({
               <Play size={12} /> Çalıştır
             </button>
           )}
-          <button onClick={showDiff} className="flex items-center gap-1 hover:text-brand transition-colors" title="Bir dosya ile karşılaştır">
+          <button onClick={showDiff} className="flex items-center gap-1 hover:text-brand transition-colors" title="Editörde açık dosya ile karşılaştır">
             <GitCompareArrows size={12} /> Diff
           </button>
           <button onClick={saveSnippet} className="flex items-center gap-1 hover:text-brand transition-colors" title="Snippet kütüphanesine kaydet">
