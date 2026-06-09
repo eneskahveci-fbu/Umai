@@ -26,6 +26,7 @@ import {
   PanelLeft,
   Paperclip,
   Check,
+  ListChecks,
   RefreshCw,
   RotateCcw,
   Search,
@@ -381,6 +382,8 @@ export function CoderView() {
   const [teamMode, setTeamMode] = useState(false);
   const teamModeRef = useRef(false);
   useEffect(() => { teamModeRef.current = teamMode; }, [teamMode]);
+  /* Plan onayı: bir sonraki istekte plan-modu kapısını geçici aşar. */
+  const planApprovedRef = useRef(false);
   const [repoSearch, setRepoSearch] = useState("");
   const [connecting, setConnecting] = useState(false);
   const connectingRef = useRef(false);
@@ -812,6 +815,9 @@ export function CoderView() {
           tools: toolsEnabled,
           webSearch: searchOnRef.current,
           requireWriteApproval: store.config.requireWriteApproval,
+          planApprovalMode: store.config.planApprovalMode,
+          planApproved: planApprovedRef.current,
+          blockNetworkTools: store.config.blockNetworkTools,
           searchContext: webSearchContext || undefined,
           repoCtx: toolsEnabled && repo ? {
             owner: repo.owner,
@@ -1458,6 +1464,22 @@ export function CoderView() {
                             onClose={() => setPendingCommit(null)}
                             onOpenInEditor={(f) => { setEditorFile(f); setEditorOpen(true); }}
                           />
+                        </div>
+                      )}
+                      {isLastAssistant && !streaming && config.planApprovalMode && m.plan && (
+                        <div className="ml-11 max-w-2xl mt-2 flex items-center gap-2 px-3 py-2 rounded-xl border border-brand/30 bg-brand/5 text-xs">
+                          <ListChecks size={13} className="text-brand shrink-0" />
+                          <span className="text-muted flex-1">Plan hazır. Onaylarsan ajan uygulamaya başlar.</span>
+                          <button
+                            onClick={async () => {
+                              planApprovedRef.current = true;
+                              useStore.getState().pushMessage({ role: "user", content: "Planı onaylıyorum, uygula." });
+                              try { await callApi(); } finally { planApprovedRef.current = false; }
+                            }}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand text-white hover:bg-branddim font-semibold transition-colors shrink-0"
+                          >
+                            <Check size={12} /> Onayla &amp; Uygula
+                          </button>
                         </div>
                       )}
                       {isLastAssistant && !streaming && pendingActions.length > 0 && repo && (

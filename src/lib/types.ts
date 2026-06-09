@@ -159,6 +159,12 @@ export interface Config {
   autoRunCommands?: boolean;
   /** Otomatik çalıştırılmasına izin verilen komut önekleri. */
   commandAllowlist?: string[];
+  /** Açıksa ajan önce PLAN sunar ve değişiklik yapmadan durur; kullanıcı
+      onaylayınca uygular. Tanımsız = kapalı. */
+  planApprovalMode?: boolean;
+  /** Açıksa ajan internet (web_search/read_url) araçlarını kullanamaz.
+      Tanımsız = ağ erişimi serbest. */
+  blockNetworkTools?: boolean;
   rulesFile: string;
   fontScale: "sm" | "base" | "lg";
   soundEnabled: boolean;

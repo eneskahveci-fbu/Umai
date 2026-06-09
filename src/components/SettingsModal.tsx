@@ -707,6 +707,20 @@ export function SettingsModal() {
                     />
                   </div>
                 )}
+                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
+                  <input type="checkbox" checked={!!config.planApprovalMode} onChange={() => saveConfig({ ...config, planApprovalMode: !config.planApprovalMode })} className="accent-brand mt-0.5" />
+                  <div>
+                    <div className="text-sm font-semibold">Plan onay modu</div>
+                    <div className="text-xs text-muted mt-0.5">Ajan önce bir plan sunar ve durur; değişiklik yapmaz. Sen &quot;Onayla &amp; Uygula&quot; deyince uygulamaya başlar.</div>
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
+                  <input type="checkbox" checked={!!config.blockNetworkTools} onChange={() => saveConfig({ ...config, blockNetworkTools: !config.blockNetworkTools })} className="accent-brand mt-0.5" />
+                  <div>
+                    <div className="text-sm font-semibold">Ağ erişimini engelle</div>
+                    <div className="text-xs text-muted mt-0.5">Açıkken ajan internet araçlarını (web arama / sayfa okuma) kullanamaz. Gizlilik/güvenlik için.</div>
+                  </div>
+                </label>
               </div>
             </div>
 

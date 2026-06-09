@@ -46,6 +46,9 @@ interface ChatRequest {
   tools?: boolean;
   webSearch?: boolean;
   requireWriteApproval?: boolean;
+  planApprovalMode?: boolean;
+  planApproved?: boolean;
+  blockNetworkTools?: boolean;
   repoCtx?: RepoCtx;
   mcpServers?: McpServerConfig[];
 }
@@ -730,6 +733,13 @@ export async function POST(req: Request) {
         `Bunun yerine değişiklikleri \`\`\`dil:dosya/yolu biçiminde kod bloğu olarak ÖNER; ` +
         `kullanıcı inceleyip commit arayüzüyle kendisi uygular. Okuma/arama araçlarını serbestçe kullan.`;
     }
+    if (body.planApprovalMode && !body.planApproved) {
+      sysPrompt +=
+        `\n\n[ÖNEMLİ — Plan modu açık]\n` +
+        `ÖNCE ilgili dosyaları okuyup anla, sonra update_plan ile NET ve ayrıntılı bir uygulama planı sun ve DUR. ` +
+        `Hiçbir değişiklik YAPMA (yazma/silme araçları zaten devre dışı). Planı + kısa gerekçeyi yaz, ` +
+        `kullanıcı planı onaylayıp 'uygula' dediğinde bir sonraki turda gerçekleştireceksin.`;
+    }
   }
   if (body.webSearch && !body.repoCtx) {
     sysPrompt +=
@@ -802,13 +812,17 @@ export async function POST(req: Request) {
       },
     },
   ];
-  /* Onay modunda yazma araçlarını kaldır → ajan doğrudan commit edemez. */
-  const coderTools = body.requireWriteApproval
-    ? CODER_TOOLS.filter((t) => t.function.name !== "write_file" && t.function.name !== "str_replace")
-    : CODER_TOOLS;
+  /* İzin/plan moduna göre araçları kısıtla:
+     - Onay modu veya plan-modu(onaylanmadan): yazma araçları kaldırılır.
+     - Plan modu (onaylanmadan): yıkıcı öneriler de kaldırılır → ajan yalnızca planlar. */
+  const planGate = !!body.planApprovalMode && !body.planApproved;
+  const blockWrites = !!body.requireWriteApproval || planGate;
+  let coderTools = CODER_TOOLS;
+  if (blockWrites) coderTools = coderTools.filter((t) => t.function.name !== "write_file" && t.function.name !== "str_replace");
+  if (planGate) coderTools = coderTools.filter((t) => t.function.name !== "delete_file" && t.function.name !== "rename_file");
   const allTools = [
     ...(body.tools && body.repoCtx ? coderTools : []),
-    ...(body.webSearch ? WEB_TOOLS : []),
+    ...(body.webSearch && !body.blockNetworkTools ? WEB_TOOLS : []),
     ...mcpToolDefs.map((t) => ({
       type: "function" as const,
       function: { name: t.name, description: t.description, parameters: t.parameters },
