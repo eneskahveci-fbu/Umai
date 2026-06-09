@@ -9,7 +9,7 @@ interface GitHubTreeItem {
 export function parseRepo(input: string): { owner: string; repo: string } | null {
   const v = input
     .trim()
-    .replace(/^https?:\/\/github\.com\//, "")
+    .replace(/^(?:https?:\/\/)?github\.com\//, "")
     .replace(/\.git$/, "")
     .replace(/\/$/, "");
   const [owner, repo] = v.split("/");

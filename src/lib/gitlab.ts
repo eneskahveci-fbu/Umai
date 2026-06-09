@@ -12,7 +12,7 @@ interface GitLabTreeItem {
 export function parseGitLabRepo(input: string): { namespace: string; repo: string } | null {
   const v = input
     .trim()
-    .replace(/^https?:\/\/gitlab\.com\//, "")
+    .replace(/^(?:https?:\/\/)?gitlab\.com\//, "")
     .replace(/^gl:/, "")
     .replace(/\.git$/, "")
     .replace(/\/$/, "");
