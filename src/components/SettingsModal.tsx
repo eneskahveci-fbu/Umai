@@ -20,6 +20,8 @@ import {
 import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS } from "@/lib/constants";
 import { calculateCost, formatCost } from "@/lib/pricing";
+import { fetchUserRepos } from "@/lib/github";
+import { fetchGitLabUserRepos } from "@/lib/gitlab";
 import type { Provider, ResponseStyle } from "@/lib/types";
 
 export function SettingsModal() {
@@ -105,6 +107,9 @@ export function SettingsModal() {
   const [glUser, setGlUser] = useState("");
   const [glToken, setGlToken] = useState("");
   const [repoInput, setRepoInput] = useState("");
+  /* Hesaba bağlı otomatik gelen depolar (henüz eklenmemiş olanlar) */
+  const [accountRepos, setAccountRepos] = useState<string[]>([]);
+  const [loadingAccountRepos, setLoadingAccountRepos] = useState(false);
   const [testing, setTesting] = useState(false);
   const [memInput, setMemInput] = useState("");
   /* Local drafts for large text fields — saved on blur to avoid calling
@@ -155,6 +160,32 @@ export function SettingsModal() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey, baseUrl, provider, open, tab]);
+
+  /* Git sekmesi açıldığında ve bir hesap aktifse, o hesaptaki depoları otomatik
+     getir. Henüz eklenmemiş olanlar "Hesabındaki depolar" listesinde tek tıkla
+     eklenebilir. Token varsa özel depolar da gelir. */
+  useEffect(() => {
+    if (!open || tab !== "github") return;
+    const gh = config.githubAccounts.find((a) => a.id === config.activeGithubId);
+    const gl = (config.gitlabAccounts ?? []).find((a) => a.id === config.activeGitlabId);
+    let cancelled = false;
+    (async () => {
+      if (!gh && !gl) { if (!cancelled) setAccountRepos([]); return; }
+      setLoadingAccountRepos(true);
+      const results: string[] = [];
+      try {
+        if (gh) results.push(...(await fetchUserRepos(gh.token, gh.username)));
+      } catch { /* sessiz */ }
+      try {
+        if (gl) results.push(...(await fetchGitLabUserRepos(gl.token, gl.username)));
+      } catch { /* sessiz */ }
+      if (cancelled) return;
+      const have = new Set(config.repos);
+      setAccountRepos([...new Set(results)].filter((r) => !have.has(r)));
+      setLoadingAccountRepos(false);
+    })();
+    return () => { cancelled = true; };
+  }, [open, tab, config.activeGithubId, config.activeGitlabId, config.githubAccounts, config.gitlabAccounts, config.repos]);
 
   if (!open) return null;
 
@@ -445,6 +476,39 @@ export function SettingsModal() {
                   <button onClick={submitRepo} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-line hover:border-brand text-sm font-semibold transition-colors"><Plus size={15} /> Depo Ekle</button>
                 </div>
               </div>
+
+              {/* Hesabındaki depolar — bağlı hesaptan otomatik gelir */}
+              {(loadingAccountRepos || accountRepos.length > 0) && (
+                <div className="mt-3 rounded-xl border border-line p-3.5 bg-bgsoft/50">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div className="text-xs font-bold text-muted uppercase tracking-wide">Hesabındaki depolar</div>
+                    {accountRepos.length > 0 && (
+                      <button
+                        onClick={() => { accountRepos.forEach((r) => addRepo(r)); addToast(`${accountRepos.length} depo eklendi.`, "success"); setAccountRepos([]); }}
+                        className="text-[11px] text-brand hover:underline font-semibold"
+                      >
+                        Tümünü ekle ({accountRepos.length})
+                      </button>
+                    )}
+                  </div>
+                  {loadingAccountRepos ? (
+                    <div className="flex items-center gap-2 text-xs text-muted"><Loader2 size={13} className="animate-spin" /> Depolar getiriliyor…</div>
+                  ) : (
+                    <div className="flex flex-col gap-1.5 max-h-48 overflow-auto">
+                      {accountRepos.map((r) => (
+                        <button
+                          key={r}
+                          onClick={() => { addRepo(r); setAccountRepos((prev) => prev.filter((x) => x !== r)); }}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-line hover:border-brand bg-bg/40 text-left transition-colors"
+                        >
+                          <Plus size={12} className="text-brand shrink-0" />
+                          <span className="flex-1 text-xs font-mono truncate">{r}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* GitLab Accounts */}

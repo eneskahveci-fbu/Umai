@@ -36,6 +36,30 @@ function glHeaders(token?: string): Record<string, string> {
   return h;
 }
 
+/** Hesaba ait projeleri "gitlab.com/namespace/path" listesi olarak getirir.
+   Token varsa erişilebilen tüm (özel dahil) projeler, yoksa kullanıcının
+   herkese açık projeleri. Son etkinliğe göre sıralı, en fazla 100 proje. */
+export async function fetchGitLabUserRepos(
+  token?: string,
+  username?: string,
+): Promise<string[]> {
+  const url = token
+    ? `https://gitlab.com/api/v4/projects?membership=true&per_page=100&order_by=last_activity_at&simple=true`
+    : username
+      ? `https://gitlab.com/api/v4/users/${encodeURIComponent(username)}/projects?per_page=100&order_by=last_activity_at&simple=true`
+      : "";
+  if (!url) return [];
+  const res = await fetch(url, { headers: glHeaders(token) });
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.message || `Projeler alınamadı (${res.status})`);
+  }
+  const data = (await res.json()) as { path_with_namespace?: string }[];
+  return Array.isArray(data)
+    ? data.map((p) => p.path_with_namespace).filter((x): x is string => !!x).map((p) => `gitlab.com/${p}`)
+    : [];
+}
+
 /** Deponun varsayılan dalını ve özyinelemeli dosya ağacını getirir. */
 export async function fetchGitLabRepoTree(
   namespace: string,

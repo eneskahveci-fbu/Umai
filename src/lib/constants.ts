@@ -72,7 +72,7 @@ export const PRESETS: Record<Provider, Preset> = {
     label: "✦ Pollinations (Ücretsiz · Gömülü)",
     baseUrl: "https://text.pollinations.ai/openai",
     model: "openai",
-    keyHint: "(API anahtarı gerekmez)",
+    keyHint: "opsiyonel: pollinations.ai ücretsiz token'ı (limiti yükseltir)",
   },
   ollama: {
     label: "💻 Ollama (Yerel / Ücretsiz)",
