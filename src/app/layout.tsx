@@ -80,6 +80,9 @@ export const viewport = {
   /* `cover` lets the page extend behind the notch / home indicator;
      safe-area-inset-* in CSS handles the actual padding. */
   viewportFit: "cover" as const,
+  /* Klavye açıldığında düzeni yeniden boyutlandır (composer klavyenin altında
+     kaybolmasın) — destekleyen tarayıcılarda etkili, diğerlerinde zararsız. */
+  interactiveWidget: "resizes-content" as const,
   /* Don't disable user-scalable — accessibility. iOS auto-zoom on
      input focus is solved by 16px+ font-size on form fields. */
 };

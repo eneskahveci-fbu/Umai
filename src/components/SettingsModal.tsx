@@ -5,6 +5,7 @@ import { useModalA11y } from "@/lib/useModalA11y";
 import {
   Brain,
   Check,
+  ExternalLink,
   FolderGit2,
   GitBranch,
   Loader2,
@@ -16,6 +17,7 @@ import {
   Sun,
   Trash2,
   X,
+  Zap,
 } from "lucide-react";
 import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS } from "@/lib/constants";
@@ -111,6 +113,11 @@ export function SettingsModal() {
   const [accountRepos, setAccountRepos] = useState<string[]>([]);
   const [loadingAccountRepos, setLoadingAccountRepos] = useState(false);
   const [testing, setTesting] = useState(false);
+  /* Hızlı kurulum: ücretsiz güvenilir model ekle + test et */
+  const [quickProvider, setQuickProvider] = useState<"gemini" | "groq">("gemini");
+  const [quickKey, setQuickKey] = useState("");
+  const [quickBusy, setQuickBusy] = useState(false);
+  const [quickResult, setQuickResult] = useState<null | "ok" | string>(null);
   const [memInput, setMemInput] = useState("");
   /* Local drafts for large text fields — saved on blur to avoid calling
      saveConfig on every keystroke (which triggers re-renders and focus loss). */
@@ -271,6 +278,52 @@ export function SettingsModal() {
     finally { setTesting(false); }
   };
 
+  const QUICK_KEY_URL: Record<"gemini" | "groq", string> = {
+    gemini: "https://aistudio.google.com/apikey",
+    groq: "https://console.groq.com/keys",
+  };
+
+  /* Ücretsiz modeli ekle, aktif yap ve canlı test et. */
+  const quickSetup = async () => {
+    const key = quickKey.trim();
+    if (!key) { addToast("Önce ücretsiz anahtarı yapıştır.", "error"); return; }
+    const preset = PRESETS[quickProvider];
+    const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `m_${Date.now()}`;
+    const newModel = {
+      id,
+      label: quickProvider === "gemini" ? "Google Gemini" : "Groq",
+      provider: quickProvider as Provider,
+      baseUrl: preset.baseUrl,
+      model: preset.model,
+      apiKey: key,
+    };
+    /* addModel mevcut aktif modeli korur; burada yeni modeli aktif yapıyoruz. */
+    saveConfig({ ...config, models: [...config.models, newModel], activeModelId: id });
+    setQuickBusy(true);
+    setQuickResult(null);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: "Merhaba" }], baseUrl: preset.baseUrl, model: preset.model, apiKey: key, provider: quickProvider }),
+      });
+      if (res.ok) {
+        setQuickResult("ok");
+        setQuickKey("");
+        addToast("Model eklendi ve çalışıyor — artık aktif.", "success");
+      } else {
+        const t = (await res.text()).slice(0, 140);
+        setQuickResult(t || `HTTP ${res.status}`);
+        addToast("Model eklendi ama test başarısız.", "error");
+      }
+    } catch (e) {
+      setQuickResult((e as Error).message);
+      addToast(`Test hatası: ${(e as Error).message}`, "error");
+    } finally {
+      setQuickBusy(false);
+    }
+  };
+
   const activeProj = config.projects.find((p) => p.id === config.activeProjectId);
 
   return (
@@ -333,14 +386,58 @@ export function SettingsModal() {
           <section>
             <p className="text-xs text-muted mb-3">Birden fazla model ekleyebilirsin. Anahtarlar yalnızca bu tarayıcıda saklanır.</p>
             
-            {/* Gemini API Info */}
-            <div className="mb-4 p-3 bg-brand/8 border border-brand/25 rounded-lg">
-              <div className="text-xs text-brand font-semibold mb-1">💡 Gemini API Hakkında</div>
-              <p className="text-xs text-muted leading-relaxed">
-                Google Gemini ücretsiz olarak kullanılabilir.
-                <a href="https://ai.google.dev/pricing" target="_blank" rel="noopener noreferrer" className="text-brand hover:text-branddim underline"> ai.google.dev</a>&apos;den API anahtarı alabilirsin.
-                Günde 1.5 milyon istek sınırı var.
+            {/* Hızlı kurulum: ücretsiz, güvenilir model */}
+            <div className="mb-4 rounded-xl border border-brand/30 bg-brand/8 p-3.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-brand mb-1.5">
+                <Zap size={14} /> Hızlı kurulum — ücretsiz çalışan model
+              </div>
+              <p className="text-[11px] text-muted leading-relaxed mb-2.5">
+                Varsayılan Pollinations modeli yoğun zamanlarda kesilebilir. 30 saniyede
+                ücretsiz ve güvenilir bir anahtar ekle. Anahtar yalnızca tarayıcında kalır.
               </p>
+              <div className="flex gap-1.5 mb-2.5">
+                {(["gemini", "groq"] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => { setQuickProvider(p); setQuickResult(null); }}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${quickProvider === p ? "border-brand bg-brand/15 text-ink" : "border-line text-muted hover:text-ink"}`}
+                  >
+                    {p === "gemini" ? "✨ Gemini" : "⚡ Groq"}
+                  </button>
+                ))}
+              </div>
+              <a
+                href={QUICK_KEY_URL[quickProvider]}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[11px] text-brand hover:text-branddim underline mb-2"
+              >
+                Ücretsiz {quickProvider === "gemini" ? "Gemini" : "Groq"} anahtarı al <ExternalLink size={11} />
+              </a>
+              <div className="flex gap-1.5">
+                <input
+                  value={quickKey}
+                  onChange={(e) => { setQuickKey(e.target.value); setQuickResult(null); }}
+                  placeholder={quickProvider === "gemini" ? "AIza..." : "gsk_..."}
+                  className="input-mono flex-1"
+                  onKeyDown={(e) => { if (e.key === "Enter" && !quickBusy) quickSetup(); }}
+                />
+                <button
+                  onClick={quickSetup}
+                  disabled={quickBusy || !quickKey.trim()}
+                  className="px-3 py-2 rounded-lg bg-brand hover:bg-branddim text-white text-xs font-semibold disabled:opacity-40 flex items-center gap-1.5 shrink-0"
+                >
+                  {quickBusy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Ekle ve test et
+                </button>
+              </div>
+              {quickResult === "ok" && (
+                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-green font-semibold">
+                  <Check size={12} /> Çalışıyor — bu model artık aktif.
+                </div>
+              )}
+              {quickResult && quickResult !== "ok" && (
+                <div className="mt-2 text-[11px] text-red break-words">Test başarısız: {quickResult}</div>
+              )}
             </div>
 
             {config.models.length > 0 && (
