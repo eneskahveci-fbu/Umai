@@ -497,9 +497,14 @@ export function CoderView() {
             setRepo({ owner: gl.namespace, repo: gl.repo, branch });
             setTree(buildGitLabTree(items));
           } catch {
-            /* İkisi de başarısız → GitHub hatasını, yönlendirici ipucuyla göster. */
+            /* İkisi de başarısız → token durumuna göre eyleme dönük hata. */
+            if (!token) {
+              throw new Error(
+                `GitHub deposuna erişilemedi (${(ghErr as Error).message}). ÖZEL repo ise Ayarlar → Depolar'dan bir GitHub erişim token'ı (PAT, 'repo' kapsamı) ekle; GitLab deposuysa "gitlab.com/namespace/repo" biçiminde gir.`,
+              );
+            }
             throw new Error(
-              `${(ghErr as Error).message}. GitLab deposuysa "gitlab.com/namespace/repo" biçiminde ekle veya Ayarlar'dan GitLab token'ı tanımla.`,
+              `${(ghErr as Error).message}. Depo adı doğru mu, token 'repo' kapsamına sahip mi? GitLab deposuysa "gitlab.com/namespace/repo" biçiminde ekle.`,
             );
           }
         }
