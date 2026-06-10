@@ -107,6 +107,7 @@ export function SettingsModal() {
   const [editKey, setEditKey] = useState("");
   const [ghUser, setGhUser] = useState("");
   const [ghToken, setGhToken] = useState("");
+  const [verifyingGithub, setVerifyingGithub] = useState(false);
   const [glUser, setGlUser] = useState("");
   const [glToken, setGlToken] = useState("");
   const [repoInput, setRepoInput] = useState("");
@@ -249,11 +250,32 @@ export function SettingsModal() {
     setLabel(""); setApiKey("");
   };
 
-  const submitGithub = () => {
-    if (!ghUser.trim() || !ghToken.trim()) { addToast("Kullanıcı adı ve token gerekli.", "error"); return; }
-    addGithub({ username: ghUser.trim(), token: ghToken.trim() });
-    addToast("GitHub hesabı eklendi.", "success");
-    setGhUser(""); setGhToken("");
+  const submitGithub = async () => {
+    if (!ghToken.trim()) { addToast("GitHub token gerekli (ghp_...).", "error"); return; }
+    setVerifyingGithub(true);
+    try {
+      /* Token'ı eklemeden ÖNCE doğrula → anında net geri bildirim, sessiz hata yok. */
+      const res = await fetch("https://api.github.com/user", {
+        headers: { Authorization: `Bearer ${ghToken.trim()}`, Accept: "application/vnd.github+json" },
+      });
+      if (!res.ok) {
+        addToast(
+          res.status === 401 ? "Token geçersiz veya süresi dolmuş — yeni bir PAT oluştur."
+          : res.status === 403 ? "Token yetkisiz/oran sınırı — 'repo' kapsamı gerekli."
+          : `GitHub doğrulama hatası (${res.status}).`,
+          "error",
+        );
+        return;
+      }
+      const user = await res.json() as { login?: string };
+      addGithub({ username: ghUser.trim() || user.login || "github", token: ghToken.trim() });
+      addToast(`GitHub bağlandı: ${user.login} ✓`, "success");
+      setGhUser(""); setGhToken("");
+    } catch (e) {
+      addToast(`Ağ hatası: ${(e as Error).message}`, "error");
+    } finally {
+      setVerifyingGithub(false);
+    }
   };
 
   const submitGitlab = () => {
@@ -547,9 +569,9 @@ export function SettingsModal() {
               <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50">
                 <div className="text-xs font-bold text-muted uppercase tracking-wide mb-2.5">+ Hesap Ekle</div>
                 <div className="grid gap-2">
-                  <input value={ghUser} onChange={(e) => setGhUser(e.target.value)} placeholder="Kullanıcı adı" className="input-mono" />
-                  <input type="password" value={ghToken} onChange={(e) => setGhToken(e.target.value)} placeholder="GitHub token (ghp_...)" className="input-mono" />
-                  <button onClick={submitGithub} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-line hover:border-brand text-sm font-semibold transition-colors"><Plus size={15} /> Hesap Ekle</button>
+                  <input value={ghUser} onChange={(e) => setGhUser(e.target.value)} placeholder="Kullanıcı adı (opsiyonel)" className="input-mono" />
+                  <input type="password" value={ghToken} onChange={(e) => setGhToken(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !verifyingGithub) submitGithub(); }} placeholder="GitHub token (ghp_...)" className="input-mono" />
+                  <button onClick={submitGithub} disabled={verifyingGithub} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-line hover:border-brand text-sm font-semibold transition-colors disabled:opacity-50">{verifyingGithub ? <><Loader2 size={15} className="animate-spin" /> Doğrulanıyor…</> : <><Plus size={15} /> Bağla &amp; Doğrula</>}</button>
                 </div>
               </div>
             </div>

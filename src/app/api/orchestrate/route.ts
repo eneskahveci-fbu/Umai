@@ -28,6 +28,12 @@ interface OrchestrateRequest {
   skills?: SkillLike[];
   searchContext?: string;
   repoCtx?: RepoReadCtx;
+  /* İstemci /api/chat ile aynı gövdeyi yollar; orkestrasyonda işçiler zaten
+     salt-okunurdur (yazma aracı yok) ama tutarlılık için kontrat eksiksiz. */
+  requireWriteApproval?: boolean;
+  planApprovalMode?: boolean;
+  planApproved?: boolean;
+  blockNetworkTools?: boolean;
 }
 
 const MAX_AGENTS = 4;
