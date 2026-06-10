@@ -123,21 +123,38 @@ function ComposerButton({
   );
 }
 
-/* "⋯ Daha fazla" — az kullanılan composer eylemlerini tek menüde toplar. */
+/* "⋯ Daha fazla" — az kullanılan composer eylemlerini tek menüde toplar.
+   Açılır menü createPortal ile body'e render edilir; aksi halde araç çubuğunun
+   overflow-x-auto kabı menüyü kırpar (görünmez olur). */
 function MoreMenu({ active, children }: { active?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; bottom: number } | null>(null);
   useEffect(() => {
     if (!open) return;
+    const update = () => {
+      const r = btnRef.current?.getBoundingClientRect();
+      if (r) setPos({ left: r.right, bottom: window.innerHeight - r.top + 8 });
+    };
+    update();
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (!btnRef.current?.contains(t) && !menuRef.current?.contains(t)) setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
   }, [open]);
   return (
-    <div ref={ref} className="relative shrink-0">
+    <div className="relative shrink-0">
       <button
+        ref={btnRef}
         onClick={() => setOpen((o) => !o)}
         title="Daha fazla"
         className={`flex items-center gap-1.5 text-[12px] px-2 py-2 sm:py-1.5 rounded-lg transition-colors active:scale-95 ${
@@ -146,13 +163,16 @@ function MoreMenu({ active, children }: { active?: boolean; children: React.Reac
       >
         <MoreHorizontal size={13} />
       </button>
-      {open && (
+      {open && pos && createPortal(
         <div
+          ref={menuRef}
           onClick={() => setOpen(false)}
-          className="absolute bottom-full right-0 mb-1.5 min-w-[170px] bg-surface border border-line rounded-xl shadow-2xl shadow-black/40 p-1 z-30 flex flex-col gap-0.5 animate-modal-bg"
+          style={{ position: "fixed", left: pos.left, bottom: pos.bottom, transform: "translateX(-100%)" }}
+          className="min-w-[180px] bg-surface border border-line rounded-xl shadow-2xl shadow-black/40 p-1 z-[80] flex flex-col gap-0.5 animate-modal-bg"
         >
           {children}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -477,9 +497,14 @@ export function CoderView() {
             setRepo({ owner: gl.namespace, repo: gl.repo, branch });
             setTree(buildGitLabTree(items));
           } catch {
-            /* İkisi de başarısız → GitHub hatasını, yönlendirici ipucuyla göster. */
+            /* İkisi de başarısız → token durumuna göre eyleme dönük hata. */
+            if (!token) {
+              throw new Error(
+                `GitHub deposuna erişilemedi (${(ghErr as Error).message}). ÖZEL repo ise Ayarlar → Depolar'dan bir GitHub erişim token'ı (PAT, 'repo' kapsamı) ekle; GitLab deposuysa "gitlab.com/namespace/repo" biçiminde gir.`,
+              );
+            }
             throw new Error(
-              `${(ghErr as Error).message}. GitLab deposuysa "gitlab.com/namespace/repo" biçiminde ekle veya Ayarlar'dan GitLab token'ı tanımla.`,
+              `${(ghErr as Error).message}. Depo adı doğru mu, token 'repo' kapsamına sahip mi? GitLab deposuysa "gitlab.com/namespace/repo" biçiminde ekle.`,
             );
           }
         }
