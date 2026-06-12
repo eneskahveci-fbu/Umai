@@ -416,8 +416,6 @@ export function CoderView() {
   /* Ajanın bu turda yazdığı dosyaların ESKİ içeriği — "Geri al" için. */
   const [checkpoints, setCheckpoints] = useState<{ path: string; previous: string }[]>([]);
   const [undoing, setUndoing] = useState(false);
-  /* Yanıt token sınırında kesildiyse "Devam et" göster. */
-  const [canContinue, setCanContinue] = useState(false);
   /* Ajanın önerdiği YIKICI işlemler (sil/yeniden adlandır) — onay bekler. */
   const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
   const [resolvingAction, setResolvingAction] = useState<string | null>(null);
@@ -789,7 +787,6 @@ export function CoderView() {
     store.setStreaming(true);
     setCheckpoints([]); // yeni tur — önceki turun geri-al noktalarını sıfırla
     setPendingActions([]); // ve bekleyen yıkıcı işlem önerilerini
-    setCanContinue(false);
     store.setFollowUpSuggestions([]);
     coderAbort = new AbortController();
     const abortCtl = coderAbort;
@@ -829,7 +826,6 @@ export function CoderView() {
     }
 
     let full = ""; // try ve catch (iptal) ortak erişimi için dışta tanımlı
-    let truncated = false; // finish_reason === "length" → "Devam et" göster
     try {
       const allEnabledSkills = (store.config.skills ?? []).filter((s) => s.enabled);
       /* Relevance scoring: compare skill text against the last user message.
@@ -1031,7 +1027,6 @@ export function CoderView() {
               }
               continue;
             }
-            if (parsed.choices?.[0]?.finish_reason === "length") truncated = true;
             const delta = parsed.choices?.[0]?.delta?.content ?? "";
             const reasoning = (parsed.choices?.[0]?.delta as Record<string, unknown>)?.reasoning as string | undefined;
             if (reasoning) useStore.getState().updateLastThinking(reasoning);
@@ -1040,7 +1035,6 @@ export function CoderView() {
         }
       }
       if (!full) useStore.getState().updateLastContent("_(Model boş yanıt döndürdü.)_");
-      setCanContinue(truncated);
 
       /* Extended thinking: <think>...</think> bloklarını ayır */
       {
@@ -1509,20 +1503,6 @@ export function CoderView() {
                             onClose={() => setPendingCommit(null)}
                             onOpenInEditor={(f) => { setEditorFile(f); setEditorOpen(true); }}
                           />
-                        </div>
-                      )}
-                      {isLastAssistant && !streaming && canContinue && (
-                        <div className="ml-11 mt-2">
-                          <button
-                            onClick={async () => {
-                              setCanContinue(false);
-                              useStore.getState().pushMessage({ role: "user", content: "Önceki yanıtın token sınırında kesildi — kaldığın yerden, baştan tekrar etmeden devam et." });
-                              await callApi();
-                            }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand/40 text-brand hover:bg-brand/10 text-xs font-semibold transition-colors"
-                          >
-                            <RefreshCw size={12} /> Devam et (yanıt kesildi)
-                          </button>
                         </div>
                       )}
                       {isLastAssistant && !streaming && config.planApprovalMode && m.plan && (
