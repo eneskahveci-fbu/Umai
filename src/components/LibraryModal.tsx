@@ -30,12 +30,12 @@ export function LibraryModal() {
     const project: Project = {
       id: crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       name: name.trim(),
-      repoOwner: owner.trim(),
-      repoName: repoName.trim(),
-      branch: branch.trim() || "main",
-      provider,
-      token: token.trim() || undefined,
-      createdAt: Date.now(),
+      repo: {
+        owner: owner.trim(),
+        repo: repoName.trim(),
+        branch: branch.trim() || "main",
+      },
+      gitAccountId: provider,
     };
 
     addProject(project);
