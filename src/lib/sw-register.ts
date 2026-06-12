@@ -1,34 +1,41 @@
-"use client";
+// src/lib/sw-register.ts — Service Worker kaydı
 
-let reg: ServiceWorkerRegistration | null = null;
+let registration: ServiceWorkerRegistration | null = null;
 
-export function registerServiceWorker(): void {
-  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+export async function registerSW(): Promise<void> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+    return;
+  }
 
-  navigator.serviceWorker
-    .register("/sw.js", { scope: "/" })
-    .then((r) => {
-      reg = r;
-    })
-    .catch(() => {
-      // SW kaydı başarısız olursa sessizce geç
+  try {
+    registration = await navigator.serviceWorker.register("/sw.js", {
+      scope: "/",
     });
+    console.log("[SW] Kaydedildi:", registration.scope);
+  } catch (err) {
+    console.warn("[SW] Kayıt başarısız:", err);
+  }
 }
 
-export function watchConnection(): () => void {
-  if (typeof window === "undefined") return () => {};
+export async function unregisterSW(): Promise<void> {
+  if (!registration) return;
 
-  const handler = () => {
-    document.documentElement.classList.toggle("offline", !navigator.onLine);
-  };
+  try {
+    await registration.unregister();
+    registration = null;
+  } catch (err) {
+    console.warn("[SW] Kaldırma başarısız:", err);
+  }
+}
 
-  window.addEventListener("online", handler);
-  window.addEventListener("offline", handler);
-  // Başlangıç durumu
-  handler();
-
-  return () => {
-    window.removeEventListener("online", handler);
-    window.removeEventListener("offline", handler);
-  };
+// Periyodik güncelleme kontrolü
+if (typeof window !== "undefined") {
+  setInterval(async () => {
+    if (!registration) return;
+    try {
+      await registration.update();
+    } catch {
+      // sessiz
+    }
+  }, 60 * 60 * 1000);
 }
