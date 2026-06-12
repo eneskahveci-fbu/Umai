@@ -477,6 +477,14 @@ export function CoderView() {
     if (stickRef.current) endRef.current?.scrollIntoView({ behavior: grew ? "smooth" : "auto" });
   }, [messages.length, lastMessageContent]);
 
+  /* Sohbet değişince en alta yapış + scroll (yeni sohbet hep dipten başlasın). */
+  useEffect(() => {
+    stickRef.current = true;
+    prevLenRef.current = messages.length;
+    endRef.current?.scrollIntoView({ behavior: "auto" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId]);
+
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
