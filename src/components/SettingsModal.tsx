@@ -354,7 +354,7 @@ export function SettingsModal({ open, onClose }: Props) {
                   {(["dark", "light"] as const).map((t) => (
                     <button
                       key={t}
-                      onClick={() => updateConfig({ theme: t })}
+                      onClick={() => updateConfig("theme", t)}
                       className={`flex-1 py-2 text-sm rounded-lg border transition-colors capitalize ${
                         config.theme === t
                           ? "border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]"
