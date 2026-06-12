@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useStore } from "@/lib/store";
-import type { ModelConfig, Provider, AppConfig, ResponseStyle } from "@/lib/types";
-import { PROVIDER_DEFAULTS } from "@/lib/constants";
+import type { AIModel, ProviderKind, ResponseStyle } from "@/lib/types";
+import { PROVIDER_DEFAULTS, PROVIDER_LABELS } from "@/lib/constants";
 
 interface Props {
   open?: boolean;
@@ -12,8 +12,8 @@ interface Props {
 
 type TabId = "model" | "git" | "general" | "advanced";
 
-const PROVIDERS: { id: Provider; label: string }[] = [
-  { id: "hf", label: "Hugging Face" },
+const PROVIDERS: { id: ProviderKind; label: string }[] = [
+  { id: "huggingface", label: "Hugging Face" },
   { id: "deepseek", label: "DeepSeek" },
   { id: "openrouter", label: "OpenRouter" },
   { id: "groq", label: "Groq" },
