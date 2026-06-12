@@ -91,27 +91,24 @@ export function MultiCommitBar({
       if (gitLab) {
         const activeGitlab = store.activeGitlab();
         if (!activeGitlab || !activeGitlab.token) throw new Error("GitLab token yok — Ayarlar → Depolar'dan ekle");
-        // GitLab: commit her dosyayı tek tek
-        for (const f of toCommit) {
-          const res = await fetch("/api/gitlab/write", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              namespace: repo.owner,
-              repo: repo.repo,
-              branch: repo.branch,
-              path: f.path,
-              content: f.content,
-              message: commitMsg,
-              token: activeGitlab.token,
-            }),
-          });
-          if (!res.ok) {
-            const { error } = await res.json().catch(() => ({ error: "Bilinmeyen hata" }));
-            throw new Error(error);
-          }
+        // GitLab: tüm dosyalar TEK atomik commit'te (paralel var/yok kontrolü + commits API)
+        const res = await fetch("/api/gitlab/batch-write", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            namespace: repo.owner,
+            repo: repo.repo,
+            branch: repo.branch,
+            message: commitMsg,
+            token: activeGitlab.token,
+            files: toCommit.map((f) => ({ path: f.path, content: f.content })),
+          }),
+        });
+        if (!res.ok) {
+          const { error } = await res.json().catch(() => ({ error: "Bilinmeyen hata" }));
+          throw new Error(error);
         }
-        addToast(`✓ ${toCommit.length} dosya GitLab'a commit'lendi`, "success");
+        addToast(`✓ ${toCommit.length} dosya GitLab'a tek commit'te yazıldı`, "success");
       } else {
         const activeGithub = store.activeGithub();
         if (!activeGithub || !activeGithub.token) throw new Error("GitHub token yok — Ayarlar → Depolar'dan ekle");
