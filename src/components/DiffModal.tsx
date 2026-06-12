@@ -1,150 +1,108 @@
 "use client";
 
-import { X, ArrowLeftRight } from "lucide-react";
-import { useEffect, useRef } from "react";
-import { useStore } from "@/lib/store";
+import { useState, useEffect, useCallback } from "react";
 
-function simpleDiff(oldText: string, newText: string): Array<{ type: "same" | "add" | "remove"; value: string }> {
-  const oldLines = oldText.split("\n");
-  const newLines = newText.split("\n");
-  const result: Array<{ type: "same" | "add" | "remove"; value: string }> = [];
-
-  // En uzun ortak alt-dizi (LCS) tabanlı basit diff
-  const m = oldLines.length;
-  const n = newLines.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (oldLines[i - 1] === newLines[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1;
-      } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
-      }
-    }
-  }
-
-  // Geriye doğru izle
-  let i = m, j = n;
-  const temp: Array<{ type: "same" | "add" | "remove"; value: string }> = [];
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
-      temp.push({ type: "same", value: oldLines[i - 1] });
-      i--; j--;
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      temp.push({ type: "add", value: newLines[j - 1] });
-      j--;
-    } else {
-      temp.push({ type: "remove", value: oldLines[i - 1] });
-      i--;
-    }
-  }
-  return temp.reverse();
+interface Props {
+  title?: string;
+  leftContent?: string;
+  rightContent?: string;
+  leftLabel?: string;
+  rightLabel?: string;
+  open?: boolean;
+  onClose?: () => void;
 }
 
-export function DiffModal() {
-  const open = useStore((s) => s.diffOpen);
-  const diff = useStore((s) => s.diff);
-  const setDiff = useStore((s) => s.setDiff);
-  const setDiffOpen = useStore((s) => s.setDiffOpen);
-  const ref = useRef<HTMLDivElement>(null);
+export function DiffModal({ title, leftContent, rightContent, leftLabel, rightLabel, open, onClose }: Props) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [splitView, setSplitView] = useState(true);
+
+  const isControlled = open !== undefined;
+  const visible = isControlled ? open : isOpen;
+
+  const close = useCallback(() => {
+    if (isControlled) onClose?.();
+    else setIsOpen(false);
+  }, [isControlled, onClose]);
 
   useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setDiffOpen(false);
-        setDiff(null);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open, setDiffOpen, setDiff]);
+    const handler = () => setIsOpen(true);
+    window.addEventListener("open-diff", handler);
+    return () => window.removeEventListener("open-diff", handler);
+  }, []);
 
-  if (!open || !diff) return null;
+  if (!visible) return null;
 
-  const lines = simpleDiff(diff.left, diff.right);
+  const renderLines = (text?: string) => {
+    if (!text) return <div className="text-[var(--color-ink)]/30 italic p-4">İçerik yok</div>;
+    return text.split("\n").map((line, i) => (
+      <div key={i} className="flex">
+        <span className="w-10 text-right pr-3 text-[10px] text-[var(--color-ink)]/30 select-none leading-6 shrink-0">
+          {i + 1}
+        </span>
+        <span className="font-mono text-xs leading-6 whitespace-pre-wrap break-all">{line}</span>
+      </div>
+    ));
+  };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[5vh] bg-bg/70 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          setDiffOpen(false);
-          setDiff(null);
-        }
-      }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Değişiklik karşılaştırma"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) close(); }}
     >
-      <div
-        ref={ref}
-        className="bg-surface border border-line rounded-2xl shadow-2xl w-full max-w-4xl mx-4 max-h-[85vh] flex flex-col overflow-hidden"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-line shrink-0">
+      <div className="w-full max-w-5xl max-h-[85vh] bg-[var(--color-bg)] border border-[var(--color-surface)] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        {/* Başlık */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--color-surface)]">
+          <h2 className="text-base font-semibold flex items-center gap-2">
+            🔄 {title || "Karşılaştırma"}
+          </h2>
           <div className="flex items-center gap-2">
-            <ArrowLeftRight size={15} className="text-muted" />
-            <h2 className="text-sm font-semibold">{diff.title ?? "Değişiklik Karşılaştırma"}</h2>
+            <button
+              onClick={() => setSplitView(!splitView)}
+              className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                splitView ? "bg-[var(--color-brand)]/10 text-[var(--color-brand)]" : "bg-[var(--color-surface)] text-[var(--color-ink)]/60"
+              }`}
+            >
+              {splitView ? "Yan Yana" : "Birleşik"}
+            </button>
+            <button onClick={close} className="text-[var(--color-ink)]/40 hover:text-[var(--color-ink)] transition-colors text-lg">
+              ✕
+            </button>
           </div>
-          <button
-            onClick={() => {
-              setDiffOpen(false);
-              setDiff(null);
-            }}
-            className="text-muted hover:text-ink p-1 rounded hover:bg-bgsoft transition-colors"
-            aria-label="Kapat"
-          >
-            <X size={15} />
-          </button>
         </div>
 
-        {/* Diff content */}
-        <div className="overflow-y-auto flex-1 font-mono text-xs leading-relaxed">
-          <div className="flex">
-            {/* Sol — eski */}
-            <div className="flex-1 min-w-0 border-r border-line/50 bg-red-50/20">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-muted/60 px-4 py-2 border-b border-line/30 sticky top-0 bg-surface">
-                Önceki
-              </div>
-              {lines.filter((l) => l.type !== "add").map((line, i) => (
-                <div
-                  key={i}
-                  className={`px-4 py-0.5 whitespace-pre-wrap break-all ${
-                    line.type === "remove"
-                      ? "bg-red-100 text-red-900 dark:bg-red-900/20 dark:text-red-300"
-                      : "text-muted"
-                  }`}
-                >
-                  {line.type === "remove" && <span className="select-none mr-2 text-red-400">-</span>}
-                  {line.type === "same" && <span className="select-none mr-2">&nbsp;</span>}
-                  {line.value || "\u00A0"}
+        {/* Diff içerik */}
+        <div className={`flex-1 overflow-auto ${splitView ? "grid grid-cols-2 divide-x divide-[var(--color-surface)]" : ""}`}>
+          {splitView ? (
+            <>
+              <div>
+                <div className="sticky top-0 px-4 py-2 bg-[var(--color-surface)]/50 text-xs font-medium text-[var(--color-ink)]/60 border-b border-[var(--color-surface)]">
+                  {leftLabel || "Önceki"}
                 </div>
-              ))}
-            </div>
-
-            {/* Sağ — yeni */}
-            <div className="flex-1 min-w-0 bg-green-50/20">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-muted/60 px-4 py-2 border-b border-line/30 sticky top-0 bg-surface">
-                Sonraki
+                <div className="p-2">{renderLines(leftContent)}</div>
               </div>
-              {lines.filter((l) => l.type !== "remove").map((line, i) => (
-                <div
-                  key={i}
-                  className={`px-4 py-0.5 whitespace-pre-wrap break-all ${
-                    line.type === "add"
-                      ? "bg-green-100 text-green-900 dark:bg-green-900/20 dark:text-green-300"
-                      : "text-muted"
-                  }`}
-                >
-                  {line.type === "add" && <span className="select-none mr-2 text-green-400">+</span>}
-                  {line.type === "same" && <span className="select-none mr-2">&nbsp;</span>}
-                  {line.value || "\u00A0"}
+              <div>
+                <div className="sticky top-0 px-4 py-2 bg-[var(--color-surface)]/50 text-xs font-medium text-[var(--color-ink)]/60 border-b border-[var(--color-surface)]">
+                  {rightLabel || "Sonraki"}
                 </div>
-              ))}
+                <div className="p-2">{renderLines(rightContent)}</div>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-4 p-4">
+              <div>
+                <div className="text-xs font-medium text-[var(--color-ink)]/60 mb-2 px-2">
+                  {leftLabel || "Önceki"}
+                </div>
+                <div className="bg-[var(--color-surface)]/30 rounded-xl p-3">{renderLines(leftContent)}</div>
+              </div>
+              <div>
+                <div className="text-xs font-medium text-[var(--color-ink)]/60 mb-2 px-2">
+                  {rightLabel || "Sonraki"}
+                </div>
+                <div className="bg-[var(--color-surface)]/30 rounded-xl p-3">{renderLines(rightContent)}</div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
