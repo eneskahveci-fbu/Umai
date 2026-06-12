@@ -13,13 +13,21 @@ export function getSupabaseClient(): SupabaseClient {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !anonKey) {
-    throw new Error(
-      "Supabase bağlantısı için NEXT_PUBLIC_SUPABASE_URL ve NEXT_PUBLIC_SUPABASE_ANON_KEY gerekli",
-    );
+    // Girişsiz / misafir mod: client yok
+    return null as unknown as SupabaseClient;
   }
 
   supabase = createBrowserClient(url, anonKey);
   return supabase;
+}
+
+// createClient alias — app/page.tsx uyumluluğu için
+export function createClient(): SupabaseClient | null {
+  try {
+    return getSupabaseClient();
+  } catch {
+    return null;
+  }
 }
 
 //─────── Chat share helpers ───────
