@@ -1,111 +1,92 @@
-import type { ChatMessage, ToolDef } from "@/lib/types";
+// src/lib/subagent.ts — Çoklu-ajan orkestrasyonu (Claude Code tarzı)
 
-interface SubagentOptions {
-  instruction: string;
-  repoFiles: { path: string; content: string }[];
-  tools?: ToolDef[];
-  baseUrl: string;
-  model: string;
+import type { SubAgentTask, SubAgentResult } from "./types";
+
+interface SubAgentContext {
+  modelId: string;
   apiKey: string;
-  provider?: string;
+  baseURL: string;
+  projectContext?: string;
+  platformKnowledge?: string;
 }
 
-interface SubagentResult {
-  title: string;
-  result: string;
-  error?: string;
+async function runSingleSubAgent(
+  task: SubAgentTask,
+  ctx: SubAgentContext,
+): Promise<SubAgentResult> {
+  const systemPrompt = `Sen bir alt-ajansın. Görevin: ${task.title}
+Yalnızca aşağıdaki talimatı yerine getir, başka şey yapma.
+Kod tabanını analiz et, dosyaları oku, sonucu kapsamlı ve yapılandırılmış olarak döndür.
+
+${ctx.platformKnowledge ?? ""}
+${ctx.projectContext ? `\n[Proje bağlamı]:\n${ctx.projectContext}` : ""}`;
+
+  const response = await fetch(`${ctx.baseURL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${ctx.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: ctx.modelId,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: task.instruction },
+      ],
+      max_tokens: 4096,
+      temperature: 0.3,
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    return { title: task.title, result: "", error: `API hatası: ${errText}` };
+  }
+
+  const json = (await response.json()) as {
+    choices: Array<{ message: { content: string } }>;
+  };
+  const content = json.choices?.[0]?.message?.content ?? "";
+
+  return { title: task.title, result: content };
 }
 
-/**
- * Salt-okunur bir alt-ajan çalıştırır.
- * Yalnızca repodaki dosyaları okuyabilir, değişiklik YAPAMAZ.
- * dispatch_agents() pattern'ini Claude Code tarzı uygular.
- */
-export async function runReadOnlyAgent(opts: SubagentOptions): Promise<SubagentResult> {
-  const { instruction, repoFiles, tools, baseUrl, model, apiKey, provider } = opts;
+// Paralel alt-ajanları çalıştır
+export async function dispatchSubAgents(
+  tasks: SubAgentTask[],
+  ctx: SubAgentContext,
+): Promise<SubAgentResult[]> {
+  if (tasks.length === 0) return [];
 
-  const fileList = repoFiles
-    .map((f) => `- ${f.path} (${f.content.length} karakter)`)
-    .join("\n");
+  const results = await Promise.allSettled(
+    tasks.map((task) => runSingleSubAgent(task, ctx)),
+  );
 
-  const systemPrompt = `Sen salt-okunur bir kod analiz alt-ajanısın. 
-Görevin: ${instruction}
-
-Kullanabileceğin repo dosyaları:
-${fileList || "(repo boş)"}
-
-YANITINI YALNIZCA düz metin olarak ver. Markdown formatında yazabilirsin.
-Dosyaları değiştiremezsin, commit yapamazsın, PR açamazsın. Yalnızca analiz yap.`;
-
-  const messages: { role: string; content: string }[] = [
-    { role: "system", content: systemPrompt },
-  ];
-
-  // Dosya içeriklerini context'e ekle (token limitine dikkat)
-  const MAX_FILE_CONTEXT = 40_000;
-  let totalChars = 0;
-  for (const file of repoFiles) {
-    if (totalChars > MAX_FILE_CONTEXT) break;
-    const snippet = file.content.slice(0, 10_000);
-    totalChars += snippet.length;
-    messages.push({
-      role: "user",
-      content: `Dosya: ${file.path}\n\`\`\`\n${snippet}\n\`\`\``,
-    });
-  }
-
-  messages.push({ role: "user", content: instruction });
-
-  // Tool definitions varsa ekle
-  const body: Record<string, unknown> = {
-    model,
-    messages,
-    stream: false,
-  };
-
-  if (tools && tools.length > 0) {
-    body.tools = tools;
-  }
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (provider === "anthropic") {
-    headers["anthropic-version"] = "2023-06-01";
-    headers["x-api-key"] = apiKey;
-  } else if (apiKey) {
-    headers["Authorization"] = `Bearer ${apiKey}`;
-  }
-
-  try {
-    const res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      return {
-        title: instruction.slice(0, 80),
-        result: "",
-        error: `${res.status}: ${errText.slice(0, 200)}`,
-      };
-    }
-
-    const data = await res.json();
-    const text: string = data.choices?.[0]?.message?.content?.trim() ?? "";
-
+  return results.map((r, i) => {
+    if (r.status === "fulfilled") return r.value;
     return {
-      title: instruction.slice(0, 80),
-      result: text,
-    };
-  } catch (e) {
-    return {
-      title: instruction.slice(0, 80),
+      title: tasks[i].title,
       result: "",
-      error: (e as Error).message,
+      error: r.reason?.message ?? "Bilinmeyen hata",
     };
+  });
+}
+
+// Sonuçları birleştirip özet üret
+export function mergeSubAgentResults(
+  results: SubAgentResult[],
+): string {
+  const parts: string[] = ["## Alt-ajan Sonuçları\n"];
+
+  for (const r of results) {
+    parts.push(`### ${r.title}`);
+    if (r.error) {
+      parts.push(`❌ Hata: ${r.error}`);
+    } else {
+      parts.push(r.result);
+    }
+    parts.push("");
   }
+
+  return parts.join("\n");
 }
