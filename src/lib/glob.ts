@@ -1,85 +1,47 @@
-/**
- * Basit glob desen eşleştirme (minimatch olmadan).
- * *, **, ? destekler.
- */
+// ── Glob deseniyle dosya yollarını filtreleme ──
 
 /**
- * Glob desenini regex'e çevirir.
- * *      → tek segmentte herhangi karakter (dosya adı)
- * **     → sıfır veya daha fazla dizin
- * ?      → tek karakter
- * [abc]  → karakter sınıfı
+ * Bir glob desenini regex'e çevirir.
+ * '*' → tek segment, '**' → çoklu segment, '?' → tek karakter.
  */
 function globToRegex(pattern: string): RegExp {
-  let regex = "";
+  let re = "";
   let i = 0;
-
   while (i < pattern.length) {
     const ch = pattern[i];
-    const next = pattern[i + 1];
-
-    if (ch === "*" && next === "*") {
-      // ** → herhangi dizin zinciri
-      regex += ".*";
-      i += 2;
-      // /**/ veya sondaki /**
-      if (pattern[i] === "/") {
-        regex += "/?";
+    if (ch === "*") {
+      if (pattern[i + 1] === "*") {
+        // ** : dizinler arası
+        re += ".*";
+        i += 2;
+        // opsiyonel '/'
+        if (pattern[i] === "/") {
+          re += "/?";
+          i++;
+        }
+      } else {
+        re += "[^/]*";
         i++;
       }
-    } else if (ch === "*") {
-      regex += "[^/]*";
-      i++;
     } else if (ch === "?") {
-      regex += "[^/]";
+      re += "[^/]";
       i++;
-    } else if (ch === ".") {
-      regex += "\\.";
-      i++;
-    } else if (ch === "/") {
-      regex += "/";
+    } else if (ch === "." || ch === "(" || ch === ")" || ch === "+" || ch === "^" || ch === "$" || ch === "|" || ch === "{" || ch === "}" || ch === "[" || ch === "]") {
+      re += "\\" + ch;
       i++;
     } else {
-      // Normal karakter
-      regex += ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      re += ch;
       i++;
     }
   }
-
-  return new RegExp(`^${regex}$`);
+  return new RegExp("^" + re + "$");
 }
 
 /**
- * Dosya yollarını glob desenine göre filtreler.
- * Birden çok desen verilebilir (virgül veya noktalı virgül ile ayrılmış).
+ * Glob desenine uyan dosya yollarını döndürür.
  */
 export function filterByGlob(paths: string[], pattern: string): string[] {
-  if (!pattern || pattern === "*" || pattern === "**") return paths;
-
-  const patterns = pattern
-    .split(/[,;]/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-
-  if (patterns.length === 0) return paths;
-
-  const regexes = patterns.map(globToRegex);
-
-  return paths.filter((path) => {
-    // Baştaki /'yi kaldır
-    const clean = path.startsWith("/") ? path.slice(1) : path;
-    return regexes.some((re) => re.test(clean));
-  });
-}
-
-/**
- * Glob deseni geçerli mi?
- */
-export function isValidGlob(pattern: string): boolean {
-  if (!pattern || typeof pattern !== "string") return false;
-  // Çok uzun desenleri reddet
-  if (pattern.length > 200) return false;
-  // Geçersiz karakterler
-  if (/[\0\n\r]/.test(pattern)) return false;
-  return true;
+  if (!pattern) return paths;
+  const re = globToRegex(pattern);
+  return paths.filter((p) => re.test(p));
 }
