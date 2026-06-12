@@ -43,6 +43,50 @@ export const CODER_TOOLS: ToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "read_files",
+      description: "Birden çok dosyayı TEK çağrıda okur (satır numaralı). Bağımsız dosyaları ayrı ayrı read_file ile çağırmak yerine bunu kullan — daha hızlı.",
+      parameters: {
+        type: "object",
+        properties: {
+          paths: { type: "array", description: "Okunacak dosya yolları dizisi (en çok 10)" },
+        },
+        required: ["paths"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "glob",
+      description: "Yıldızlı desenle dosya bulur. '*' tek segment, çift-yıldız dizinler arası, '?' tek karakter. Örn: 'src/**/*.tsx', '*.json'.",
+      parameters: {
+        type: "object",
+        properties: {
+          pattern: { type: "string", description: "Glob deseni. Örn: 'src/**/*.ts'" },
+        },
+        required: ["pattern"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "grep",
+      description: "REGEX ile dosya İÇERİKLERİnde arar; 'dosya:satır: eşleşen satır' döndürür. 'glob' ile kapsamı daralt (büyük repolarda gerekli).",
+      parameters: {
+        type: "object",
+        properties: {
+          pattern: { type: "string", description: "Aranacak regex. Örn: 'function\\s+\\w+', 'TODO'" },
+          glob: { type: "string", description: "Aramayı sınırlayan dosya deseni (opsiyonel). Örn: 'src/**/*.ts'" },
+          ignore_case: { type: "boolean", description: "Büyük/küçük harf duyarsız (opsiyonel)" },
+        },
+        required: ["pattern"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "search_files",
       description: "Dosya adlarında anahtar kelime arar (içerik değil, yol arar).",
       parameters: {
