@@ -85,8 +85,8 @@ interface StoreState {
 
   // Actions — Chats
   setChats: (chats: ChatSession[]) => void;
-  loadChats: () => Promise<void>;
-  newChat: () => string;
+  loadChats: (userId: string | null) => Promise<void>;
+  newChat: (incognito?: boolean) => string;
   setActiveChatId: (id: string | null) => void;
 
   // Actions — Skills & Models
