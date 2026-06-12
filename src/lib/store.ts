@@ -170,6 +170,10 @@ export const useStore = create<AppState>()(
             s.activeProjectId === id ? null : s.activeProjectId,
         })),
       setActiveProject: (id) => set({ activeProjectId: id }),
+
+      // UI state
+      settingsOpen: false,
+      setSettingsOpen: (open) => set({ settingsOpen: open }),
     }),
     {
       name: "craft-coder-store",
