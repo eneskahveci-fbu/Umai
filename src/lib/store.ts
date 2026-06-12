@@ -1,5 +1,12 @@
 import { create } from "zustand";
-import type { Config, ChatSession, ModelEntry, Skill, GitAccount, Project, MemoryItem, UserSettings } from "./types";
+import type { Config, ChatSession, ModelEntry, Skill, GitAccount, Project, MemoryItem, UserSettings, Artifact } from "./types";
+
+interface Toast {
+  id: string;
+  message: string;
+  type?: "info" | "success" | "error" | "warning";
+  duration?: number;
+}
 
 // ── Default Config ──
 
