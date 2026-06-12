@@ -97,7 +97,7 @@ export function SettingsModal({ open, onClose }: Props) {
     setShowNewModel(false);
   };
 
-  const handleTest = async (model: ModelConfig) => {
+  const handleTest = async (model: AIModel) => {
     setTesting(model.id);
     setTestResult((prev) => ({ ...prev, [model.id]: "" }));
     try {
