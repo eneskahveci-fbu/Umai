@@ -1,47 +1,51 @@
-// ── Glob deseniyle dosya yollarını filtreleme ──
-
 /**
- * Bir glob desenini regex'e çevirir.
- * '*' → tek segment, '**' → çoklu segment, '?' → tek karakter.
- */
-function globToRegex(pattern: string): RegExp {
-  let re = "";
-  let i = 0;
-  while (i < pattern.length) {
-    const ch = pattern[i];
-    if (ch === "*") {
-      if (pattern[i + 1] === "*") {
-        // ** : dizinler arası
-        re += ".*";
-        i += 2;
-        // opsiyonel '/'
-        if (pattern[i] === "/") {
-          re += "/?";
-          i++;
-        }
-      } else {
-        re += "[^/]*";
-        i++;
-      }
-    } else if (ch === "?") {
-      re += "[^/]";
-      i++;
-    } else if (ch === "." || ch === "(" || ch === ")" || ch === "+" || ch === "^" || ch === "$" || ch === "|" || ch === "{" || ch === "}" || ch === "[" || ch === "]") {
-      re += "\\" + ch;
-      i++;
-    } else {
-      re += ch;
-      i++;
-    }
-  }
-  return new RegExp("^" + re + "$");
-}
-
-/**
- * Glob desenine uyan dosya yollarını döndürür.
+ * Glob deseni ile dosya filtreleme.
+ * Desteklenen: * (tek segment), ** (dizinler arası), ? (tek karakter)
  */
 export function filterByGlob(paths: string[], pattern: string): string[] {
-  if (!pattern) return paths;
-  const re = globToRegex(pattern);
-  return paths.filter((p) => re.test(p));
+  const regex = globToRegex(pattern);
+  return paths.filter((p) => regex.test(p));
+}
+
+function globToRegex(pattern: string): RegExp {
+  let regexStr = "";
+  let i = 0;
+
+  while (i < pattern.length) {
+    const ch = pattern[i];
+
+    if (ch === "*") {
+      if (pattern[i + 1] === "*") {
+        // ** — dizinler arası
+        if (pattern[i + 2] === "/") {
+          regexStr += "(.*/)?";
+          i += 3;
+          continue;
+        }
+        regexStr += ".*";
+        i += 2;
+        continue;
+      }
+      // * — tek segment içinde
+      regexStr += "[^/]*";
+      i++;
+      continue;
+    }
+
+    if (ch === "?") {
+      regexStr += "[^/]";
+      i++;
+      continue;
+    }
+
+    // Özel regex karakterlerini escape et
+    if ("\\^$.[]{}()+|".includes(ch)) {
+      regexStr += "\\" + ch;
+    } else {
+      regexStr += ch;
+    }
+    i++;
+  }
+
+  return new RegExp(`^${regexStr}$`);
 }
