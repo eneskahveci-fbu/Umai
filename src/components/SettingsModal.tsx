@@ -115,8 +115,8 @@ export function SettingsModal() {
   const [accountRepos, setAccountRepos] = useState<string[]>([]);
   const [loadingAccountRepos, setLoadingAccountRepos] = useState(false);
   const [testing, setTesting] = useState(false);
-  /* Hızlı kurulum: ücretsiz güvenilir model ekle + test et */
-  const [quickProvider, setQuickProvider] = useState<"gemini" | "groq">("gemini");
+  /* Hızlı kurulum: herhangi bir sağlayıcı için anahtar ekle + test et */
+  const [quickProvider, setQuickProvider] = useState<Provider>("gemini");
   const [quickKey, setQuickKey] = useState("");
   const [quickBusy, setQuickBusy] = useState(false);
   const [quickResult, setQuickResult] = useState<null | "ok" | string>(null);
@@ -301,10 +301,24 @@ export function SettingsModal() {
     finally { setTesting(false); }
   };
 
-  const QUICK_KEY_URL: Record<"gemini" | "groq", string> = {
+  /* Anahtar alma sayfaları (bilinenler; olmayanlarda link gizlenir). */
+  const QUICK_KEY_URL: Partial<Record<Provider, string>> = {
     gemini: "https://aistudio.google.com/apikey",
     groq: "https://console.groq.com/keys",
+    deepseek: "https://platform.deepseek.com/api_keys",
+    openrouter: "https://openrouter.ai/keys",
+    anthropic: "https://console.anthropic.com/settings/keys",
+    mistral: "https://console.mistral.ai/api-keys",
+    cerebras: "https://cloud.cerebras.ai",
+    together: "https://api.together.xyz/settings/api-keys",
+    xai: "https://console.x.ai",
+    hf: "https://huggingface.co/settings/tokens",
   };
+  /* Hızlı kurulumda sunulan sağlayıcılar (anahtar gerektirenler; pollinations
+     anahtarsız çalışır, ollama yereldir, custom manuel → alttaki formdan eklenir). */
+  const QUICK_PROVIDERS: Provider[] = ["gemini", "groq", "deepseek", "openrouter", "anthropic", "mistral", "cerebras", "together", "xai", "hf"];
+  /* PRESET etiketinden kısa, temiz ad (emoji + parantez kırpılır). */
+  const cleanLabel = (p: Provider) => PRESETS[p].label.replace(/\s*\([^)]*\)\s*$/, "").replace(/^[^\p{L}]*/u, "").trim();
 
   /* Ücretsiz modeli ekle, aktif yap ve canlı test et. */
   const quickSetup = async () => {
@@ -314,7 +328,7 @@ export function SettingsModal() {
     const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `m_${Date.now()}`;
     const newModel = {
       id,
-      label: quickProvider === "gemini" ? "Google Gemini" : "Groq",
+      label: cleanLabel(quickProvider),
       provider: quickProvider as Provider,
       baseUrl: preset.baseUrl,
       model: preset.model,
@@ -424,36 +438,36 @@ export function SettingsModal() {
             {/* Hızlı kurulum: ücretsiz, güvenilir model */}
             <div className="mb-4 rounded-xl border border-brand/30 bg-brand/8 p-3.5">
               <div className="flex items-center gap-1.5 text-xs font-bold text-brand mb-1.5">
-                <Zap size={14} /> Hızlı kurulum — ücretsiz çalışan model
+                <Zap size={14} /> Hızlı kurulum — bir sağlayıcı seç, anahtarı yapıştır
               </div>
               <p className="text-[11px] text-muted leading-relaxed mb-2.5">
-                Varsayılan Pollinations modeli yoğun zamanlarda kesilebilir. 30 saniyede
-                ücretsiz ve güvenilir bir anahtar ekle. Anahtar yalnızca tarayıcında kalır.
+                Sağlayıcıyı seç, anahtarını yapıştır — base URL ve varsayılan model otomatik
+                ayarlanır, eklenip test edilir ve aktif olur. Anahtar yalnızca tarayıcında kalır.
               </p>
-              <div className="flex gap-1.5 mb-2.5">
-                {(["gemini", "groq"] as const).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => { setQuickProvider(p); setQuickResult(null); }}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${quickProvider === p ? "border-brand bg-brand/15 text-ink" : "border-line text-muted hover:text-ink"}`}
-                  >
-                    {p === "gemini" ? "✨ Gemini" : "⚡ Groq"}
-                  </button>
-                ))}
-              </div>
-              <a
-                href={QUICK_KEY_URL[quickProvider]}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-[11px] text-brand hover:text-branddim underline mb-2"
+              <select
+                value={quickProvider}
+                onChange={(e) => { setQuickProvider(e.target.value as Provider); setQuickResult(null); }}
+                className="input-mono w-full mb-2.5"
               >
-                Ücretsiz {quickProvider === "gemini" ? "Gemini" : "Groq"} anahtarı al <ExternalLink size={11} />
-              </a>
+                {QUICK_PROVIDERS.map((p) => (
+                  <option key={p} value={p}>{PRESETS[p].label}</option>
+                ))}
+              </select>
+              {QUICK_KEY_URL[quickProvider] && (
+                <a
+                  href={QUICK_KEY_URL[quickProvider]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] text-brand hover:text-branddim underline mb-2"
+                >
+                  {cleanLabel(quickProvider)} anahtarı al <ExternalLink size={11} />
+                </a>
+              )}
               <div className="flex gap-1.5">
                 <input
                   value={quickKey}
                   onChange={(e) => { setQuickKey(e.target.value); setQuickResult(null); }}
-                  placeholder={quickProvider === "gemini" ? "AIza..." : "gsk_..."}
+                  placeholder={PRESETS[quickProvider].keyHint}
                   className="input-mono flex-1"
                   onKeyDown={(e) => { if (e.key === "Enter" && !quickBusy) quickSetup(); }}
                 />
