@@ -256,20 +256,24 @@ export const useStore = create<StoreState>((set, get) => ({
     const chats = loadFromStorage<ChatSession[]>("craft-chats", []);
     set({ chats });
   },
-  newChat: () => {
+  newChat: (incognito = false) => {
     const id = generateId();
     const chat: ChatSession = {
       id,
-      title: "Yeni Sohbet",
+      title: incognito ? "Gizli Sohbet" : "Yeni Sohbet",
       messages: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    set((s) => {
-      const chats = [chat, ...s.chats];
-      saveToStorage("craft-chats", chats);
-      return { chats, activeChatId: id, incognito: false };
-    });
+    if (incognito) {
+      set({ activeChatId: id, incognito: true });
+    } else {
+      set((s) => {
+        const chats = [chat, ...s.chats];
+        saveToStorage("craft-chats", chats);
+        return { chats, activeChatId: id, incognito: false };
+      });
+    }
     return id;
   },
   setActiveChatId: (id) => set({ activeChatId: id }),
