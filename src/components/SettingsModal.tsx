@@ -296,7 +296,7 @@ export function SettingsModal() {
     setTesting(true);
     try {
       const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "Merhaba, 1+1=?" }], baseUrl: m.baseUrl, model: m.model, apiKey: m.apiKey, provider: m.provider }) });
-      addToast(res.ok ? "Bağlantı başarılı!" : `Hata: ${(await res.text()).slice(0, 80)}`, res.ok ? "success" : "error");
+      addToast(res.ok ? "Bağlantı başarılı!" : `Hata: ${(await res.text()).slice(0, 200)}`, res.ok ? "success" : "error");
     } catch (err) { addToast(`Hata: ${(err as Error).message}`, "error"); }
     finally { setTesting(false); }
   };
