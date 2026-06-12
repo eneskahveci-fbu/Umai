@@ -8,9 +8,7 @@ import {
   Sun,
   Moon,
   BookOpen,
-  GitCompareArrows,
   Search,
-  Code2,
   FileText,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -105,36 +103,6 @@ export function CommandPalette() {
         setOpen(false);
       },
       keywords: ["prompt", "kutuphane", "library", "sablon", "template", "snippet"],
-    },
-    {
-      id: "compare-mode",
-      label: "Karsilastirma modu",
-      icon: <GitCompareArrows size={16} />,
-      action: () => {
-        useStore.getState().setView("compare");
-        setOpen(false);
-      },
-      keywords: ["karsilastir", "compare", "model", "vs"],
-    },
-    {
-      id: "chat-view",
-      label: "Sohbet gorunumu",
-      icon: <MessageSquare size={16} />,
-      action: () => {
-        useStore.getState().setView("chat");
-        setOpen(false);
-      },
-      keywords: ["sohbet", "chat", "gorunum"],
-    },
-    {
-      id: "coder-view",
-      label: "Coder gorunumu",
-      icon: <Code2 size={16} />,
-      action: () => {
-        useStore.getState().setView("coder");
-        setOpen(false);
-      },
-      keywords: ["coder", "kod", "github", "gorunum"],
     },
   ];
 

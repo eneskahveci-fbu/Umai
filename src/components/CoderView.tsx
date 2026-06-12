@@ -21,7 +21,6 @@ import {
   MoreHorizontal,
   Image as ImageIcon,
   Loader2 as Loader2Icon,
-  Mic,
   Palette,
   PanelLeft,
   Paperclip,
@@ -419,7 +418,6 @@ export function CoderView() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [gitPanelOpen, setGitPanelOpen] = useState(false);
   const [loadingAll, setLoadingAll] = useState(false);
-  const [listening, setListening] = useState(false);
   const [prModalOpen, setPrModalOpen] = useState(false);
   const [prNumber, setPrNumber] = useState("");
   const [prLoading, setPrLoading] = useState(false);
@@ -809,6 +807,7 @@ export function CoderView() {
       } catch { /* ignore — continue without search */ }
     }
 
+    let full = ""; // try ve catch (iptal) ortak erişimi için dışta tanımlı
     try {
       const allEnabledSkills = (store.config.skills ?? []).filter((s) => s.enabled);
       /* Relevance scoring: compare skill text against the last user message.
@@ -957,7 +956,6 @@ export function CoderView() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let full = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -1081,7 +1079,10 @@ export function CoderView() {
       const tokenOut = estimateTokens(full);
       useStore.getState().updateLastTokens(tokenIn, tokenOut);
     } catch (err) {
-      if ((err as Error).name !== "AbortError") {
+      if ((err as Error).name === "AbortError") {
+        /* Kullanıcı durdurdu: hiç içerik gelmediyse boş asistan baloncuğunu kaldır. */
+        if (!full) useStore.getState().popLastMessage();
+      } else {
         useStore.getState().updateLastContent(`**Hata:** ${(err as Error).message}\n\n_Anahtar/model doğru mu? Ayarlardan kontrol et._`);
       }
     } finally {
@@ -1866,32 +1867,6 @@ export function CoderView() {
                       onClick={() => { setSlashQuery("/"); setSlashOpen((o) => !o); }}
                     />
                   </MoreMenu>
-
-                  {typeof window !== "undefined" && "webkitSpeechRecognition" in window && (
-                    <button
-                      onClick={() => {
-                        const SR = (window as typeof window & { webkitSpeechRecognition: new () => SpeechRecognition }).webkitSpeechRecognition;
-                        const recognition = new SR();
-                        recognition.lang = "tr-TR";
-                        recognition.continuous = false;
-                        recognition.interimResults = false;
-                        recognition.onresult = (e: SpeechRecognitionEvent) => {
-                          setInput((prev) => prev + (prev ? " " : "") + e.results[0][0].transcript);
-                          setListening(false);
-                        };
-                        recognition.onerror = () => setListening(false);
-                        recognition.onend = () => setListening(false);
-                        setListening(true);
-                        recognition.start();
-                      }}
-                      title="Sesle yaz"
-                      className={`flex items-center gap-1.5 text-[12px] px-2 py-1.5 rounded-lg transition-colors ${
-                        listening ? "text-red-400 bg-red-400/10 animate-pulse" : "text-muted hover:text-ink hover:bg-bgsoft"
-                      }`}
-                    >
-                      <Mic size={13} />
-                    </button>
-                  )}
                 </div>
 
                 <div className="flex items-center gap-1.5 text-[11px] text-muted/50 shrink-0">
