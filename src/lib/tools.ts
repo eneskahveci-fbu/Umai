@@ -181,6 +181,20 @@ export const CODER_TOOLS: ToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "dispatch_agents",
+      description: "Karmaşık bir görevi PARALEL alt-ajanlara böler (Claude'daki Task/subagent gibi). Her alt-ajan repoyu salt-okunur araçlarla BAĞIMSIZ inceler ve sonucunu döndürür; sen sonuçları birleştirip uygularsın. Yalnızca birbirinden bağımsız, aynı anda yapılabilen 2-4 alt görev için kullan (ör. farklı modülleri/konuları paralel araştırmak). Basit görevlerde KULLANMA — kendin oku.",
+      parameters: {
+        type: "object",
+        properties: {
+          tasks: { type: "array", description: "Alt görevler dizisi: [{title, instruction}] (2-4 adet, bağımsız)" },
+        },
+        required: ["tasks"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "update_plan",
       description: "Çok adımlı bir görev için canlı yapılacaklar listesini (plan) günceller; kullanıcı ilerlemeyi görür. Göreve başlarken tüm adımları yaz, her adım bitince listeyi yeniden gönder. Her satır bir adım: '[ ]' bekliyor, '[~]' devam ediyor, '[x]' tamamlandı. Örn: '[x] Dosyaları incele\\n[~] Bug'ı düzelt\\n[ ] Testi çalıştır'.",
       parameters: {

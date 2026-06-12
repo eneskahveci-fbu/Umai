@@ -1,6 +1,7 @@
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/constants";
 import { buildContextSections, type SkillLike } from "@/lib/prompt";
-import { READONLY_TOOLS, executeReadTool, type RepoReadCtx } from "@/lib/repoRead";
+import type { RepoReadCtx } from "@/lib/repoRead";
+import { runReadOnlyAgent } from "@/lib/subagent";
 import type { ChatMessage, MemoryItem, Provider, ResponseStyle } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -86,46 +87,6 @@ async function callModel(
   return data.choices?.[0]?.message?.content?.trim() ?? "";
 }
 
-/* Araçlı (salt-okunur) işçi çağrısı: model repoyu kendi okuyabilir. Bounded
-   tool-use döngüsü (en çok MAX_TOOL_ROUNDS tur). repoCtx yoksa düz callModel. */
-const MAX_TOOL_ROUNDS = 4;
-async function callModelWithReadTools(
-  cfg: Cfg,
-  messages: { role: string; content: string }[],
-  ctx: RepoReadCtx,
-  signal: AbortSignal,
-): Promise<string> {
-  type Msg = { role: string; content: string; tool_calls?: unknown[]; tool_call_id?: string };
-  const convo: Msg[] = [...messages];
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const body: Record<string, unknown> = {
-      model: cfg.model,
-      messages: convo,
-      stream: false,
-      tools: READONLY_TOOLS,
-      tool_choice: round === MAX_TOOL_ROUNDS - 1 ? "none" : "auto",
-    };
-    if (cfg.provider === "pollinations") body.referrer = "craft-coder";
-    const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
-      method: "POST", headers: cfg.headers, body: JSON.stringify(body), signal,
-    });
-    if (!res.ok) throw new Error(`Model hatası ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
-    const data = await res.json() as {
-      choices?: { message?: { content?: string; tool_calls?: { id: string; function: { name: string; arguments: string } }[] } }[];
-    };
-    const msg = data.choices?.[0]?.message;
-    const toolCalls = msg?.tool_calls ?? [];
-    if (toolCalls.length === 0) return msg?.content?.trim() ?? "";
-    convo.push({ role: "assistant", content: msg?.content ?? "", tool_calls: toolCalls });
-    for (const tc of toolCalls) {
-      let args: Record<string, unknown> = {};
-      try { args = JSON.parse(tc.function.arguments || "{}"); } catch { /* ignore */ }
-      const result = await executeReadTool(tc.function.name, args, ctx);
-      convo.push({ role: "tool", tool_call_id: tc.id, content: result });
-    }
-  }
-  return "(İşçi ajan tur sınırına ulaştı.)";
-}
 
 /* Akışlı model çağrısı → her delta'yı `send` ile istemciye yolla. */
 async function streamModel(
@@ -270,7 +231,7 @@ export async function POST(req: Request) {
               /* repoCtx varsa işçi salt-okunur araçlarla repoyu kendi gezer
                  (tam alt-ajan paritesi); yoksa düz çağrı. */
               const r = repoCtx
-                ? await callModelWithReadTools(cfg, wmsgs, repoCtx, signal)
+                ? await runReadOnlyAgent(cfg, wmsgs, repoCtx, signal)
                 : await callModel(cfg, wmsgs, signal);
               send(`✅ Ajan ${i + 1} tamam — ${t.title}\n`);
               return r;
