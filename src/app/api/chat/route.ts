@@ -1,6 +1,7 @@
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/constants";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { buildContextSections } from "@/lib/prompt";
+import { filterByGlob } from "@/lib/glob";
 import { pruneMessages } from "@/lib/contextWindow";
 import { detectFrameworks, extractDeps, parseGitignore } from "@/lib/projectContext";
 import { CODER_TOOLS } from "@/lib/tools";
@@ -93,36 +94,94 @@ function encodeGlProject(owner: string, repo: string) {
   return encodeURIComponent(`${owner}/${repo}`);
 }
 
-async function execListFiles(ctx: RepoCtx, args: { filter?: string }): Promise<string> {
-  const filter = args.filter?.toLowerCase();
+/* Repo'daki tüm dosya yollarını döndürür (glob/grep/list_files ortak kullanır). */
+async function getAllPaths(ctx: RepoCtx): Promise<string[]> {
   if (ctx.provider === "gitlab") {
     const proj = encodeGlProject(ctx.owner, ctx.repo);
     const res = await fetch(
       `https://gitlab.com/api/v4/projects/${proj}/repository/tree?recursive=true&ref=${encodeURIComponent(ctx.branch)}&per_page=100`,
       { headers: glHeaders(ctx.token) },
     );
-    if (!res.ok) return `Hata: ${res.status} ${await res.text()}`;
-    const data = await res.json();
-    const items = (data as { path: string; type: string }[])
-      .filter((t) => t.type === "blob")
-      .map((t) => t.path)
-      .filter((p) => !filter || p.toLowerCase().includes(filter));
-    return items.slice(0, 200).join("\n") || "(eşleşen dosya yok)";
+    if (!res.ok) throw new Error(`${res.status} ${(await res.text().catch(() => "")).slice(0, 120)}`);
+    const data = await res.json() as { path: string; type: string }[];
+    return data.filter((t) => t.type === "blob").map((t) => t.path);
   }
   const res = await fetch(
     `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/trees/${ctx.branch}?recursive=1`,
     { headers: ghHeaders(ctx.token) },
   );
-  if (!res.ok) return `Hata: ${res.status} ${await res.text()}`;
-  const data = await res.json();
-  const items = (data.tree as { path: string; type: string }[])
-    .filter((t) => t.type === "blob")
-    .map((t) => t.path)
-    .filter((p) => !filter || p.toLowerCase().includes(filter));
+  if (!res.ok) throw new Error(`${res.status} ${(await res.text().catch(() => "")).slice(0, 120)}`);
+  const data = await res.json() as { tree?: { path: string; type: string }[] };
+  return (data.tree ?? []).filter((t) => t.type === "blob").map((t) => t.path);
+}
+
+async function execListFiles(ctx: RepoCtx, args: { filter?: string }): Promise<string> {
+  let items: string[];
+  try { items = await getAllPaths(ctx); } catch (e) { return `Hata: ${(e as Error).message}`; }
+  const filter = args.filter?.toLowerCase();
+  if (filter) items = items.filter((p) => p.toLowerCase().includes(filter));
   if (items.length > 200) {
     return items.slice(0, 200).join("\n") + `\n\n[${items.length - 200} dosya daha gizlendi — filtre kullan]`;
   }
   return items.join("\n") || "(eşleşen dosya yok)";
+}
+
+/* glob: '**' dahil yıldızlı desenle dosya bul. */
+async function execGlob(ctx: RepoCtx, args: { pattern: string }): Promise<string> {
+  if (!args.pattern) return "Hata: pattern zorunlu";
+  let items: string[];
+  try { items = await getAllPaths(ctx); } catch (e) { return `Hata: ${(e as Error).message}`; }
+  const matched = filterByGlob(items, args.pattern);
+  if (matched.length === 0) return "(eşleşen dosya yok)";
+  if (matched.length > 200) return matched.slice(0, 200).join("\n") + `\n\n[${matched.length - 200} daha]`;
+  return matched.join("\n");
+}
+
+/* grep: regex ile dosya içeriklerinde ara → dosya:satır eşleşmeleri. */
+async function execGrep(ctx: RepoCtx, args: { pattern: string; glob?: string; ignore_case?: boolean | string }, cache?: Map<string, string>): Promise<string> {
+  if (!args.pattern) return "Hata: pattern zorunlu";
+  let re: RegExp;
+  try { re = new RegExp(args.pattern, (args.ignore_case === true || args.ignore_case === "true") ? "i" : ""); }
+  catch (e) { return `Hata: geçersiz regex: ${(e as Error).message}`; }
+  let paths: string[];
+  try { paths = await getAllPaths(ctx); } catch (e) { return `Hata: ${(e as Error).message}`; }
+  if (args.glob) paths = filterByGlob(paths, args.glob);
+  const MAX_FILES = 60;
+  const capped = paths.slice(0, MAX_FILES);
+  const out: string[] = [];
+  let matches = 0;
+  for (const p of capped) {
+    const r = await getFileRaw(ctx, p, cache);
+    if (!r.ok) continue;
+    const lines = r.content.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      if (re.test(lines[i])) {
+        out.push(`${p}:${i + 1}: ${lines[i].trim().slice(0, 200)}`);
+        if (++matches >= 100) break;
+      }
+    }
+    if (matches >= 100) break;
+  }
+  let res = out.join("\n") || "(eşleşme yok)";
+  if (paths.length > MAX_FILES) res += `\n\n[Not: ${paths.length} dosyadan ilk ${MAX_FILES}'i tarandı — 'glob' ile daralt]`;
+  return res;
+}
+
+/* read_files: birden çok dosyayı tek çağrıda, satır numaralı oku. */
+async function execReadFiles(ctx: RepoCtx, args: { paths: string[] | string }, cache?: Map<string, string>): Promise<string> {
+  let paths: string[] = Array.isArray(args.paths)
+    ? args.paths
+    : typeof args.paths === "string" ? args.paths.split(/[,\n]/).map((s) => s.trim()).filter(Boolean) : [];
+  if (paths.length === 0) return "Hata: paths zorunlu (dizi veya virgülle ayrılmış yollar)";
+  paths = paths.slice(0, 10);
+  const parts: string[] = [];
+  for (const p of paths) {
+    const r = await getFileRaw(ctx, p, cache);
+    if (!r.ok) { parts.push(`### ${p}\n${r.error}`); continue; }
+    const numbered = r.content.split("\n").map((l, i) => `${i + 1}\t${l}`).join("\n").slice(0, 8000);
+    parts.push(`### ${p}\n${numbered}`);
+  }
+  return parts.join("\n\n");
 }
 
 /* Bir dosyanın TAM ham içeriğini getirir (kırpma yok). read_file ve str_replace
@@ -473,9 +532,12 @@ async function executeTool(
   cache?: Map<string, string>,
 ): Promise<string> {
   try {
-    if (!ctx && ["list_files","read_file","search_files","search_code","write_file","str_replace","list_branches","create_branch","create_pr","get_commit_history"].includes(name))
+    if (!ctx && ["list_files","read_file","read_files","glob","grep","search_files","search_code","write_file","str_replace","list_branches","create_branch","create_pr","get_commit_history"].includes(name))
       return "Hata: repo bağlı değil. Kullanıcıya bir repo bağlamasını söyle.";
     if (name === "list_files") return await execListFiles(ctx!, args as { filter?: string });
+    if (name === "glob") return await execGlob(ctx!, args as { pattern: string });
+    if (name === "grep") return await execGrep(ctx!, args as { pattern: string; glob?: string; ignore_case?: boolean | string }, cache);
+    if (name === "read_files") return await execReadFiles(ctx!, args as { paths: string[] | string }, cache);
     if (name === "read_file") return await execReadFile(ctx!, args as { path: string }, cache);
     if (name === "search_files") return await execSearchFiles(ctx!, args as { query: string });
     if (name === "search_code") return await execSearchCode(ctx!, args as { query: string; extension?: string });
@@ -710,8 +772,11 @@ export async function POST(req: Request) {
       `Mevcut araçlar:\n` +
       `• list_files(filter?) — repo dosya ağacını listele\n` +
       `• read_file(path) — dosya içeriğini oku (SATIR NUMARALARIYLA döner)\n` +
+      `• read_files(paths[]) — birden çok dosyayı TEK çağrıda oku\n` +
+      `• glob(pattern) — yıldızlı desenle dosya bul (ör. src/**/*.tsx)\n` +
+      `• grep(pattern, glob?, ignore_case?) — regex ile içerik ara (dosya:satır)\n` +
       `• search_files(query) — dosya yolunda arama\n` +
-      `• search_code(query, extension?) — dosya İÇERİĞİNDE arama\n` +
+      `• search_code(query, extension?) — dosya İÇERİĞİNDE arama (basit)\n` +
       `• str_replace(path, old_string, new_string, commit_message?) — HEDEFLİ düzenleme (tercih et)\n` +
       `• write_file(path, content, commit_message) — YENİ dosya veya tam değişim\n` +
       `• delete_file(path, reason?) — dosya silmeyi ÖNERİR (kullanıcı onaylar)\n` +
