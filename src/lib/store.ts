@@ -81,7 +81,7 @@ interface StoreState {
 
   // Actions — Config
   setConfig: (partial: Partial<Config>) => void;
-  syncConfig: (c: Config) => void;
+  syncConfig: (userId: string) => Promise<void>;
 
   // Actions — Chats
   setChats: (chats: ChatSession[]) => void;
