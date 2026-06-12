@@ -221,8 +221,38 @@ export const useStore = create<StoreState>((set, get) => ({
 
   // ── Chats ──
   setChats: (chats) => set({ chats }),
-  loadChats: async () => {
-    // Tarayıcıda localStorage'dan yükle
+  loadChats: async (userId) => {
+    if (userId) {
+      // Giriş yapmış kullanıcı — Supabase'den yükle
+      try {
+        const { createClient } = await import("@/lib/supabase/client");
+        const sb = createClient();
+        if (!sb) return;
+        const { data, error } = await sb
+          .from("chats")
+          .select("*")
+          .eq("user_id", userId)
+          .order("updated_at", { ascending: false });
+        if (!error && data) {
+          const chats = (data as Array<Record<string, unknown>>).map((r) => ({
+            id: r.id as string,
+            title: r.title as string,
+            messages: (r.messages as ChatSession["messages"]) ?? [],
+            createdAt: new Date(r.created_at as string).getTime(),
+            updatedAt: new Date(r.updated_at as string).getTime(),
+            modelId: r.model_id as string | undefined,
+            provider: r.provider as ChatSession["provider"],
+            archived: r.archived as boolean | undefined,
+          }));
+          set({ chats });
+          saveToStorage("craft-chats", chats);
+          return;
+        }
+      } catch {
+        // fallback → localStorage
+      }
+    }
+    // localStorage'dan yükle
     const chats = loadFromStorage<ChatSession[]>("craft-chats", []);
     set({ chats });
   },
