@@ -410,7 +410,7 @@ export function CoderView() {
   const [editorFile, setEditorFile] = useState<EditorFile | null>(null);
   const [pendingCommit, setPendingCommit] = useState<EditorFile[] | null>(null);
   /* Ajanın bu turda yazdığı dosyaların ESKİ içeriği — "Geri al" için. */
-  const [checkpoints, setCheckpoints] = useState<{ path: string; previous: string }[]>([]);
+  const [checkpoints, setCheckpoints] = useState<{ path: string; previous: string | null }[]>([]);
   const [undoing, setUndoing] = useState(false);
   /* Ajanın önerdiği YIKICI işlemler (sil/yeniden adlandır) — onay bekler. */
   const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
@@ -440,6 +440,15 @@ export function CoderView() {
   const messages = current?.messages ?? [];
   const activeRepoStr = config.activeRepo || "";
   const repoIsGitLab = isGitLabRepo(activeRepoStr);
+
+  /* Sohbet değişince / sayfa yenilenince: son asistan mesajına kalıcı yazılmış
+     geri-al noktalarını yerel duruma geri yükle (Geri Al kaybolmasın). */
+  useEffect(() => {
+    const msgs = useStore.getState().current()?.messages ?? [];
+    const last = msgs[msgs.length - 1];
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCheckpoints(last?.role === "assistant" && last.checkpoints?.length ? last.checkpoints : []);
+  }, [currentId]);
 
   useEffect(() => {
     if (pendingInput) {
@@ -623,28 +632,28 @@ export function CoderView() {
   }, [attachedFiles, tree]);
 
   /* Geri al: ajanın bu turda değiştirdiği dosyaları eski içerikleriyle yeniden
-     commit eder (revert). EditorPanel/MultiCommitBar ile aynı yazma uçları. */
+     commit eder (revert); bu turda OLUŞTURULAN dosyaları (previous === null)
+     siler. EditorPanel/MultiCommitBar ile aynı yazma/silme uçları. */
   const undoCheckpoints = async () => {
     if (!repo || checkpoints.length === 0) return;
     setUndoing(true);
     const store = useStore.getState();
     try {
+      const token = repoIsGitLab ? store.activeGitlab()?.token : store.activeGithub()?.token;
+      const idField = repoIsGitLab ? { namespace: repo.owner } : { owner: repo.owner };
+      const base = { ...idField, repo: repo.repo, branch: repo.branch, token };
       for (const cp of checkpoints) {
-        const endpoint = repoIsGitLab ? "/api/gitlab/write" : "/api/github/write";
-        const token = repoIsGitLab ? store.activeGitlab()?.token : store.activeGithub()?.token;
-        const idField = repoIsGitLab ? { namespace: repo.owner } : { owner: repo.owner };
+        const isCreated = cp.previous === null;
+        const endpoint = repoIsGitLab
+          ? (isCreated ? "/api/gitlab/delete" : "/api/gitlab/write")
+          : (isCreated ? "/api/github/delete" : "/api/github/write");
+        const body = isCreated
+          ? { ...base, path: cp.path, message: `revert: remove ${cp.path}` }
+          : { ...base, path: cp.path, content: cp.previous, message: `revert: ${cp.path}` };
         const res = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...idField,
-            repo: repo.repo,
-            branch: repo.branch,
-            path: cp.path,
-            content: cp.previous,
-            message: `revert: ${cp.path}`,
-            token,
-          }),
+          body: JSON.stringify(body),
         });
         if (!res.ok) {
           const { error } = await res.json().catch(() => ({ error: `Hata ${res.status}` }));
@@ -653,6 +662,8 @@ export function CoderView() {
       }
       addToast(`↩ ${checkpoints.length} dosya eski haline döndürüldü`, "success");
       setCheckpoints([]);
+      store.setCheckpointsOnLast([]);
+      void store.persistCurrent();
     } catch (e) {
       addToast(`Geri alınamadı: ${(e as Error).message}`, "error");
     } finally {
@@ -787,6 +798,7 @@ export function CoderView() {
     store.pushMessage({ role: "assistant", content: "" });
     store.setStreaming(true);
     setCheckpoints([]); // yeni tur — önceki turun geri-al noktalarını sıfırla
+    const turnCheckpoints: { path: string; previous: string | null }[] = []; // mesaja kalıcı kopya
     setPendingActions([]); // ve bekleyen yıkıcı işlem önerilerini
     store.setFollowUpSuggestions([]);
     coderAbort = new AbortController();
@@ -1013,13 +1025,17 @@ export function CoderView() {
               useStore.getState().setPlanOnLast(String(parsed.plan_event.plan ?? ""));
               continue;
             }
-            /* checkpoint: ajan bir dosyayı değiştirdi → eski içeriği sakla (geri al) */
+            /* checkpoint: ajan bir dosyayı değiştirdi → eski içeriği sakla (geri al).
+               previous === null ⇒ dosya bu turda oluşturuldu (geri al = sil). */
             if (parsed.checkpoint_event) {
               const { path, previous } = parsed.checkpoint_event;
-              if (typeof path === "string" && typeof previous === "string") {
+              if (typeof path === "string" && (typeof previous === "string" || previous === null)) {
                 setCheckpoints((prev) =>
                   prev.some((c) => c.path === path) ? prev : [...prev, { path, previous }],
                 );
+                if (!turnCheckpoints.some((c) => c.path === path)) {
+                  turnCheckpoints.push({ path, previous });
+                }
               }
               continue;
             }
@@ -1102,6 +1118,9 @@ export function CoderView() {
       const tokenIn = estimateTokens(inputText) + estimateTokens(coderSystemPrompt);
       const tokenOut = estimateTokens(full);
       useStore.getState().updateLastTokens(tokenIn, tokenOut);
+      /* geri-al noktalarını mesaja yaz → persistCurrent ile sohbetle kaydedilir,
+         sayfa yenilense bile son turun "Geri Al" imkânı kaybolmaz */
+      if (turnCheckpoints.length) useStore.getState().setCheckpointsOnLast(turnCheckpoints);
     } catch (err) {
       if ((err as Error).name === "AbortError") {
         /* Kullanıcı durdurdu: hiç içerik gelmediyse boş asistan baloncuğunu kaldır. */
@@ -1578,7 +1597,11 @@ export function CoderView() {
                             {undoing ? "Geri alınıyor…" : "Geri Al"}
                           </button>
                           <button
-                            onClick={() => setCheckpoints([])}
+                            onClick={() => {
+                              setCheckpoints([]);
+                              useStore.getState().setCheckpointsOnLast([]);
+                              void useStore.getState().persistCurrent();
+                            }}
                             className="text-muted/50 hover:text-ink p-1 rounded transition-colors shrink-0"
                             title="Kapat"
                           >

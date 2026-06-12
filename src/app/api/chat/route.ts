@@ -1034,11 +1034,14 @@ export async function POST(req: Request) {
             return;
           }
           /* Checkpoint: yazma öncesi eski içeriği yakala (geri al için).
-             getFileRaw readCache'i ısıtır → str_replace tekrar çekmez. */
-          let prevContent: string | undefined;
+             getFileRaw readCache'i ısıtır → str_replace tekrar çekmez.
+             Dosya yoksa ve write_file ile OLUŞTURULUYORSA previous: null
+             gönderilir → istemcide geri al = dosyayı sil. */
+          let prevContent: string | null | undefined;
           if ((tc.name === "write_file" || tc.name === "str_replace") && repoCtx && typeof args.path === "string") {
             const old = await getFileRaw(repoCtx, args.path, readCache);
             if (old.ok) prevContent = old.content;
+            else if (tc.name === "write_file") prevContent = null;
           }
           const result = await executeTool(tc.name, args, repoCtx, activeMcpServers, readCache);
           if (prevContent !== undefined && result.startsWith("✅") && typeof args.path === "string") {

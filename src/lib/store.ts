@@ -4,6 +4,7 @@ import type {
   Chat,
   ChatMessage,
   Config,
+  FileCheckpoint,
   GitHubAccount,
   GitLabAccount,
   McpServer,
@@ -318,6 +319,7 @@ interface StoreState {
   updateLastContent: (content: string) => void;
   updateLastThinking: (thinking: string) => void;
   setPlanOnLast: (plan: string) => void;
+  setCheckpointsOnLast: (checkpoints: FileCheckpoint[]) => void;
   updateLastTokens: (tokenIn: number, tokenOut: number) => void;
   setLastAgentId: (agentId: string | undefined) => void;
   popLastMessage: () => void;
@@ -805,6 +807,17 @@ export const useStore = create<StoreState>()((set, get) => ({
         const messages = c.messages.slice();
         if (messages.length) {
           messages[messages.length - 1] = { ...messages[messages.length - 1], plan };
+        }
+        return { ...c, messages };
+      }),
+    })),
+  setCheckpointsOnLast: (checkpoints) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const messages = c.messages.slice();
+        if (messages.length) {
+          messages[messages.length - 1] = { ...messages[messages.length - 1], checkpoints };
         }
         return { ...c, messages };
       }),
