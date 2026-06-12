@@ -1,59 +1,108 @@
+// src/lib/projectContext.ts — Proje bağlamı çıkarma (SOUL.md, .rules, package.json)
+
 /**
- * Proje bağlamı tespiti: framework'leri, bağımlılıkları ve .gitignore kalıplarını çıkarır.
+ * Bir repodaki proje profilini çıkar.
+ * Algılanan teknolojileri, .gitignore kalıplarını,
+ * Next.js agent kurallarını derler.
  */
-
-interface ProjectInfo {
-  frameworks: string[];
-  deps: Record<string, string>;
+export interface ProjectProfile {
+  technologies: string[];
   gitignorePatterns: string[];
+  hasNextJsAgentRules: boolean;
+  soulMd: string;
+  workspaceRules: string;
 }
 
-export function detectFrameworks(deps: Record<string, string>): string[] {
-  const frameworks: string[] = [];
+const TECH_INDICATORS: Record<string, string[]> = {
+  nextjs: ["next.config.", "next-env.d.ts", "app/layout.tsx", "app/page.tsx"],
+  react: ["react", "react-dom"],
+  tailwind: ["tailwind.config", "postcss.config", "@tailwindcss"],
+  vitest: ["vitest.config", "vitest"],
+  typescript: ["tsconfig.json", "typescript"],
+  prisma: ["prisma/schema.prisma", "@prisma/client"],
+  trpc: ["@trpc"],
+  zustand: ["zustand"],
+};
 
-  const depNames = Object.keys(deps);
+export function detectTechnologies(files: string[], packageJson?: Record<string, unknown>): string[] {
+  const techs = new Set<string>();
 
-  if (depNames.some((d) => d === "next" || d === "@next")) frameworks.push("Next.js");
-  if (depNames.some((d) => d === "react")) frameworks.push("React");
-  if (depNames.some((d) => d === "vue")) frameworks.push("Vue");
-  if (depNames.some((d) => d === "svelte") || depNames.some((d) => d === "@sveltejs")) frameworks.push("Svelte");
-  if (depNames.some((d) => d === "astro")) frameworks.push("Astro");
-  if (depNames.some((d) => d === "tailwindcss")) frameworks.push("Tailwind CSS");
-  if (depNames.some((d) => d === "typescript" || d === "tsx" || d === "ts-node")) frameworks.push("TypeScript");
-  if (depNames.some((d) => d === "vitest")) frameworks.push("Vitest");
-  if (depNames.some((d) => d === "jest")) frameworks.push("Jest");
-  if (depNames.some((d) => d === "prisma")) frameworks.push("Prisma");
-  if (depNames.some((d) => d === "drizzle-orm")) frameworks.push("Drizzle");
-  if (depNames.some((d) => d === "express")) frameworks.push("Express");
-  if (depNames.some((d) => d === "fastify")) frameworks.push("Fastify");
-  if (depNames.some((d) => d === "nestjs" || d === "@nestjs")) frameworks.push("NestJS");
-
-  return frameworks;
-}
-
-export function extractDeps(
-  packageJsonContent: string,
-): Record<string, string> {
-  try {
-    const pkg = JSON.parse(packageJsonContent);
-    const deps: Record<string, string> = {};
-
-    for (const [name, version] of Object.entries(pkg.dependencies ?? {})) {
-      if (typeof version === "string") deps[name] = version;
+  // Dosya isimlerinden tespit
+  for (const file of files) {
+    for (const [tech, indicators] of Object.entries(TECH_INDICATORS)) {
+      if (indicators.some((ind) => file.includes(ind))) {
+        techs.add(tech);
+      }
     }
-    for (const [name, version] of Object.entries(pkg.devDependencies ?? {})) {
-      if (typeof version === "string") deps[name] = version;
-    }
-
-    return deps;
-  } catch {
-    return {};
   }
+
+  // package.json'dan tespit
+  if (packageJson) {
+    const deps = {
+      ...((packageJson.dependencies as Record<string, string>) ?? {}),
+      ...((packageJson.devDependencies as Record<string, string>) ?? {}),
+    };
+    for (const dep of Object.keys(deps)) {
+      for (const [tech, indicators] of Object.entries(TECH_INDICATORS)) {
+        if (indicators.includes(dep)) {
+          techs.add(tech);
+        }
+      }
+    }
+    if (deps["typescript"]) techs.add("typescript");
+  }
+
+  return [...techs];
 }
+
+const DEFAULT_GITIGNORE = [
+  "/node_modules",
+  "/.next/",
+  "/out/",
+  "/build",
+  ".DS_Store",
+  "*.pem",
+  ".env*",
+  "!.env.example",
+  ".vercel",
+  "*.tsbuildinfo",
+  "next-env.d.ts",
+];
 
 export function parseGitignore(content: string): string[] {
   return content
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith("#"));
+}
+
+export function buildProjectContext(profile: ProjectProfile): string {
+  const parts: string[] = [];
+
+  parts.push("[Proje profili]");
+  parts.push(
+    `• Algılanan teknolojiler: ${profile.technologies.join(", ")} — bu ekosistemin en iyi pratiklerini uygula.`,
+  );
+
+  if (profile.gitignorePatterns.length > 0) {
+    parts.push(
+      `• .gitignore kalıpları (bunlara dokunma/oluşturma): ${profile.gitignorePatterns.join(", ")}`,
+    );
+  }
+
+  if (profile.hasNextJsAgentRules) {
+    parts.push(
+      "[Ajan modu — Next.js agent kuralları geçerli]",
+    );
+  }
+
+  if (profile.soulMd) {
+    parts.push(`[SOUL.md]:\n${profile.soulMd}`);
+  }
+
+  return parts.join("\n");
+}
+
+export function getDefaultGitignorePatterns(): string[] {
+  return [...DEFAULT_GITIGNORE];
 }
