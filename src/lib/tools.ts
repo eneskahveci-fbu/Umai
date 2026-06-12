@@ -1,12 +1,6 @@
-// ── Coder modu araç tanımları (function calling) ──
+import type { ToolDef } from "@/lib/types";
 
-import type { ToolDefinition } from "./types";
-
-/**
- * Coder modunda kullanılan araç seti.
- * Bunlar repo içinde salt-okunur işlemler + yazma işlemleri.
- */
-export const CODER_TOOLS: ToolDefinition[] = [
+export const CODER_TOOLS: ToolDef[] = [
   {
     type: "function",
     function: {
@@ -28,7 +22,8 @@ export const CODER_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "read_file",
-      description: "Bağlı repodan bir dosyanın içeriğini okur. İçerik SATIR NUMARALARIYLA döner.",
+      description:
+        "Bağlı repodan bir dosyanın içeriğini okur. İçerik SATIR NUMARALARIYLA döner (referans için).",
       parameters: {
         type: "object",
         properties: {
@@ -45,14 +40,14 @@ export const CODER_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "read_files",
-      description: "Birden çok dosyayı TEK çağrıda okur (satır numaralı).",
+      description:
+        "Birden çok dosyayı TEK çağrıda okur (satır numaralı). Bağımsız dosyaları ayrı ayrı read_file ile çağırmak yerine bunu kullan — daha hızlı.",
       parameters: {
         type: "object",
         properties: {
           paths: {
             type: "array",
             description: "Okunacak dosya yolları dizisi (en çok 10)",
-            items: { type: "string" },
           },
         },
         required: ["paths"],
@@ -63,7 +58,7 @@ export const CODER_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "glob",
-      description: "Yıldızlı desenle dosya bulur. '*' tek segment, çift-yıldız dizinler arası.",
+      description: "Yıldızlı desenle dosya bulur. '*' tek segment, çift-yıldız dizinler arası, '?' tek karakter.",
       parameters: {
         type: "object",
         properties: {
@@ -80,13 +75,14 @@ export const CODER_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "grep",
-      description: "REGEX ile dosya İÇERİKLERİnde arar; 'dosya:satır: eşleşen satır' döndürür.",
+      description:
+        "REGEX ile dosya İÇERİKLERİnde arar; 'dosya:satır: eşleşen satır' döndürür. 'glob' ile kapsamı daralt.",
       parameters: {
         type: "object",
         properties: {
           pattern: {
             type: "string",
-            description: "Aranacak regex. Örn: 'function\\\\s+\\\\w+', 'TODO'",
+            description: "Aranacak regex. Örn: 'function\\s+\\w+', 'TODO'",
           },
           glob: {
             type: "string",
@@ -122,7 +118,8 @@ export const CODER_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "search_code",
-      description: "Dosya İÇERİKLERİNDE kod veya metin arar.",
+      description:
+        "Dosya İÇERİKLERİNDE kod veya metin arar. Belirli bir fonksiyon, değişken veya pattern aramak için kullan.",
       parameters: {
         type: "object",
         properties: {
@@ -143,7 +140,8 @@ export const CODER_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "write_file",
-      description: "YENİ dosya oluşturur veya bir dosyayı TAMAMEN değiştirir.",
+      description:
+        "YENİ dosya oluşturur veya bir dosyayı TAMAMEN değiştirir (tüm içerik). Var olan bir dosyada KÜÇÜK değişiklik yapacaksan write_file yerine str_replace kullan — daha hızlı ve ucuz.",
       parameters: {
         type: "object",
         properties: {
@@ -168,7 +166,8 @@ export const CODER_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "str_replace",
-      description: "Var olan bir dosyada HEDEFLİ düzenleme: old_string'i new_string ile değiştirir.",
+      description:
+        "Var olan bir dosyada HEDEFLİ düzenleme: old_string'i new_string ile değiştirir. old_string dosyada BENZERSİZ ve birebir eşleşmeli.",
       parameters: {
         type: "object",
         properties: {
@@ -178,7 +177,8 @@ export const CODER_TOOLS: ToolDefinition[] = [
           },
           old_string: {
             type: "string",
-            description: "Değiştirilecek MEVCUT metin — ham kod, girinti dahil birebir",
+            description:
+              "Değiştirilecek MEVCUT metin — ham kod (satır numarası OLMADAN), girinti dahil birebir",
           },
           new_string: {
             type: "string",
@@ -190,7 +190,8 @@ export const CODER_TOOLS: ToolDefinition[] = [
           },
           replace_all: {
             type: "boolean",
-            description: "true ise tüm eşleşmeleri değiştirir (opsiyonel)",
+            description:
+              "true ise tüm eşleşmeleri değiştirir (opsiyonel, varsayılan false)",
           },
         },
         required: ["path", "old_string", "new_string"],
@@ -201,7 +202,8 @@ export const CODER_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "delete_file",
-      description: "Bir dosyanın SİLİNMESİNİ ÖNERİR. Doğrudan silmez — kullanıcıya onay olarak sunulur.",
+      description:
+        "Bir dosyanın SİLİNMESİNİ ÖNERİR. Doğrudan silmez — kullanıcıya onay olarak sunulur. Yıkıcı işlem olduğu için yalnızca gerçekten gerektiğinde kullan.",
       parameters: {
         type: "object",
         properties: {
@@ -211,7 +213,8 @@ export const CODER_TOOLS: ToolDefinition[] = [
           },
           reason: {
             type: "string",
-            description: "Neden silinmeli",
+            description:
+              "Neden silinmeli (kullanıcının onay ekranında görünür)",
           },
         },
         required: ["path"],
@@ -222,7 +225,8 @@ export const CODER_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "rename_file",
-      description: "Bir dosyanın YENİDEN ADLANDIRILMASINI/TAŞINMASINI ÖNERİR.",
+      description:
+        "Bir dosyanın YENİDEN ADLANDIRILMASINI/TAŞINMASINI ÖNERİR. Doğrudan yapmaz — kullanıcı onayına sunulur.",
       parameters: {
         type: "object",
         properties: {
@@ -236,7 +240,7 @@ export const CODER_TOOLS: ToolDefinition[] = [
           },
           reason: {
             type: "string",
-            description: "Neden (opsiyonel)",
+            description: "Neden (opsiyonel, onay ekranında görünür)",
           },
         },
         required: ["path", "new_path"],
@@ -247,21 +251,15 @@ export const CODER_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "dispatch_agents",
-      description: "Karmaşık bir görevi PARALEL alt-ajanlara böler.",
+      description:
+        "Karmaşık bir görevi PARALEL alt-ajanlara böler (Claude'daki Task/subagent gibi). Yalnızca birbirinden bağımsız 2-4 alt görev için kullan.",
       parameters: {
         type: "object",
         properties: {
           tasks: {
             type: "array",
-            description: "Alt görevler dizisi: [{title, instruction}] (2-4 adet, bağımsız)",
-            items: {
-              type: "object",
-              properties: {
-                title: { type: "string" },
-                instruction: { type: "string" },
-              },
-              required: ["title", "instruction"],
-            },
+            description:
+              "Alt görevler dizisi: [{title, instruction}] (2-4 adet, bağımsız)",
           },
         },
         required: ["tasks"],
@@ -272,13 +270,15 @@ export const CODER_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "update_plan",
-      description: "Çok adımlı bir görev için canlı yapılacaklar listesini günceller.",
+      description:
+        "Çok adımlı bir görev için canlı yapılacaklar listesini (plan) günceller. Her satır bir adım: '[ ]' bekliyor, '[~]' devam ediyor, '[x]' tamamlandı.",
       parameters: {
         type: "object",
         properties: {
           plan: {
             type: "string",
-            description: "Her satırda bir adım: '[ ]' / '[~]' / '[x]' durum işaretiyle başlar",
+            description:
+              "Her satırda bir adım: '[ ]' / '[~]' / '[x]' durum işaretiyle başlar",
           },
         },
         required: ["plan"],
@@ -311,7 +311,8 @@ export const CODER_TOOLS: ToolDefinition[] = [
           },
           from: {
             type: "string",
-            description: "Kaynak dal adı. Belirtilmezse aktif dal kullanılır.",
+            description:
+              "Kaynak dal adı. Belirtilmezse aktif dal kullanılır.",
           },
         },
         required: ["name"],
@@ -322,7 +323,8 @@ export const CODER_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "create_pr",
-      description: "head dalından base dalına bir Pull Request / Merge Request açar.",
+      description:
+        "head dalından base dalına bir Pull Request (GitHub) / Merge Request (GitLab) açar. Başlık ve açıklamayı sen üret.",
       parameters: {
         type: "object",
         properties: {
@@ -332,7 +334,7 @@ export const CODER_TOOLS: ToolDefinition[] = [
           },
           head: {
             type: "string",
-            description: "Kaynak dal",
+            description: "Kaynak dal (değişikliklerin olduğu)",
           },
           base: {
             type: "string",
@@ -361,7 +363,8 @@ export const CODER_TOOLS: ToolDefinition[] = [
           },
           path: {
             type: "string",
-            description: "Sadece belirli dosyayı etkileyen commit'ler (opsiyonel)",
+            description:
+              "Sadece belirli dosyayı etkileyen commit'ler (opsiyonel)",
           },
         },
         required: [],
