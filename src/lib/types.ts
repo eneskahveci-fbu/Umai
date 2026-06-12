@@ -82,6 +82,7 @@ export interface AppConfig {
   theme: "dark" | "light";
   responseStyle: "normal" | "short" | "detailed" | "code-focused" | "formal";
   fontSize: number;
+  fontScale: "sm" | "base" | "lg";
   accentColor: string;
   soundEnabled: boolean;
   guestMode: boolean;
