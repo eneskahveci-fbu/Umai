@@ -1,95 +1,111 @@
-// ── Salt-okunur alt ajan (dispatch_agents implementasyonu) ──
+import type { ChatMessage, ToolDef } from "@/lib/types";
 
-import type { ChatMessage } from "./types";
-import { buildContextSections } from "./prompt";
-
-interface AgentTask {
-  title: string;
+interface SubagentOptions {
   instruction: string;
+  repoFiles: { path: string; content: string }[];
+  tools?: ToolDef[];
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+  provider?: string;
 }
 
-interface AgentResult {
+interface SubagentResult {
   title: string;
   result: string;
   error?: string;
 }
 
-interface SubagentOptions {
-  baseUrl: string;
-  model: string;
-  apiKey: string;
-  systemPrompt?: string;
-}
-
 /**
- * Birden çok salt-okunur alt ajanı paralel çalıştırır.
- * Her alt ajan tek bir mesaj alır, metin yanıtı döner.
+ * Salt-okunur bir alt-ajan çalıştırır.
+ * Yalnızca repodaki dosyaları okuyabilir, değişiklik YAPAMAZ.
+ * dispatch_agents() pattern'ini Claude Code tarzı uygular.
  */
-export async function runReadOnlyAgents(
-  tasks: AgentTask[],
-  opts: SubagentOptions,
-): Promise<AgentResult[]> {
-  const results = await Promise.allSettled(
-    tasks.map(async (task): Promise<AgentResult> => {
-      const systemPrompt = buildContextSections({
-        systemPrompt: opts.systemPrompt,
-      });
+export async function runReadOnlyAgent(opts: SubagentOptions): Promise<SubagentResult> {
+  const { instruction, repoFiles, tools, baseUrl, model, apiKey, provider } = opts;
 
-      const messages: ChatMessage[] = [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: `Görev: ${task.title}\n\n${task.instruction}\n\nBu görevi tamamla. Yalnızca salt-okunur araçları (list_files, read_file, glob, grep, search_files, search_code) kullanabilirsin. Yanıtını Türkçe ve markdown formatında, kod bloklarını dil belirterek ver.`,
-        },
-      ];
+  const fileList = repoFiles
+    .map((f) => `- ${f.path} (${f.content.length} karakter)`)
+    .join("\n");
 
-      const res = await fetch(`${opts.baseUrl.replace(/\/$/, "")}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${opts.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: opts.model,
-          messages,
-          temperature: 0.3,
-          max_tokens: 4096,
-        }),
-      });
+  const systemPrompt = `Sen salt-okunur bir kod analiz alt-ajanısın. 
+Görevin: ${instruction}
 
-      if (!res.ok) {
-        const errText = await res.text().catch(() => "");
-        throw new Error(`Agent API error ${res.status}: ${errText.slice(0, 200)}`);
-      }
+Kullanabileceğin repo dosyaları:
+${fileList || "(repo boş)"}
 
-      const data = (await res.json()) as {
-        choices: { message: { content: string } }[];
-      };
+YANITINI YALNIZCA düz metin olarak ver. Markdown formatında yazabilirsin.
+Dosyaları değiştiremezsin, commit yapamazsın, PR açamazsın. Yalnızca analiz yap.`;
 
+  const messages: { role: string; content: string }[] = [
+    { role: "system", content: systemPrompt },
+  ];
+
+  // Dosya içeriklerini context'e ekle (token limitine dikkat)
+  const MAX_FILE_CONTEXT = 40_000;
+  let totalChars = 0;
+  for (const file of repoFiles) {
+    if (totalChars > MAX_FILE_CONTEXT) break;
+    const snippet = file.content.slice(0, 10_000);
+    totalChars += snippet.length;
+    messages.push({
+      role: "user",
+      content: `Dosya: ${file.path}\n\`\`\`\n${snippet}\n\`\`\``,
+    });
+  }
+
+  messages.push({ role: "user", content: instruction });
+
+  // Tool definitions varsa ekle
+  const body: Record<string, unknown> = {
+    model,
+    messages,
+    stream: false,
+  };
+
+  if (tools && tools.length > 0) {
+    body.tools = tools;
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (provider === "anthropic") {
+    headers["anthropic-version"] = "2023-06-01";
+    headers["x-api-key"] = apiKey;
+  } else if (apiKey) {
+    headers["Authorization"] = `Bearer ${apiKey}`;
+  }
+
+  try {
+    const res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
       return {
-        title: task.title,
-        result: data.choices?.[0]?.message?.content ?? "(boş yanıt)",
+        title: instruction.slice(0, 80),
+        result: "",
+        error: `${res.status}: ${errText.slice(0, 200)}`,
       };
-    }),
-  );
+    }
 
-  return results.map((r, i) => {
-    if (r.status === "fulfilled") return r.value;
+    const data = await res.json();
+    const text: string = data.choices?.[0]?.message?.content?.trim() ?? "";
+
     return {
-      title: tasks[i]?.title ?? "unknown",
-      result: "",
-      error: r.reason?.message ?? "Bilinmeyen hata",
+      title: instruction.slice(0, 80),
+      result: text,
     };
-  });
-}
-
-/**
- * Tek bir salt-okunur ajan çalıştırır (uyumlu wrapper).
- */
-export async function runReadOnlyAgent(
-  task: AgentTask,
-  opts: SubagentOptions,
-): Promise<AgentResult> {
-  const results = await runReadOnlyAgents([task], opts);
-  return results[0]!;
+  } catch (e) {
+    return {
+      title: instruction.slice(0, 80),
+      result: "",
+      error: (e as Error).message,
+    };
+  }
 }
