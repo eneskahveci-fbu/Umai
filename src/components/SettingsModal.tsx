@@ -399,7 +399,7 @@ export function SettingsModal({ open, onClose }: Props) {
                   </div>
                 </div>
                 <button
-                  onClick={() => updateConfig({ notificationSound: !config.soundEnabled })}
+                  onClick={() => updateConfig({ soundEnabled: !config.soundEnabled })}
                   className={`w-11 h-6 rounded-full transition-colors relative ${
                     config.soundEnabled ? "bg-[var(--color-brand)]" : "bg-[var(--color-surface)]"
                   }`}
