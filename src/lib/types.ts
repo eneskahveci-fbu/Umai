@@ -1,141 +1,65 @@
-// ── Temel Tipler ──
+// ── Merkezi tip tanımları ──
 
 export type Provider =
   | "pollinations"
   | "hf"
   | "openai"
   | "anthropic"
-  | "openrouter"
-  | "deepseek"
-  | "groq"
   | "google"
   | "mistral"
+  | "groq"
+  | "deepseek"
+  | "openrouter"
   | "cerebras"
-  | "together"
+  | "togetherai"
   | "xai"
   | "ollama"
   | "pollinations"
   | "custom";
 
-export type ResponseStyle = "normal" | "short" | "detailed" | "code" | "formal";
-
-export type Theme = "dark" | "light";
-export type AccentColor = "amber" | "green" | "orange";
-export type FontScale = "sm" | "base" | "lg";
+export type ResponseStyle = "normal" | "short" | "detailed" | "code-focused" | "formal";
 
 export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant" | "system";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
-  createdAt: number;
-  model?: string;
-  provider?: Provider;
-  toolCalls?: ToolCall[];
-  toolResults?: ToolResult[];
-  artifacts?: Artifact[];
-  edited?: boolean;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+  name?: string;
 }
 
 export interface ToolCall {
   id: string;
-  name: string;
-  arguments: Record<string, unknown>;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
 }
 
-export interface ToolResult {
-  toolCallId: string;
-  name: string;
-  result: string;
-}
-
-export interface Artifact {
-  id: string;
-  type: "html" | "svg" | "mermaid" | "code";
-  content: string;
-  language?: string;
+export interface ToolDefinition {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+    strict?: boolean;
+  };
 }
 
 export interface MemoryItem {
-  id: string;
-  content: string;
-  createdAt: number;
+  key: string;
+  value: string;
 }
 
-export interface Config {
-  theme: Theme;
-  accentColor: AccentColor;
-  fontScale: FontScale;
-  fontSize: number;
-  responseStyle: ResponseStyle;
-  memory: string;
-  systemPrompt: string;
-  followUpQuestions: boolean;
-  webSearch: boolean;
-  contextWindowTokens: number;
-  guestMode: boolean;
-  notificationSound: boolean;
-  webContainerApiKey: string;
-}
-
-export interface ModelEntry {
-  id: string;
-  name: string;
-  provider: Provider;
-  baseUrl: string;
-  apiKey: string;
-  modelId: string;
-  enabled: boolean;
-  isDefault?: boolean;
-}
-
-export interface Skill {
-  id: string;
+export interface SkillPayload {
   title: string;
   content: string;
-  source: "manual" | "file";
-  enabled: boolean;
   tags?: string[];
+  source?: "manual" | "file";
   fileName?: string;
 }
 
-export interface ChatSession {
-  id: string;
-  title: string;
-  messages: ChatMessage[];
-  modelId?: string;
-  provider?: Provider;
-  createdAt: number;
-  updatedAt: number;
-  archived?: boolean;
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  repoOwner?: string;
-  repoName?: string;
-  branch?: string;
-  provider?: "github" | "gitlab";
-  token?: string;
-  rules?: string;
-}
-
-export interface GitAccount {
-  id: string;
-  provider: "github" | "gitlab";
-  username: string;
-  token: string;
-}
-
-export interface UserSettings {
-  id: string;
-  config: Config;
-  models: ModelEntry[];
-  skills: Skill[];
-  gitAccounts: GitAccount[];
-  projects: Project[];
-  memories: MemoryItem[];
-}
+export type SkillLike = SkillPayload;
 
 export interface RepoReadCtx {
   owner: string;
@@ -143,4 +67,84 @@ export interface RepoReadCtx {
   branch: string;
   token?: string;
   provider?: "github" | "gitlab";
+}
+
+export interface ModelConfig {
+  id: string;
+  name: string;
+  provider: Provider;
+  baseUrl: string;
+  apiKey: string;
+  active: boolean;
+}
+
+export interface AppConfig {
+  theme: "dark" | "light";
+  accentColor: "amber" | "green" | "orange";
+  fontScale: "sm" | "base" | "lg";
+  responseStyle: ResponseStyle;
+  fontSize: number;
+  notificationSound: boolean;
+}
+
+export interface GitAccount {
+  username: string;
+  token: string;
+  provider: "github" | "gitlab";
+}
+
+export interface Project {
+  owner: string;
+  repo: string;
+  branch: string;
+  rules?: string;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: number;
+  updatedAt: number;
+  incognito?: boolean;
+  userId?: string;
+}
+
+export interface McpServerConfig {
+  url: string;
+  headers?: Record<string, string>;
+  enabled?: boolean;
+}
+
+// ── API istek/yanıt tipleri ──
+
+export interface ChatRequest {
+  messages: (ChatMessage | { role: string; content: unknown })[];
+  baseUrl?: string;
+  model?: string;
+  apiKey?: string;
+  provider?: Provider;
+  systemPrompt?: string;
+  temperature?: number;
+  maxTokens?: number;
+  style?: ResponseStyle;
+  memories?: MemoryItem[];
+  skills?: SkillPayload[];
+  searchContext?: string;
+  projectPrompt?: string;
+  tools?: boolean;
+  webSearch?: boolean;
+  requireWriteApproval?: boolean;
+  planApprovalMode?: boolean;
+  planApproved?: boolean;
+  blockNetworkTools?: boolean;
+  repoCtx?: RepoReadCtx;
+  mcpServers?: McpServerConfig[];
+}
+
+export interface SharePayload {
+  id: string;
+  messages: ChatMessage[];
+  createdAt: string;
+  title?: string;
 }
