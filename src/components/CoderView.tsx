@@ -19,7 +19,6 @@ import {
   Folder,
   GitPullRequest,
   Globe,
-  Users,
   MoreHorizontal,
   Image as ImageIcon,
   Loader2 as Loader2Icon,
@@ -32,7 +31,6 @@ import {
   RotateCcw,
   Search,
   Trash2,
-  Sparkles,
   Square,
   Terminal,
   VenetianMask,
@@ -82,6 +80,7 @@ import type { TreeFile, TreeNode } from "@/lib/types";
 import { AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agents";
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
 import { buildContextSections } from "@/lib/prompt";
+import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { addPendingAction, removePendingAction, isCommandAllowed, DEFAULT_COMMAND_ALLOWLIST, type PendingAction } from "@/lib/agentActions";
 
 declare global {
@@ -402,9 +401,6 @@ export function CoderView() {
   const searchOnRef = useRef(false);
   useEffect(() => { searchOnRef.current = searchOn; }, [searchOn]);
   /* Çoklu-ajan ("Ajan Ekibi") modu: planlayıcı → paralel işçiler → birleştirici. */
-  const [teamMode, setTeamMode] = useState(false);
-  const teamModeRef = useRef(false);
-  useEffect(() => { teamModeRef.current = teamMode; }, [teamMode]);
   /* Plan onayı: bir sonraki istekte plan-modu kapısını geçici aşar. */
   const planApprovedRef = useRef(false);
   const [repoSearch, setRepoSearch] = useState("");
@@ -852,7 +848,7 @@ export function CoderView() {
          Sunucu Pollinations'ı anahtarsız destekler). */
       /* Ajan Ekibi modunda orkestrasyon endpoint'ine git (planlayıcı → paralel
          işçiler → birleştirici). Aynı gövdeyi alır, aynı OpenAI-uyumlu SSE'yi döner. */
-      const endpoint = teamModeRef.current ? "/api/orchestrate" : "/api/chat";
+      const endpoint = "/api/chat";
       const callViaServer = () => fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -897,10 +893,11 @@ export function CoderView() {
          kullanıcının kendi IP'si). Araç-kullanımı/web-arama TOOL-LOOP gerektirir
          → bunlar sunucu-proxy'ye gider (yoksa araçlar sessizce çalışmaz, model
          repodan habersiz kalır). */
-      if (active.provider === "pollinations" && !teamModeRef.current && !toolsEnabled && !searchOnRef.current) {
+      if (active.provider === "pollinations" && !toolsEnabled && !searchOnRef.current) {
         /* Bağlam blokları sunucu (/api/chat) ile ORTAK tek kaynaktan gelir →
-           Pollinations kullanıcıları da aynı, eksiksiz bağlamı alır. */
-        const sysContent = finalSystemPrompt + buildContextSections({
+           Pollinations kullanıcıları da aynı, eksiksiz bağlamı alır. PLATFORM_KNOWLEDGE
+           eklenir ki bu sağlayıcıdaki model de platformun farkında olsun. */
+        const sysContent = finalSystemPrompt + "\n\n" + PLATFORM_KNOWLEDGE + buildContextSections({
           style: store.config.style,
           memories: store.config.memories,
           skills: activeSkills,
@@ -1809,14 +1806,6 @@ export function CoderView() {
                     <span>Ekle</span>
                   </ComposerButton>
                   <ComposerButton
-                    onClick={() => setTeamMode((v) => !v)}
-                    active={teamMode}
-                    title="Ajan Ekibi: görevi alt görevlere böler, paralel ajanlarla çözer, sonuçları birleştirir (seçili modelle çalışır)"
-                  >
-                    <Users size={13} />
-                    <span>Ekip</span>
-                  </ComposerButton>
-                  <ComposerButton
                     onClick={() => {
                       const store = useStore.getState();
                       if (!store.repo) {
@@ -1868,18 +1857,11 @@ export function CoderView() {
                       label="Kütüphane"
                       onClick={() => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); }}
                     />
-                    <MoreItem
-                      icon={<Sparkles size={14} />}
-                      label={activeAgent ? `Agent: ${activeAgent.command}` : "Agent ( / )"}
-                      active={!!activeAgent || slashOpen}
-                      onClick={() => { setSlashQuery("/"); setSlashOpen((o) => !o); }}
-                    />
                   </MoreMenu>
                 </div>
 
                 <div className="flex items-center gap-1.5 text-[11px] text-muted/50 shrink-0">
                   {searchOn && <span className="text-brand font-medium">Web</span>}
-                  {teamMode && <span className="text-brand font-medium">Ekip</span>}
                   {toolsEnabled && <span className="text-green/80 font-medium">Tools</span>}
                   {activeAgent && <span className="text-brand font-medium">{activeAgent.command}</span>}
                 </div>
