@@ -1041,9 +1041,10 @@ export const useStore = create<StoreState>()((set, get) => ({
   toolsEnabled:
     typeof window !== "undefined" && localStorage.getItem("craftai_tools") === "1",
   setToolsEnabled: (b) => {
+    /* "1"=açık, "0"=kullanıcı bilerek kapattı, yok=hiç seçilmedi (repo bağlanınca
+       otomatik açılabilir). */
     if (typeof window !== "undefined") {
-      if (b) localStorage.setItem("craftai_tools", "1");
-      else localStorage.removeItem("craftai_tools");
+      localStorage.setItem("craftai_tools", b ? "1" : "0");
     }
     set({ toolsEnabled: b });
   },
