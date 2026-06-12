@@ -872,6 +872,10 @@ export function SettingsModal() {
                 <input type="checkbox" checked={config.autoMemory !== false} onChange={() => saveConfig({ ...config, autoMemory: config.autoMemory === false })} className="accent-brand" />
                 Otomatik bellek — kalıcı tercihleri 🧠 skill&apos;ine damıt
               </label>
+              <label className="flex items-center gap-3 text-sm cursor-pointer">
+                <input type="checkbox" checked={config.autoContinue !== false} onChange={() => saveConfig({ ...config, autoContinue: config.autoContinue === false })} className="accent-brand" />
+                Otomatik devam — yanıt token sınırında kesilirse kendiliğinden sürdür
+              </label>
             </div>
 
             {/* Bağlam limiti */}

@@ -29,6 +29,8 @@ export interface ChatMessage {
   plan?: string;
   /** Bu turda değiştirilen dosyaların geri-al noktaları (sohbetle kalıcı). */
   checkpoints?: FileCheckpoint[];
+  /** Üreticinin bitiş nedeni: "length" ⇒ token sınırında kesildi (Devam et). */
+  finishReason?: string;
   /** Mesaj dallandırma: bu (kullanıcı) mesajı düzenlendiğinde her sürümün
       kendi yanıt zinciri. Her dal = bu mesajdan sonraki mesajların anlık görüntüsü. */
   branches?: ChatMessage[][];
@@ -167,6 +169,8 @@ export interface Config {
   /** Otomatik bellek: her yanıt sonrası kalıcı tercihler "🧠 Otomatik Bellek"
       skill'ine damıtılır ve sonraki sohbetlerin prompt'una eklenir. */
   autoMemory?: boolean;
+  /** Yanıt token sınırında kesilirse otomatik sürdür (en çok 2 kez). */
+  autoContinue?: boolean;
   webSearch: boolean;
   cliMode: boolean;
   autoTerminal: boolean;

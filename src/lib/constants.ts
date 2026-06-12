@@ -410,6 +410,7 @@ export const DEFAULT_CONFIG: Config = {
   activeProjectId: null,
   followUps: true,
   autoMemory: true,
+  autoContinue: true,
   webSearch: false,
   cliMode: false,
   autoTerminal: false,
