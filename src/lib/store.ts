@@ -311,6 +311,7 @@ interface StoreState {
   currentId: string | null;
   incognito: boolean;
   loadChats: (userId: string | null) => Promise<void>;
+  importBackup: (data: { config?: Config; chats?: Chat[] }) => void;
   newChat: (incognito?: boolean) => void;
   selectChat: (id: string) => void;
   deleteChat: (id: string) => Promise<void>;
@@ -742,6 +743,14 @@ export const useStore = create<StoreState>()((set, get) => ({
       }
     }
     set({ chats: loadLocalChats() });
+  },
+
+  importBackup: (data) => {
+    if (data.config) get().saveConfig({ ...DEFAULT_CONFIG, ...data.config });
+    if (Array.isArray(data.chats)) {
+      set({ chats: data.chats, currentId: data.chats[0]?.id ?? null });
+      saveLocalChats(data.chats);
+    }
   },
 
   newChat: (incognito = false) => {

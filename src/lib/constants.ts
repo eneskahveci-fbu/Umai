@@ -409,6 +409,7 @@ export const DEFAULT_CONFIG: Config = {
   projects: [],
   activeProjectId: null,
   followUps: true,
+  autoTheme: false,
   autoMemory: true,
   autoContinue: true,
   webSearch: false,

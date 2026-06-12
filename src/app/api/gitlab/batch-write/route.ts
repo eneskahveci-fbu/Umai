@@ -55,6 +55,14 @@ export async function POST(req: NextRequest) {
   const headers: Record<string, string> = { "PRIVATE-TOKEN": token, "Content-Type": "application/json" };
 
   try {
+    /* Dal var mı? (silinmiş dala yazma → net hata) */
+    const branchRes = await fetch(
+      `https://gitlab.com/api/v4/projects/${proj}/repository/branches/${encodeURIComponent(branch)}`,
+      { method: "HEAD", headers },
+    );
+    if (!branchRes.ok) {
+      return NextResponse.json({ error: `Dal bulunamadı: ${branch}` }, { status: 404 });
+    }
     /* Her dosyanın var olup olmadığını PARALEL kontrol et → create/update. */
     const exists = await Promise.all(
       files.map(async (f) => {
