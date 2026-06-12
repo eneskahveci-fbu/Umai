@@ -1,85 +1,64 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useStore } from "@/lib/store";
+import { Command } from "lucide-react";
 
-interface Shortcut {
-  key: string;
-  ctrl?: boolean;
-  shift?: boolean;
-  alt?: boolean;
-  description: string;
-  action: () => void;
-}
-
-interface Props {
-  shortcuts: Shortcut[];
-}
-
-export function KeyboardShortcuts({ shortcuts }: Props) {
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      // Input/textarea alanlarında kısayolları devre dışı bırak (özel tuşlar hariç)
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-
-      for (const s of shortcuts) {
-        const ctrlOk = s.ctrl ? (e.ctrlKey || e.metaKey) : !e.ctrlKey && !e.metaKey;
-        const shiftOk = s.shift ? e.shiftKey : !e.shiftKey;
-        const altOk = s.alt ? e.altKey : !e.altKey;
-
-        if (
-          e.key.toLowerCase() === s.key.toLowerCase() &&
-          ctrlOk &&
-          shiftOk &&
-          altOk
-        ) {
-          e.preventDefault();
-          s.action();
-          return;
-        }
-      }
-    },
-    [shortcuts],
-  );
-
-  useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown]);
-
-  return null; // Görünmez bileşen, sadece olayları dinler
-}
-
-/** Yaygın kullanılan kısayol tanımları */
-export const DEFAULT_SHORTCUTS: Shortcut[] = [
-  {
-    key: "k",
-    ctrl: true,
-    description: "Komut paletini aç",
-    action: () => document.dispatchEvent(new CustomEvent("open-command-palette")),
-  },
-  {
-    key: "b",
-    ctrl: true,
-    description: "Kenar çubuğunu aç/kapat",
-    action: () => document.dispatchEvent(new CustomEvent("toggle-sidebar")),
-  },
-  {
-    key: ",",
-    ctrl: true,
-    description: "Ayarları aç",
-    action: () => document.dispatchEvent(new CustomEvent("open-settings")),
-  },
-  {
-    key: "n",
-    ctrl: true,
-    description: "Yeni sohbet",
-    action: () => document.dispatchEvent(new CustomEvent("new-chat")),
-  },
-  {
-    key: "/",
-    ctrl: true,
-    description: "Dosya ara",
-    action: () => document.dispatchEvent(new CustomEvent("search-files")),
-  },
+const shortcuts = [
+  { keys: ["⌘", "N"], desc: "Yeni sohbet" },
+  { keys: ["⌘", ","], desc: "Ayarlar" },
+  { keys: ["⌘", "K"], desc: "Komut paleti" },
+  { keys: ["⌘", "B"], desc: "Kenar çubuğu" },
+  { keys: ["⌘", "/"], desc: "Kısayollar" },
 ];
+
+export function KeyboardShortcuts() {
+  const open = useStore((s) => s.shortcutsOpen);
+  const setOpen = useStore((s) => s.setShortcutsOpen);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 backdrop-blur-sm"
+      onClick={() => setOpen(false)}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Klavye kısayolları"
+    >
+      <div
+        className="bg-surface border border-line rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <Command size={20} className="text-amber-400" />
+          <h3 className="font-semibold text-lg">Klavye Kısayolları</h3>
+        </div>
+
+        <div className="space-y-2">
+          {shortcuts.map((s) => (
+            <div
+              key={s.desc}
+              className="flex items-center justify-between py-1.5"
+            >
+              <span className="text-sm text-muted">{s.desc}</span>
+              <div className="flex gap-1">
+                {s.keys.map((k, i) => (
+                  <kbd
+                    key={i}
+                    className="px-2 py-0.5 rounded-md bg-bgsoft border border-line text-xs font-mono text-ink"
+                  >
+                    {k}
+                  </kbd>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <p className="text-xs text-muted mt-4">
+          macOS&apos;ta ⌘ = Cmd, diğer sistemlerde Ctrl
+        </p>
+      </div>
+    </div>
+  );
+}
