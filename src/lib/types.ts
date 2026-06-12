@@ -20,6 +20,11 @@ export interface ChatMessage {
   rating?: "up" | "down";
   /** Ajan görev planı (update_plan aracıyla canlı güncellenen checklist). */
   plan?: string;
+  /** Mesaj dallandırma: bu (kullanıcı) mesajı düzenlendiğinde her sürümün
+      kendi yanıt zinciri. Her dal = bu mesajdan sonraki mesajların anlık görüntüsü. */
+  branches?: ChatMessage[][];
+  /** Aktif dalın indeksi. */
+  branchIndex?: number;
 }
 
 export interface McpServer {
