@@ -1,39 +1,46 @@
-/* Service worker artık KULLANILMIYOR. Eski sürüm gezinme HTML'ini önbelleğe
-   alıp bayat uygulama sunuyordu. Bu fonksiyon yeni SW kaydetmez; bunun yerine
-   mevcut tüm kayıtları düşürür ve cache'leri temizler ki kullanıcılar bayat
-   paketten kurtulsun. (public/sw.js de kendini unregister eden bir kill-switch.) */
+/**
+ * Service Worker kaydı ve bağlantı durumu takibi.
+ */
 
+let connectionWatcher: (() => void) | null = null;
+
+/**
+ * Service Worker'ı kaydeder. Başarısız olursa sessizce geçer.
+ */
 export function registerServiceWorker() {
-  if (typeof window === "undefined") return;
-  if (!("serviceWorker" in navigator)) return;
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
-  const cleanup = async () => {
-    try {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map((r) => r.unregister()));
-    } catch { /* yok say */ }
-    try {
-      if (typeof caches !== "undefined") {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((k) => caches.delete(k)));
-      }
-    } catch { /* yok say */ }
-  };
-
-  if (document.readyState === "complete") cleanup();
-  else window.addEventListener("load", cleanup, { once: true });
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((reg) => {
+        console.log("[SW] Kayıt başarılı:", reg.scope);
+      })
+      .catch((err) => {
+        console.warn("[SW] Kayıt başarısız:", err);
+      });
+  });
 }
 
-/* Lightweight online/offline notifier — emits a `craftai:online` /
-   `craftai:offline` window event for any component that cares. */
-export function watchConnection() {
-  if (typeof window === "undefined") return () => { /* noop */ };
-  const onOff = () => window.dispatchEvent(new Event("craftai:offline"));
-  const onOn = () => window.dispatchEvent(new Event("craftai:online"));
-  window.addEventListener("offline", onOff);
-  window.addEventListener("online", onOn);
+/**
+ * Çevrimiçi/çevrimdışı durumunu izler. Durum değişince callback'i çağırır.
+ * Geri dönen cleanup fonksiyonunu useEffect'te kullan.
+ */
+export function watchConnection(callback: (online: boolean) => void): () => void {
+  if (typeof window === "undefined") {
+    callback(true);
+    return () => {};
+  }
+
+  const handler = () => callback(navigator.onLine);
+  window.addEventListener("online", handler);
+  window.addEventListener("offline", handler);
+
+  // İlk durumu bildir
+  callback(navigator.onLine);
+
   return () => {
-    window.removeEventListener("offline", onOff);
-    window.removeEventListener("online", onOn);
+    window.removeEventListener("online", handler);
+    window.removeEventListener("offline", handler);
   };
 }
