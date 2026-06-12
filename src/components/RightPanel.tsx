@@ -58,6 +58,17 @@ export function RightPanel(props: RightPanelProps) {
     prevOpen.current = cur;
   }, [props.editorOpen, props.gitOpen, props.artifact]);
 
+  /* Boyutlandırılabilir genişlik (masaüstü). Lazy init → SSR güvenli, set-state
+     effect'i yok. Sol kenardan sürükle; her değişimde localStorage'a yaz. */
+  const [width, setWidth] = useState<number>(() => {
+    if (typeof window === "undefined") return 540;
+    const saved = Number(localStorage.getItem("craftai_rightpanel_w"));
+    return saved >= 360 ? saved : 540;
+  });
+  useEffect(() => {
+    try { localStorage.setItem("craftai_rightpanel_w", String(width)); } catch { /* ignore */ }
+  }, [width]);
+
   if (!firstAvailable) return null;
 
   /* Split view: show editor + preview side-by-side unless user switched to Git */
@@ -69,17 +80,41 @@ export function RightPanel(props: RightPanelProps) {
     else if (effectiveActive === "git") props.onCloseGit();
   };
 
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = width;
+    const onMove = (me: MouseEvent) => {
+      const next = Math.min(Math.max(startW + (startX - me.clientX), 360), Math.round(window.innerWidth * 0.75));
+      setWidth(next);
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.userSelect = "";
+    };
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
+
   return (
     <div
       className="
         fixed inset-x-0 bottom-0 top-12 z-30 bg-bg
-        md:static md:inset-auto md:z-auto md:w-[min(50vw,540px)] md:shrink-0
+        md:relative md:inset-auto md:z-auto md:w-[var(--rp-w)] md:shrink-0
         flex flex-col min-h-0 border-line/60
         border-t md:border-t-0 md:border-l
         animate-in slide-in-from-bottom-4 md:animate-none duration-200
       "
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      style={{ paddingBottom: "env(safe-area-inset-bottom)", ["--rp-w" as string]: `${width}px` }}
     >
+      {/* Sürükleme tutamacı (masaüstü) — sol kenardan genişlik ayarla */}
+      <div
+        onMouseDown={startResize}
+        title="Sürükleyerek genişliği ayarla"
+        className="hidden md:block absolute left-0 inset-y-0 w-1.5 -ml-0.5 cursor-col-resize hover:bg-brand/40 active:bg-brand/60 transition-colors z-20"
+      />
       {/* Tab strip */}
       <div className="h-10 shrink-0 flex items-center gap-0.5 px-2 border-b border-line/60 bg-surface/40">
         {tabs.filter((t) => t.available).map((t) => {
