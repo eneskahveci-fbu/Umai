@@ -244,19 +244,28 @@ async function execStrReplace(
   if (!r.ok) return r.error;
   const content = r.content;
   const replaceAll = args.replace_all === true || args.replace_all === "true";
-  const occurrences = content.split(args.old_string).length - 1;
+
+  /* Tolerans: model read_file'dan gelen "42<TAB>kod" satır numarası önekini
+     yanlışlıkla old_string'e kopyarsa, önekleri soyup tekrar dene. */
+  let oldStr = args.old_string;
+  if (content.split(oldStr).length - 1 === 0) {
+    const stripped = oldStr.split("\n").map((l) => l.replace(/^\s*\d+\t/, "")).join("\n");
+    if (stripped !== oldStr && content.split(stripped).length - 1 >= 1) oldStr = stripped;
+  }
+
+  const occurrences = content.split(oldStr).length - 1;
   if (occurrences === 0) {
-    return `Hata: old_string '${args.path}' içinde bulunamadı. Önce read_file ile mevcut metni kontrol et (satır numarası olmadan, birebir kopyala).`;
+    return `Hata: old_string '${args.path}' içinde bulunamadı. Önce read_file ile mevcut metni kontrol et (satır numarası ve baştaki '<sayı><TAB>' olmadan, birebir kopyala).`;
   }
   if (occurrences > 1 && !replaceAll) {
     return `Hata: old_string ${occurrences} kez eşleşti. Benzersiz olması için daha fazla bağlam ekle ya da replace_all:true kullan.`;
   }
   let updated: string;
   if (replaceAll) {
-    updated = content.split(args.old_string).join(args.new_string);
+    updated = content.split(oldStr).join(args.new_string);
   } else {
-    const idx = content.indexOf(args.old_string);
-    updated = content.slice(0, idx) + args.new_string + content.slice(idx + args.old_string.length);
+    const idx = content.indexOf(oldStr);
+    updated = content.slice(0, idx) + args.new_string + content.slice(idx + oldStr.length);
   }
   const msg = args.commit_message || `chore: update ${args.path}`;
   const writeRes = await execWriteFile(ctx, { path: args.path, content: updated, commit_message: msg });
