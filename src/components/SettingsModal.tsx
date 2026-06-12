@@ -6,9 +6,11 @@ import {
   Brain,
   Check,
   ExternalLink,
+  Download,
   FolderGit2,
   GitBranch,
   Loader2,
+  Upload,
   Moon,
   Pencil,
   Play,
@@ -771,10 +773,53 @@ export function SettingsModal() {
             {/* Tema */}
             <div>
               <h4 className="text-sm font-bold mb-2">Tema</h4>
-              <button onClick={toggleTheme} className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-line bg-bgsoft hover:border-brand text-sm">
+              <button onClick={toggleTheme} disabled={!!config.autoTheme} className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-line bg-bgsoft hover:border-brand text-sm disabled:opacity-50 w-full">
                 {config.theme === "dark" ? <><Moon size={15} /> Koyu tema</> : <><Sun size={15} /> Açık tema</>}
                 <span className="text-muted ml-auto text-xs">Değiştir</span>
               </button>
+              <label className="flex items-center gap-2 mt-2 text-xs text-muted cursor-pointer">
+                <input type="checkbox" checked={!!config.autoTheme} onChange={() => saveConfig({ ...config, autoTheme: !config.autoTheme })} className="accent-brand" />
+                Sistem temasını izle (işletim sistemine göre otomatik)
+              </label>
+            </div>
+
+            {/* Yedekle / geri yükle */}
+            <div>
+              <h4 className="text-sm font-bold mb-2">Yedek</h4>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const s = useStore.getState();
+                    const data = JSON.stringify({ version: 1, exportedAt: Date.now(), config: s.config, chats: s.chats }, null, 2);
+                    const blob = new Blob([data], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url; a.download = `craftcoder-yedek-${new Date().toISOString().slice(0, 10)}.json`;
+                    a.click(); URL.revokeObjectURL(url);
+                    addToast("Yedek indirildi (ayarlar + sohbetler)", "success");
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-line bg-bgsoft hover:border-brand text-sm"
+                >
+                  <Download size={14} /> Yedek indir
+                </button>
+                <label className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-line bg-bgsoft hover:border-brand text-sm cursor-pointer">
+                  <Upload size={14} /> Geri yükle
+                  <input
+                    type="file" accept="application/json" className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        const data = JSON.parse(await file.text());
+                        useStore.getState().importBackup({ config: data.config, chats: data.chats });
+                        addToast("Yedek geri yüklendi ✓", "success");
+                      } catch { addToast("Geçersiz yedek dosyası", "error"); }
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+              <p className="text-[11px] text-muted/60 mt-1.5">API anahtarları da dahil — dosyayı güvende tut.</p>
             </div>
 
             {/* Yanıt stili */}

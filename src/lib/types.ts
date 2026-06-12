@@ -170,6 +170,8 @@ export interface Config {
   projects: Project[];
   activeProjectId: string | null;
   followUps: boolean;
+  /** Açıksa tema işletim sistemini izler (prefers-color-scheme). */
+  autoTheme?: boolean;
   /** Otomatik bellek: her yanıt sonrası kalıcı tercihler "🧠 Otomatik Bellek"
       skill'ine damıtılır ve sonraki sohbetlerin prompt'una eklenir. */
   autoMemory?: boolean;

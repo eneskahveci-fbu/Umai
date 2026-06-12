@@ -30,6 +30,20 @@ export default function AppPage() {
     return watchConnection();
   }, [setSidebarOpen]);
 
+  /* Sistem teması: autoTheme açıksa OS'i izle ve değiştikçe uygula. */
+  useEffect(() => {
+    const mql = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      const cfg = useStore.getState().config;
+      if (!cfg.autoTheme) return;
+      const want = mql.matches ? "dark" : "light";
+      if (cfg.theme !== want) useStore.getState().saveConfig({ ...cfg, theme: want });
+    };
+    apply();
+    mql.addEventListener("change", apply);
+    return () => mql.removeEventListener("change", apply);
+  }, []);
+
   useEffect(() => {
     const sb = createClient();
     if (!sb) { loadChats(null); return; }
