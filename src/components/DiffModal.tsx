@@ -1,200 +1,151 @@
 "use client";
 
-// src/components/DiffModal.tsx — Çoklu model karşılaştırma modalı
-
-import { useState, useCallback } from "react";
+import { useMemo, useState } from "react";
+import { Check, Copy, X } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { X, Plus, Play, Trash2 } from "lucide-react";
-import type { ChatMessage } from "@/lib/types";
-import type { CompareResult } from "./DiffViewer";
-import { DiffViewer } from "./DiffViewer";
 
-interface Props {
-  open: boolean;
-  onClose: () => void;
+interface DiffLine {
+  type: "ctx" | "add" | "del";
+  text: string;
+  oldNo?: number;
+  newNo?: number;
 }
 
-export function DiffModal({ open, onClose }: Props) {
-  const messages = useStore((s) => s.messages);
-  const models = useStore((s) => s.models);
+/* Basic line-based diff using LCS */
+function computeDiff(a: string, b: string): DiffLine[] {
+  const aLines = a.split("\n");
+  const bLines = b.split("\n");
+  const m = aLines.length;
+  const n = bLines.length;
 
-  const [prompt, setPrompt] = useState("");
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
-  const [results, setResults] = useState<CompareResult[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  const enabledModels = models.filter((m) => m.enabled);
-
-  const toggleModel = (id: string) => {
-    setSelectedModels((prev) =>
-      prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id],
-    );
-  };
-
-  const runCompare = useCallback(async () => {
-    if (!prompt.trim() || selectedModels.length === 0) return;
-    setLoading(true);
-    setResults([]);
-
-    const newResults: CompareResult[] = [];
-    for (const modelId of selectedModels) {
-      const model = models.find((m) => m.id === modelId);
-      if (!model) continue;
-
-      try {
-        const startTime = performance.now();
-        const response = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            modelId,
-            messages: [{ role: "user", content: prompt }],
-            stream: false,
-            toolsEnabled: false,
-          }),
-        });
-
-        const elapsed = (performance.now() - startTime) / 1000;
-        if (!response.ok) {
-          newResults.push({
-            modelName: model.name,
-            content: "",
-            error: `HTTP ${response.status}`,
-          });
-          setResults([...newResults]);
-          continue;
-        }
-
-        const data = (await response.json()) as { content: string };
-        const tokensPerSecond = data.content.length / Math.max(elapsed, 0.1) / 4;
-        newResults.push({
-          modelName: model.name,
-          content: data.content,
-          tokensPerSecond,
-        });
-      } catch (err) {
-        newResults.push({
-          modelName: model.name,
-          content: "",
-          error: (err as Error).message,
-        });
-      }
-      setResults([...newResults]);
+  /* LCS table */
+  const lcs: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (aLines[i - 1] === bLines[j - 1]) lcs[i][j] = lcs[i - 1][j - 1] + 1;
+      else lcs[i][j] = Math.max(lcs[i - 1][j], lcs[i][j - 1]);
     }
-    setLoading(false);
-  }, [prompt, selectedModels, models]);
+  }
 
-  // Son kullanıcı mesajından prompt'u otomatik doldur
-  const useLastMessage = () => {
-    const last = messages.filter((m) => m.role === "user").pop();
-    if (last) setPrompt(last.content);
+  const result: DiffLine[] = [];
+  let i = m, j = n;
+  let oldNo = m, newNo = n;
+  const stack: DiffLine[] = [];
+  while (i > 0 && j > 0) {
+    if (aLines[i - 1] === bLines[j - 1]) {
+      stack.push({ type: "ctx", text: aLines[i - 1], oldNo, newNo });
+      i--; j--; oldNo--; newNo--;
+    } else if (lcs[i - 1][j] >= lcs[i][j - 1]) {
+      stack.push({ type: "del", text: aLines[i - 1], oldNo });
+      i--; oldNo--;
+    } else {
+      stack.push({ type: "add", text: bLines[j - 1], newNo });
+      j--; newNo--;
+    }
+  }
+  while (i > 0) { stack.push({ type: "del", text: aLines[i - 1], oldNo: oldNo-- }); i--; }
+  while (j > 0) { stack.push({ type: "add", text: bLines[j - 1], newNo: newNo-- }); j--; }
+  while (stack.length) result.push(stack.pop()!);
+  return result;
+}
+
+export function DiffModal() {
+  const diff = useStore((s) => s.diffModal);
+  const setDiff = useStore((s) => s.setDiffModal);
+  const addToast = useStore((s) => s.addToast);
+  const [copied, setCopied] = useState(false);
+
+  const lines = useMemo(
+    () => (diff ? computeDiff(diff.original, diff.newCode) : []),
+    [diff],
+  );
+
+  if (!diff) return null;
+
+  const added = lines.filter((l) => l.type === "add").length;
+  const removed = lines.filter((l) => l.type === "del").length;
+
+  const copyNew = async () => {
+    try {
+      await navigator.clipboard.writeText(diff.newCode);
+      setCopied(true);
+      addToast("Yeni kod panoya kopyalandı", "success");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      addToast("Kopyalanamadı", "error");
+    }
   };
-
-  if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-bg/70 backdrop-blur-sm"
-      onClick={onClose}
-      role="dialog"
-      aria-modal
-      aria-label="Model karşılaştırma"
+      className="fixed inset-0 z-[55] bg-black/50 backdrop-blur-sm grid place-items-center px-4 animate-modal-bg"
+      onClick={() => setDiff(null)}
     >
       <div
-        className="w-full max-w-4xl max-h-[90vh] bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+        className="w-full max-w-4xl h-[80vh] bg-surface border border-line rounded-2xl shadow-2xl shadow-black/40 flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Başlık */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-line">
-          <h2 className="text-sm font-semibold text-ink">Model Karşılaştırma</h2>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-bgsoft rounded-lg transition-colors text-muted hover:text-ink"
-            title="Kapat"
-            aria-label="Kapat"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* Sonuç yoksa → kurulum */}
-        {results.length === 0 ? (
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Prompt */}
-            <div>
-              <label className="block text-xs font-semibold text-muted mb-1.5">
-                İstem
-              </label>
-              <div className="flex gap-2">
-                <textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Karşılaştırılacak istem..."
-                  rows={3}
-                  className="flex-1 px-3 py-2 bg-bgsoft border border-line rounded-xl text-sm text-ink placeholder:text-muted outline-none focus:border-amber-400/50 transition-colors resize-none"
-                />
-                <div className="flex flex-col gap-1.5">
-                  <button
-                    onClick={useLastMessage}
-                    className="px-2 py-1.5 text-[10px] bg-bgsoft border border-line rounded-lg hover:bg-surface transition-colors text-muted"
-                    title="Son mesajı kullan"
-                  >
-                    Son
-                  </button>
-                </div>
-              </div>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-line/60 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <h2 className="font-bold text-sm">Diff Görünümü</h2>
+            {diff.path && (
+              <code className="text-xs font-mono px-2 py-0.5 rounded-md bg-bgsoft border border-line/60 text-muted truncate">
+                {diff.path}
+              </code>
+            )}
+            <div className="flex items-center gap-2 text-[11px] shrink-0">
+              <span className="text-green/80 font-mono">+{added}</span>
+              <span className="text-red/80 font-mono">-{removed}</span>
             </div>
-
-            {/* Model seçimi */}
-            <div>
-              <label className="block text-xs font-semibold text-muted mb-1.5">
-                Modeller ({selectedModels.length} seçili)
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {enabledModels.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => toggleModel(m.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${
-                      selectedModels.includes(m.id)
-                        ? "bg-amber-400 text-black"
-                        : "bg-bgsoft border border-line text-muted hover:text-ink"
-                    }`}
-                  >
-                    {m.name}
-                  </button>
-                ))}
-                {enabledModels.length === 0 && (
-                  <p className="text-xs text-muted py-2">
-                    Karşılaştırma için önce ayarlardan model ekleyin.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Çalıştır */}
+          </div>
+          <div className="flex items-center gap-2">
             <button
-              onClick={runCompare}
-              disabled={loading || !prompt.trim() || selectedModels.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-400 text-black rounded-xl text-sm font-medium hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={copyNew}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-brand hover:bg-branddim text-white font-semibold transition-colors"
             >
-              {loading ? (
-                <>
-                  <span className="inline-block w-3.5 h-3.5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                  Karşılaştırılıyor...
-                </>
-              ) : (
-                <>
-                  <Play size={14} />
-                  Karşılaştır
-                </>
-              )}
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+              {copied ? "Kopyalandı" : "Yeniyi kopyala"}
+            </button>
+            <button
+              onClick={() => setDiff(null)}
+              className="w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
+            >
+              <X size={14} />
             </button>
           </div>
-        ) : (
-          /* Sonuçlar → DiffViewer */
-          <DiffViewer prompt={prompt} results={results} />
-        )}
+        </div>
+
+        {/* Diff body */}
+        <div className="flex-1 overflow-auto bg-[#0a0a0d] font-mono text-[12px] leading-relaxed">
+          {lines.map((l, i) => (
+            <div
+              key={i}
+              className={`flex items-start gap-3 px-3 py-0.5 ${
+                l.type === "add"
+                  ? "bg-green/8 text-green/90"
+                  : l.type === "del"
+                  ? "bg-red/8 text-red/90"
+                  : "text-muted/70"
+              }`}
+            >
+              <span className="w-10 text-right text-muted/30 shrink-0 select-none tabular-nums">
+                {l.oldNo ?? ""}
+              </span>
+              <span className="w-10 text-right text-muted/30 shrink-0 select-none tabular-nums">
+                {l.newNo ?? ""}
+              </span>
+              <span className="w-4 shrink-0 select-none font-bold">
+                {l.type === "add" ? "+" : l.type === "del" ? "-" : " "}
+              </span>
+              <span className="whitespace-pre flex-1 break-all">{l.text || " "}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="px-5 py-2.5 border-t border-line/60 text-[11px] text-muted/50 text-center shrink-0">
+          Yeni kodu kopyalayıp orijinal dosyana yapıştırarak uygula
+        </div>
       </div>
     </div>
   );

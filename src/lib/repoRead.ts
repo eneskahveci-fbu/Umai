@@ -1,160 +1,115 @@
-// src/lib/repoRead.ts — GitHub/GitLab API üzerinden repo okuma
+/* İşçi-ajanlar (orkestrasyon) için SALT-OKUNUR repo araçları.
+   Ayrı modül: çalışan /api/chat akışına dokunmaz (regresyon riski yok).
+   Yalnızca okuma/listeleme — yazma/silme YOK (işçiler değiştiremez). */
 
-import type { GitRepo, GitAccount } from "./types";
-
-const GITHUB_API = "https://api.github.com";
-const GITLAB_API = "https://gitlab.com/api/v4";
-
-interface RepoFileInfo {
-  path: string;
-  type: "file" | "dir";
-  size?: number;
+export interface RepoReadCtx {
+  owner: string;
+  repo: string;
+  branch: string;
+  token?: string;
+  provider?: "github" | "gitlab";
 }
 
-//─────── Dosya listeleme ───────
-export async function listRepoFiles(
-  repo: GitRepo,
-  account: GitAccount,
-  path?: string,
-): Promise<RepoFileInfo[]> {
-  if (account.provider === "github") {
-    return listGitHubFiles(repo, account.token, path);
-  }
-  return listGitLabFiles(repo, account.token, path);
-}
-
-async function listGitHubFiles(
-  repo: GitRepo,
-  token: string,
-  dirPath: string = "",
-): Promise<RepoFileInfo[]> {
-  const url = `${GITHUB_API}/repos/${repo.owner}/${repo.repo}/contents/${dirPath}`;
-  const branch = repo.branch ?? "main";
-  const response = await fetch(`${url}?ref=${branch}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-  });
-
-  if (!response.ok) {
-    if (response.status === 404) return [];
-    throw new Error(`GitHub API hatası: ${response.status}`);
-  }
-
-  const data = (await response.json()) as Array<{
-    path: string;
-    type: string;
-    size?: number;
-  }>;
-
-  return data.map((item) => ({
-    path: item.path,
-    type: item.type === "dir" ? "dir" : "file",
-    size: item.size,
-  }));
-}
-
-async function listGitLabFiles(
-  repo: GitRepo,
-  token: string,
-  dirPath: string = "",
-): Promise<RepoFileInfo[]> {
-  const encodedPath = encodeURIComponent(`${repo.owner}/${repo.repo}`);
-  const branch = repo.branch ?? "main";
-  const url = `${GITLAB_API}/projects/${encodedPath}/repository/tree?ref=${branch}&path=${dirPath}&per_page=100`;
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  if (!response.ok) {
-    if (response.status === 404) return [];
-    throw new Error(`GitLab API hatası: ${response.status}`);
-  }
-
-  const data = (await response.json()) as Array<{
-    path: string;
-    type: string;
-  }>;
-
-  return data.map((item) => ({
-    path: item.path,
-    type: item.type === "tree" ? "dir" : "file",
-  }));
-}
-
-//─────── Dosya içeriği okuma ───────
-export async function readRepoFile(
-  path: string,
-  repo: GitRepo,
-  account: GitAccount,
-): Promise<string> {
-  if (account.provider === "github") {
-    return readGitHubFile(path, repo, account.token);
-  }
-  return readGitLabFile(path, repo, account.token);
-}
-
-async function readGitHubFile(
-  filePath: string,
-  repo: GitRepo,
-  token: string,
-): Promise<string> {
-  const url = `${GITHUB_API}/repos/${repo.owner}/${repo.repo}/contents/${filePath}`;
-  const branch = repo.branch ?? "main";
-  const response = await fetch(`${url}?ref=${branch}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Dosya okunamadı (${filePath}): ${response.status}`);
-  }
-
-  const data = (await response.json()) as {
-    content?: string;
-    encoding?: string;
+export interface ReadToolDef {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: { type: "object"; properties: Record<string, { type: string; description: string }>; required: string[] };
   };
-
-  if (data.encoding === "base64" && data.content) {
-    return Buffer.from(data.content, "base64").toString("utf-8");
-  }
-
-  throw new Error(`Beklenmeyen dosya formatı: ${filePath}`);
 }
 
-async function readGitLabFile(
-  filePath: string,
-  repo: GitRepo,
-  token: string,
-): Promise<string> {
-  const encodedPath = encodeURIComponent(`${repo.owner}/${repo.repo}`);
-  const encodedFilePath = encodeURIComponent(filePath);
-  const branch = repo.branch ?? "main";
-  const url = `${GITLAB_API}/projects/${encodedPath}/repository/files/${encodedFilePath}/raw?ref=${branch}`;
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+export const READONLY_TOOLS: ReadToolDef[] = [
+  {
+    type: "function",
+    function: {
+      name: "list_files",
+      description: "Repo dosya ağacını listeler (yollar).",
+      parameters: { type: "object", properties: { filter: { type: "string", description: "Yolda aranacak alt-string (opsiyonel)" } }, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_file",
+      description: "Bir dosyanın içeriğini SATIR NUMARALARIYLA okur.",
+      parameters: { type: "object", properties: { path: { type: "string", description: "Repo köküne göre yol" } }, required: ["path"] },
+    },
+  },
+];
 
-  if (!response.ok) {
-    throw new Error(`Dosya okunamadı (${filePath}): ${response.status}`);
-  }
+export const READONLY_TOOL_NAMES = new Set(READONLY_TOOLS.map((t) => t.function.name));
 
-  return response.text();
+/** İçeriğe 1'den başlayan satır numaraları ekler (Claude Code 'cat -n' gibi). */
+export function withLineNumbers(content: string): string {
+  return content.split("\n").map((l, i) => `${i + 1}\t${l}`).join("\n");
 }
 
-//─────── Dosya içeriğini satır numaralarıyla formatla ───────
-export function formatFileWithLineNumbers(content: string): string {
-  const lines = content.split("\n");
-  const width = String(lines.length).length;
-  return lines
-    .map((line, i) => {
-      const num = String(i + 1).padStart(width, " ");
-      return ` ${num} │ ${line}`;
-    })
-    .join("\n");
+function glHeaders(token?: string): Record<string, string> {
+  const h: Record<string, string> = {};
+  if (token) h["PRIVATE-TOKEN"] = token;
+  return h;
+}
+function ghHeaders(token?: string): Record<string, string> {
+  const h: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "craft-ai-web" };
+  if (token) h["Authorization"] = `Bearer ${token}`;
+  return h;
+}
+
+async function listFiles(ctx: RepoReadCtx, filter?: string): Promise<string> {
+  let paths: string[] = [];
+  if (ctx.provider === "gitlab") {
+    const proj = encodeURIComponent(`${ctx.owner}/${ctx.repo}`);
+    const res = await fetch(
+      `https://gitlab.com/api/v4/projects/${proj}/repository/tree?recursive=true&per_page=100&ref=${encodeURIComponent(ctx.branch)}`,
+      { headers: glHeaders(ctx.token) },
+    );
+    if (!res.ok) return `Hata: ${res.status} — ağaç alınamadı`;
+    const data = (await res.json()) as { path: string; type: string }[];
+    paths = data.filter((d) => d.type === "blob").map((d) => d.path);
+  } else {
+    const res = await fetch(
+      `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/trees/${encodeURIComponent(ctx.branch)}?recursive=1`,
+      { headers: ghHeaders(ctx.token) },
+    );
+    if (!res.ok) return `Hata: ${res.status} — ağaç alınamadı`;
+    const data = (await res.json()) as { tree?: { path: string; type: string }[] };
+    paths = (data.tree ?? []).filter((t) => t.type === "blob").map((t) => t.path);
+  }
+  if (filter) paths = paths.filter((p) => p.toLowerCase().includes(filter.toLowerCase()));
+  if (paths.length > 300) return paths.slice(0, 300).join("\n") + `\n[... ${paths.length - 300} dosya daha — filtre kullan]`;
+  return paths.join("\n") || "(dosya yok)";
+}
+
+async function readFile(ctx: RepoReadCtx, path: string): Promise<string> {
+  if (ctx.provider === "gitlab") {
+    const proj = encodeURIComponent(`${ctx.owner}/${ctx.repo}`);
+    const res = await fetch(
+      `https://gitlab.com/api/v4/projects/${proj}/repository/files/${encodeURIComponent(path)}/raw?ref=${encodeURIComponent(ctx.branch)}`,
+      { headers: glHeaders(ctx.token) },
+    );
+    if (!res.ok) return `Hata: ${res.status} — dosya bulunamadı (${path})`;
+    const text = await res.text();
+    return withLineNumbers(text).slice(0, 16_000);
+  }
+  const res = await fetch(
+    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/contents/${encodeURIComponent(path)}?ref=${ctx.branch}`,
+    { headers: ghHeaders(ctx.token) },
+  );
+  if (!res.ok) return `Hata: ${res.status} — dosya bulunamadı (${path})`;
+  const data = (await res.json()) as { content?: string; size?: number };
+  if ((data.size ?? 0) > 100_000) return `Hata: dosya çok büyük`;
+  const content = Buffer.from(data.content ?? "", "base64").toString("utf-8");
+  return withLineNumbers(content).slice(0, 16_000);
+}
+
+/** Salt-okunur araç çağrısını yürütür. Bilinmeyen/yazma araçları reddedilir. */
+export async function executeReadTool(name: string, args: Record<string, unknown>, ctx: RepoReadCtx): Promise<string> {
+  try {
+    if (name === "list_files") return await listFiles(ctx, typeof args.filter === "string" ? args.filter : undefined);
+    if (name === "read_file") return await readFile(ctx, String(args.path ?? ""));
+    return `Bu ajan yalnızca okuma yapabilir; '${name}' kullanılamaz.`;
+  } catch (e) {
+    return `Hata: ${(e as Error).message}`;
+  }
 }

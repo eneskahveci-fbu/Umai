@@ -1,66 +1,39 @@
-// src/lib/sw-register.ts — Service Worker kaydı
+/* Service worker artık KULLANILMIYOR. Eski sürüm gezinme HTML'ini önbelleğe
+   alıp bayat uygulama sunuyordu. Bu fonksiyon yeni SW kaydetmez; bunun yerine
+   mevcut tüm kayıtları düşürür ve cache'leri temizler ki kullanıcılar bayat
+   paketten kurtulsun. (public/sw.js de kendini unregister eden bir kill-switch.) */
 
-let registration: ServiceWorkerRegistration | null = null;
-let connectionCleanup: (() => void) | null = null;
-
-export async function registerSW(): Promise<void> {
-  if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
-    return;
-  }
-
-  try {
-    registration = await navigator.serviceWorker.register("/sw.js", {
-      scope: "/",
-    });
-    console.log("[SW] Kaydedildi:", registration.scope);
-  } catch (err) {
-    console.warn("[SW] Kayıt başarısız:", err);
-  }
-}
-
-// Aliases for app/page.tsx compatibility
-export const registerServiceWorker = registerSW;
-
-export async function unregisterSW(): Promise<void> {
-  if (!registration) return;
-
-  try {
-    await registration.unregister();
-    registration = null;
-  } catch (err) {
-    console.warn("[SW] Kaldırma başarısız:", err);
-  }
-}
-
-// Periyodik güncelleme kontrolü (yalnızca tarayıcıda)
-function startPeriodicUpdate(): void {
+export function registerServiceWorker() {
   if (typeof window === "undefined") return;
-  setInterval(async () => {
-    if (!registration) return;
+  if (!("serviceWorker" in navigator)) return;
+
+  const cleanup = async () => {
     try {
-      await registration.update();
-    } catch {
-      // sessiz
-    }
-  }, 60 * 60 * 1000);
-}
-
-// watchConnection — app/page.tsx tarafından çağrılır
-export function watchConnection(): () => void {
-  if (typeof window === "undefined") return () => {};
-
-  const onOnline = () => console.log("[Bağlantı] Çevrimiçi");
-  const onOffline = () => console.log("[Bağlantı] Çevrimdışı");
-
-  window.addEventListener("online", onOnline);
-  window.addEventListener("offline", onOffline);
-
-  connectionCleanup = () => {
-    window.removeEventListener("online", onOnline);
-    window.removeEventListener("offline", onOffline);
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    } catch { /* yok say */ }
+    try {
+      if (typeof caches !== "undefined") {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+    } catch { /* yok say */ }
   };
 
-  startPeriodicUpdate();
+  if (document.readyState === "complete") cleanup();
+  else window.addEventListener("load", cleanup, { once: true });
+}
 
-  return connectionCleanup;
+/* Lightweight online/offline notifier — emits a `craftai:online` /
+   `craftai:offline` window event for any component that cares. */
+export function watchConnection() {
+  if (typeof window === "undefined") return () => { /* noop */ };
+  const onOff = () => window.dispatchEvent(new Event("craftai:offline"));
+  const onOn = () => window.dispatchEvent(new Event("craftai:online"));
+  window.addEventListener("offline", onOff);
+  window.addEventListener("online", onOn);
+  return () => {
+    window.removeEventListener("offline", onOff);
+    window.removeEventListener("online", onOn);
+  };
 }

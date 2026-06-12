@@ -1,195 +1,272 @@
 "use client";
 
-// src/components/CommandPalette.tsx — ⌘K komut paleti (hızlı erişim)
-
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useStore } from "@/lib/store";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import {
-  Search,
   MessageSquare,
+  VenetianMask,
   Settings,
-  BookOpen,
-  GitBranch,
-  Code2,
-  Columns2,
-  User,
-  Moon,
   Sun,
-  ArrowRight,
+  Moon,
+  BookOpen,
+  Search,
+  FileText,
 } from "lucide-react";
+import { useStore } from "@/lib/store";
+import type { TreeNode } from "@/lib/types";
 
-interface Command {
+interface PaletteAction {
   id: string;
   label: string;
-  description: string;
   icon: React.ReactNode;
+  shortcut?: string;
   action: () => void;
+  keywords: string[];
+}
+
+/** Birleşik palet satırı: komut VEYA dosya. */
+interface Row {
+  id: string;
+  label: string;
+  sub?: string;
+  icon: React.ReactNode;
+  shortcut?: string;
+  run: () => void;
+}
+
+function flattenTree(node: TreeNode | null): { name: string; path: string }[] {
+  if (!node) return [];
+  return [...node.files, ...Object.values(node.dirs).flatMap(flattenTree)];
 }
 
 export function CommandPalette() {
   const open = useStore((s) => s.commandPaletteOpen);
   const setOpen = useStore((s) => s.setCommandPaletteOpen);
-  const config = useStore((s) => s.config);
-  const updateConfig = useStore((s) => s.updateConfig);
-  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
-  const newChat = useStore((s) => s.newChat);
+  const theme = useStore((s) => s.config.theme);
+  const tree = useStore((s) => s.tree);
 
   const [query, setQuery] = useState("");
-  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const router = useRouter();
+  const listRef = useRef<HTMLDivElement>(null);
 
-  const commands: Command[] = [
+  const actions: PaletteAction[] = [
     {
       id: "new-chat",
-      label: "Yeni Sohbet",
-      description: "Yeni bir sohbet başlat",
+      label: "Yeni sohbet",
       icon: <MessageSquare size={16} />,
-      action: () => { newChat(false); setOpen(false); },
+      shortcut: "Ctrl+N",
+      action: () => {
+        useStore.getState().newChat(false);
+        setOpen(false);
+      },
+      keywords: ["yeni", "sohbet", "chat", "new"],
     },
     {
-      id: "new-incognito",
-      label: "Gizli Sohbet",
-      description: "Geçmişe kaydedilmeyen sohbet",
-      icon: <MessageSquare size={16} className="opacity-50" />,
-      action: () => { newChat(true); setOpen(false); },
+      id: "incognito-chat",
+      label: "Gizli sohbet",
+      icon: <VenetianMask size={16} />,
+      shortcut: "Ctrl+Shift+N",
+      action: () => {
+        useStore.getState().newChat(true);
+        setOpen(false);
+      },
+      keywords: ["gizli", "sohbet", "incognito", "private"],
     },
     {
       id: "settings",
       label: "Ayarlar",
-      description: "Model, Git, tema ayarları",
       icon: <Settings size={16} />,
-      action: () => { setSettingsOpen(true); setOpen(false); },
+      shortcut: "Ctrl+,",
+      action: () => {
+        useStore.getState().setSettingsOpen(true);
+        setOpen(false);
+      },
+      keywords: ["ayarlar", "settings", "yapilandirma", "config"],
     },
     {
-      id: "coder",
-      label: "Coder Görünümü",
-      description: "Kod editörü ve terminal",
-      icon: <Code2 size={16} />,
-      action: () => { router.push("/app?view=coder"); setOpen(false); },
+      id: "toggle-theme",
+      label: theme === "dark" ? "Acik temaya gec" : "Koyu temaya gec",
+      icon: theme === "dark" ? <Sun size={16} /> : <Moon size={16} />,
+      action: () => {
+        useStore.getState().toggleTheme();
+        setOpen(false);
+      },
+      keywords: ["tema", "theme", "dark", "light", "koyu", "acik", "degistir"],
     },
     {
-      id: "compare",
-      label: "Karşılaştırma Görünümü",
-      description: "Farklı model yanıtlarını karşılaştır",
-      icon: <Columns2 size={16} />,
-      action: () => { router.push("/app?view=compare"); setOpen(false); },
-    },
-    {
-      id: "theme",
-      label: "Tema Değiştir",
-      description: `Koyu ↔ Açık (şu an: ${config.theme})`,
-      icon: config.theme === "dark" ? <Moon size={16} /> : <Sun size={16} />,
-      action: () => { updateConfig("theme", config.theme === "dark" ? "light" : "dark"); },
-    },
-    {
-      id: "docs",
-      label: "Dokümantasyon",
-      description: "Kullanım kılavuzunu aç",
+      id: "prompt-library",
+      label: "Kütüphane (şablonlar)",
       icon: <BookOpen size={16} />,
-      action: () => { window.open("/docs", "_blank"); setOpen(false); },
-    },
-    {
-      id: "login",
-      label: "Giriş Yap",
-      description: "Hesabınla oturum aç",
-      icon: <User size={16} />,
-      action: () => { router.push("/login"); setOpen(false); },
+      action: () => {
+        useStore.getState().setLibraryTab("prompts");
+        useStore.getState().setLibraryOpen(true);
+        setOpen(false);
+      },
+      keywords: ["prompt", "kutuphane", "library", "sablon", "template", "snippet"],
     },
   ];
 
-  const filtered = query
-    ? commands.filter(
-        (c) =>
-          c.label.toLowerCase().includes(query.toLowerCase()) ||
-          c.description.toLowerCase().includes(query.toLowerCase()),
-      )
-    : commands;
+  const commandRows: Row[] = (query
+    ? actions.filter((a) => {
+        const q = query.toLowerCase();
+        return (
+          a.label.toLowerCase().includes(q) ||
+          a.keywords.some((k) => k.includes(q))
+        );
+      })
+    : actions
+  ).map((a) => ({ id: a.id, label: a.label, icon: a.icon, shortcut: a.shortcut, run: a.action }));
 
-  useEffect(() => {
+  /* Cmd+P tarzı dosya bulucu: en az 1 karakter yazınca repo ağacında ara,
+     seçilince dosyayı editörde aç (CoderView dinler). */
+  const q = query.toLowerCase();
+  const fileRows: Row[] = query.length >= 1
+    ? flattenTree(tree)
+        .filter((f) => f.path.toLowerCase().includes(q))
+        .slice(0, 8)
+        .map((f) => ({
+          id: "file:" + f.path,
+          label: f.name,
+          sub: f.path,
+          icon: <FileText size={16} />,
+          run: () => {
+            window.dispatchEvent(new CustomEvent("craftai:open-file", { detail: { path: f.path } }));
+            setOpen(false);
+          },
+        }))
+    : [];
+
+  const filtered: Row[] = [...commandRows, ...fileRows];
+
+  /* Reset the highlighted row when the query changes, and clear search when
+     the palette (re)opens — both adjusted during render rather than in an
+     effect (React's recommended pattern for prop-derived state). */
+  const [prevQuery, setPrevQuery] = useState(query);
+  if (query !== prevQuery) {
+    setPrevQuery(query);
+    setSelectedIndex(0);
+  }
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) {
       setQuery("");
-      setSelectedIdx(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      setSelectedIndex(0);
+    }
+  }
+
+  /* Focus the input after the palette opens (genuine post-render side effect). */
+  useEffect(() => {
+    if (open) {
+      const t = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(t);
     }
   }, [open]);
 
+  // Global Ctrl+K listener
   useEffect(() => {
-    setSelectedIdx(0);
-  }, [query]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "ArrowDown") {
+    const handler = (e: KeyboardEvent) => {
+      /* Ctrl/Cmd+K → komut paleti, Ctrl/Cmd+P → hızlı dosya bulucu (ikisi de
+         aynı paleti açar; dosya araması yazdıkça çalışır). */
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "p")) {
         e.preventDefault();
-        setSelectedIdx((i) => (i + 1) % filtered.length);
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setSelectedIdx((i) => (i - 1 + filtered.length) % filtered.length);
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        filtered[selectedIdx]?.action();
-      } else if (e.key === "Escape") {
-        setOpen(false);
+        setOpen(!useStore.getState().commandPaletteOpen);
       }
-    },
-    [filtered, selectedIdx, setOpen],
-  );
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [setOpen]);
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIndex((prev) => Math.min(prev + 1, filtered.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedIndex((prev) => Math.max(prev - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (filtered[selectedIndex]) {
+        filtered[selectedIndex].run();
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
+  };
+
+  // Scroll selected into view
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const item = list.children[selectedIndex] as HTMLElement | undefined;
+    if (item) item.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex]);
 
   if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-[22vh] bg-bg/70 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-start justify-center pt-[15vh] bg-black/60 backdrop-blur-sm"
       onClick={() => setOpen(false)}
-      role="dialog"
-      aria-modal
-      aria-label="Komut paleti"
     >
       <div
-        className="w-full max-w-lg bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden"
+        className="w-full max-w-lg mx-4 bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={handleKeyDown}
       >
-        {/* Arama çubuğu */}
+        {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-line">
           <Search size={16} className="text-muted shrink-0" />
           <input
             ref={inputRef}
-            type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Komut ara..."
-            className="flex-1 bg-transparent border-none outline-none text-sm text-ink placeholder:text-muted"
-            aria-label="Komut ara"
+            onKeyDown={onKeyDown}
+            placeholder="Komut veya dosya ara…"
+            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted/60"
           />
-          <kbd className="text-[10px] text-muted bg-bgsoft px-1.5 py-0.5 rounded border border-line">
+          <kbd className="text-[10px] text-muted border border-line rounded px-1.5 py-0.5 font-mono">
             ESC
           </kbd>
         </div>
 
-        {/* Komut listesi */}
-        <div className="max-h-72 overflow-y-auto p-2">
+        {/* Actions list */}
+        <div ref={listRef} className="max-h-[300px] overflow-y-auto py-2">
           {filtered.length === 0 ? (
-            <p className="text-sm text-muted text-center py-6">Komut bulunamadı</p>
+            <div className="text-center py-6 text-muted text-sm">
+              Sonuc bulunamadi.
+            </div>
           ) : (
-            filtered.map((cmd, i) => (
+            filtered.map((a, i) => (
               <button
-                key={cmd.id}
-                onClick={() => cmd.action()}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${
-                  i === selectedIdx
-                    ? "bg-amber-400/10 text-amber-400"
+                key={a.id}
+                onClick={() => a.run()}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                  i === selectedIndex
+                    ? "bg-brand/10 text-brand"
                     : "text-ink hover:bg-bgsoft"
                 }`}
               >
-                <span className="shrink-0">{cmd.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{cmd.label}</p>
-                  <p className="text-xs text-muted">{cmd.description}</p>
-                </div>
-                {i === selectedIdx && <ArrowRight size={14} className="shrink-0" />}
+                <span
+                  className={
+                    i === selectedIndex ? "text-brand" : "text-muted"
+                  }
+                >
+                  {a.icon}
+                </span>
+                <span className="flex-1 text-left min-w-0">
+                  <span className="block truncate">{a.label}</span>
+                  {a.sub && <span className="block truncate text-[11px] text-muted/60 font-mono">{a.sub}</span>}
+                </span>
+                {a.shortcut && (
+                  <kbd className="text-[10px] text-muted border border-line rounded px-1.5 py-0.5 font-mono">
+                    {a.shortcut}
+                  </kbd>
+                )}
+                {i === selectedIndex && !a.shortcut && (
+                  <kbd className="text-[10px] text-muted border border-line rounded px-1.5 py-0.5 font-mono">
+                    Enter
+                  </kbd>
+                )}
               </button>
             ))
           )}

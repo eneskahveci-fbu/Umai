@@ -1,155 +1,161 @@
 "use client";
 
-// src/components/OnboardingTour.tsx — İlk kullanım rehberi turu
-
-import { useState, useCallback } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ArrowRight, Check, GitBranch, MessageSquare, Settings, X } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { X, ArrowRight, ArrowLeft, Check } from "lucide-react";
+import { useModalA11y } from "@/lib/useModalA11y";
 
-interface TourStep {
-  target: string; // CSS selector açıklaması (görsel değil, metinsel)
+interface Step {
+  icon: ReactNode;
   title: string;
-  description: string;
-  position: "bottom" | "top" | "right" | "left";
+  body: ReactNode;
+  action?: { label: string; onClick: () => void };
 }
 
-const TOUR_STEPS: TourStep[] = [
-  {
-    target: "üst bar",
-    title: "Model Seçici",
-    description:
-      "Üst bardan aktif yapay zeka modelini seçebilir, yeni modeller ekleyebilirsiniz.",
-    position: "bottom",
-  },
-  {
-    target: "sohbet alanı",
-    title: "Sohbet",
-    description:
-      "Mesajınızı yazın, Enter'a basın. Shift+Enter ile alt satıra geçin. Dosya ekleyebilir, sesli giriş yapabilirsiniz.",
-    position: "top",
-  },
-  {
-    target: "kenar çubuğu",
-    title: "Sohbet Geçmişi",
-    description:
-      "Sol tarafta sohbet geçmişiniz bulunur. Gizli sohbet başlatabilir, mesajları paylaşabilirsiniz.",
-    position: "right",
-  },
-  {
-    target: "alt araçlar",
-    title: "Araçlar",
-    description:
-      "Web arama, Canvas önizleme ve dosya ekleme araçlarını kullanın. Coder görünümünde kod editörü ve terminal mevcuttur.",
-    position: "top",
-  },
-  {
-    target: "ayarlar",
-    title: "Ayarlar",
-    description:
-      "⚙️ Ayarlar menüsünden modelleri yönetebilir, Git hesaplarınızı bağlayabilir, temayı ve yanıt stilini özelleştirebilirsiniz.",
-    position: "bottom",
-  },
-];
-
 export function OnboardingTour() {
+  const onboardingDone = useStore((s) => s.onboardingDone);
+  const setOnboardingDone = useStore((s) => s.setOnboardingDone);
+  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
+  const hasModel = useStore((s) => s.config.models.length > 0);
+  const hasGithub = useStore((s) => s.config.githubAccounts.length > 0);
+
   const [step, setStep] = useState(0);
-  const onboardingOpen = useStore((s) => s.onboardingOpen);
-  const setOnboardingOpen = useStore((s) => s.setOnboardingOpen);
+  const [visible, setVisible] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const dismiss = () => {
+    setOnboardingDone(true);
+    setVisible(false);
+  };
+  useModalA11y(modalRef, visible, dismiss);
 
-  const current = TOUR_STEPS[step];
+  /* Show on first run only — defer one tick so the rest of the UI has
+     mounted (the spotlight feels weirder on a blank screen). */
+  useEffect(() => {
+    if (onboardingDone) return;
+    const t = window.setTimeout(() => setVisible(true), 400);
+    return () => window.clearTimeout(t);
+  }, [onboardingDone]);
 
-  const next = useCallback(() => {
-    if (step < TOUR_STEPS.length - 1) {
-      setStep(step + 1);
-    } else {
-      setOnboardingOpen(false);
-      setStep(0);
-    }
-  }, [step, setOnboardingOpen]);
+  if (!visible || onboardingDone) return null;
 
-  const prev = useCallback(() => {
-    if (step > 0) setStep(step - 1);
-  }, [step]);
+  const steps: Step[] = [
+    {
+      icon: <span className="text-2xl">◈</span>,
+      title: "Craft.Coder'a hoş geldin",
+      body: (
+        <>
+          Bu, kendi <strong className="text-ink">API anahtarınla</strong> çalışan bir AI kod asistanı.
+          OpenAI, Anthropic, Hugging Face veya OpenAI-uyumlu herhangi bir model — sen seç.
+          Anahtarın <strong className="text-ink">tarayıcında</strong> kalır, sunucumuza gönderilmez.
+        </>
+      ),
+    },
+    {
+      icon: <Settings size={22} className="text-brand" />,
+      title: "1. Bir model ekle",
+      body: hasModel ? (
+        <>Harika — bir model zaten ekli. <Check size={13} className="inline text-green" /></>
+      ) : (
+        <>
+          Ayarlar → Model&apos;den bir provider seç, baseURL + API anahtarını gir, &quot;Test&quot; düğmesiyle doğrula.
+          Cevap dönüyorsa hazırsın.
+        </>
+      ),
+      action: hasModel ? undefined : {
+        label: "Ayarlar'ı aç",
+        onClick: () => { setSettingsOpen(true); setVisible(false); },
+      },
+    },
+    {
+      icon: <GitBranch size={22} className="text-brand" />,
+      title: "2. (Opsiyonel) GitHub bağla",
+      body: hasGithub ? (
+        <>GitHub hesabı bağlı. <Check size={13} className="inline text-green" /></>
+      ) : (
+        <>
+          Kod tabanına özel cevaplar için Ayarlar → GitHub&apos;tan kişisel access token ekle (
+          <code className="text-[11px] bg-bgsoft px-1 rounded">repo</code> izni yeter). Sonra sol panelden bir depo seç.
+        </>
+      ),
+    },
+    {
+      icon: <MessageSquare size={22} className="text-brand" />,
+      title: "3. İlk sorunu sor",
+      body: (
+        <>
+          Composer&apos;a yaz. <code className="text-[11px] bg-bgsoft px-1 rounded">/</code> ile agent seç,
+          {" "}<code className="text-[11px] bg-bgsoft px-1 rounded">@</code> ile dosya mention&apos;la.
+          AI birden fazla dosya yazınca, otomatik <strong className="text-ink">çok dosyalı commit</strong> barı çıkar.
+        </>
+      ),
+    },
+  ];
 
-  const skip = useCallback(() => {
-    setOnboardingOpen(false);
-    setStep(0);
-  }, [setOnboardingOpen]);
-
-  if (!onboardingOpen) return null;
+  const total = steps.length;
+  const cur = steps[step];
+  const isLast = step === total - 1;
 
   return (
     <div
-      className="fixed inset-0 z-[110] flex items-end justify-center pb-8 bg-bg/80 backdrop-blur-sm"
-      role="dialog"
-      aria-modal
-      aria-label="Kullanım rehberi"
+      className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+      onClick={dismiss}
     >
-      <div className="w-full max-w-md mx-4 bg-surface border border-line rounded-2xl shadow-2xl p-5 space-y-4">
-        {/* Adım göstergesi */}
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted">
-            {step + 1} / {TOUR_STEPS.length}
-          </span>
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="onboarding-title"
+        className="w-full max-w-md rounded-2xl border border-line bg-surface shadow-2xl shadow-brand/10 animate-in zoom-in-95 fade-in duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted/50">
+            Tanıtım · {step + 1} / {total}
+          </div>
           <button
-            onClick={skip}
-            className="p-1 hover:bg-bgsoft rounded-lg transition-colors text-muted hover:text-ink"
-            title="Turu kapat"
-            aria-label="Turu kapat"
+            onClick={dismiss}
+            title="Atla"
+            className="text-muted/50 hover:text-ink p-1 rounded transition-colors"
           >
             <X size={14} />
           </button>
         </div>
 
-        {/* İlerleme çubuğu */}
-        <div className="h-1 bg-bgsoft rounded-full overflow-hidden">
-          <div
-            className="h-full bg-amber-400 transition-all duration-300"
-            style={{
-              width: `${((step + 1) / TOUR_STEPS.length) * 100}%`,
-            }}
-          />
+        <div className="px-5 pb-5">
+          <div className="w-12 h-12 rounded-2xl bg-bgsoft grid place-items-center mb-4 shadow-sm">
+            {cur.icon}
+          </div>
+          <h3 id="onboarding-title" className="text-lg font-extrabold mb-1.5">{cur.title}</h3>
+          <p className="text-sm text-muted/80 leading-relaxed">{cur.body}</p>
         </div>
 
-        {/* İçerik */}
-        <div>
-          <h3 className="text-base font-semibold text-ink mb-1.5">
-            {current.title}
-          </h3>
-          <p className="text-sm text-muted leading-relaxed">
-            {current.description}
-          </p>
-          <p className="text-[10px] text-muted mt-2 opacity-60">
-            📍 Konum: {current.target}
-          </p>
-        </div>
+        <div className="px-5 pb-5 flex items-center gap-2">
+          {/* progress dots */}
+          <div className="flex items-center gap-1.5 flex-1">
+            {steps.map((_, i) => (
+              <span
+                key={i}
+                className={`h-1 rounded-full transition-all ${
+                  i === step ? "w-6 bg-brand" : i < step ? "w-1.5 bg-brand/40" : "w-1.5 bg-line"
+                }`}
+              />
+            ))}
+          </div>
 
-        {/* Butonlar */}
-        <div className="flex items-center justify-between pt-1">
-          <button
-            onClick={prev}
-            disabled={step === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-line text-muted hover:text-ink hover:bg-bgsoft transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <ArrowLeft size={12} />
-            Geri
-          </button>
+          {cur.action && (
+            <button
+              onClick={cur.action.onClick}
+              className="text-xs px-3 py-1.5 rounded-lg border border-line hover:border-brand/40 text-muted hover:text-ink transition-colors"
+            >
+              {cur.action.label}
+            </button>
+          )}
 
           <button
-            onClick={next}
-            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-xl bg-amber-400 text-black hover:bg-amber-300 transition-colors"
+            onClick={() => (isLast ? dismiss() : setStep((s) => s + 1))}
+            className="flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-lg bg-brand hover:bg-branddim text-white font-semibold transition-colors"
           >
-            {step < TOUR_STEPS.length - 1 ? (
-              <>
-                İleri
-                <ArrowRight size={12} />
-              </>
-            ) : (
-              <>
-                Tamam
-                <Check size={12} />
-              </>
-            )}
+            {isLast ? <>Başla <Check size={12} /></> : <>Devam <ArrowRight size={12} /></>}
           </button>
         </div>
       </div>
