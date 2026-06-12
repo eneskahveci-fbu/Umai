@@ -1,58 +1,67 @@
-import type { ChatMessage } from "@/lib/types";
+// src/lib/contextWindow.ts — Token sayımı ve bağlam penceresi yönetimi
+
+import { DEFAULT_CONTEXT_WINDOW } from "./constants";
 
 /**
- * Token limitine göre mesajları budar.
- * En eski mesajlardan başlayarak, sistem prompt'unu koruyarak keser.
- * Yaklaşık token hesaplaması: 1 token ≈ 4 karakter (İngilizce) veya ≈ 3 karakter (Türkçe).
+ * Basit token tahmini (char / 4 kuralı, İngilizce için ~%85 doğruluk).
+ * Gerçek token sayımı için tiktoken veya gpt-tokenizer kullanılmalı.
  */
-export function pruneMessages(
-  messages: ChatMessage[],
-  maxTokens: number,
-): ChatMessage[] {
-  if (messages.length === 0) return [];
-
-  // Türkçe için karakter başına token oranı daha yüksek
-  const charsPerToken = 3;
-  const maxChars = maxTokens * charsPerToken;
-
-  // Sistem mesajlarını koru
-  const systemMessages = messages.filter((m) => m.role === "system");
-  const nonSystemMessages = messages.filter((m) => m.role !== "system");
-
-  let totalChars = systemMessages.reduce(
-    (sum, m) => sum + estimateChars(m),
-    0,
-  );
-
-  const kept: ChatMessage[] = [];
-
-  // Sondan başa doğru ekle (en yeni mesajlar öncelikli)
-  for (let i = nonSystemMessages.length - 1; i >= 0; i--) {
-    const msg = nonSystemMessages[i];
-    const msgChars = estimateChars(msg);
-
-    if (totalChars + msgChars <= maxChars) {
-      kept.unshift(msg);
-      totalChars += msgChars;
-    } else {
-      // İlk kullanıcı mesajını korumaya çalış
-      if (i === 0 && kept.length === 0) {
-        kept.unshift(msg);
-      }
-      break;
-    }
-  }
-
-  return [...systemMessages, ...kept];
+export function estimateTokens(text: string): number {
+  if (!text) return 0;
+  // Türkçe karakterler için biraz daha geniş hesapla
+  return Math.ceil(text.length / 3.5);
 }
 
-function estimateChars(msg: ChatMessage): number {
-  let chars = msg.content?.length ?? 0;
-  if (msg.tool_calls) {
-    chars += JSON.stringify(msg.tool_calls).length;
+/**
+ * Mesaj dizisindeki toplam token sayısını tahmin et.
+ */
+export function estimateMessageTokens(
+  messages: Array<{ content: string; role?: string }>,
+): number {
+  let total = 0;
+  for (const msg of messages) {
+    total += estimateTokens(msg.role ?? "user");
+    total += estimateTokens(msg.content);
+    total += 4; // mesaj sınırlayıcıları için sabit
   }
-  if (msg.tool_call_id) {
-    chars += msg.tool_call_id.length;
+  return total;
+}
+
+/**
+ * Belirli bir max token değerine sığacak şekilde mesajları buda.
+ * En son mesajlar korunur, en eskiler atılır.
+ */
+export function pruneMessages<T extends { content: string; role?: string }>(
+  messages: T[],
+  maxTokens: number = DEFAULT_CONTEXT_WINDOW,
+  systemPromptTokens: number = 0,
+): T[] {
+  const available = maxTokens - systemPromptTokens - 500; // yanıt için buffer
+  if (available <= 0) return messages.slice(-2); // son 2 mesajı koru
+
+  const pruned: T[] = [];
+  let tokenCount = 0;
+
+  // Sondan başa doğru ekle
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    const msgTokens = estimateTokens(msg.content) + estimateTokens(msg.role ?? "user") + 4;
+
+    if (tokenCount + msgTokens > available) break;
+
+    pruned.unshift(msg);
+    tokenCount += msgTokens;
   }
-  return chars;
+
+  return pruned;
+}
+
+/**
+ * Toplam context'in yüzde kaçı dolu?
+ */
+export function contextUsagePercent(
+  usedTokens: number,
+  totalWindow: number = DEFAULT_CONTEXT_WINDOW,
+): number {
+  return Math.min(100, Math.round((usedTokens / totalWindow) * 100));
 }
