@@ -777,7 +777,10 @@ export function CoderView() {
     } catch { /* yoksay */ }
   }, []);
 
-  const callApi = useCallback(async (overrideAgent?: Agent | null) => {
+  const callApi = useCallback(async (
+    overrideAgent?: Agent | null,
+    opts?: { continuation?: boolean; depth?: number },
+  ) => {
     const store = useStore.getState();
     let active = store.activeModel();
     if (!active) { store.setSettingsOpen(true); return; }
@@ -799,6 +802,12 @@ export function CoderView() {
         ? AGENTS.find((a) => a.id === messageAgentId) ?? null
         : null;
 
+    /* Devam modu (Claude Code tarzı): kesilen asistan yanıtı YENİ baloncuk
+       açmadan, aynı mesajın içinden sürdürülür. Sohbete görünür bir kullanıcı
+       mesajı eklenmez; talimat yalnızca API isteğine iliştirilir. */
+    const lastMsg = chat?.messages[chat.messages.length - 1];
+    const isContinuation = !!opts?.continuation && lastMsg?.role === "assistant" && !!lastMsg.content;
+
     const rawMessages = (chat?.messages ?? []).map((m) => {
       if (m.images?.length) {
         const content: unknown[] = m.images.map((img) => ({ type: "image_url", image_url: { url: img } }));
@@ -807,6 +816,15 @@ export function CoderView() {
       }
       return { role: m.role, content: m.content };
     });
+    if (isContinuation) {
+      rawMessages.push({
+        role: "user",
+        content:
+          "[Devam] Önceki yanıtın token sınırında kesildi. Tam kaldığın yerden sür: " +
+          "kesilen cümlenin/kod bloğunun ortasından devam et, önceki metni TEKRARLAMA, " +
+          "selamlama veya giriş cümlesi YAZMA, açık kalan markdown/kod bloğu yapısını koru.",
+      });
+    }
     /* Context window management: keep last 24 messages to avoid token overflow */
     const MAX_CTX = 24;
     const apiMessages = rawMessages.length > MAX_CTX
@@ -826,11 +844,13 @@ export function CoderView() {
       config.rulesFile?.trim() ? `## Proje Kuralları (.rules)\n${config.rulesFile.trim()}` : "",
     ].filter(Boolean).join("\n\n");
 
-    store.pushMessage({ role: "assistant", content: "" });
+    if (!isContinuation) store.pushMessage({ role: "assistant", content: "" });
+    store.setFinishReasonOnLast(undefined); // bayatlamış "kesildi" şeridini temizle
     store.setStreaming(true);
-    setCheckpoints([]); // yeni tur — önceki turun geri-al noktalarını sıfırla
-    const turnCheckpoints: { path: string; previous: string | null }[] = []; // mesaja kalıcı kopya
-    setPendingActions([]); // ve bekleyen yıkıcı işlem önerilerini
+    if (!isContinuation) setCheckpoints([]); // yeni tur — önceki turun geri-al noktaları sıfırlanır
+    const turnCheckpoints: { path: string; previous: string | null }[] =
+      isContinuation ? [...(lastMsg?.checkpoints ?? [])] : []; // devamda önceki yazmalar korunur
+    setPendingActions([]); // bekleyen yıkıcı işlem önerileri
     store.setFollowUpSuggestions([]);
     coderAbort = new AbortController();
     const abortCtl = coderAbort;
@@ -869,7 +889,10 @@ export function CoderView() {
       } catch { /* ignore — continue without search */ }
     }
 
-    let full = ""; // try ve catch (iptal) ortak erişimi için dışta tanımlı
+    /* Devam modunda full mevcut içerikten başlar → akış aynı baloncuğa eklenir. */
+    const priorLen = isContinuation ? (lastMsg?.content.length ?? 0) : 0;
+    let full = isContinuation ? (lastMsg?.content ?? "") : ""; // try/catch ortak erişimi
+    let cutAtLength = false; // finish_event: "length" ⇒ otomatik devam tetiklenebilir
     try {
       const allEnabledSkills = (store.config.skills ?? []).filter((s) => s.enabled);
       /* Relevance scoring: compare skill text against the last user message.
@@ -1056,6 +1079,13 @@ export function CoderView() {
               useStore.getState().setPlanOnLast(String(parsed.plan_event.plan ?? ""));
               continue;
             }
+            /* bitiş nedeni: "length" ⇒ token sınırında kesildi → şerit + oto-devam */
+            if (parsed.finish_event) {
+              const reason = String(parsed.finish_event.reason ?? "");
+              if (reason === "length") cutAtLength = true;
+              useStore.getState().setFinishReasonOnLast(reason && reason !== "stop" ? reason : undefined);
+              continue;
+            }
             /* checkpoint: ajan bir dosyayı değiştirdi → eski içeriği sakla (geri al).
                previous === null ⇒ dosya bu turda oluşturuldu (geri al = sil). */
             if (parsed.checkpoint_event) {
@@ -1144,10 +1174,10 @@ export function CoderView() {
         }
       }
 
-      /* token tahmini */
+      /* token tahmini (devamda yalnızca yeni üretilen kısım sayılır) */
       const inputText = apiMessages.map((m) => typeof m.content === "string" ? m.content : "").join("\n");
       const tokenIn = estimateTokens(inputText) + estimateTokens(coderSystemPrompt);
-      const tokenOut = estimateTokens(full);
+      const tokenOut = estimateTokens(full.slice(priorLen));
       useStore.getState().updateLastTokens(tokenIn, tokenOut);
       /* geri-al noktalarını mesaja yaz → persistCurrent ile sohbetle kaydedilir,
          sayfa yenilense bile son turun "Geri Al" imkânı kaybolmaz */
@@ -1170,6 +1200,14 @@ export function CoderView() {
       }
       fetchFollowUps();
       void extractMemory();
+    }
+    /* Otomatik devam (Claude Code gibi): yanıt token sınırında kesildiyse aynı
+       baloncuk içinden kendiliğinden sürdür — kullanıcı tıklamasına gerek yok.
+       Sonsuz döngüye karşı en çok 2 ardışık otomatik devam. */
+    const depth = opts?.depth ?? 0;
+    if (cutAtLength && useStore.getState().config.autoContinue !== false && depth < 2 && !abortCtl.signal.aborted) {
+      useStore.getState().addToast("Yanıt sınırda kesildi — kaldığı yerden devam ediliyor…", "info");
+      await callApi(overrideAgent, { continuation: true, depth: depth + 1 });
     }
   /* callApi reads the rest of its inputs live via useStore.getState() during
      streaming, so it deliberately keeps a minimal dep set — recreating it on
@@ -1236,14 +1274,15 @@ export function CoderView() {
 
   /* Keep the previous answer; ask the model to pick up where it left off.
      Useful when the stream was stopped, hit a token cap, or got truncated. */
+  /* Devam et (Claude Code tarzı): sohbete görünür mesaj eklemeden, kesilen
+     asistan yanıtını AYNI baloncuğun içinden sürdürür. */
   const continueLast = async () => {
     if (streaming) return;
     const store = useStore.getState();
     const chat = store.current();
-    if (!chat || chat.messages.length === 0) return;
-    if (chat.messages[chat.messages.length - 1].role !== "assistant") return;
-    store.pushMessage({ role: "user", content: "Lütfen tam olarak kaldığın yerden devam et. Önceki cevabını tekrar etme." });
-    await callApi();
+    const last = chat?.messages[chat.messages.length - 1];
+    if (!chat || !last || last.role !== "assistant" || !last.content) return;
+    await callApi(undefined, { continuation: true });
   };
 
   const editAndResend = async (index: number, content: string) => {
@@ -1546,6 +1585,7 @@ export function CoderView() {
                         showRegenerate={isLastAssistant && !streaming}
                         onRegenerate={regenerate}
                         onContinue={isLastAssistant && m.content ? continueLast : undefined}
+                        streamingNow={isLastAssistant && streaming}
                         onEdit={m.role === "user" ? editAndResend : undefined}
                         onSwitchVersion={
                           m.branches && m.branches.length > 1

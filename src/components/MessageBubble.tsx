@@ -247,6 +247,7 @@ export function MessageBubble({
   onContinue,
   onEdit,
   onSwitchVersion,
+  streamingNow,
 }: {
   message: ChatMessage;
   index: number;
@@ -256,6 +257,8 @@ export function MessageBubble({
   onContinue?: () => void;
   onEdit?: (index: number, content: string) => void;
   onSwitchVersion?: (branchIndex: number) => void;
+  /** Bu mesaj şu an akıyor (yanıp sönen imleç gösterilir). */
+  streamingNow?: boolean;
 }) {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
@@ -306,7 +309,7 @@ export function MessageBubble({
   const agent = message.agentId ? AGENTS.find((a) => a.id === message.agentId) : null;
 
   return (
-    <div className="group/msg flex gap-3.5 py-5">
+    <div className="group/msg flex gap-3.5 py-5 animate-fade-in">
       <div
         className={`shrink-0 w-8 h-8 rounded-xl grid place-items-center text-sm font-bold shadow-sm ${
           isUser ? "bg-blue/90 text-white" : "bg-brand/10 border border-brand/25 text-brand"
@@ -405,9 +408,25 @@ export function MessageBubble({
             >
               {message.content}
             </ReactMarkdown>
+            {streamingNow && <span className="caret" />}
           </div>
         ) : (
           <span className="caret" />
+        )}
+
+        {/* Kesilme şeridi: yanıt token sınırında kesildi → tek tıkla aynı
+            baloncuk içinden sürdür (otomatik devam kapalıysa / tükendiyse) */}
+        {!isUser && !streamingNow && message.finishReason === "length" && onContinue && (
+          <div className="mt-2.5 flex items-center gap-2 px-3 py-2 rounded-xl border border-amber-400/25 bg-amber-400/5 text-xs animate-fade-in">
+            <ChevronRight size={13} className="text-amber-400 shrink-0" />
+            <span className="text-muted flex-1 min-w-0">Yanıt token sınırında kesildi.</span>
+            <button
+              onClick={onContinue}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-400/10 text-amber-400 hover:bg-amber-400/20 font-semibold transition-colors shrink-0"
+            >
+              <ChevronRight size={12} /> Devam et
+            </button>
+          </div>
         )}
 
         {/* Action buttons */}

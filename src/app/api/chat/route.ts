@@ -945,7 +945,14 @@ export async function POST(req: Request) {
 
         const { content, toolCalls, finishReason } = await streamRound(upstream, controller, encoder);
 
-        if (toolCalls.length === 0 || finishReason === "stop") break;
+        if (toolCalls.length === 0 || finishReason === "stop") {
+          /* Bitiş nedenini istemciye ilet: "length" ⇒ yanıt token sınırında
+             kesildi → istemci kesilme şeridi gösterir / otomatik devam eder. */
+          if (finishReason && finishReason !== "tool_calls") {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ finish_event: { reason: finishReason } })}\n\n`));
+          }
+          break;
+        }
 
         /* Append assistant turn with tool calls */
         convo.push({
