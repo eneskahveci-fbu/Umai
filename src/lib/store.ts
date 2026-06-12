@@ -6,12 +6,12 @@ import type {
   AIModel,
   AppConfig,
   ChatMessage,
+  ChatSummary,
   GitAccount,
   GitRepo,
   Project,
   Skill,
 } from "./types";
-import type { ChatSummary } from "@/components/ChatHistory";
 import { DEFAULT_CONFIG, DEFAULT_MODELS } from "./constants";
 import { safeJSONParse } from "./validate";
 
