@@ -525,6 +525,11 @@ export function CoderView() {
           }
         }
       }
+      /* Repo bağlandı → ajan repoyu görebilsin diye tool-use'u otomatik aç.
+         Kullanıcı daha önce BİLEREK kapatmadıysa (localStorage anahtarı yoksa). */
+      if (typeof window !== "undefined" && localStorage.getItem("craftai_tools") === null) {
+        useStore.getState().setToolsEnabled(true);
+      }
     } catch (e) {
       /* Açılıştaki otomatik bağlanmada sessiz kal; sadece elle bağlanınca hata göster. */
       if (!silent) addToast(`Depo bağlantısı başarısız: ${(e as Error).message}`, "error");
@@ -888,7 +893,11 @@ export function CoderView() {
       /* Pollinations: tarayıcıdan doğrudan çağrı yapılır (her kullanıcı kendi IP'sini kullanır,
          sunucu IP'si paylaşıldığında oluşan rate-limit sorunu önlenir). CORS açık. */
       let res: Response;
-      if (active.provider === "pollinations" && !teamModeRef.current) {
+      /* Pollinations'ı yalnızca DÜZ sohbette doğrudan tarayıcıdan çağır (hızlı +
+         kullanıcının kendi IP'si). Araç-kullanımı/web-arama TOOL-LOOP gerektirir
+         → bunlar sunucu-proxy'ye gider (yoksa araçlar sessizce çalışmaz, model
+         repodan habersiz kalır). */
+      if (active.provider === "pollinations" && !teamModeRef.current && !toolsEnabled && !searchOnRef.current) {
         /* Bağlam blokları sunucu (/api/chat) ile ORTAK tek kaynaktan gelir →
            Pollinations kullanıcıları da aynı, eksiksiz bağlamı alır. */
         const sysContent = finalSystemPrompt + buildContextSections({
