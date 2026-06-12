@@ -1,28 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { WifiOff } from "lucide-react";
+import { watchConnection } from "@/lib/sw-register";
 
 export function OfflineBanner() {
-  const [offline, setOffline] = useState(false);
+  const [online, setOnline] = useState(true);
 
   useEffect(() => {
-    const go = () => setOffline(!navigator.onLine);
-    window.addEventListener("online", go);
-    window.addEventListener("offline", go);
-    go();
-    return () => {
-      window.removeEventListener("online", go);
-      window.removeEventListener("offline", go);
-    };
+    setOnline(navigator.onLine);
+    return watchConnection(setOnline);
   }, []);
 
-  if (!offline) return null;
+  if (online) return null;
 
   return (
-    <div className="flex items-center justify-center gap-2 bg-amber-400 text-black text-xs font-medium py-1.5 px-4">
-      <WifiOff size={12} />
-      <span>İnternet bağlantısı kesildi — değişiklikler yerel olarak saklanıyor</span>
+    <div
+      className="sticky top-0 z-50 bg-amber-500/90 text-black text-center py-2 text-sm font-medium backdrop-blur-sm"
+      role="alert"
+    >
+      ⚠️ İnternet bağlantısı kesildi — bazı özellikler kullanılamayabilir
     </div>
   );
 }
