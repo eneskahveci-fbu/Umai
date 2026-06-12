@@ -224,7 +224,7 @@ export function SettingsModal({ open, onClose }: Props) {
                 <div className="p-4 border border-[var(--color-brand)]/30 rounded-xl space-y-3 bg-[var(--color-surface)]/20">
                   <select
                     value={newProvider}
-                    onChange={(e) => setNewProvider(e.target.value as Provider)}
+                    onChange={(e) => setNewProvider(e.target.value as ProviderKind)}
                     className="w-full bg-[var(--color-surface)] rounded-lg px-3 py-2 text-sm outline-none border-none text-[var(--color-ink)]"
                   >
                     {PROVIDERS.map((p) => (
