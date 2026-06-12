@@ -164,6 +164,9 @@ export interface Config {
   projects: Project[];
   activeProjectId: string | null;
   followUps: boolean;
+  /** Otomatik bellek: her yanıt sonrası kalıcı tercihler "🧠 Otomatik Bellek"
+      skill'ine damıtılır ve sonraki sohbetlerin prompt'una eklenir. */
+  autoMemory?: boolean;
   webSearch: boolean;
   cliMode: boolean;
   autoTerminal: boolean;

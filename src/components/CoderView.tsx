@@ -746,6 +746,37 @@ export function CoderView() {
     } catch { /* yoksay */ }
   }, []);
 
+  /* Otomatik bellek: yanıt bittikten sonra arka planda son alışverişten kalıcı
+     tercihleri damıt ve "🧠 Otomatik Bellek" skill'ine ekle. Gizli sohbetlerde
+     ve ayar kapalıyken çalışmaz; hata ana akışı asla etkilemez. */
+  const extractMemory = useCallback(async () => {
+    const store = useStore.getState();
+    if (store.config.autoMemory === false) return;
+    const chat = store.current();
+    if (!chat || chat.incognito) return;
+    const active = store.activeModel();
+    if (!active?.apiKey) return; // anahtarsız (Pollinations) uçta ekstra çağrı yapma
+    const msgs = chat.messages;
+    const lastUser = [...msgs].reverse().find((m) => m.role === "user")?.content ?? "";
+    const lastAssistant = [...msgs].reverse().find((m) => m.role === "assistant")?.content ?? "";
+    if (!lastUser.trim() || !lastAssistant.trim()) return;
+    const existing = store.config.skills?.find((s) => s.id === "auto_memory")?.content ?? "";
+    try {
+      const res = await fetch("/api/memory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userText: lastUser, assistantText: lastAssistant, existing,
+          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey,
+        }),
+      });
+      const { facts } = await res.json();
+      if (Array.isArray(facts) && facts.length) {
+        store.addAutoMemoryFacts(facts.filter((f: unknown): f is string => typeof f === "string"));
+      }
+    } catch { /* yoksay */ }
+  }, []);
+
   const callApi = useCallback(async (overrideAgent?: Agent | null) => {
     const store = useStore.getState();
     let active = store.activeModel();
@@ -1138,12 +1169,13 @@ export function CoderView() {
         notifyReady("Craft.Coder", "Yanıt hazır.");
       }
       fetchFollowUps();
+      void extractMemory();
     }
   /* callApi reads the rest of its inputs live via useStore.getState() during
      streaming, so it deliberately keeps a minimal dep set — recreating it on
      every config change would break in-flight requests. */
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.systemPrompt, fetchFollowUps]);
+  }, [config.systemPrompt, fetchFollowUps, extractMemory]);
 
   const send = async () => {
     const text = input.trim();

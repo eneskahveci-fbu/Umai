@@ -22,10 +22,10 @@ export const PRESETS: Record<Provider, Preset> = {
     keyHint: "HF token (hf_...)",
   },
   deepseek: {
-    label: "🐋 DeepSeek",
+    label: "🐋 DeepSeek (Önerilen Ücretli — çok uygun)",
     baseUrl: "https://api.deepseek.com/v1",
     model: "deepseek-chat",
-    keyHint: "sk-... (kredi yüklü olmalı)",
+    keyHint: "sk-... (kredi yüklü olmalı; ~$0.27/M giriş)",
   },
   openrouter: {
     label: "🔀 OpenRouter",
@@ -40,10 +40,10 @@ export const PRESETS: Record<Provider, Preset> = {
     keyHint: "gsk_...",
   },
   gemini: {
-    label: "✨ Google Gemini (Ücretsiz)",
+    label: "✨ Google Gemini (Ücretsiz · Önerilen)",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
     model: "gemini-2.5-flash",
-    keyHint: "AIza...",
+    keyHint: "AIza... (aistudio.google.com/apikey — ücretsiz)",
   },
   mistral: {
     label: "🌬️ Mistral",
@@ -409,6 +409,7 @@ export const DEFAULT_CONFIG: Config = {
   projects: [],
   activeProjectId: null,
   followUps: true,
+  autoMemory: true,
   webSearch: false,
   cliMode: false,
   autoTerminal: false,
