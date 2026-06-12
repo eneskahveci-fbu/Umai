@@ -71,9 +71,11 @@ export function SettingsModal({ open, onClose }: Props) {
 
   useEffect(() => {
     // Sağlayıcı değişince Base URL'yi otomatik doldur
-    const def = PROVIDER_DEFAULTS[newProvider];
-    if (def && !newBaseUrl) {
-      setNewBaseUrl(def.baseUrl);
+    if (newProvider !== "custom" && newProvider !== "ollama") {
+      const def = PROVIDER_DEFAULTS[newProvider];
+      if (def && !newBaseUrl) {
+        setNewBaseUrl(def);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newProvider]);
