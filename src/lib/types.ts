@@ -96,6 +96,15 @@ export interface Project {
   gitAccountId: string;
 }
 
+//─────── Chat Summary (sidebar list) ───────
+export interface ChatSummary {
+  id: string;
+  title: string;
+  pinned: boolean;
+  incognito: boolean;
+  createdAt: number;
+}
+
 //─────── Sub-agent ───────
 export interface SubAgentTask {
   title: string;
