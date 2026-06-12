@@ -85,11 +85,11 @@ export function SettingsModal({ open, onClose }: Props) {
     const id = `${newProvider}-${Date.now()}`;
     addModel({
       id,
-      name: newName.trim() || PROVIDER_DEFAULTS[newProvider]?.name || newProvider,
+      name: newName.trim() || PROVIDER_LABELS[newProvider] || newProvider,
       provider: newProvider,
-      baseUrl: newBaseUrl.trim() || PROVIDER_DEFAULTS[newProvider]?.baseUrl || "",
+      baseURL: newBaseUrl.trim() || (newProvider !== "custom" && newProvider !== "ollama" ? PROVIDER_DEFAULTS[newProvider] : ""),
       apiKey: newApiKey.trim(),
-      active: models.length === 0,
+      enabled: models.length === 0,
     });
     setNewApiKey("");
     setNewName("");
