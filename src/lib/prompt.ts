@@ -1,77 +1,59 @@
-// ── Sistem prompt'u birleştirici ──
+import type { Skill } from "@/lib/types";
 
-import type { MemoryItem, SkillPayload } from "./types";
-import { DEFAULT_SYSTEM_PROMPT } from "./constants";
-import { PLATFORM_KNOWLEDGE } from "./platform-knowledge";
-
-export { SkillPayload as SkillLike };
+export type SkillLike = Pick<Skill, "title" | "content" | "source" | "fileName">;
 
 interface BuildContextOptions {
-  systemPrompt?: string;
-  memories?: MemoryItem[];
-  skills?: SkillPayload[];
-  searchContext?: string;
+  skills?: SkillLike[];
+  memories?: { content: string }[];
   projectPrompt?: string;
-  repoInfo?: string;
+  searchContext?: string;
+  platformKnowledge?: string;
+  repoSummary?: string;
 }
 
 /**
- * Tüm parçaları birleştirerek nihai sistem prompt'unu oluşturur.
+ * Sistem prompt'una eklenmek üzere bağlam bölümleri oluşturur.
+ * Her bölüm ayrı XML-benzeri başlık altında gruplanır.
  */
 export function buildContextSections(opts: BuildContextOptions): string {
   const sections: string[] = [];
 
-  // 1. Taban sistem prompt'u
-  sections.push(opts.systemPrompt || DEFAULT_SYSTEM_PROMPT);
-
-  // 2. Platform bilgisi
-  if (opts.systemPrompt?.includes("Craft.Coder") || !opts.systemPrompt) {
-    sections.push(PLATFORM_KNOWLEDGE);
+  if (opts.platformKnowledge) {
+    sections.push(`[Proje bağlamı — SOUL.md]:\n${opts.platformKnowledge}`);
   }
 
-  // 3. Proje bağlamı
   if (opts.projectPrompt) {
-    sections.push(`[Proje bağlamı — SOUL.md]:\n${opts.projectPrompt}`);
+    sections.push(`[Proje profili]\n${opts.projectPrompt}`);
   }
 
-  // 4. Repo bilgisi
-  if (opts.repoInfo) {
-    sections.push(`[Ajan modu — Repo: ${opts.repoInfo}]`);
-  }
-
-  // 5. Skills / referans dosyalar
-  if (opts.skills && opts.skills.length > 0) {
-    const manualSkills = opts.skills.filter((s) => s.source === "manual" || !s.source);
-    const fileSkills = opts.skills.filter((s) => s.source === "file");
-
-    if (manualSkills.length > 0) {
-      sections.push(
-        "[Eğitim seti]:\n" +
-          manualSkills.map((s) => `--- ${s.title} ---\n${s.content}`).join("\n\n"),
-      );
-    }
-
-    if (fileSkills.length > 0) {
-      sections.push(
-        "[Referans dosyalar — örnek olarak kullan]:\n" +
-          fileSkills
-            .map((s) => `--- ${s.fileName || s.title} ---\n${s.content}`)
-            .join("\n\n"),
-      );
-    }
-  }
-
-  // 6. Anılar (memories)
-  if (opts.memories && opts.memories.length > 0) {
-    sections.push(
-      "[Kullanıcı anıları]:\n" +
-        opts.memories.map((m) => `- ${m.key}: ${m.value}`).join("\n"),
-    );
-  }
-
-  // 7. Web arama bağlamı
   if (opts.searchContext) {
-    sections.push(`[Web arama sonucu]:\n${opts.searchContext}`);
+    sections.push(`[Web arama sonucu]\n${opts.searchContext}`);
+  }
+
+  if (opts.repoSummary) {
+    sections.push(`[Repo özeti]\n${opts.repoSummary}`);
+  }
+
+  if (opts.memories && opts.memories.length > 0) {
+    const memText = opts.memories.map((m) => `- ${m.content}`).join("\n");
+    sections.push(`[Kullanıcı notları / Bellek]\n${memText}`);
+  }
+
+  if (opts.skills && opts.skills.length > 0) {
+    const manual = opts.skills.filter((s) => s.source === "manual");
+    const file = opts.skills.filter((s) => s.source === "file");
+
+    if (manual.length > 0) {
+      const items = manual.map((s) => s.content).join("\n\n");
+      sections.push(`[Eğitim seti]\n${items}`);
+    }
+
+    if (file.length > 0) {
+      const items = file
+        .map((s) => `--- ${s.fileName ?? s.title} ---\n${s.content}`)
+        .join("\n\n");
+      sections.push(`[Referans dosyalar — örnek olarak kullan]:\n${items}`);
+    }
   }
 
   return sections.join("\n\n");
