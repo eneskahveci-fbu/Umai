@@ -8,6 +8,13 @@ export interface ToolCallRecord {
   status: "pending" | "done" | "error";
 }
 
+/** Ajanın bir turda değiştirdiği dosyanın yazma-öncesi anlık görüntüsü.
+    previous: null ⇒ dosya o turda OLUŞTURULDU (geri al = dosyayı sil). */
+export interface FileCheckpoint {
+  path: string;
+  previous: string | null;
+}
+
 export interface ChatMessage {
   role: Role;
   content: string;
@@ -20,6 +27,8 @@ export interface ChatMessage {
   rating?: "up" | "down";
   /** Ajan görev planı (update_plan aracıyla canlı güncellenen checklist). */
   plan?: string;
+  /** Bu turda değiştirilen dosyaların geri-al noktaları (sohbetle kalıcı). */
+  checkpoints?: FileCheckpoint[];
   /** Mesaj dallandırma: bu (kullanıcı) mesajı düzenlendiğinde her sürümün
       kendi yanıt zinciri. Her dal = bu mesajdan sonraki mesajların anlık görüntüsü. */
   branches?: ChatMessage[][];
