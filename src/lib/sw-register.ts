@@ -1,46 +1,39 @@
-/**
- * Service Worker kaydı ve bağlantı durumu takibi.
- */
+// ── Service Worker kayıt ve çevrimiçi/çevrimdışı izleme ──
 
-let connectionWatcher: (() => void) | null = null;
+let online = typeof navigator !== "undefined" ? navigator.onLine : true;
+const listeners = new Set<(online: boolean) => void>();
 
-/**
- * Service Worker'ı kaydeder. Başarısız olursa sessizce geçer.
- */
-export function registerServiceWorker() {
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => {
+    online = true;
+    listeners.forEach((fn) => fn(true));
+  });
+  window.addEventListener("offline", () => {
+    online = false;
+    listeners.forEach((fn) => fn(false));
+  });
+}
+
+export function isOnline(): boolean {
+  return online;
+}
+
+export function watchConnection(fn: (online: boolean) => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+export function registerSW(): void {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("/sw.js")
-      .then((reg) => {
-        console.log("[SW] Kayıt başarılı:", reg.scope);
+      .then(() => {
+        console.log("[SW] registered");
       })
       .catch((err) => {
-        console.warn("[SW] Kayıt başarısız:", err);
+        console.warn("[SW] registration failed:", err);
       });
   });
-}
-
-/**
- * Çevrimiçi/çevrimdışı durumunu izler. Durum değişince callback'i çağırır.
- * Geri dönen cleanup fonksiyonunu useEffect'te kullan.
- */
-export function watchConnection(callback: (online: boolean) => void): () => void {
-  if (typeof window === "undefined") {
-    callback(true);
-    return () => {};
-  }
-
-  const handler = () => callback(navigator.onLine);
-  window.addEventListener("online", handler);
-  window.addEventListener("offline", handler);
-
-  // İlk durumu bildir
-  callback(navigator.onLine);
-
-  return () => {
-    window.removeEventListener("online", handler);
-    window.removeEventListener("offline", handler);
-  };
 }
