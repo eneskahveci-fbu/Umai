@@ -43,7 +43,7 @@ export function SettingsModal({ open, onClose }: Props) {
 
   // Yeni model formu
   const [showNewModel, setShowNewModel] = useState(false);
-  const [newProvider, setNewProvider] = useState<Provider>("deepseek");
+  const [newProvider, setNewProvider] = useState<ProviderKind>("deepseek");
   const [newBaseUrl, setNewBaseUrl] = useState("");
   const [newApiKey, setNewApiKey] = useState("");
   const [newName, setNewName] = useState("");
