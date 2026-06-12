@@ -1,23 +1,21 @@
-// ── Merkezi tip tanımları ──
+// ── Paylaşımlı tipler ──
 
 export type Provider =
-  | "pollinations"
-  | "hf"
   | "openai"
   | "anthropic"
   | "google"
-  | "mistral"
   | "groq"
   | "deepseek"
+  | "mistral"
+  | "ollama"
   | "openrouter"
   | "cerebras"
-  | "togetherai"
   | "xai"
-  | "ollama"
+  | "together"
   | "pollinations"
   | "custom";
 
-export type ResponseStyle = "normal" | "short" | "detailed" | "code-focused" | "formal";
+export type ResponseStyle = "normal" | "short" | "detailed" | "code" | "formal";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -36,115 +34,81 @@ export interface ToolCall {
   };
 }
 
-export interface ToolDefinition {
-  type: "function";
-  function: {
-    name: string;
-    description: string;
-    parameters: Record<string, unknown>;
-    strict?: boolean;
-  };
-}
-
 export interface MemoryItem {
-  key: string;
-  value: string;
+  id: string;
+  content: string;
+  createdAt: number;
 }
 
-export interface SkillPayload {
+export interface Skill {
   title: string;
   content: string;
   tags?: string[];
-  source?: "manual" | "file";
+  source: "manual" | "file";
   fileName?: string;
+  enabled: boolean;
 }
 
-export type SkillLike = SkillPayload;
-
-export interface RepoReadCtx {
-  owner: string;
-  repo: string;
-  branch: string;
-  token?: string;
-  provider?: "github" | "gitlab";
-}
-
-export interface ModelConfig {
-  id: string;
-  name: string;
-  provider: Provider;
-  baseUrl: string;
-  apiKey: string;
-  active: boolean;
-}
-
-export interface AppConfig {
+export interface Config {
   theme: "dark" | "light";
   accentColor: "amber" | "green" | "orange";
   fontScale: "sm" | "base" | "lg";
   responseStyle: ResponseStyle;
+  followUpQuestions: boolean;
+  webSearch: boolean;
+  contextWindowTokens: number;
+  guestMode: boolean;
   fontSize: number;
-  notificationSound: boolean;
+  soundEnabled: boolean;
 }
 
-export interface GitAccount {
-  username: string;
-  token: string;
-  provider: "github" | "gitlab";
-}
-
-export interface Project {
-  owner: string;
-  repo: string;
-  branch: string;
-  rules?: string;
+export interface ModelEntry {
+  id: string;
+  provider: Provider;
+  displayName?: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  enabled: boolean;
 }
 
 export interface ChatSession {
   id: string;
   title: string;
   messages: ChatMessage[];
+  modelId?: string;
   createdAt: number;
   updatedAt: number;
   incognito?: boolean;
-  userId?: string;
+  pinned?: boolean;
 }
 
-export interface McpServerConfig {
-  url: string;
-  headers?: Record<string, string>;
-  enabled?: boolean;
-}
-
-// ── API istek/yanıt tipleri ──
-
-export interface ChatRequest {
-  messages: (ChatMessage | { role: string; content: unknown })[];
-  baseUrl?: string;
-  model?: string;
-  apiKey?: string;
-  provider?: Provider;
-  systemPrompt?: string;
-  temperature?: number;
-  maxTokens?: number;
-  style?: ResponseStyle;
-  memories?: MemoryItem[];
-  skills?: SkillPayload[];
-  searchContext?: string;
-  projectPrompt?: string;
-  tools?: boolean;
-  webSearch?: boolean;
-  requireWriteApproval?: boolean;
-  planApprovalMode?: boolean;
-  planApproved?: boolean;
-  blockNetworkTools?: boolean;
-  repoCtx?: RepoReadCtx;
-  mcpServers?: McpServerConfig[];
-}
-
-export interface SharePayload {
+export interface Project {
   id: string;
-  messages: ChatMessage[];
-  createdAt: string;
-  title?: string;
+  name: string;
+  repoOwner?: string;
+  repoName?: string;
+  branch?: string;
+  provider?: "github" | "gitlab";
+  token?: string;
+  rulesContent?: string;
+  createdAt: number;
+}
+
+export interface ToolDef {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
+// Repo bağlamı (API route'larda ortak kullanılır)
+export interface RepoCtx {
+  owner: string;
+  repo: string;
+  branch: string;
+  token?: string;
+  provider?: "github" | "gitlab";
 }
