@@ -19,6 +19,7 @@ import type {
   TreeNode,
 } from "./types";
 import { DEFAULT_CONFIG, DEFAULT_REPO, DEFAULT_SKILLS, POLLINATIONS_DEFAULT_MODEL } from "./constants";
+import { applyEditBranch, applySwitchBranch } from "./branching";
 import { createClient } from "./supabase/client";
 
 const CONFIG_KEY = "craftai_config";
@@ -322,6 +323,8 @@ interface StoreState {
   popLastMessage: () => void;
   editMessageAt: (index: number, content: string) => void;
   truncateAfter: (index: number) => void;
+  editMessageBranch: (index: number, content: string) => void;
+  switchMessageVersion: (index: number, branchIndex: number) => void;
   maybeSetTitle: (text: string) => void;
   persistCurrent: () => Promise<void>;
   exportChat: (id: string) => void;
@@ -863,6 +866,22 @@ export const useStore = create<StoreState>()((set, get) => ({
         c.id === s.currentId ? { ...c, messages: c.messages.slice(0, index + 1) } : c,
       ),
     })),
+
+  editMessageBranch: (index, content) =>
+    set((s) => ({
+      chats: s.chats.map((c) =>
+        c.id === s.currentId ? { ...c, messages: applyEditBranch(c.messages, index, content) } : c,
+      ),
+    })),
+
+  switchMessageVersion: (index, branchIndex) => {
+    set((s) => ({
+      chats: s.chats.map((c) =>
+        c.id === s.currentId ? { ...c, messages: applySwitchBranch(c.messages, index, branchIndex) } : c,
+      ),
+    }));
+    void get().persistCurrent();
+  },
 
   maybeSetTitle: (text) =>
     set((s) => ({
