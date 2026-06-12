@@ -1,60 +1,84 @@
-import type { Skill } from "@/lib/types";
+// src/lib/prompt.ts — Sistem promptu oluşturma
 
-export type SkillLike = Pick<Skill, "title" | "content" | "source" | "fileName">;
+import type { PromptContext, Skill, ResponseStyle } from "./types";
+import { RESPONSE_STYLE_PROMPTS, PLATFORM_KNOWLEDGE } from "./constants";
 
-interface BuildContextOptions {
-  skills?: SkillLike[];
-  memories?: { content: string }[];
-  projectPrompt?: string;
-  searchContext?: string;
-  platformKnowledge?: string;
-  repoSummary?: string;
+function buildSkillsSection(skills: Skill[]): string {
+  if (!skills.length) return "";
+
+  const manual = skills.filter((s) => s.enabled && s.type === "manual");
+  const file = skills.filter((s) => s.enabled && s.type === "file");
+
+  const parts: string[] = [];
+
+  if (manual.length > 0) {
+    parts.push("[Eğitim seti — manuel skill'ler]:");
+    for (const s of manual) {
+      parts.push(`--- ${s.title} ---`);
+      parts.push(s.content);
+    }
+  }
+
+  if (file.length > 0) {
+    parts.push("[Referans dosyalar — örnek olarak kullan]:");
+    for (const s of file) {
+      parts.push(`--- ${s.title} ---`);
+      parts.push(s.content);
+    }
+  }
+
+  return parts.join("\n");
 }
 
-/**
- * Sistem prompt'una eklenmek üzere bağlam bölümleri oluşturur.
- * Her bölüm ayrı XML-benzeri başlık altında gruplanır.
- */
-export function buildContextSections(opts: BuildContextOptions): string {
-  const sections: string[] = [];
+export function buildSystemPrompt(ctx: PromptContext): string {
+  const parts: string[] = [];
 
-  if (opts.platformKnowledge) {
-    sections.push(`[Proje bağlamı — SOUL.md]:\n${opts.platformKnowledge}`);
+  // Ana direktif
+  parts.push(
+    `Sen Craft.Coder, deneyimli bir yazılım geliştirme asistanısın. Kod yazabilir, açıklayabilir, hata ayıklayabilir, mimari önerebilirsin. Kullanıcı sana GitHub deposundan dosya içeriği gösterebilir; bunları dikkate al. Adım adım düşün. Cevapların Türkçe ve markdown formatında olsun; kod bloklarını dilini belirterek yaz. Bir dosya içeriği yazarken code-fence'i \`dil:dosya/yolu\` biçiminde başlat (örn. \` \`\`ts:src/utils/helper.ts \` \`\`), böylece editörde otomatik açılabilsin.`,
+  );
+
+  // Platform bilgisi
+  if (ctx.platformKnowledge) {
+    parts.push(ctx.platformKnowledge);
+  } else {
+    parts.push(PLATFORM_KNOWLEDGE);
   }
 
-  if (opts.projectPrompt) {
-    sections.push(`[Proje profili]\n${opts.projectPrompt}`);
+  // Skill'ler
+  const skillsSection = buildSkillsSection(ctx.skills);
+  if (skillsSection) {
+    parts.push(skillsSection);
   }
 
-  if (opts.searchContext) {
-    sections.push(`[Web arama sonucu]\n${opts.searchContext}`);
+  // Proje bağlamı
+  if (ctx.projectContext) {
+    parts.push("[Proje bağlamı — SOUL.md]:");
+    parts.push(ctx.projectContext);
   }
 
-  if (opts.repoSummary) {
-    sections.push(`[Repo özeti]\n${opts.repoSummary}`);
+  // Bellek
+  if (ctx.memory) {
+    parts.push(`[Kullanıcı belleği — sohbetler arası hatırlanan notlar]:\n${ctx.memory}`);
   }
 
-  if (opts.memories && opts.memories.length > 0) {
-    const memText = opts.memories.map((m) => `- ${m.content}`).join("\n");
-    sections.push(`[Kullanıcı notları / Bellek]\n${memText}`);
+  // Yanıt stili
+  const stylePrompt = RESPONSE_STYLE_PROMPTS[ctx.responseStyle];
+  if (stylePrompt) {
+    parts.push(stylePrompt);
   }
 
-  if (opts.skills && opts.skills.length > 0) {
-    const manual = opts.skills.filter((s) => s.source === "manual");
-    const file = opts.skills.filter((s) => s.source === "file");
-
-    if (manual.length > 0) {
-      const items = manual.map((s) => s.content).join("\n\n");
-      sections.push(`[Eğitim seti]\n${items}`);
-    }
-
-    if (file.length > 0) {
-      const items = file
-        .map((s) => `--- ${s.fileName ?? s.title} ---\n${s.content}`)
-        .join("\n\n");
-      sections.push(`[Referans dosyalar — örnek olarak kullan]:\n${items}`);
-    }
+  // Sistem prompt override
+  if (ctx.systemPrompt) {
+    parts.push(ctx.systemPrompt);
   }
 
-  return sections.join("\n\n");
+  return parts.join("\n\n");
+}
+
+// Tool-use talimatlarını prompt'a ekle
+export function buildToolUsePrompt(): string {
+  return `Sen uzman bir yazılım geliştiricisisin. Claude Code tarzında çalış: kullanıcının kod tabanını anla, dosya içeriklerini incele, sorunlara adım adım yaklaş. Kod yazarken best practice'leri uygula, okunabilir ve sürdürülebilir çözümler sun.
+
+[Düşünme: YÜKSEK] Adım adım analiz et. Sorunu içselleştir, olası yaklaşımları kıyasla, edge case'leri düşün, ardından gerekçeli çözümü ver.`;
 }
