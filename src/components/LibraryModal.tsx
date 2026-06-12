@@ -1,85 +1,201 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { useStore } from "@/lib/store";
-import type { ModelConfig, Provider, AppConfig } from "@/lib/types";
+import type { Project } from "@/lib/types";
+import { X, Plus, FolderGit2, Trash2, Check } from "lucide-react";
 
-interface Props {
-  open?: boolean;
-  onClose?: () => void;
-}
+export function LibraryModal() {
+  const open = useStore((s) => s.libraryOpen);
+  const setOpen = useStore((s) => s.setLibraryOpen);
+  const projects = useStore((s) => s.projects);
+  const addProject = useStore((s) => s.addProject);
+  const removeProject = useStore((s) => s.removeProject);
+  const setActiveProject = useStore((s) => s.setActiveProject);
+  const activeProjectId = useStore((s) => s.activeProjectId);
 
-type TabId = "model" | "git" | "general" | "advanced";
+  const [showForm, setShowForm] = useState(false);
+  const [name, setName] = useState("");
+  const [owner, setOwner] = useState("");
+  const [repoName, setRepoName] = useState("");
+  const [branch, setBranch] = useState("main");
+  const [provider, setProvider] = useState<"github" | "gitlab">("github");
+  const [token, setToken] = useState("");
 
-export function LibraryModal({ open, onClose }: Props) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState<"all" | "manual" | "files">("all");
+  if (!open) return null;
 
-  const isControlled = open !== undefined;
-  const visible = isControlled ? open : isOpen;
+  const handleAdd = () => {
+    if (!name.trim() || !owner.trim() || !repoName.trim()) return;
 
-  const close = useCallback(() => {
-    if (isControlled) onClose?.();
-    else setIsOpen(false);
-  }, [isControlled, onClose]);
+    const project: Project = {
+      id: crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      name: name.trim(),
+      repoOwner: owner.trim(),
+      repoName: repoName.trim(),
+      branch: branch.trim() || "main",
+      provider,
+      token: token.trim() || undefined,
+      createdAt: Date.now(),
+    };
 
-  useEffect(() => {
-    const handler = () => setIsOpen(true);
-    window.addEventListener("open-library", handler);
-    return () => window.removeEventListener("open-library", handler);
-  }, []);
-
-  if (!visible) return null;
+    addProject(project);
+    setName("");
+    setOwner("");
+    setRepoName("");
+    setBranch("main");
+    setToken("");
+    setShowForm(false);
+  };
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) close(); }}
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] bg-bg/80 backdrop-blur-sm"
+      onClick={() => setOpen(false)}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Proje kütüphanesi"
     >
-      <div className="w-full max-w-3xl max-h-[80vh] bg-[var(--color-bg)] border border-[var(--color-surface)] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-        {/* Başlık */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-surface)]">
-          <h2 className="text-lg font-semibold">📚 Kütüphane</h2>
-          <button onClick={close} className="text-[var(--color-ink)]/40 hover:text-[var(--color-ink)] transition-colors text-lg">
-            ✕
+      <div
+        className="bg-surface border border-line rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-line">
+          <div className="flex items-center gap-2">
+            <FolderGit2 size={18} className="text-amber-400" />
+            <h3 className="font-semibold">Projeler</h3>
+          </div>
+          <button
+            onClick={() => setOpen(false)}
+            className="hover:bg-bgsoft rounded-lg p-1 transition-colors"
+            title="Kapat"
+            aria-label="Kapat"
+          >
+            <X size={18} />
           </button>
         </div>
 
-        {/* Arama ve filtreler */}
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-[var(--color-surface)]">
-          <div className="flex-1 flex items-center gap-2 bg-[var(--color-surface)]/50 rounded-lg px-3 py-2">
-            <span className="text-[var(--color-ink)]/40">🔍</span>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Skill veya dosya ara..."
-              className="flex-1 bg-transparent outline-none text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink)]/40"
-            />
-          </div>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value as typeof category)}
-            className="bg-[var(--color-surface)]/50 rounded-lg px-3 py-2 text-xs outline-none border-none text-[var(--color-ink)]/70"
-          >
-            <option value="all">Tümü</option>
-            <option value="manual">Manuel</option>
-            <option value="files">Dosyalar</option>
-          </select>
-        </div>
+        <div className="max-h-80 overflow-y-auto p-4 space-y-3">
+          {/* Proje listesi */}
+          {projects.map((p) => (
+            <div
+              key={p.id}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors cursor-pointer group ${
+                activeProjectId === p.id
+                  ? "border-amber-400/50 bg-amber-400/10"
+                  : "border-line hover:bg-bgsoft"
+              }`}
+              onClick={() => setActiveProject(p.id === activeProjectId ? null : p.id)}
+            >
+              <FolderGit2 size={16} className="text-muted shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{p.name}</p>
+                <p className="text-xs text-muted truncate">
+                  {p.repoOwner}/{p.repoName}
+                </p>
+              </div>
+              {activeProjectId === p.id && (
+                <Check size={14} className="text-amber-400 shrink-0" />
+              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeProject(p.id);
+                }}
+                className="opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all p-0.5 shrink-0"
+                title="Sil"
+                aria-label={`${p.name} projesini sil`}
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
 
-        {/* İçerik — placeholder */}
-        <div className="flex-1 overflow-y-auto p-5">
-          <div className="text-center py-12">
-            <div className="text-4xl mb-4">📚</div>
-            <p className="text-sm text-[var(--color-ink)]/40">
-              Skill ve referans dosya kütüphanesi burada görüntülenecek.
+          {projects.length === 0 && !showForm && (
+            <p className="text-sm text-muted text-center py-6">
+              Henüz proje yok. Yeni bir repo bağlantısı ekleyin.
             </p>
-            <p className="text-xs text-[var(--color-ink)]/30 mt-1">
-              Skills panelinden skill ekleyebilirsiniz.
-            </p>
-          </div>
+          )}
+
+          {/* Ekleme formu */}
+          {showForm && (
+            <div className="space-y-2 p-3 rounded-xl border border-line bg-bgsoft/50">
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Proje adı (örn: Kişisel Blog)"
+                className="w-full bg-bgsoft border border-line rounded-xl px-3 py-2 text-sm outline-none focus:border-amber-400/50"
+              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={owner}
+                  onChange={(e) => setOwner(e.target.value)}
+                  placeholder="Kullanıcı adı"
+                  className="flex-1 bg-bgsoft border border-line rounded-xl px-3 py-2 text-sm outline-none focus:border-amber-400/50"
+                />
+                <span className="text-muted self-center">/</span>
+                <input
+                  type="text"
+                  value={repoName}
+                  onChange={(e) => setRepoName(e.target.value)}
+                  placeholder="Repo"
+                  className="flex-1 bg-bgsoft border border-line rounded-xl px-3 py-2 text-sm outline-none focus:border-amber-400/50"
+                />
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={branch}
+                  onChange={(e) => setBranch(e.target.value)}
+                  placeholder="Dal (main)"
+                  className="flex-1 bg-bgsoft border border-line rounded-xl px-3 py-2 text-sm outline-none focus:border-amber-400/50"
+                />
+                <select
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value as "github" | "gitlab")}
+                  className="bg-bgsoft border border-line rounded-xl px-2 py-2 text-sm outline-none"
+                >
+                  <option value="github">GitHub</option>
+                  <option value="gitlab">GitLab</option>
+                </select>
+              </div>
+              <input
+                type="password"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="Token (opsiyonel, sadece tarayıcıda saklanır)"
+                className="w-full bg-bgsoft border border-line rounded-xl px-3 py-2 text-sm outline-none focus:border-amber-400/50"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAdd}
+                  className="flex-1 py-2 bg-amber-400 text-black rounded-xl text-sm font-medium hover:bg-amber-300 transition-colors flex items-center justify-center gap-1"
+                >
+                  <Plus size={14} />
+                  Ekle
+                </button>
+                <button
+                  onClick={() => setShowForm(false)}
+                  className="px-4 py-2 border border-line rounded-xl text-sm hover:bg-bgsoft transition-colors"
+                >
+                  İptal
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Ekle butonu */}
+          {!showForm && (
+            <button
+              onClick={() => setShowForm(true)}
+              className="w-full py-2.5 border border-dashed border-line rounded-xl text-sm text-muted hover:text-ink hover:bg-bgsoft transition-colors flex items-center justify-center gap-2"
+            >
+              <Plus size={14} />
+              Yeni Proje Bağla
+            </button>
+          )}
         </div>
       </div>
     </div>
