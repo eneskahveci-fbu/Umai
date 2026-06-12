@@ -376,7 +376,7 @@ export function SettingsModal({ open, onClose }: Props) {
                   {RESPONSE_STYLES.map((s) => (
                     <button
                       key={s.id}
-                      onClick={() => updateConfig({ responseStyle: s.id })}
+                      onClick={() => updateConfig("responseStyle", s.id)}
                       className={`p-3 text-left rounded-xl border transition-colors ${
                         config.responseStyle === s.id
                           ? "border-[var(--color-brand)] bg-[var(--color-brand)]/10"
