@@ -79,44 +79,73 @@ function getKeyArg(name: string, args: Record<string, unknown>): string {
   }
 }
 
-function ToolCallCard({ call }: { call: NonNullable<ChatMessage["toolCalls"]>[number] }) {
+function ToolCallCard({
+  call,
+  isLast,
+}: {
+  call: NonNullable<ChatMessage["toolCalls"]>[number];
+  isLast: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const isRunning = call.status === "pending";
   const args = (() => { try { return JSON.parse(call.arguments || "{}"); } catch { return {}; } })();
   const label = isRunning ? (TOOL_LABEL[call.name] ?? call.name) : (TOOL_DONE_LABEL[call.name] ?? call.name);
   const keyArg = getKeyArg(call.name, args);
+  const elapsed =
+    call.startedAt && call.endedAt && call.endedAt > call.startedAt
+      ? call.endedAt - call.startedAt >= 1000
+        ? ((call.endedAt - call.startedAt) / 1000).toFixed(1) + "s"
+        : (call.endedAt - call.startedAt) + "ms"
+      : null;
 
   return (
-    <div>
-      <div className="flex items-center gap-2 py-1 min-w-0 group/tool">
-        <div className="shrink-0 w-4 flex justify-center">
-          {isRunning
-            ? <Loader2 size={10} className="animate-spin text-brand" />
-            : <Check size={10} className="text-green/80" />}
+    <div className="relative">
+      {/* Vertical timeline connector */}
+      {!isLast && (
+        <div className="absolute left-[11px] top-[22px] bottom-0 w-px bg-line/25 pointer-events-none" />
+      )}
+      <div className="flex items-start gap-2.5 py-[3px] min-w-0 group/tool">
+        {/* Status indicator */}
+        <div className="shrink-0 mt-0.5 w-5 h-5 flex items-center justify-center">
+          {isRunning ? (
+            <Loader2 size={12} className="animate-spin text-brand" />
+          ) : (
+            <div className="w-4 h-4 rounded-full bg-bgsoft border border-line/60 flex items-center justify-center">
+              <Check size={8} className="text-green/80" strokeWidth={2.5} />
+            </div>
+          )}
         </div>
-        <span className={`shrink-0 ${isRunning ? "text-brand" : "text-muted/50"}`}>
-          <ToolIcon name={call.name} />
-        </span>
-        <span className={`text-[11px] font-medium shrink-0 ${isRunning ? "text-ink/80" : "text-muted/60"}`}>
-          {label}
-        </span>
-        {keyArg && (
-          <code className={`text-[11px] font-mono truncate min-w-0 ${isRunning ? "text-brand/80" : "text-muted/50"}`}>
-            {keyArg}
-          </code>
-        )}
-        {call.result && (
-          <button
-            onClick={() => setOpen((o) => !o)}
-            className="ml-auto shrink-0 opacity-0 group-hover/tool:opacity-100 transition-opacity flex items-center gap-0.5 text-[10px] text-muted/50 hover:text-muted px-1.5 py-0.5 rounded hover:bg-bgsoft"
-          >
-            {open ? <><ChevronUp size={9} /> gizle</> : <><ChevronDown size={9} /> sonuç</>}
-          </button>
-        )}
+
+        <div className="flex items-center gap-1.5 flex-1 min-w-0 py-0.5">
+          <span className={`shrink-0 ${isRunning ? "text-brand" : "text-muted/50"}`}>
+            <ToolIcon name={call.name} size={12} />
+          </span>
+          <span className={`text-[11px] font-medium shrink-0 ${isRunning ? "text-ink/80" : "text-muted/60"}`}>
+            {label}
+          </span>
+          {keyArg && (
+            <code className={`text-[11px] font-mono truncate min-w-0 ${isRunning ? "text-brand/80" : "text-muted/45"}`}>
+              {keyArg}
+            </code>
+          )}
+          <div className="ml-auto flex items-center gap-1 shrink-0">
+            {elapsed && (
+              <span className="text-[10px] text-muted/35 font-mono tabular-nums">{elapsed}</span>
+            )}
+            {call.result && (
+              <button
+                onClick={() => setOpen((o) => !o)}
+                className="opacity-0 group-hover/tool:opacity-100 transition-opacity flex items-center gap-0.5 text-[10px] text-muted/45 hover:text-muted/80 px-1.5 py-0.5 rounded hover:bg-bgsoft"
+              >
+                {open ? <ChevronUp size={9} /> : <ChevronDown size={9} />}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
       {open && call.result && (
-        <div className="ml-6 mb-1 rounded-lg bg-bgsoft/40 border border-line/30 px-2.5 py-2">
-          <pre className="font-mono text-[10px] text-muted/70 whitespace-pre-wrap break-all max-h-36 overflow-y-auto">
+        <div className="ml-7 mb-1 rounded-lg bg-bgsoft/40 border border-line/25 px-2.5 py-2">
+          <pre className="font-mono text-[10px] text-muted/65 whitespace-pre-wrap break-all max-h-40 overflow-y-auto">
             {call.result}
           </pre>
         </div>
@@ -179,6 +208,15 @@ function ToolCallGroup({ calls }: { calls: NonNullable<ChatMessage["toolCalls"]>
     ? `${running.length > 1 ? `${running.length} işlem` : "1 işlem"} çalışıyor…`
     : `${calls.length} işlem tamamlandı`;
 
+  /* Total elapsed time across all finished calls */
+  const totalMs = done.reduce((sum, c) => {
+    if (c.startedAt && c.endedAt && c.endedAt > c.startedAt) return sum + (c.endedAt - c.startedAt);
+    return sum;
+  }, 0);
+  const totalElapsed = done.length === calls.length && totalMs > 0
+    ? totalMs >= 1000 ? (totalMs / 1000).toFixed(1) + "s" : totalMs + "ms"
+    : null;
+
   /* Count reads for cross-file summary */
   const readFiles = calls
     .filter((c) => c.name === "read_file")
@@ -195,8 +233,11 @@ function ToolCallGroup({ calls }: { calls: NonNullable<ChatMessage["toolCalls"]>
           ? <Loader2 size={10} className="animate-spin text-brand shrink-0" />
           : <Check size={10} className="text-green/80 shrink-0" />}
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted/60 flex-1">{headerText}</span>
+        {totalElapsed && (
+          <span className="text-[10px] text-muted/35 font-mono tabular-nums mr-2">{totalElapsed}</span>
+        )}
         {readFiles.length > 1 && running.length === 0 && (
-          <span className="text-[10px] text-muted/40 mr-2">{readFiles.length} dosya çapraz okundu</span>
+          <span className="text-[10px] text-muted/35 mr-2">{readFiles.length} dosya</span>
         )}
         {running.length === 0 && (
           collapsed ? <ChevronRight size={10} className="text-muted/40 shrink-0" /> : <ChevronDown size={10} className="text-muted/40 shrink-0" />
@@ -204,8 +245,10 @@ function ToolCallGroup({ calls }: { calls: NonNullable<ChatMessage["toolCalls"]>
       </button>
 
       {!collapsed && (
-        <div className="px-3 py-1 divide-y divide-line/20">
-          {calls.map((tc) => <ToolCallCard key={tc.id} call={tc} />)}
+        <div className="px-3 pt-1 pb-0.5">
+          {calls.map((tc, i) => (
+            <ToolCallCard key={tc.id} call={tc} isLast={i === calls.length - 1} />
+          ))}
         </div>
       )}
 

@@ -1066,10 +1066,12 @@ export function CoderView() {
               if (ev.phase === "start") {
                 useStore.getState().appendToolCallToLast({
                   id: ev.id, name: ev.name, arguments: ev.arguments || "{}", status: "pending",
+                  startedAt: Date.now(),
                 });
               } else if (ev.phase === "end") {
                 useStore.getState().updateToolCallOnLast(ev.id, {
                   result: ev.result, status: "done",
+                  endedAt: Date.now(),
                 });
               }
               continue;
@@ -1097,6 +1099,14 @@ export function CoderView() {
                 if (!turnCheckpoints.some((c) => c.path === path)) {
                   turnCheckpoints.push({ path, previous });
                 }
+              }
+              continue;
+            }
+            /* toplu commit tamamlandı */
+            if (parsed.batch_commit_event) {
+              const ev = parsed.batch_commit_event;
+              if (ev?.result?.startsWith("✅")) {
+                addToast(`${ev.result}`, "success");
               }
               continue;
             }
