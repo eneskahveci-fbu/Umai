@@ -49,6 +49,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   theme: "dark",
   responseStyle: "normal",
   fontSize: 16,
+  fontScale: "base",
   accentColor: "amber",
   soundEnabled: false,
   guestMode: false,
