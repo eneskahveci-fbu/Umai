@@ -198,9 +198,25 @@ export const useStore = create<StoreState>((set, get) => ({
       return { config: next };
     });
   },
-  syncConfig: (c) => {
-    saveToStorage("craft-config", c);
-    set({ config: c });
+  syncConfig: async (userId) => {
+    // Sync config with Supabase for logged-in user
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const sb = createClient();
+      if (!sb) return;
+      const { data, error } = await sb
+        .from("user_config")
+        .select("config")
+        .eq("user_id", userId)
+        .single();
+      if (!error && data?.config) {
+        const merged = { ...get().config, ...(data.config as Partial<Config>) };
+        set({ config: merged });
+        saveToStorage("craft-config", merged);
+      }
+    } catch {
+      // Offline veya hata — sessizce geç
+    }
   },
 
   // ── Chats ──
