@@ -172,6 +172,10 @@ export const useStore = create<StoreState>((set, get) => ({
   gitAccounts: [],
   projects: [],
   memories: [],
+  toasts: [],
+  artifact: null,
+  diff: null,
+  onboardingCompleted: loadFromStorage<boolean>("craft-onboarding", false),
 
   // ── UI Actions ──
   setSidebarOpen: (v) => set({ sidebarOpen: v }),
