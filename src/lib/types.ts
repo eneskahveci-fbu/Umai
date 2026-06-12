@@ -1,213 +1,146 @@
-export type Role = "user" | "assistant" | "system" | "tool";
-
-export interface ToolCallRecord {
-  id: string;
-  name: string;
-  arguments: string;
-  result?: string;
-  status: "pending" | "done" | "error";
-}
-
-export interface ChatMessage {
-  role: Role;
-  content: string;
-  images?: string[];
-  agentId?: string;
-  tokenIn?: number;
-  tokenOut?: number;
-  toolCalls?: ToolCallRecord[];
-  thinking?: string;
-  rating?: "up" | "down";
-  /** Ajan görev planı (update_plan aracıyla canlı güncellenen checklist). */
-  plan?: string;
-  /** Mesaj dallandırma: bu (kullanıcı) mesajı düzenlendiğinde her sürümün
-      kendi yanıt zinciri. Her dal = bu mesajdan sonraki mesajların anlık görüntüsü. */
-  branches?: ChatMessage[][];
-  /** Aktif dalın indeksi. */
-  branchIndex?: number;
-}
-
-export interface McpServer {
-  id: string;
-  name: string;
-  url: string;
-  headers?: Record<string, string>;
-  enabled: boolean;
-}
-
-export interface Snippet {
-  id: string;
-  title: string;
-  language: string;
-  code: string;
-  created_at: number;
-  tags?: string[];
-}
-
-export interface Chat {
-  id: string;
-  title: string;
-  messages: ChatMessage[];
-  created_at: number;
-  incognito?: boolean;
-  projectId?: string;
-  totalInTokens?: number;
-  totalOutTokens?: number;
-  tags?: string[];
-  pinned?: boolean;
-}
+// ── Temel Tipler ──
 
 export type Provider =
   | "pollinations"
   | "hf"
-  | "deepseek"
+  | "openai"
+  | "anthropic"
   | "openrouter"
+  | "deepseek"
   | "groq"
-  | "gemini"
+  | "google"
   | "mistral"
   | "cerebras"
   | "together"
   | "xai"
   | "ollama"
-  | "anthropic"
   | "pollinations"
   | "custom";
 
-export interface ModelProfile {
+export type ResponseStyle = "normal" | "short" | "detailed" | "code" | "formal";
+
+export type Theme = "dark" | "light";
+export type AccentColor = "amber" | "green" | "orange";
+export type FontScale = "sm" | "base" | "lg";
+
+export interface ChatMessage {
   id: string;
-  label: string;
-  provider: Provider;
-  baseUrl: string;
-  model: string;
-  apiKey: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  createdAt: number;
+  model?: string;
+  provider?: Provider;
+  toolCalls?: ToolCall[];
+  toolResults?: ToolResult[];
+  artifacts?: Artifact[];
+  edited?: boolean;
 }
 
-export interface GitHubAccount {
-  id: string;
-  username: string;
-  token: string;
-}
-
-export interface GitLabAccount {
-  id: string;
-  username: string;
-  token: string;
-}
-
-export type ResponseStyle = "normal" | "concise" | "detailed" | "code" | "formal";
-
-export interface Project {
+export interface ToolCall {
   id: string;
   name: string;
-  systemPrompt: string;
-  created_at: number;
-  /** Bu proje aktifken kullanılacak model (boşsa global aktif model). */
-  modelId?: string;
-  /** Bu projeye özel örnekleme sıcaklığı (0-2). Tanımsız = sağlayıcı varsayılanı. */
-  temperature?: number;
-  /** Bu projeye özel maksimum yanıt token'ı. Tanımsız = sağlayıcı varsayılanı. */
-  maxTokens?: number;
+  arguments: Record<string, unknown>;
+}
+
+export interface ToolResult {
+  toolCallId: string;
+  name: string;
+  result: string;
+}
+
+export interface Artifact {
+  id: string;
+  type: "html" | "svg" | "mermaid" | "code";
+  content: string;
+  language?: string;
 }
 
 export interface MemoryItem {
   id: string;
   content: string;
+  createdAt: number;
+}
+
+export interface Config {
+  theme: Theme;
+  accentColor: AccentColor;
+  fontScale: FontScale;
+  fontSize: number;
+  responseStyle: ResponseStyle;
+  memory: string;
+  systemPrompt: string;
+  followUpQuestions: boolean;
+  webSearch: boolean;
+  contextWindowTokens: number;
+  guestMode: boolean;
+  notificationSound: boolean;
+  webContainerApiKey: string;
+}
+
+export interface ModelEntry {
+  id: string;
+  name: string;
+  provider: Provider;
+  baseUrl: string;
+  apiKey: string;
+  modelId: string;
+  enabled: boolean;
+  isDefault?: boolean;
 }
 
 export interface Skill {
   id: string;
   title: string;
   content: string;
-  tags: string[];
-  enabled: boolean;
   source: "manual" | "file";
+  enabled: boolean;
+  tags?: string[];
   fileName?: string;
-  usageCount: number;
-  createdAt: number;
 }
 
-export interface Artifact {
-  type: "html" | "svg" | "mermaid";
-  content: string;
-  title: string;
-}
-
-export interface PromptTemplate {
+export interface ChatSession {
   id: string;
-  category: string;
   title: string;
-  prompt: string;
+  messages: ChatMessage[];
+  modelId?: string;
+  provider?: Provider;
+  createdAt: number;
+  updatedAt: number;
+  archived?: boolean;
 }
 
-export interface Config {
-  models: ModelProfile[];
-  activeModelId: string | null;
-  githubAccounts: GitHubAccount[];
-  activeGithubId: string | null;
-  gitlabAccounts: GitLabAccount[];
-  activeGitlabId: string | null;
-  repos: string[];
-  activeRepo: string | null;
-  systemPrompt: string;
-  theme: "dark" | "light";
-  style: ResponseStyle;
-  memories: MemoryItem[];
+export interface Project {
+  id: string;
+  name: string;
+  repoOwner?: string;
+  repoName?: string;
+  branch?: string;
+  provider?: "github" | "gitlab";
+  token?: string;
+  rules?: string;
+}
+
+export interface GitAccount {
+  id: string;
+  provider: "github" | "gitlab";
+  username: string;
+  token: string;
+}
+
+export interface UserSettings {
+  id: string;
+  config: Config;
+  models: ModelEntry[];
   skills: Skill[];
+  gitAccounts: GitAccount[];
   projects: Project[];
-  activeProjectId: string | null;
-  followUps: boolean;
-  webSearch: boolean;
-  cliMode: boolean;
-  autoTerminal: boolean;
-  /** Editörde satır içi (ghost text) AI tamamlama. Aktif modelin API kotasını
-      kullandığı için kapatılabilir. Tanımsız = açık. */
-  inlineCompletion?: boolean;
-  /** Açıksa ajan dosyaları doğrudan yazıp commit edemez; değişiklikleri kod
-      bloğu olarak ÖNERİR, kullanıcı commit arayüzüyle uygular. Tanımsız = kapalı. */
-  requireWriteApproval?: boolean;
-  /** Açıksa AI'nın önerdiği SADECE allowlist'teki komutlar otomatik çalışır
-      (çıktı AI'ya beslenir → güvenli oto-düzelt). Tanımsız = kapalı. */
-  autoRunCommands?: boolean;
-  /** Otomatik çalıştırılmasına izin verilen komut önekleri. */
-  commandAllowlist?: string[];
-  /** Açıksa ajan önce PLAN sunar ve değişiklik yapmadan durur; kullanıcı
-      onaylayınca uygular. Tanımsız = kapalı. */
-  planApprovalMode?: boolean;
-  /** Açıksa ajan internet (web_search/read_url) araçlarını kullanamaz.
-      Tanımsız = ağ erişimi serbest. */
-  blockNetworkTools?: boolean;
-  rulesFile: string;
-  fontScale: "sm" | "base" | "lg";
-  soundEnabled: boolean;
-  accentColor: "amber" | "green" | "orange";
-  maxContext: number;
-  webcontainerApiKey: string;
-  mcpServers?: McpServer[];
+  memories: MemoryItem[];
 }
 
-export interface RepoState {
+export interface RepoReadCtx {
   owner: string;
   repo: string;
   branch: string;
-}
-
-export interface TreeFile {
-  name: string;
-  path: string;
-}
-
-export interface TreeNode {
-  dirs: Record<string, TreeNode>;
-  files: TreeFile[];
-}
-
-export interface OpenFile {
-  path: string;
-  content: string;
-}
-
-export interface Toast {
-  id: string;
-  message: string;
-  type: "success" | "error" | "info";
+  token?: string;
+  provider?: "github" | "gitlab";
 }
