@@ -1,6 +1,7 @@
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/constants";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { buildContextSections } from "@/lib/prompt";
+import { runReadOnlyAgent } from "@/lib/subagent";
 import { filterByGlob } from "@/lib/glob";
 import { pruneMessages } from "@/lib/contextWindow";
 import { detectFrameworks, extractDeps, parseGitignore } from "@/lib/projectContext";
@@ -797,10 +798,12 @@ export async function POST(req: Request) {
       `• list_branches() / create_branch(name, from?) — dal işlemleri\n` +
       `• create_pr(title, head, base, body?) — PR/MR aç (başlık+açıklamayı sen üret)\n` +
       `• get_commit_history(limit?, path?) — commit geçmişi\n` +
+      `• dispatch_agents(tasks[]) — karmaşık görevi PARALEL salt-okunur alt-ajanlara böl (Claude'daki gibi)\n` +
       `• update_plan(plan) — çok adımlı görevde canlı yapılacaklar listesi\n` +
       (body.webSearch ? `• web_search(query) — internette ara\n• read_url(url) — web sayfası oku\n` : "") +
       `\nÇalışma pratiği:\n` +
       `— Çok adımlı (3+) görevlerde önce update_plan ile adımları yaz, her adım bitince planı güncelle.\n` +
+      `— Görev BAĞIMSIZ paralel parçalara bölünebiliyorsa (ör. birden çok modülü ayrı ayrı incelemek) dispatch_agents ile alt-ajanlara dağıt; basitse kendin yap.\n` +
       `— Cevaplamadan önce ilgili dosyaları oku. Bağımsız okumaları TEK turda birlikte iste (paralel çalışır).\n` +
       `— list_files veya search_code ile önce yapıyı anla, sonra spesifik dosyalara gir.\n` +
       `— Var olan dosyada KÜÇÜK değişiklik için str_replace kullan (tüm dosyayı yeniden yazma); old_string ham metin olmalı (satır numarası DEĞİL), birebir ve benzersiz.\n` +
@@ -972,6 +975,34 @@ export async function POST(req: Request) {
         const runOne = async (tc: AccumulatedToolCall) => {
           let args: Record<string, unknown> = {};
           try { args = JSON.parse(tc.arguments || "{}"); } catch { /* invalid */ }
+          /* dispatch_agents: ana ajan görevi paralel SALT-OKUNUR alt-ajanlara
+             böler (Claude'daki Task aracı gibi). Sonuçlar birleştirilip döner. */
+          if (tc.name === "dispatch_agents") {
+            const tasks = Array.isArray(args.tasks)
+              ? (args.tasks as { title?: string; instruction?: string }[])
+                  .filter((t) => t && typeof t.instruction === "string" && t.instruction.trim())
+                  .slice(0, 4)
+              : [];
+            const fail = (m: string) => {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: m } })}\n\n`));
+              resultById.set(tc.id, m);
+            };
+            if (!repoCtx) { fail("Hata: repo bağlı değil"); return; }
+            if (tasks.length === 0) { fail("Hata: en az 1 alt görev (tasks) gerekli"); return; }
+            const subCfg = { baseUrl, model, provider: (body.provider || "hf") as Provider, headers: upstreamHeaders };
+            const results = await Promise.all(tasks.map(async (t) => {
+              try {
+                return await runReadOnlyAgent(subCfg, [
+                  { role: "system", content: "Sen uzman bir alt-ajansın. SADECE verilen alt göreve odaklan; repoyu read_file/list_files ile incele ve NET, uygulanabilir bir özet/sonuç döndür. Türkçe yaz." },
+                  { role: "user", content: `ALT GÖREV: ${t.title || ""}\n${t.instruction}` },
+                ], repoCtx);
+              } catch (e) { return `(hata: ${(e as Error).message})`; }
+            }));
+            const combined = tasks.map((t, i) => `### ${t.title || "Alt görev"}\n${results[i]}`).join("\n\n");
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: `${tasks.length} alt-ajan tamamlandı` } })}\n\n`));
+            resultById.set(tc.id, combined);
+            return;
+          }
           /* Yıkıcı işlemler (silme/yeniden adlandırma): ASLA doğrudan yapılmaz.
              Kullanıcı onayına sunulur; istemci onaylarsa uygular. */
           if (tc.name === "delete_file" || tc.name === "rename_file") {
