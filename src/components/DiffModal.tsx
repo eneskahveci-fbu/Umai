@@ -1,108 +1,109 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useStore } from "@/lib/store";
+import { X, ArrowLeftRight } from "lucide-react";
 
-interface Props {
-  title?: string;
-  leftContent?: string;
-  rightContent?: string;
-  leftLabel?: string;
-  rightLabel?: string;
-  open?: boolean;
-  onClose?: () => void;
-}
+export function DiffModal() {
+  const open = useStore((s) => s.diffModalOpen);
+  const setOpen = useStore((s) => s.setDiffModalOpen);
+  const diff = useStore((s) => s.diffContent);
+  const setDiff = useStore((s) => s.setDiffContent);
 
-export function DiffModal({ title, leftContent, rightContent, leftLabel, rightLabel, open, onClose }: Props) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [splitView, setSplitView] = useState(true);
+  if (!open || !diff) return null;
 
-  const isControlled = open !== undefined;
-  const visible = isControlled ? open : isOpen;
-
-  const close = useCallback(() => {
-    if (isControlled) onClose?.();
-    else setIsOpen(false);
-  }, [isControlled, onClose]);
-
-  useEffect(() => {
-    const handler = () => setIsOpen(true);
-    window.addEventListener("open-diff", handler);
-    return () => window.removeEventListener("open-diff", handler);
-  }, []);
-
-  if (!visible) return null;
-
-  const renderLines = (text?: string) => {
-    if (!text) return <div className="text-[var(--color-ink)]/30 italic p-4">İçerik yok</div>;
-    return text.split("\n").map((line, i) => (
-      <div key={i} className="flex">
-        <span className="w-10 text-right pr-3 text-[10px] text-[var(--color-ink)]/30 select-none leading-6 shrink-0">
-          {i + 1}
-        </span>
-        <span className="font-mono text-xs leading-6 whitespace-pre-wrap break-all">{line}</span>
-      </div>
-    ));
+  const handleClose = () => {
+    setDiff(null);
+    setOpen(false);
   };
+
+  const lines = (text: string) => text.split("\n");
+
+  const originalLines = lines(diff.original);
+  const modifiedLines = lines(diff.modified);
+  const maxLines = Math.max(originalLines.length, modifiedLines.length);
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) close(); }}
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[5vh] bg-bg/80 backdrop-blur-sm"
+      onClick={handleClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Diff karşılaştırma"
     >
-      <div className="w-full max-w-5xl max-h-[85vh] bg-[var(--color-bg)] border border-[var(--color-surface)] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-        {/* Başlık */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--color-surface)]">
-          <h2 className="text-base font-semibold flex items-center gap-2">
-            🔄 {title || "Karşılaştırma"}
-          </h2>
+      <div
+        className="bg-surface border border-line rounded-2xl w-full max-w-4xl max-h-[85vh] shadow-2xl overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-line">
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setSplitView(!splitView)}
-              className={`px-3 py-1 text-xs rounded-lg transition-colors ${
-                splitView ? "bg-[var(--color-brand)]/10 text-[var(--color-brand)]" : "bg-[var(--color-surface)] text-[var(--color-ink)]/60"
-              }`}
-            >
-              {splitView ? "Yan Yana" : "Birleşik"}
-            </button>
-            <button onClick={close} className="text-[var(--color-ink)]/40 hover:text-[var(--color-ink)] transition-colors text-lg">
-              ✕
-            </button>
+            <ArrowLeftRight size={18} className="text-amber-400" />
+            <h3 className="font-semibold">Değişiklikler</h3>
+            <span className="text-xs text-muted font-mono ml-2">{diff.path}</span>
           </div>
+          <button
+            onClick={handleClose}
+            className="hover:bg-bgsoft rounded-lg p-1 transition-colors"
+            title="Kapat"
+            aria-label="Kapat"
+          >
+            <X size={18} />
+          </button>
         </div>
 
-        {/* Diff içerik */}
-        <div className={`flex-1 overflow-auto ${splitView ? "grid grid-cols-2 divide-x divide-[var(--color-surface)]" : ""}`}>
-          {splitView ? (
-            <>
-              <div>
-                <div className="sticky top-0 px-4 py-2 bg-[var(--color-surface)]/50 text-xs font-medium text-[var(--color-ink)]/60 border-b border-[var(--color-surface)]">
-                  {leftLabel || "Önceki"}
-                </div>
-                <div className="p-2">{renderLines(leftContent)}</div>
-              </div>
-              <div>
-                <div className="sticky top-0 px-4 py-2 bg-[var(--color-surface)]/50 text-xs font-medium text-[var(--color-ink)]/60 border-b border-[var(--color-surface)]">
-                  {rightLabel || "Sonraki"}
-                </div>
-                <div className="p-2">{renderLines(rightContent)}</div>
-              </div>
-            </>
-          ) : (
-            <div className="space-y-4 p-4">
-              <div>
-                <div className="text-xs font-medium text-[var(--color-ink)]/60 mb-2 px-2">
-                  {leftLabel || "Önceki"}
-                </div>
-                <div className="bg-[var(--color-surface)]/30 rounded-xl p-3">{renderLines(leftContent)}</div>
-              </div>
-              <div>
-                <div className="text-xs font-medium text-[var(--color-ink)]/60 mb-2 px-2">
-                  {rightLabel || "Sonraki"}
-                </div>
-                <div className="bg-[var(--color-surface)]/30 rounded-xl p-3">{renderLines(rightContent)}</div>
-              </div>
-            </div>
-          )}
+        {/* Diff view */}
+        <div className="overflow-auto flex-1 font-mono text-xs leading-relaxed">
+          <table className="w-full border-collapse">
+            <tbody>
+              {Array.from({ length: maxLines }).map((_, i) => {
+                const orig = originalLines[i];
+                const mod = modifiedLines[i];
+                const isSame = orig === mod;
+                const isAdded = orig === undefined && mod !== undefined;
+                const isRemoved = mod === undefined && orig !== undefined;
+
+                return (
+                  <tr
+                    key={i}
+                    className={
+                      isRemoved
+                        ? "bg-red-500/10"
+                        : isAdded
+                          ? "bg-green-500/10"
+                          : isSame
+                            ? ""
+                            : "bg-amber-500/5"
+                    }
+                  >
+                    <td className="text-right text-muted px-2 py-0 select-none w-10 border-r border-line">
+                      {isRemoved ? i + 1 : ""}
+                    </td>
+                    <td
+                      className={`px-3 py-0 whitespace-pre ${
+                        isRemoved ? "text-red-400" : "text-muted"
+                      }`}
+                    >
+                      {isRemoved ? `- ${orig}` : ""}
+                    </td>
+                    <td className="text-right text-muted px-2 py-0 select-none w-10 border-r border-line">
+                      {!isRemoved ? (originalLines.length > i ? i + 1 : i + 1) : ""}
+                    </td>
+                    <td
+                      className={`px-3 py-0 whitespace-pre ${
+                        isAdded
+                          ? "text-green-400"
+                          : isSame
+                            ? "text-ink"
+                            : "text-ink"
+                      }`}
+                    >
+                      {isAdded ? `+ ${mod}` : isRemoved ? "" : mod}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
