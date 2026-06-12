@@ -104,7 +104,7 @@ export function SettingsModal({ open, onClose }: Props) {
       const res = await fetch("/api/models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ baseUrl: model.baseUrl, apiKey: model.apiKey }),
+        body: JSON.stringify({ baseUrl: model.baseURL, apiKey: model.apiKey }),
       });
       if (res.ok) {
         setTestResult((prev) => ({ ...prev, [model.id]: "✅ Bağlantı başarılı" }));
