@@ -1,86 +1,129 @@
-/* Proje farkındalığı için saf yardımcılar (ağ/yan etki yok → test edilebilir):
-   - .gitignore ayrıştırma + basit eşleştirme
-   - package.json bağımlılıkları + dosya işaretlerinden framework algılama */
+/**
+ * Proje bağlamı çıkarımı.
+ * package.json, tsconfig vb dosyalardan framework/dependency bilgisi toplar.
+ */
 
-/** .gitignore içeriğini desenlere ayırır (yorum/boş satır atlanır). */
-export function parseGitignore(content: string): string[] {
-  return content
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0 && !l.startsWith("#"));
+interface FileEntry {
+  path: string;
+  content?: string;
 }
 
-/** Bir yolun .gitignore desenlerinden biriyle eşleşip eşleşmediğini döndürür.
-    Desteklenen: birebir, `dir/`, `*.ext`, baştaki `/`, alt dizin eşleşmesi. */
-export function isIgnored(path: string, patterns: string[]): boolean {
-  const p = path.replace(/^\/+/, "");
-  for (const raw of patterns) {
-    if (raw.startsWith("!")) continue; // negasyon — basitlik için atla
-    let pat = raw.replace(/^\/+/, "");
-    const dirOnly = pat.endsWith("/");
-    if (dirOnly) pat = pat.slice(0, -1);
+interface FrameworkInfo {
+  name: string;
+  version?: string;
+  configFiles: string[];
+}
 
-    if (pat.startsWith("*.")) {
-      const ext = pat.slice(1); // ".ext"
-      if (p.endsWith(ext)) return true;
-      continue;
+export interface ProjectProfile {
+  frameworks: FrameworkInfo[];
+  lang: string;
+  deps: Record<string, string>;
+  gitignorePatterns: string[];
+}
+
+/**
+ * Dosya listesinden kullanılan framework'leri tespit eder.
+ */
+export function detectFrameworks(files: string[]): FrameworkInfo[] {
+  const frameworks: FrameworkInfo[] = [];
+  const fileSet = new Set(files.map((f) => f.replace(/^\/+/, "")));
+
+  // Next.js
+  if (fileSet.has("next.config.ts") || fileSet.has("next.config.mjs") || fileSet.has("next.config.js")) {
+    frameworks.push({ name: "Next.js", configFiles: ["next.config.*"] });
+  }
+
+  // React
+  if (
+    fileSet.has("package.json") ||
+    files.some((f) => f.endsWith(".tsx") || f.endsWith(".jsx"))
+  ) {
+    if (!frameworks.some((fw) => fw.name === "Next.js")) {
+      frameworks.push({ name: "React", configFiles: [] });
     }
-    // Yol bileşenlerinden herhangi biri desene eşitse (dizin/dosya adı) eşleş
-    const segments = p.split("/");
-    if (segments.includes(pat)) return true;
-    if (p === pat || p.startsWith(pat + "/")) return true;
   }
-  return false;
+
+  // Tailwind CSS
+  if (
+    fileSet.has("tailwind.config.ts") ||
+    fileSet.has("tailwind.config.mjs") ||
+    fileSet.has("tailwind.config.js") ||
+    fileSet.has("postcss.config.mjs") ||
+    fileSet.has("postcss.config.js")
+  ) {
+    frameworks.push({ name: "Tailwind CSS", configFiles: ["tailwind.config.*", "postcss.config.*"] });
+  }
+
+  // TypeScript
+  if (fileSet.has("tsconfig.json")) {
+    frameworks.push({ name: "TypeScript", configFiles: ["tsconfig.json"] });
+  }
+
+  // Vitest
+  if (fileSet.has("vitest.config.ts") || fileSet.has("vitest.config.mts") || fileSet.has("vitest.config.js")) {
+    frameworks.push({ name: "Vitest", configFiles: ["vitest.config.*"] });
+  }
+
+  // Prisma
+  if (files.some((f) => f.includes("prisma/schema.prisma"))) {
+    frameworks.push({ name: "Prisma", configFiles: ["prisma/schema.prisma"] });
+  }
+
+  // Drizzle
+  if (files.some((f) => f.includes("drizzle.config"))) {
+    frameworks.push({ name: "Drizzle", configFiles: ["drizzle.config.*"] });
+  }
+
+  // ESLint
+  if (fileSet.has("eslint.config.mjs") || fileSet.has("eslint.config.js") || fileSet.has(".eslintrc.js")) {
+    frameworks.push({ name: "ESLint", configFiles: ["eslint.config.*"] });
+  }
+
+  return frameworks;
 }
 
-const DEP_FRAMEWORKS: { dep: string; label: string }[] = [
-  { dep: "next", label: "Next.js" },
-  { dep: "@angular/core", label: "Angular" },
-  { dep: "vue", label: "Vue" },
-  { dep: "svelte", label: "Svelte" },
-  { dep: "@nestjs/core", label: "NestJS" },
-  { dep: "express", label: "Express" },
-  { dep: "fastify", label: "Fastify" },
-  { dep: "react", label: "React" },
-  { dep: "vite", label: "Vite" },
-  { dep: "tailwindcss", label: "Tailwind CSS" },
-  { dep: "vitest", label: "Vitest" },
-  { dep: "jest", label: "Jest" },
-];
-
-const PATH_FRAMEWORKS: { marker: string; label: string }[] = [
-  { marker: "manage.py", label: "Django" },
-  { marker: "pyproject.toml", label: "Python (pyproject)" },
-  { marker: "requirements.txt", label: "Python" },
-  { marker: "Cargo.toml", label: "Rust (Cargo)" },
-  { marker: "go.mod", label: "Go" },
-  { marker: "pom.xml", label: "Java (Maven)" },
-  { marker: "build.gradle", label: "Java/Kotlin (Gradle)" },
-  { marker: "Gemfile", label: "Ruby" },
-  { marker: "composer.json", label: "PHP (Composer)" },
-];
-
-/** package.json bağımlılıkları ve dosya yollarından framework/araç listesi. */
-export function detectFrameworks(input: { deps?: Record<string, string>; paths?: string[] }): string[] {
-  const found = new Set<string>();
-  const deps = input.deps ?? {};
-  for (const { dep, label } of DEP_FRAMEWORKS) {
-    if (deps[dep]) found.add(label);
-  }
-  const paths = input.paths ?? [];
-  const baseNames = new Set(paths.map((p) => p.split("/").pop() ?? p));
-  for (const { marker, label } of PATH_FRAMEWORKS) {
-    if (baseNames.has(marker)) found.add(label);
-  }
-  return [...found];
-}
-
-/** package.json metninden { ...deps, ...devDeps } çıkarır (hata toleranslı). */
-export function extractDeps(packageJson: string): Record<string, string> {
+/**
+ * package.json içeriğinden bağımlılıkları çıkarır.
+ */
+export function extractDeps(packageJsonContent: string): Record<string, string> {
   try {
-    const pkg = JSON.parse(packageJson) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
-    return { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
+    const pkg = JSON.parse(packageJsonContent);
+    const deps: Record<string, string> = {};
+
+    if (pkg.dependencies) Object.assign(deps, pkg.dependencies);
+    if (pkg.devDependencies) {
+      for (const [k, v] of Object.entries(pkg.devDependencies as Record<string, string>)) {
+        deps[`dev:${k}`] = v;
+      }
+    }
+
+    return deps;
   } catch {
     return {};
   }
+}
+
+/**
+ * .gitignore içeriğinden kalıpları ayrıştırır.
+ * Yorumları ve boş satırları atlar.
+ */
+export function parseGitignore(content: string): string[] {
+  const lines = content.split("\n");
+  const patterns: string[] = [];
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    patterns.push(line);
+  }
+
+  // Her zaman temel kalıpları ekle
+  const defaults = ["/node_modules", "/.next", "/out", "/build", "/coverage", ".env*", "!.env.example"];
+  for (const d of defaults) {
+    if (!patterns.includes(d)) {
+      patterns.push(d);
+    }
+  }
+
+  return patterns;
 }
