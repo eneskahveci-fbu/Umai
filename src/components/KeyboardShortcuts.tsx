@@ -1,64 +1,82 @@
 "use client";
 
-import { useStore } from "@/lib/store";
-import { Command } from "lucide-react";
+// src/components/KeyboardShortcuts.tsx — Klavye kısayolları
 
-const shortcuts = [
-  { keys: ["⌘", "N"], desc: "Yeni sohbet" },
-  { keys: ["⌘", ","], desc: "Ayarlar" },
-  { keys: ["⌘", "K"], desc: "Komut paleti" },
-  { keys: ["⌘", "B"], desc: "Kenar çubuğu" },
-  { keys: ["⌘", "/"], desc: "Kısayollar" },
-];
+import { useEffect, type ReactNode } from "react";
 
-export function KeyboardShortcuts() {
-  const open = useStore((s) => s.shortcutsOpen);
-  const setOpen = useStore((s) => s.setShortcutsOpen);
+interface Shortcut {
+  key: string;
+  ctrl?: boolean;
+  shift?: boolean;
+  alt?: boolean;
+  handler: () => void;
+  description: string;
+}
 
-  if (!open) return null;
+interface Props {
+  shortcuts: Shortcut[];
+  enabled?: boolean;
+}
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 backdrop-blur-sm"
-      onClick={() => setOpen(false)}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Klavye kısayolları"
-    >
-      <div
-        className="bg-surface border border-line rounded-2xl p-6 w-full max-w-sm shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-2 mb-4">
-          <Command size={20} className="text-amber-400" />
-          <h3 className="font-semibold text-lg">Klavye Kısayolları</h3>
-        </div>
+export function KeyboardShortcuts({ shortcuts, enabled = true }: Props) {
+  useEffect(() => {
+    if (!enabled || typeof window === "undefined") return;
 
-        <div className="space-y-2">
-          {shortcuts.map((s) => (
-            <div
-              key={s.desc}
-              className="flex items-center justify-between py-1.5"
-            >
-              <span className="text-sm text-muted">{s.desc}</span>
-              <div className="flex gap-1">
-                {s.keys.map((k, i) => (
-                  <kbd
-                    key={i}
-                    className="px-2 py-0.5 rounded-md bg-bgsoft border border-line text-xs font-mono text-ink"
-                  >
-                    {k}
-                  </kbd>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+    function handleKeyDown(e: KeyboardEvent) {
+      // Input/textarea içindeyken çalışma
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 
-        <p className="text-xs text-muted mt-4">
-          macOS&apos;ta ⌘ = Cmd, diğer sistemlerde Ctrl
-        </p>
-      </div>
-    </div>
-  );
+      for (const s of shortcuts) {
+        const ctrlOk = s.ctrl ? e.ctrlKey || e.metaKey : !e.ctrlKey && !e.metaKey;
+        const shiftOk = s.shift ? e.shiftKey : !e.shiftKey;
+        const altOk = s.alt ? e.altKey : !e.altKey;
+
+        if (e.key.toLowerCase() === s.key.toLowerCase() && ctrlOk && shiftOk && altOk) {
+          e.preventDefault();
+          s.handler();
+          return;
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [shortcuts, enabled]);
+
+  return null; // Görünmez bileşen
+}
+
+//─────── Genel kısayol listesi ───────
+export function getDefaultShortcuts(handlers: {
+  newChat: () => void;
+  toggleSidebar: () => void;
+  focusInput: () => void;
+}): Shortcut[] {
+  return [
+    {
+      key: "k",
+      ctrl: true,
+      handler: handlers.focusInput,
+      description: "Komut paletini aç",
+    },
+    {
+      key: "b",
+      ctrl: true,
+      handler: handlers.toggleSidebar,
+      description: "Kenar panelini aç/kapat",
+    },
+    {
+      key: "n",
+      ctrl: true,
+      handler: handlers.newChat,
+      description: "Yeni sohbet",
+    },
+    {
+      key: "Enter",
+      ctrl: true,
+      handler: handlers.focusInput,
+      description: "Sohbet girdisine odaklan",
+    },
+  ];
 }
