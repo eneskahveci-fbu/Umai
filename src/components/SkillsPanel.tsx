@@ -1,170 +1,265 @@
 "use client";
 
-import { X, Plus, GripVertical, ToggleLeft, ToggleRight, Trash2, FileText, User Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useStore } from "@/lib/store";
-import type { Skill } from "@/lib/types";
+import { useState, useEffect } from "react";
 
-export function SkillsPanel() {
-  const open = useStore((s) => s.libraryOpen);
-  const setLibraryOpen = useStore((s) => s.setLibraryOpen);
-  const skills = useStore((s) => s.skills);
-  const addSkill = useStore((s) => s.addSkill);
-  const toggleSkill = useStore((s) => s.toggleSkill);
-  const removeSkill = useStore((s) => s.removeSkill);
+interface Skill {
+  id: string;
+  title: string;
+  content: string;
+  tags?: string[];
+  source?: "manual" | "file";
+  fileName?: string;
+  enabled: boolean;
+}
 
-  const [tab, setTab] = useState<"manual" | "file">("manual");
+interface Props {
+  skills: Skill[];
+  onToggle: (id: string, enabled: boolean) => void;
+  onSave: (skill: Skill) => void;
+  onDelete: (id: string) => void;
+  open?: boolean;
+  onClose?: () => void;
+}
+
+type TabId = "skills" | "files" | "agents" | "progress";
+
+const BUILTIN_AGENTS = [
+  { id: "explain", name: "/explain", description: "Kod veya kavramı açıklar", icon: "📖" },
+  { id: "refactor", name: "/refactor", description: "Kodu yeniden düzenler", icon: "🔧" },
+  { id: "test", name: "/test", description: "Test kodu yazar", icon: "🧪" },
+  { id: "fix", name: "/fix", description: "Hata ayıklar ve düzeltir", icon: "🐛" },
+  { id: "review", name: "/review", description: "Kod incelemesi yapar", icon: "👀" },
+  { id: "docs", name: "/docs", description: "Dokümantasyon yazar", icon: "📝" },
+];
+
+export function SkillsPanel({ skills, onToggle, onSave, onDelete, open: controlledOpen, onClose }: Props) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>("skills");
+  const [editing, setEditing] = useState<Skill | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const titleRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setLibraryOpen(false);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open, setLibraryOpen]);
+  const isControlled = controlledOpen !== undefined;
+  const visible = isControlled ? controlledOpen : isOpen;
 
-  const handleAddManual = () => {
-    const t = title.trim();
-    const c = content.trim();
-    if (!t || !c) return;
-    const skill: Skill = {
-      id: `manual_${Date.now()}`,
-      title: t,
-      content: c,
-      source: "manual",
-      enabled: true,
-    };
-    addSkill(skill);
-    setTitle("");
-    setContent("");
-    titleRef.current?.focus();
+  const close = () => {
+    if (isControlled) onClose?.();
+    else setIsOpen(false);
+    setEditing(null);
   };
 
-  const manualSkills = skills.filter((s) => s.source === "manual");
-  const fileSkills = skills.filter((s) => s.source === "file");
-  const currentSkills = tab === "manual" ? manualSkills : fileSkills;
+  useEffect(() => {
+    const handler = () => setIsOpen(true);
+    window.addEventListener("open-skills", handler);
+    return () => window.removeEventListener("open-skills", handler);
+  }, []);
 
-  if (!open) return null;
+  if (!visible) return null;
+
+  const tabs: { id: TabId; label: string; count?: number }[] = [
+    { id: "skills", label: "Skills", count: skills.filter((s) => s.source !== "file").length },
+    { id: "files", label: "Dosyalar", count: skills.filter((s) => s.source === "file").length },
+    { id: "agents", label: "Agents", count: BUILTIN_AGENTS.length },
+    { id: "progress", label: "İlerleme" },
+  ];
+
+  const handleSaveNew = () => {
+    if (!title.trim()) return;
+    onSave({
+      id: `skill-${Date.now()}`,
+      title: title.trim(),
+      content: content.trim(),
+      source: "manual",
+      enabled: true,
+    });
+    setTitle("");
+    setContent("");
+    setEditing(null);
+  };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[8vh] bg-bg/70 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) setLibraryOpen(false);
-      }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Skills Yönetimi"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) close(); }}
     >
-      <div className="bg-surface border border-line rounded-2xl shadow-2xl w-full max-w-xl mx-4 max-h-[80vh] flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-line shrink-0">
-          <h2 className="text-sm font-semibold">Skills Yönetimi</h2>
-          <button
-            onClick={() => setLibraryOpen(false)}
-            className="text-muted hover:text-ink p-1 rounded hover:bg-bgsoft transition-colors"
-            aria-label="Kapat"
-          >
-            <X size={15} />
+      <div className="w-full max-w-2xl max-h-[80vh] bg-[var(--color-bg)] border border-[var(--color-surface)] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        {/* Başlık ve sekmeler */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-surface)]">
+          <h2 className="text-lg font-semibold">⚡ Skills &amp; Özelleştirme</h2>
+          <button onClick={close} className="text-[var(--color-ink)]/40 hover:text-[var(--color-ink)] transition-colors text-lg">
+            ✕
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 px-4 pt-3 pb-2 shrink-0">
-          <button
-            onClick={() => setTab("manual")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              tab === "manual" ? "bg-amber-400 text-black" : "bg-bgsoft text-muted hover:text-ink"
-            }`}
-          >
-            <UserPlus size={12} />
-            Manuel
-          </button>
-          <button
-            onClick={() => setTab("file")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              tab === "file" ? "bg-amber-400 text-black" : "bg-bgsoft text-muted hover:text-ink"
-            }`}
-          >
-            <FileText size={12} />
-            Dosya
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {/* Manual add form */}
-          {tab === "manual" && (
-            <div className="space-y-2.5 pb-3 border-b border-line/50">
-              <input
-                ref={titleRef}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Skill başlığı..."
-                className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-400/50 transition-colors"
-                onKeyDown={(e) => e.key === "Enter" && handleAddManual()}
-              />
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Skill içeriği (sistem prompt'una eklenecek)..."
-                rows={3}
-                className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-400/50 transition-colors resize-none"
-              />
-              <button
-                onClick={handleAddManual}
-                disabled={!title.trim() || !content.trim()}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-400 text-black hover:bg-amber-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Plus size={12} />
-                Ekle
-              </button>
-            </div>
-          )}
-
-          {/* File skills info */}
-          {tab === "file" && fileSkills.length === 0 && (
-            <p className="text-sm text-muted text-center py-8">
-              Henüz dosya tabanlı skill eklenmedi. Ayarlar → Dosyalar sekmesinden ekleyebilirsiniz.
-            </p>
-          )}
-
-          {/* Skill listesi */}
-          {currentSkills.map((skill) => (
-            <div
-              key={skill.id}
-              className="flex items-start gap-3 p-3 rounded-xl bg-bgsoft/50 border border-line/30 group hover:border-line/60 transition-colors"
+        <div className="flex border-b border-[var(--color-surface)] px-5">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-[1px] ${
+                activeTab === t.id
+                  ? "border-[var(--color-brand)] text-[var(--color-brand)]"
+                  : "border-transparent text-[var(--color-ink)]/50 hover:text-[var(--color-ink)]/70"
+              }`}
             >
-              <GripVertical size={13} className="text-muted/40 mt-0.5 shrink-0 cursor-grab opacity-0 group-hover:opacity-100" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium truncate">{skill.title}</span>
-                  {skill.fileName && (
-                    <span className="text-[10px] font-mono text-muted truncate">({skill.fileName})</span>
-                  )}
-                </div>
-                <p className="text-[11px] text-muted mt-0.5 line-clamp-2">{skill.content.slice(0, 120)}</p>
-              </div>
-              <button
-                onClick={() => toggleSkill(skill.id)}
-                className="shrink-0 text-muted hover:text-ink transition-colors"
-                title={skill.enabled ? "Devre dışı bırak" : "Etkinleştir"}
-              >
-                {skill.enabled ? <ToggleRight size={18} className="text-amber-400" /> : <ToggleLeft size={18} />}
-              </button>
-              <button
-                onClick={() => removeSkill(skill.id)}
-                className="shrink-0 text-muted/40 hover:text-red-400 transition-colors"
-                title="Sil"
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
+              {t.label}
+              {t.count !== undefined && (
+                <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-surface)]">
+                  {t.count}
+                </span>
+              )}
+            </button>
           ))}
+        </div>
+
+        {/* İçerik */}
+        <div className="flex-1 overflow-y-auto p-5">
+          {activeTab === "skills" && (
+            <div className="space-y-3">
+              {editing && (
+                <div className="p-4 border border-[var(--color-brand)]/30 rounded-xl bg-[var(--color-surface)]/50">
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Skill başlığı"
+                    className="w-full bg-transparent border-b border-[var(--color-surface)] pb-2 mb-3 outline-none text-sm"
+                  />
+                  <textarea
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    placeholder="Skill içeriği (markdown)"
+                    rows={5}
+                    className="w-full bg-transparent border-b border-[var(--color-surface)] pb-2 mb-3 outline-none text-sm resize-none"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSaveNew}
+                      className="px-4 py-1.5 text-xs rounded-lg bg-[var(--color-brand)] text-white hover:opacity-90 transition-opacity"
+                    >
+                      Kaydet
+                    </button>
+                    <button
+                      onClick={() => setEditing(null)}
+                      className="px-4 py-1.5 text-xs rounded-lg border border-[var(--color-surface)] hover:bg-[var(--color-surface)] transition-colors"
+                    >
+                      İptal
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!editing && (
+                <button
+                  onClick={() => setEditing({ id: "", title: "", content: "", enabled: true })}
+                  className="w-full py-3 text-sm border border-dashed border-[var(--color-surface)] rounded-xl hover:border-[var(--color-brand)]/30 hover:bg-[var(--color-brand)]/5 transition-all"
+                >
+                  + Yeni Skill Ekle
+                </button>
+              )}
+
+              {skills
+                .filter((s) => s.source !== "file")
+                .map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-start gap-3 p-3 rounded-xl bg-[var(--color-surface)]/30 hover:bg-[var(--color-surface)]/50 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={s.enabled}
+                      onChange={(e) => onToggle(s.id, e.target.checked)}
+                      className="mt-1 accent-[var(--color-brand)]"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{s.title}</div>
+                      <div className="text-xs text-[var(--color-ink)]/40 line-clamp-2 mt-0.5">
+                        {s.content.slice(0, 120)}
+                      </div>
+                      {s.tags && s.tags.length > 0 && (
+                        <div className="flex gap-1 mt-1.5">
+                          {s.tags.map((t) => (
+                            <span key={t} className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-surface)] text-[var(--color-ink)]/40">
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => onDelete(s.id)}
+                      className="text-xs text-[var(--color-ink)]/30 hover:text-red-400 transition-colors"
+                      title="Sil"
+                    >
+                      🗑
+                    </button>
+                  </div>
+                ))}
+
+              {skills.filter((s) => s.source !== "file").length === 0 && !editing && (
+                <p className="text-center text-sm text-[var(--color-ink)]/40 py-8">
+                  Henüz manuel skill eklenmemiş
+                </p>
+              )}
+            </div>
+          )}
+
+          {activeTab === "files" && (
+            <div className="space-y-3">
+              {skills
+                .filter((s) => s.source === "file")
+                .map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-start gap-3 p-3 rounded-xl bg-[var(--color-surface)]/30 hover:bg-[var(--color-surface)]/50 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={s.enabled}
+                      onChange={(e) => onToggle(s.id, e.target.checked)}
+                      className="mt-1 accent-[var(--color-brand)]"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">📄 {s.fileName || s.title}</div>
+                      <div className="text-xs text-[var(--color-ink)]/40 line-clamp-2 mt-0.5">
+                        {s.content.slice(0, 120)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              {skills.filter((s) => s.source === "file").length === 0 && (
+                <p className="text-center text-sm text-[var(--color-ink)]/40 py-8">
+                  Henüz dosya eklenmemiş
+                </p>
+              )}
+            </div>
+          )}
+
+          {activeTab === "agents" && (
+            <div className="grid grid-cols-2 gap-2">
+              {BUILTIN_AGENTS.map((a) => (
+                <div
+                  key={a.id}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-[var(--color-surface)]/30"
+                >
+                  <span className="text-lg">{a.icon}</span>
+                  <div>
+                    <div className="text-sm font-medium">{a.name}</div>
+                    <div className="text-xs text-[var(--color-ink)]/40">{a.description}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeTab === "progress" && (
+            <div className="text-center py-8">
+              <div className="text-3xl mb-3">📊</div>
+              <p className="text-sm text-[var(--color-ink)]/60">
+                Kullanım istatistikleri yakında burada görünecek.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
