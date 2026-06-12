@@ -300,7 +300,34 @@ export const useStore = create<StoreState>((set, get) => ({
   setProjects: (projects) => set({ projects }),
 
   // ── Memories ──
-  setMemories: (memories) => set({ memories }),
+  setMemories: (memories) => {
+    set({ memories });
+    saveToStorage("craft-memories", memories);
+  },
+
+  // ── Toasts ──
+  addToast: (toast) => {
+    const id = `toast_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const t: Toast = { ...toast, id };
+    set((s) => ({ toasts: [...s.toasts, t] }));
+    const duration = toast.duration ?? 4000;
+    if (duration > 0) {
+      setTimeout(() => get().removeToast(id), duration);
+    }
+  },
+  removeToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+
+  // ── Artifact ──
+  setArtifact: (artifact) => set({ artifact }),
+
+  // ── Diff ──
+  setDiff: (diff) => set({ diff }),
+
+  // ── Onboarding ──
+  setOnboardingCompleted: (v) => {
+    set({ onboardingCompleted: v });
+    saveToStorage("craft-onboarding", v);
+  },
 
   // ── Persistence ──
   saveConfig: () => saveToStorage("craft-config", get().config),
