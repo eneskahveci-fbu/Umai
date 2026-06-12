@@ -1,115 +1,136 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useStore } from "@/lib/store";
+import { X, ChevronRight, ChevronLeft, Check } from "lucide-react";
 
-interface Step {
-  target: string;
-  title: string;
-  description: string;
-}
-
-const TOUR_STEPS: Step[] = [
+const STEPS = [
   {
-    target: "[data-tour='sidebar']",
-    title: "Kenar Çubuğu",
-    description: "Sohbet geçmişiniz, görünümler ve projeler burada.",
+    title: "Hoş Geldiniz!",
+    description:
+      "Craft.Coder, yapay zekâ destekli bir kodlama asistanıdır. Kod yazabilir, açıklayabilir ve hata ayıklayabilirsiniz.",
   },
   {
-    target: "[data-tour='model-selector']",
-    title: "Model Seçici",
-    description: "Aktif AI modelini buradan değiştirebilirsiniz.",
+    title: "Model Ekleme",
+    description:
+      "Kendi API anahtarınızla istediğiniz modeli ekleyin. Tüm anahtarlar yalnızca tarayıcınızda saklanır.",
   },
   {
-    target: "[data-tour='skills']",
-    title: "Skills & Özelleştirme",
-    description: "AI'nın davranışını özelleştirmek için skills ekleyin.",
+    title: "GitHub Entegrasyonu",
+    description:
+      "GitHub deponuza bağlanın, dosyaları gezin, düzenleyin ve doğrudan sohbetten PR açın.",
   },
   {
-    target: "[data-tour='chat-input']",
-    title: "Sohbet Girişi",
-    description: "Mesajınızı yazın, dosya ekleyin veya web araması yapın.",
+    title: "Skills & Agents",
+    description:
+      "Özel kurallar (Skills) ekleyerek yapay zekânın davranışını özelleştirin. Slash komutlarıyla hızlı işlem yapın.",
+  },
+  {
+    title: "Hazırsınız!",
+    description:
+      'Yeni bir sohbet başlatın ve "Merhaba" deyin. İyi kodlamalar! 🚀',
   },
 ];
 
-export function OnboardingTour({ open, onClose }: { open?: boolean; onClose?: () => void }) {
-  const [isOpen, setIsOpen] = useState(false);
+export function OnboardingTour() {
+  const open = useStore((s) => s.onboardingOpen);
+  const setOpen = useStore((s) => s.setOnboardingOpen);
+
   const [step, setStep] = useState(0);
 
-  const isControlled = open !== undefined;
-  const visible = isControlled ? open : isOpen;
+  if (!open) return null;
+
+  const current = STEPS[step];
+  const isFirst = step === 0;
+  const isLast = step === STEPS.length - 1;
+
+  const next = () => {
+    if (isLast) {
+      setOpen(false);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("craftai_onboarding_done", "1");
+      }
+    } else {
+      setStep((s) => s + 1);
+    }
+  };
+
+  const prev = () => setStep((s) => Math.max(0, s - 1));
 
   const close = () => {
-    if (isControlled) onClose?.();
-    else setIsOpen(false);
-    setStep(0);
-  };
-
-  useEffect(() => {
-    // localStorage'da turun daha önce gösterilip gösterilmediğini kontrol et
-    const seen = localStorage.getItem("onboarding-seen");
-    if (!seen && !isControlled) {
-      const timer = setTimeout(() => setIsOpen(true), 1000);
-      return () => clearTimeout(timer);
+    setOpen(false);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("craftai_onboarding_done", "1");
     }
-  }, [isControlled]);
-
-  const finish = () => {
-    localStorage.setItem("onboarding-seen", "1");
-    close();
   };
-
-  if (!visible) return null;
-
-  const current = TOUR_STEPS[step];
-  if (!current) return null;
 
   return (
-    <div className="fixed inset-0 z-[95] bg-black/50 backdrop-blur-sm">
-      {/* Hedef vurgusu — basit overlay, gerçek implementasyonda target elementin pozisyonu hesaplanır */}
-      <div className="absolute inset-0 pointer-events-none">
-        {/* Spotlight efekti burada olacak */}
-      </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 backdrop-blur-sm">
+      <div
+        className="bg-surface border border-line rounded-2xl p-6 w-full max-w-md shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Başlangıç turu"
+      >
+        {/* Close */}
+        <button
+          onClick={close}
+          className="absolute top-4 right-4 hover:bg-bgsoft rounded-lg p-1 transition-colors"
+          title="Kapat"
+          aria-label="Kapat"
+        >
+          <X size={18} />
+        </button>
 
-      {/* Tooltip */}
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-md">
-        <div className="bg-[var(--color-bg)] border border-[var(--color-surface)] rounded-2xl shadow-2xl p-5 mx-4">
-          <div className="text-xs text-[var(--color-brand)] mb-1">
-            {step + 1} / {TOUR_STEPS.length}
-          </div>
-          <h3 className="text-base font-semibold mb-1">{current.title}</h3>
-          <p className="text-sm text-[var(--color-ink)]/60 mb-4">{current.description}</p>
-          <div className="flex gap-2">
-            <button
-              onClick={finish}
-              className="text-xs text-[var(--color-ink)]/40 hover:text-[var(--color-ink)]/60 transition-colors px-3 py-1.5"
-            >
-              Atla
-            </button>
-            <div className="flex-1" />
-            {step > 0 && (
-              <button
-                onClick={() => setStep(step - 1)}
-                className="px-3 py-1.5 text-xs rounded-lg border border-[var(--color-surface)] hover:bg-[var(--color-surface)] transition-colors"
-              >
-                Geri
-              </button>
-            )}
-            {step < TOUR_STEPS.length - 1 ? (
-              <button
-                onClick={() => setStep(step + 1)}
-                className="px-4 py-1.5 text-xs rounded-lg bg-[var(--color-brand)] text-white hover:opacity-90 transition-opacity"
-              >
-                İleri
-              </button>
+        {/* Progress dots */}
+        <div className="flex gap-1.5 mb-4">
+          {STEPS.map((_, i) => (
+            <div
+              key={i}
+              className={`h-1 rounded-full flex-1 transition-colors ${
+                i <= step ? "bg-amber-400" : "bg-bgsoft"
+              }`}
+            />
+          ))}
+        </div>
+
+        {/* Content */}
+        <h3 className="text-lg font-semibold mb-2">{current.title}</h3>
+        <p className="text-sm text-muted mb-6 leading-relaxed">
+          {current.description}
+        </p>
+
+        {/* Actions */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={prev}
+            disabled={isFirst}
+            className="flex items-center gap-1 text-sm text-muted hover:text-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft size={16} />
+            Geri
+          </button>
+
+          <span className="text-xs text-muted">
+            {step + 1} / {STEPS.length}
+          </span>
+
+          <button
+            onClick={next}
+            className="flex items-center gap-1 px-4 py-2 bg-amber-400 text-black rounded-xl text-sm font-medium hover:bg-amber-300 transition-colors"
+          >
+            {isLast ? (
+              <>
+                <Check size={16} />
+                Başla
+              </>
             ) : (
-              <button
-                onClick={finish}
-                className="px-4 py-1.5 text-xs rounded-lg bg-green-500 text-white hover:opacity-90 transition-opacity"
-              >
-                Bitir ✅
-              </button>
+              <>
+                İleri
+                <ChevronRight size={16} />
+              </>
             )}
-          </div>
+          </button>
         </div>
       </div>
     </div>
