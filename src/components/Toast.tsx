@@ -23,9 +23,8 @@ const ToastContext = createContext<ToastContextType>({
   removeToast: () => {},
 });
 
-export function useToast() {
-  return useContext(ToastContext);
-}
+// ToastContainer alias — app/page.tsx uyumluluğu için
+export const ToastContainer = ToastProvider;
 
 const variantStyles: Record<ToastVariant, string> = {
   success: "bg-green-600 text-white border-green-500",
