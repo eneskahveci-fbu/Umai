@@ -1,8 +1,9 @@
 "use client";
 
-// src/components/DiffViewer.tsx — Çoklu model yanıt karşılaştırma görünümü
+// src/components/DiffViewer.tsx — Model karşılaştırma sonuçları görüntüleyici
 
-import { MarkdownRenderer } from "./MarkdownRenderer";
+import { useState } from "react";
+import { Copy, Check } from "lucide-react";
 
 export interface CompareResult {
   modelName: string;
@@ -17,48 +18,63 @@ interface Props {
 }
 
 export function DiffViewer({ prompt, results }: Props) {
-  const columns = results.length;
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+
+  const copyResult = async (idx: number, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedIdx(idx);
+      setTimeout(() => setCopiedIdx(null), 2000);
+    } catch {
+      // sessiz
+    }
+  };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* İstem bölümü */}
-      <div className="p-4 bg-bgsoft border-b border-line">
-        <h3 className="text-xs font-semibold text-muted mb-2 uppercase tracking-wider">
-          İstem
-        </h3>
+    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* İstem özeti */}
+      <div className="p-3 rounded-xl bg-bgsoft border border-line">
+        <p className="text-[10px] text-muted uppercase tracking-wide mb-1">İstem</p>
         <p className="text-sm text-ink">{prompt}</p>
       </div>
 
-      {/* Karşılaştırma sütunları */}
-      <div
-        className="flex-1 grid gap-0 overflow-auto"
-        style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}
-      >
-        {results.map((r) => (
+      {/* Sonuç kartları */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {results.map((r, i) => (
           <div
-            key={r.modelName}
-            className="border-r border-line last:border-r-0 overflow-auto"
+            key={i}
+            className="rounded-xl border border-line bg-bgsoft overflow-hidden"
           >
-            {/* Model başlığı */}
-            <div className="sticky top-0 z-10 px-3 py-2 bg-surface border-b border-line flex items-center justify-between">
-              <span className="text-sm font-semibold text-ink">
-                {r.modelName}
-              </span>
-              {r.tokensPerSecond !== undefined && (
-                <span className="text-xs text-muted">
-                  {r.tokensPerSecond.toFixed(1)} tok/s
-                </span>
+            {/* Başlık */}
+            <div className="flex items-center justify-between px-3 py-2 border-b border-line bg-surface/50">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-ink">{r.modelName}</span>
+                {r.tokensPerSecond !== undefined && (
+                  <span className="text-[10px] text-muted">
+                    ~{r.tokensPerSecond.toFixed(1)} tok/s
+                  </span>
+                )}
+              </div>
+              {!r.error && (
+                <button
+                  onClick={() => copyResult(i, r.content)}
+                  className="p-1 hover:bg-bgsoft rounded transition-colors text-muted hover:text-ink"
+                  title="Kopyala"
+                  aria-label={`${r.modelName} yanıtını kopyala`}
+                >
+                  {copiedIdx === i ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                </button>
               )}
             </div>
 
-            {/* Yanıt içeriği */}
-            <div className="p-3">
+            {/* İçerik */}
+            <div className="p-3 max-h-64 overflow-y-auto">
               {r.error ? (
-                <div className="text-red-400 text-sm p-3 bg-red-500/10 rounded-lg border border-red-500/20">
-                  ❌ {r.error}
-                </div>
+                <p className="text-sm text-red-400">❌ {r.error}</p>
               ) : (
-                <MarkdownRenderer content={r.content} />
+                <pre className="text-xs text-ink whitespace-pre-wrap font-mono leading-relaxed">
+                  {r.content || "(boş yanıt)"}
+                </pre>
               )}
             </div>
           </div>
