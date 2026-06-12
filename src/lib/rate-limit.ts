@@ -1,53 +1,52 @@
-/* In-memory IP-based rate limiter. Resets on process restart, which is fine
-   as a first line of defence against a single-client burst. Use a real
-   store (Upstash/Redis) for production multi-instance fairness. */
+/**
+ * Basit, bağımlılıksız rate limiter (Map tabanlı).
+ * IP başına dakikada belirli sayıda istek.
+ */
 
-import type { NextRequest } from "next/server";
-
-interface Bucket { tokens: number; resetAt: number }
-const buckets = new Map<string, Bucket>();
-
-function clientKey(req: NextRequest, scope: string): string {
-  const fwd = req.headers.get("x-forwarded-for") || "";
-  const ip = fwd.split(",")[0].trim() || req.headers.get("x-real-ip") || "anon";
-  return `${scope}:${ip}`;
+interface Entry {
+  count: number;
+  reset: number;
 }
 
-/* Cap: `max` requests per `windowMs` per IP per scope.
-   Returns null when allowed; otherwise a NextResponse-ready { status, body }. */
-export function checkLimit(
-  req: NextRequest,
-  scope: string,
-  max: number,
-  windowMs: number,
-): { status: number; body: { error: string }; retryAfter: number } | null {
-  const key = clientKey(req, scope);
-  const now = Date.now();
-  const cur = buckets.get(key);
-  if (!cur || cur.resetAt <= now) {
-    buckets.set(key, { tokens: max - 1, resetAt: now + windowMs });
-    return null;
+export class RateLimiter {
+  private store = new Map<string, Entry>();
+  private maxPerMinute: number;
+  private windowMs: number;
+
+  constructor(maxPerMinute: number, windowMs = 60_000) {
+    this.maxPerMinute = maxPerMinute;
+    this.windowMs = windowMs;
   }
-  if (cur.tokens > 0) {
-    cur.tokens--;
-    return null;
+
+  /**
+   * İstek yapılabilir mi?
+   * - Bilinen yerel IP'ler her zaman izinli
+   * - Süre aşmışsa sayaç sıfırlanır
+   * - Limite ulaşıldıysa false döner
+   */
+  check(key: string): boolean {
+    if (key === "unknown" || key === "::1" || key === "127.0.0.1") return true;
+    const now = Date.now();
+    const entry = this.store.get(key);
+    if (!entry || now > entry.reset) {
+      this.store.set(key, { count: 1, reset: now + this.windowMs });
+      return true;
+    }
+    if (entry.count >= this.maxPerMinute) return false;
+    entry.count++;
+    return true;
   }
-  const retryAfter = Math.ceil((cur.resetAt - now) / 1000);
-  return {
-    status: 429,
-    body: { error: `Çok fazla istek. ${retryAfter}s sonra tekrar dene.` },
-    retryAfter,
-  };
+
+  /** Kalan istek sayısı */
+  remaining(key: string): number {
+    const entry = this.store.get(key);
+    if (!entry) return this.maxPerMinute;
+    return Math.max(0, this.maxPerMinute - entry.count);
+  }
 }
 
-/* Trim old entries on a soft interval to bound memory. */
-if (typeof globalThis !== "undefined") {
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  const g = globalThis as any;
-  if (!g.__rateLimitSweeper) {
-    g.__rateLimitSweeper = setInterval(() => {
-      const now = Date.now();
-      for (const [k, v] of buckets) if (v.resetAt <= now) buckets.delete(k);
-    }, 60_000).unref?.();
-  }
-}
+// Önceden yapılandırılmış örnekler
+export const chatLimiter = new RateLimiter(120);
+export const searchLimiter = new RateLimiter(5);
+export const suggestLimiter = new RateLimiter(10);
+export const shareLimiter = new RateLimiter(5);
