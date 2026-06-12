@@ -11,6 +11,8 @@ import {
   GitBranch,
   ChevronRight,
   Code2,
+  Copy,
+  Download,
   File,
   FolderGit2,
   FolderOpen,
@@ -47,7 +49,6 @@ import { RightPanel } from "./RightPanel";
 import { MultiCommitBar } from "./MultiCommitBar";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { EmptyChat } from "./EmptyChat";
-import { ExportMenu } from "./ExportMenu";
 import { VoiceButton } from "./VoiceButton";
 
 const RealTerminal = dynamic(() => import("./RealTerminal").then((m) => m.RealTerminal), {
@@ -122,19 +123,22 @@ function ComposerButton({
   );
 }
 
-/* "⋯ Daha fazla" — az kullanılan composer eylemlerini tek menüde toplar.
-   Açılır menü createPortal ile body'e render edilir; aksi halde araç çubuğunun
-   overflow-x-auto kabı menüyü kırpar (görünmez olur). */
-function MoreMenu({ active, children }: { active?: boolean; children: React.ReactNode }) {
+/* "⋯ Daha fazla" — az kullanılan eylemleri tek menüde toplar.
+   Açılır menü createPortal ile body'e render edilir (overflow kabı kırpmasın).
+   placement: "top" (composer, yukarı açılır) | "bottom" (header, aşağı açılır). */
+function MoreMenu({ active, children, placement = "top", icon }: { active?: boolean; children: React.ReactNode; placement?: "top" | "bottom"; icon?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ left: number; bottom: number } | null>(null);
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
   useEffect(() => {
     if (!open) return;
     const update = () => {
       const r = btnRef.current?.getBoundingClientRect();
-      if (r) setPos({ left: r.right, bottom: window.innerHeight - r.top + 8 });
+      if (!r) return;
+      setPos(placement === "bottom"
+        ? { left: r.right, top: r.bottom + 8 }
+        : { left: r.right, bottom: window.innerHeight - r.top + 8 });
     };
     update();
     const onDown = (e: MouseEvent) => {
@@ -149,7 +153,7 @@ function MoreMenu({ active, children }: { active?: boolean; children: React.Reac
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
-  }, [open]);
+  }, [open, placement]);
   return (
     <div className="relative shrink-0">
       <button
@@ -160,14 +164,14 @@ function MoreMenu({ active, children }: { active?: boolean; children: React.Reac
           open || active ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft active:bg-bgsoft"
         }`}
       >
-        <MoreHorizontal size={13} />
+        {icon ?? <MoreHorizontal size={13} />}
       </button>
       {open && pos && createPortal(
         <div
           ref={menuRef}
           onClick={() => setOpen(false)}
-          style={{ position: "fixed", left: pos.left, bottom: pos.bottom, transform: "translateX(-100%)" }}
-          className="min-w-[180px] bg-surface border border-line rounded-xl shadow-2xl shadow-black/40 p-1 z-[80] flex flex-col gap-0.5 animate-modal-bg"
+          style={{ position: "fixed", left: pos.left, top: pos.top, bottom: pos.bottom, transform: "translateX(-100%)" }}
+          className="min-w-[190px] bg-surface border border-line rounded-xl shadow-2xl shadow-black/40 p-1 z-[80] flex flex-col gap-0.5 animate-modal-bg"
         >
           {children}
         </div>,
@@ -424,6 +428,15 @@ export function CoderView() {
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  /* Akıllı oto-kaydırma: kullanıcı yukarı kaydırırsa yapışmayı bırak (Claude gibi). */
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stickRef = useRef(true);
+  const prevLenRef = useRef(0);
+  const onMessagesScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  };
   const fileRef = useRef<HTMLInputElement>(null);
   const imgRef = useRef<HTMLInputElement>(null);
 
@@ -451,7 +464,12 @@ export function CoderView() {
 
   const lastMessageContent = messages[messages.length - 1]?.content;
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    /* Yeni mesaj eklendiyse (kullanıcı gönderdi/yanıt başladı) en alta yapış;
+       akış sırasında token gelirken yalnızca kullanıcı zaten alttaysa kaydır. */
+    const grew = messages.length > prevLenRef.current;
+    prevLenRef.current = messages.length;
+    if (grew) stickRef.current = true;
+    if (stickRef.current) endRef.current?.scrollIntoView({ behavior: grew ? "smooth" : "auto" });
   }, [messages.length, lastMessageContent]);
 
   useEffect(() => {
@@ -1248,11 +1266,6 @@ export function CoderView() {
           <UsageBadge chat={current} />
         ) : null}
 
-        {/* Export menu */}
-        {current && messages.length > 0 && (
-          <ExportMenu chatId={current.id} />
-        )}
-
         <div className="flex items-center gap-1 shrink-0">
           {config.models.length > 0 ? (
             <button onClick={() => setSettingsOpen(true)} className="flex items-center gap-1.5 text-xs text-muted hover:text-ink transition-colors px-2 py-1 rounded-lg hover:bg-bgsoft" title="Model seç">
@@ -1273,47 +1286,34 @@ export function CoderView() {
             </span>
           )}
           <button
-            onClick={() => setTerminalOpen((v) => !v)}
-            title={terminalSupported ? "Terminal" : "Terminal (masaüstü Chrome/Edge gerekli)"}
-            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${
-              terminalOpen ? "text-green bg-green/10" :
-              terminalSupported ? "text-muted hover:text-ink hover:bg-bgsoft" :
-              "text-muted/40 hover:text-muted/60 hover:bg-bgsoft"
-            }`}
-          >
-            <Terminal size={14} />
-          </button>
-          <button
             onClick={() => setEditorOpen((v) => !v)}
             title="IDE'yi aç/kapat"
             className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${editorOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
           >
             <Code2 size={14} />
           </button>
-          <button
-            onClick={() => setGitPanelOpen((v) => !v)}
-            title="Git işlemleri (dal, PR)"
-            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${gitPanelOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
-          >
-            <GitBranch size={14} />
-          </button>
-          {repo && (
-            <button
-              onClick={() => setPrModalOpen(true)}
-              title="PR / MR inceleme"
-              className="w-8 h-8 rounded-lg grid place-items-center transition-colors text-muted hover:text-brand hover:bg-brand/10"
-            >
-              <GitPullRequest size={14} />
-            </button>
-          )}
-          <button
-            onClick={() => useStore.getState().setSkillsOpen(true)}
-            title="Skills — her sohbete eklenen bağlam"
-            className="w-8 h-8 rounded-lg grid place-items-center transition-colors text-muted hover:text-brand hover:bg-brand/10"
-          >
-            <Zap size={14} />
-          </button>
           <ThinkingModeToggle />
+          {/* Birleşik ⋯ menüsü: Terminal · Git · PR · Skills · Dışa aktar */}
+          <MoreMenu placement="bottom" active={terminalOpen || gitPanelOpen}>
+            <MoreItem
+              icon={<Terminal size={14} />}
+              label={terminalSupported ? (terminalOpen ? "Terminal'i kapat" : "Terminal") : "Terminal (masaüstü Chrome/Edge)"}
+              active={terminalOpen}
+              onClick={() => setTerminalOpen((v) => !v)}
+            />
+            <MoreItem icon={<GitBranch size={14} />} label="Git (dal, PR)" active={gitPanelOpen} onClick={() => setGitPanelOpen((v) => !v)} />
+            {repo && <MoreItem icon={<GitPullRequest size={14} />} label="PR / MR incele" onClick={() => setPrModalOpen(true)} />}
+            <MoreItem icon={<Zap size={14} />} label="Skills" onClick={() => useStore.getState().setSkillsOpen(true)} />
+            {current && messages.length > 0 && (
+              <>
+                <div className="h-px bg-line/60 my-1 mx-1" />
+                <MoreItem icon={<Download size={14} />} label="Markdown indir" onClick={() => useStore.getState().exportChat(current.id)} />
+                <MoreItem icon={<Download size={14} />} label="HTML indir" onClick={() => useStore.getState().exportChatHtml(current.id)} />
+                <MoreItem icon={<Download size={14} />} label="JSON indir" onClick={() => useStore.getState().exportChatJson(current.id)} />
+                <MoreItem icon={<Copy size={14} />} label="Markdown kopyala" onClick={() => useStore.getState().copyChatMarkdown(current.id)} />
+              </>
+            )}
+          </MoreMenu>
         </div>
       </div>
 
@@ -1469,7 +1469,7 @@ export function CoderView() {
           })()}
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto">
+          <div ref={scrollRef} onScroll={onMessagesScroll} className="flex-1 overflow-y-auto">
             {messages.length === 0 ? (
               <EmptyChat
                 hasModel={config.models.length > 0}
