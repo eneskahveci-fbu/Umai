@@ -12,7 +12,7 @@ export const PRESETS: Record<Provider, Preset> = {
   anthropic: {
     label: "🧠 Anthropic (Claude — Native)",
     baseUrl: "https://api.anthropic.com/v1",
-    model: "claude-sonnet-4-5",
+    model: "claude-opus-4-8",
     keyHint: "sk-ant-... (Anthropic API anahtarı)",
   },
   hf: {
@@ -66,7 +66,7 @@ export const PRESETS: Record<Provider, Preset> = {
   xai: {
     label: "𝕏 xAI (Grok)",
     baseUrl: "https://api.x.ai/v1",
-    model: "grok-2-latest",
+    model: "grok-4",
     keyHint: "xai-...",
   },
   pollinations: {
@@ -98,13 +98,14 @@ export const PRESETS: Record<Provider, Preset> = {
  */
 export const PROVIDER_MODELS: Record<Provider, string[]> = {
   anthropic: [
+    "claude-opus-4-8",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5",
+    "claude-fable-5",
+    "claude-opus-4-7",
+    "claude-opus-4-6",
     "claude-sonnet-4-5",
     "claude-opus-4-5",
-    "claude-haiku-4-5-20251001",
-    "claude-3-7-sonnet-20250219",
-    "claude-3-5-sonnet-20241022",
-    "claude-3-5-haiku-20241022",
-    "claude-3-opus-20240229",
   ],
   hf: [
     "Qwen/Qwen2.5-Coder-32B-Instruct",
@@ -121,15 +122,14 @@ export const PROVIDER_MODELS: Record<Provider, string[]> = {
     "meta-llama/llama-3.3-70b-instruct:free",
     "google/gemini-2.0-flash-exp:free",
     "qwen/qwen-2.5-coder-32b-instruct",
-    "anthropic/claude-3.7-sonnet",
     "openai/gpt-4o-mini",
-    "x-ai/grok-2-1212",
   ],
   groq: [
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
-    "qwen-2.5-coder-32b",
-    "deepseek-r1-distill-llama-70b",
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "qwen/qwen3-32b",
     "moonshotai/kimi-k2-instruct",
   ],
   gemini: [
@@ -151,7 +151,7 @@ export const PROVIDER_MODELS: Record<Provider, string[]> = {
     "deepseek-ai/DeepSeek-V3",
     "mistralai/Mixtral-8x7B-Instruct-v0.1",
   ],
-  xai: ["grok-2-latest", "grok-2-vision-latest", "grok-beta"],
+  xai: ["grok-4", "grok-3", "grok-3-mini"],
   pollinations: [
     "openai",
     "openai-large",
