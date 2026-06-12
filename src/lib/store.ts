@@ -290,6 +290,9 @@ interface StoreState {
   setSkillsOpen: (b: boolean) => void;
   addSkill: (s: Omit<Skill, "id" | "createdAt" | "usageCount">) => void;
   updateSkill: (id: string, patch: Partial<Skill>) => void;
+  /** Otomatik bellek: damıtılmış kalıcı bilgileri "auto_memory" skill'ine
+      ekler (tekilleştirme + en eski kayıtları düşerek en çok 40 madde). */
+  addAutoMemoryFacts: (facts: string[]) => void;
   removeSkill: (id: string) => void;
   toggleSkill: (id: string) => void;
   incrementSkillUsage: (ids: string[]) => void;
@@ -629,6 +632,38 @@ export const useStore = create<StoreState>()((set, get) => ({
       usageCount: 0,
     };
     get().saveConfig({ ...config, skills: [skill, ...(config.skills ?? [])] });
+  },
+  addAutoMemoryFacts: (facts) => {
+    const config = get().config;
+    const skills = (config.skills ?? []).slice();
+    const idx = skills.findIndex((sk) => sk.id === "auto_memory");
+    const existingLines = idx >= 0
+      ? skills[idx].content.split("\n").filter((l) => l.startsWith("- ")).map((l) => l.slice(2).trim())
+      : [];
+    const seen = new Set(existingLines.map((l) => l.toLowerCase()));
+    const fresh = facts
+      .map((f) => f.trim().replace(/^[-•*]\s*/, ""))
+      .filter((f) => f.length > 4 && f.length < 200 && !seen.has(f.toLowerCase()));
+    if (fresh.length === 0) return;
+    const all = [...existingLines, ...fresh].slice(-40); // en eskiler düşer
+    const content =
+      "# Otomatik Bellek\n\nKonuşmalardan damıtılan kalıcı tercihler — her sohbete otomatik eklenir.\n\n" +
+      all.map((l) => `- ${l}`).join("\n");
+    if (idx >= 0) {
+      skills[idx] = { ...skills[idx], content };
+    } else {
+      skills.unshift({
+        id: "auto_memory",
+        title: "🧠 Otomatik Bellek",
+        content,
+        tags: ["bellek", "otomatik"],
+        enabled: true,
+        source: "manual",
+        usageCount: 0,
+        createdAt: Date.now(),
+      });
+    }
+    get().saveConfig({ ...config, skills });
   },
   updateSkill: (id, patch) => {
     const config = get().config;

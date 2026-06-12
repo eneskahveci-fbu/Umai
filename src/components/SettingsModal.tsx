@@ -868,6 +868,10 @@ export function SettingsModal() {
                 <input type="checkbox" checked={config.webSearch} onChange={() => saveConfig({ ...config, webSearch: !config.webSearch })} className="accent-brand" />
                 Web arama (varsayılan açık)
               </label>
+              <label className="flex items-center gap-3 text-sm cursor-pointer">
+                <input type="checkbox" checked={config.autoMemory !== false} onChange={() => saveConfig({ ...config, autoMemory: config.autoMemory === false })} className="accent-brand" />
+                Otomatik bellek — kalıcı tercihleri 🧠 skill&apos;ine damıt
+              </label>
             </div>
 
             {/* Bağlam limiti */}
