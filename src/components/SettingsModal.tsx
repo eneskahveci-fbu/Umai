@@ -1,1157 +1,788 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useModalA11y } from "@/lib/useModalA11y";
 import {
-  Brain,
-  Check,
-  ExternalLink,
-  FolderGit2,
-  GitBranch,
-  Loader2,
-  Moon,
-  Pencil,
-  Play,
-  Plus,
-  Search,
-  Sun,
-  Trash2,
   X,
-  Zap,
+  Plus,
+  Trash2,
+  Play,
+  Check,
+  Globe,
+  Cpu,
+  GitBranch,
+  Palette,
+  Type,
+  Volume2,
+  Eye,
+  Key,
+  CloudLightning,
+  TestTube,
+  ExternalLink,
 } from "lucide-react";
-import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
-import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS } from "@/lib/constants";
-import { calculateCost, formatCost } from "@/lib/pricing";
-import { fetchUserRepos } from "@/lib/github";
-import { fetchGitLabUserRepos } from "@/lib/gitlab";
-import type { Provider, ResponseStyle } from "@/lib/types";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useStore } from "@/lib/store";
+import type { Provider, ModelEntry, Config, GitAccount, Project } from "@/lib/types";
+
+// ── Sağlayıcı bilgileri ──
+
+const PROVIDERS: Array<{ id: Provider; label: string; defaultUrl: string }> = [
+  { id: "hf", label: "Hugging Face", defaultUrl: "https://api-inference.huggingface.co/v1" },
+  { id: "openrouter", label: "OpenRouter", defaultUrl: "https://openrouter.ai/api/v1" },
+  { id: "deepseek", label: "DeepSeek", defaultUrl: "https://api.deepseek.com/v1" },
+  { id: "groq", label: "Groq", defaultUrl: "https://api.groq.com/openai/v1" },
+  { id: "google", label: "Google Gemini", defaultUrl: "https://generativelanguage.googleapis.com/v1beta/openai" },
+  { id: "mistral", label: "Mistral", defaultUrl: "https://api.mistral.ai/v1" },
+  { id: "cerebras", label: "Cerebras", defaultUrl: "https://api.cerebras.ai/v1" },
+  { id: "together", label: "Together AI", defaultUrl: "https://api.together.xyz/v1" },
+  { id: "xai", label: "xAI (Grok)", defaultUrl: "https://api.x.ai/v1" },
+  { id: "ollama", label: "Ollama (Yerel)", defaultUrl: "http://localhost:11434/v1" },
+  { id: "custom", label: "Özel", defaultUrl: "" },
+];
+
+type SettingsTab = "model" | "git" | "general" | "advanced";
+
+// ── Ana bileşen ──
 
 export function SettingsModal() {
   const open = useStore((s) => s.settingsOpen);
-  const setOpen = useStore((s) => s.setSettingsOpen);
+  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const config = useStore((s) => s.config);
+  const setConfig = useStore((s) => s.setConfig);
+  const models = useStore((s) => s.models);
   const addModel = useStore((s) => s.addModel);
-  const updateModel = useStore((s) => s.updateModel);
   const removeModel = useStore((s) => s.removeModel);
-  const setActiveModel = useStore((s) => s.setActiveModel);
-  const addGithub = useStore((s) => s.addGithub);
-  const removeGithub = useStore((s) => s.removeGithub);
-  const setActiveGithub = useStore((s) => s.setActiveGithub);
-  const addGitlab = useStore((s) => s.addGitlab);
-  const removeGitlab = useStore((s) => s.removeGitlab);
-  const setActiveGitlab = useStore((s) => s.setActiveGitlab);
-  const addRepo = useStore((s) => s.addRepo);
-  const setActiveRepo = useStore((s) => s.setActiveRepo);
-  const removeRepo = useStore((s) => s.removeRepo);
-  const saveConfig = useStore((s) => s.saveConfig);
-  const toggleTheme = useStore((s) => s.toggleTheme);
+  const setModels = useStore((s) => s.setModels);
+  const gitAccounts = useStore((s) => s.gitAccounts);
+  const addGitAccount = useStore((s) => s.addGitAccount);
+  const removeGitAccount = useStore((s) => s.removeGitAccount);
+  const projects = useStore((s) => s.projects);
+  const setProjects = useStore((s) => s.setProjects);
+  const user = useStore((s) => s.user);
   const addToast = useStore((s) => s.addToast);
-  const chats = useStore((s) => s.chats);
-  const addMemory = useStore((s) => s.addMemory);
-  const removeMemory = useStore((s) => s.removeMemory);
-  const updateProject = useStore((s) => s.updateProject);
-  const addMcpServer = useStore((s) => s.addMcpServer);
-  const removeMcpServer = useStore((s) => s.removeMcpServer);
-  const updateMcpServer = useStore((s) => s.updateMcpServer);
 
-  const [mcpName, setMcpName] = useState("");
-  const [mcpUrl, setMcpUrl] = useState("");
-  const [mcpHeaderKey, setMcpHeaderKey] = useState("");
-  const [mcpHeaderVal, setMcpHeaderVal] = useState("");
-  const [mcpTesting, setMcpTesting] = useState<string | null>(null);
+  const [tab, setTab] = useState<SettingsTab>("model");
+  const panelRef = useRef<HTMLDivElement>(null);
 
-  const [tab, setTab] = useState<"model" | "github" | "general" | "advanced" | "mcp">("model");
-  const [search, setSearch] = useState("");
-  const modalRef = useRef<HTMLDivElement>(null);
-  useModalA11y(modalRef, open, () => setOpen(false));
-  const [guestMode, setGuestModeState] = useState(() =>
-    typeof window === "undefined" ? false : isGuestMode(),
-  );
-
-  /* Keyword index — typing in the search box jumps to whichever tab
-     contains the matching keyword (first hit wins). */
-  const SEARCH_INDEX: Record<"model" | "github" | "general" | "advanced" | "mcp", string[]> = {
-    model:    ["model", "api", "anahtar", "key", "openai", "anthropic", "huggingface", "hf", "provider", "test"],
-    github:   ["github", "gitlab", "token", "depo", "repo", "branch", "dal", "kullanıcı", "username"],
-    general:  ["sistem", "prompt", "stil", "style", "tema", "theme", "renk", "color", "accent", "font", "yazı", "ses", "sound", "skill", "memori", "ayar"],
-    advanced: ["webcontainer", "key", "context", "max", "guest", "misafir", "kural", "rules", "rulesfile", "gelişmiş"],
-    mcp:      ["mcp", "model context", "protocol", "sunucu", "server", "araç", "tool", "entegrasyon"],
-  };
-  const matchingTabs = (() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return new Set<string>();
-    const hits = new Set<string>();
-    for (const [k, kws] of Object.entries(SEARCH_INDEX)) {
-      if (kws.some((kw) => kw.includes(q))) hits.add(k);
-    }
-    return hits;
-  })();
-  /* Auto-jump to the first matching tab when the search text changes —
-     adjusted during render rather than in a state-syncing effect. */
-  const [prevSearch, setPrevSearch] = useState(search);
-  if (search !== prevSearch) {
-    setPrevSearch(search);
-    if (search.trim() && matchingTabs.size > 0) {
-      const first = (["model", "github", "general", "advanced", "mcp"] as const).find((k) => matchingTabs.has(k));
-      if (first && first !== tab) setTab(first);
-    }
-  }
-  const [provider, setProvider] = useState<Provider>("hf");
-  const [label, setLabel] = useState("");
-  const [baseUrl, setBaseUrl] = useState(PRESETS.hf.baseUrl);
-  const [model, setModel] = useState(PRESETS.hf.model);
-  const [apiKey, setApiKey] = useState("");
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editLabel, setEditLabel] = useState("");
-  const [editKey, setEditKey] = useState("");
-  const [ghUser, setGhUser] = useState("");
-  const [ghToken, setGhToken] = useState("");
-  const [verifyingGithub, setVerifyingGithub] = useState(false);
-  const [glUser, setGlUser] = useState("");
-  const [glToken, setGlToken] = useState("");
-  const [repoInput, setRepoInput] = useState("");
-  /* Hesaba bağlı otomatik gelen depolar (henüz eklenmemiş olanlar) */
-  const [accountRepos, setAccountRepos] = useState<string[]>([]);
-  const [loadingAccountRepos, setLoadingAccountRepos] = useState(false);
-  const [testing, setTesting] = useState(false);
-  /* Hızlı kurulum: herhangi bir sağlayıcı için anahtar ekle + test et */
-  const [quickProvider, setQuickProvider] = useState<Provider>("gemini");
-  const [quickKey, setQuickKey] = useState("");
-  const [quickBusy, setQuickBusy] = useState(false);
-  const [quickResult, setQuickResult] = useState<null | "ok" | string>(null);
-  const [memInput, setMemInput] = useState("");
-  /* Local drafts for large text fields — saved on blur to avoid calling
-     saveConfig on every keystroke (which triggers re-renders and focus loss). */
-  const [systemPromptDraft, setSystemPromptDraft] = useState(() => config.systemPrompt);
-  const [rulesFileDraft, setRulesFileDraft] = useState(() => config.rulesFile);
-  /* Refresh the drafts when the modal (re)opens so stale text isn't shown —
-     adjusted during render on the open→true transition. */
-  const [prevOpen, setPrevOpen] = useState(open);
-  if (open !== prevOpen) {
-    setPrevOpen(open);
-    if (open) {
-      setSystemPromptDraft(config.systemPrompt);
-      setRulesFileDraft(config.rulesFile);
-    }
-  }
-  /* Sağlayıcıdan anahtarla canlı çekilen model listesi + durum */
-  const [fetchedModels, setFetchedModels] = useState<string[]>([]);
-  const [loadingModels, setLoadingModels] = useState(false);
-
-  /* Anahtar girildiğinde modelleri otomatik (debounce'lu) çek. Anahtara göre
-     gerçek model listesini getirir; böylece model adı tahminden kaynaklı
-     "geçersiz model/anahtar" hataları oluşmaz. */
   useEffect(() => {
-    if (!open || tab !== "model") return;
-    const key = apiKey.trim();
-    const url = baseUrl.trim();
-    if (!url || (key.length > 0 && key.length < 8)) return;
-    if (provider !== "ollama" && provider !== "custom" && provider !== "pollinations" && key.length === 0) return;
-    const t = setTimeout(() => {
-      fetch("/api/models", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ baseUrl: url, apiKey: key, provider }),
-      })
-        .then((r) => r.json().catch(() => ({})))
-        .then((data) => {
-          if (!Array.isArray(data.models)) return;
-          const models: string[] = data.models;
-          setFetchedModels(models);
-          if (models.length && !models.includes(model.trim())) {
-            const preferred = (PROVIDER_MODELS[provider] ?? []).find((m) => models.includes(m));
-            setModel(preferred || models[0]);
-          }
-        })
-        .catch(() => { /* sessiz; manuel "Yenile" butonu var */ });
-    }, 700);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiKey, baseUrl, provider, open, tab]);
-
-  /* Git sekmesi açıldığında ve bir hesap aktifse, o hesaptaki depoları otomatik
-     getir. Henüz eklenmemiş olanlar "Hesabındaki depolar" listesinde tek tıkla
-     eklenebilir. Token varsa özel depolar da gelir. */
-  useEffect(() => {
-    if (!open || tab !== "github") return;
-    const gh = config.githubAccounts.find((a) => a.id === config.activeGithubId);
-    const gl = (config.gitlabAccounts ?? []).find((a) => a.id === config.activeGitlabId);
-    let cancelled = false;
-    (async () => {
-      if (!gh && !gl) { if (!cancelled) setAccountRepos([]); return; }
-      setLoadingAccountRepos(true);
-      const results: string[] = [];
-      try {
-        if (gh) results.push(...(await fetchUserRepos(gh.token, gh.username)));
-      } catch { /* sessiz */ }
-      try {
-        if (gl) results.push(...(await fetchGitLabUserRepos(gl.token, gl.username)));
-      } catch { /* sessiz */ }
-      if (cancelled) return;
-      const have = new Set(config.repos);
-      setAccountRepos([...new Set(results)].filter((r) => !have.has(r)));
-      setLoadingAccountRepos(false);
-    })();
-    return () => { cancelled = true; };
-  }, [open, tab, config.activeGithubId, config.activeGitlabId, config.githubAccounts, config.gitlabAccounts, config.repos]);
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSettingsOpen(false);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, setSettingsOpen]);
 
   if (!open) return null;
 
-  const onProvider = (p: Provider) => {
-    setProvider(p);
-    setFetchedModels([]);
-    if (p !== "custom") { setBaseUrl(PRESETS[p].baseUrl); setModel(PRESETS[p].model); }
-  };
+  const tabs: Array<{ id: SettingsTab; label: string; icon: typeof Cpu }> = [
+    { id: "model", label: "Model", icon: Cpu },
+    { id: "git", label: "Git", icon: GitBranch },
+    { id: "general", label: "Genel", icon: Palette },
+    { id: "advanced", label: "Gelişmiş", icon: Key },
+  ];
 
-  /* Girilen anahtar + Base URL ile sağlayıcının desteklediği gerçek modelleri
-     çeker. Model adını tahmin etmek yerine anahtara göre listelediğimizden
-     "model bulunamadı / geçersiz" hataları önlenir. */
-  const loadModels = async (opts?: { silent?: boolean }) => {
-    if (!baseUrl.trim()) { if (!opts?.silent) addToast("Önce Base URL gir.", "error"); return; }
-    setLoadingModels(true);
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[5vh] bg-bg/70 backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) setSettingsOpen(false);
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Ayarlar"
+    >
+      <div
+        ref={panelRef}
+        className="bg-surface border border-line rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col overflow-hidden"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-line shrink-0">
+          <h2 className="text-sm font-semibold">Ayarlar</h2>
+          <button
+            onClick={() => setSettingsOpen(false)}
+            className="text-muted hover:text-ink p-1 rounded hover:bg-bgsoft transition-colors"
+            aria-label="Kapat"
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        {/* Sekmeler */}
+        <div className="flex gap-1 px-4 pt-3 pb-2 shrink-0 border-b border-line/50">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                tab === t.id ? "bg-amber-400 text-black" : "bg-bgsoft text-muted hover:text-ink"
+              }`}
+            >
+              <t.icon size={12} />
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Sekme içerikleri */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {tab === "model" && <ModelTab models={models} addModel={addModel} removeModel={removeModel} setModels={setModels} addToast={addToast} />}
+          {tab === "git" && <GitTab gitAccounts={gitAccounts} addGitAccount={addGitAccount} removeGitAccount={removeGitAccount} projects={projects} setProjects={setProjects} addToast={addToast} />}
+          {tab === "general" && <GeneralTab config={config} setConfig={setConfig} />}
+          {tab === "advanced" && <AdvancedTab config={config} setConfig={setConfig} user={user} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Model Sekmesi ──
+
+function ModelTab({
+  models,
+  addModel,
+  removeModel,
+  setModels,
+  addToast,
+}: {
+  models: ModelEntry[];
+  addModel: (m: ModelEntry) => void;
+  removeModel: (id: string) => void;
+  setModels: (models: ModelEntry[]) => void;
+  addToast: (t: { message: string; type?: "info" | "success" | "error" | "warning" }) => void;
+}) {
+  const [provider, setProvider] = useState<Provider>("openrouter");
+  const [apiKey, setApiKey] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [fetchedModels, setFetchedModels] = useState<Array<{ id: string; name: string }>>([]);
+  const [fetching, setFetching] = useState(false);
+  const [testingId, setTestingId] = useState<string | null>(null);
+
+  const selectedProvider = PROVIDERS.find((p) => p.id === provider);
+
+  useEffect(() => {
+    if (selectedProvider) setBaseUrl(selectedProvider.defaultUrl);
+  }, [provider, selectedProvider]);
+
+  const handleFetchModels = useCallback(async () => {
+    if (!apiKey.trim() || !baseUrl.trim()) {
+      addToast({ message: "API anahtarı ve Base URL gerekli", type: "warning" });
+      return;
+    }
+    setFetching(true);
     try {
       const res = await fetch("/api/models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ baseUrl: baseUrl.trim(), apiKey: apiKey.trim(), provider }),
+        body: JSON.stringify({ baseUrl: baseUrl.trim(), apiKey: apiKey.trim() }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !Array.isArray(data.models)) {
-        if (!opts?.silent) addToast(data.error || "Modeller alınamadı.", "error");
-        setFetchedModels([]);
-        return;
-      }
-      const models: string[] = data.models;
-      setFetchedModels(models);
-      if (models.length) {
-        /* Mevcut model bu anahtarla erişilebilir değilse, ilk geçerli modele
-           otomatik düzelt; varsa önerilen (PRESET) modeli tercih et. */
-        if (!models.includes(model.trim())) {
-          const preferred = (PROVIDER_MODELS[provider] ?? []).find((m) => models.includes(m));
-          setModel(preferred || models[0]);
-        }
-        if (!opts?.silent) addToast(`${models.length} model bulundu.`, "success");
-      } else if (!opts?.silent) {
-        addToast("Bu anahtarla model bulunamadı.", "info");
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setFetchedModels(data.models ?? []);
+      addToast({ message: `${(data.models ?? []).length} model bulundu`, type: "success" });
     } catch (err) {
-      if (!opts?.silent) addToast(`Hata: ${(err as Error).message}`, "error");
-      setFetchedModels([]);
+      addToast({ message: `Model listesi alınamadı: ${err instanceof Error ? err.message : "Hata"}`, type: "error" });
     } finally {
-      setLoadingModels(false);
+      setFetching(false);
     }
-  };
+  }, [apiKey, baseUrl, addToast]);
 
-  const submitModel = () => {
-    if (!baseUrl.trim() || !model.trim()) { addToast("Base URL ve model gerekli.", "error"); return; }
-    addModel({ label: label.trim() || model.trim(), provider, baseUrl: baseUrl.trim(), model: model.trim(), apiKey: apiKey.trim() });
-    addToast("Model eklendi.", "success");
-    setLabel(""); setApiKey("");
-  };
-
-  const submitGithub = async () => {
-    if (!ghToken.trim()) { addToast("GitHub token gerekli (ghp_...).", "error"); return; }
-    setVerifyingGithub(true);
-    try {
-      /* Token'ı eklemeden ÖNCE doğrula → anında net geri bildirim, sessiz hata yok. */
-      const res = await fetch("https://api.github.com/user", {
-        headers: { Authorization: `Bearer ${ghToken.trim()}`, Accept: "application/vnd.github+json" },
-      });
-      if (!res.ok) {
-        addToast(
-          res.status === 401 ? "Token geçersiz veya süresi dolmuş — yeni bir PAT oluştur."
-          : res.status === 403 ? "Token yetkisiz/oran sınırı — 'repo' kapsamı gerekli."
-          : `GitHub doğrulama hatası (${res.status}).`,
-          "error",
-        );
-        return;
-      }
-      const user = await res.json() as { login?: string };
-      addGithub({ username: ghUser.trim() || user.login || "github", token: ghToken.trim() });
-      addToast(`GitHub bağlandı: ${user.login} ✓`, "success");
-      setGhUser(""); setGhToken("");
-    } catch (e) {
-      addToast(`Ağ hatası: ${(e as Error).message}`, "error");
-    } finally {
-      setVerifyingGithub(false);
-    }
-  };
-
-  const submitGitlab = () => {
-    if (!glUser.trim() || !glToken.trim()) { addToast("Kullanıcı adı ve token gerekli.", "error"); return; }
-    addGitlab({ username: glUser.trim(), token: glToken.trim() });
-    addToast("GitLab hesabı eklendi.", "success");
-    setGlUser(""); setGlToken("");
-  };
-
-  const submitRepo = () => {
-    if (!repoInput.trim()) { addToast("Depo adı gerekli.", "error"); return; }
-    addRepo(repoInput.trim());
-    addToast("Depo eklendi.", "success");
-    setRepoInput("");
-  };
-
-  const testModel = async (m: { baseUrl: string; model: string; apiKey: string; provider: Provider }) => {
-    setTesting(true);
-    try {
-      const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "Merhaba, 1+1=?" }], baseUrl: m.baseUrl, model: m.model, apiKey: m.apiKey, provider: m.provider }) });
-      addToast(res.ok ? "Bağlantı başarılı!" : `Hata: ${(await res.text()).slice(0, 200)}`, res.ok ? "success" : "error");
-    } catch (err) { addToast(`Hata: ${(err as Error).message}`, "error"); }
-    finally { setTesting(false); }
-  };
-
-  /* Anahtar alma sayfaları (bilinenler; olmayanlarda link gizlenir). */
-  const QUICK_KEY_URL: Partial<Record<Provider, string>> = {
-    gemini: "https://aistudio.google.com/apikey",
-    groq: "https://console.groq.com/keys",
-    deepseek: "https://platform.deepseek.com/api_keys",
-    openrouter: "https://openrouter.ai/keys",
-    anthropic: "https://console.anthropic.com/settings/keys",
-    mistral: "https://console.mistral.ai/api-keys",
-    cerebras: "https://cloud.cerebras.ai",
-    together: "https://api.together.xyz/settings/api-keys",
-    xai: "https://console.x.ai",
-    hf: "https://huggingface.co/settings/tokens",
-  };
-  /* Hızlı kurulumda sunulan sağlayıcılar (anahtar gerektirenler; pollinations
-     anahtarsız çalışır, ollama yereldir, custom manuel → alttaki formdan eklenir). */
-  const QUICK_PROVIDERS: Provider[] = ["gemini", "groq", "deepseek", "openrouter", "anthropic", "mistral", "cerebras", "together", "xai", "hf"];
-  /* PRESET etiketinden kısa, temiz ad (emoji + parantez kırpılır). */
-  const cleanLabel = (p: Provider) => PRESETS[p].label.replace(/\s*\([^)]*\)\s*$/, "").replace(/^[^\p{L}]*/u, "").trim();
-
-  /* Ücretsiz modeli ekle, aktif yap ve canlı test et. */
-  const quickSetup = async () => {
-    const key = quickKey.trim();
-    if (!key) { addToast("Önce ücretsiz anahtarı yapıştır.", "error"); return; }
-    const preset = PRESETS[quickProvider];
-    const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `m_${Date.now()}`;
-    const newModel = {
-      id,
-      label: cleanLabel(quickProvider),
-      provider: quickProvider as Provider,
-      baseUrl: preset.baseUrl,
-      model: preset.model,
-      apiKey: key,
+  const handleAddModel = (modelId: string, modelName: string) => {
+    const model: ModelEntry = {
+      id: `model_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      name: displayName.trim() || modelName,
+      provider,
+      baseUrl: baseUrl.trim(),
+      apiKey: apiKey.trim(),
+      modelId,
+      enabled: true,
     };
-    /* addModel mevcut aktif modeli korur; burada yeni modeli aktif yapıyoruz. */
-    saveConfig({ ...config, models: [...config.models, newModel], activeModelId: id });
-    setQuickBusy(true);
-    setQuickResult(null);
+    addModel(model);
+    addToast({ message: `${model.name} eklendi`, type: "success" });
+  };
+
+  const handleDeleteModel = (id: string) => {
+    removeModel(id);
+    addToast({ message: "Model kaldırıldı", type: "info" });
+  };
+
+  const handleToggleModel = (id: string, enabled: boolean) => {
+    setModels(models.map((m) => (m.id === id ? { ...m, enabled: !enabled } : m)));
+  };
+
+  const handleTestModel = async (model: ModelEntry) => {
+    setTestingId(model.id);
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [{ role: "user", content: "Merhaba" }], baseUrl: preset.baseUrl, model: preset.model, apiKey: key, provider: quickProvider }),
+        body: JSON.stringify({
+          messages: [{ role: "user", content: "Merhaba" }],
+          model: model.modelId,
+          provider: model.provider,
+          baseUrl: model.baseUrl,
+          apiKey: model.apiKey,
+          max_tokens: 10,
+        }),
       });
       if (res.ok) {
-        setQuickResult("ok");
-        setQuickKey("");
-        addToast("Model eklendi ve çalışıyor — artık aktif.", "success");
+        addToast({ message: `${model.name}: Bağlantı başarılı ✅`, type: "success" });
       } else {
-        const t = (await res.text()).slice(0, 140);
-        setQuickResult(t || `HTTP ${res.status}`);
-        addToast("Model eklendi ama test başarısız.", "error");
+        addToast({ message: `${model.name}: HTTP ${res.status}`, type: "error" });
       }
-    } catch (e) {
-      setQuickResult((e as Error).message);
-      addToast(`Test hatası: ${(e as Error).message}`, "error");
+    } catch (err) {
+      addToast({ message: `${model.name}: ${err instanceof Error ? err.message : "Hata"}`, type: "error" });
     } finally {
-      setQuickBusy(false);
+      setTestingId(null);
     }
   };
 
-  const activeProj = config.projects.find((p) => p.id === config.activeProjectId);
+  return (
+    <div className="space-y-5">
+      {/* Model ekle */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-3">+ Yeni Model Ekle</p>
+        <div className="space-y-3">
+          {/* Sağlayıcı seçici */}
+          <div>
+            <label className="text-[10px] text-muted/70 mb-1 block">Sağlayıcı</label>
+            <select
+              value={provider}
+              onChange={(e) => setProvider(e.target.value as Provider)}
+              className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50"
+            >
+              {PROVIDERS.map((p) => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Görünen ad */}
+          <div>
+            <label className="text-[10px] text-muted/70 mb-1 block">Görünen Ad (opsiyonel)</label>
+            <input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Örn: GPT-4o Hızlı"
+              className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50"
+            />
+          </div>
+
+          {/* Base URL */}
+          <div>
+            <label className="text-[10px] text-muted/70 mb-1 block">Base URL</label>
+            <input
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder="https://api.example.com/v1"
+              className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs font-mono outline-none focus:border-amber-400/50"
+            />
+          </div>
+
+          {/* API Anahtarı */}
+          <div>
+            <label className="text-[10px] text-muted/70 mb-1 block">API Anahtarı</label>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="sk-..."
+              className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs font-mono outline-none focus:border-amber-400/50"
+            />
+          </div>
+
+          {/* Model listesini getir */}
+          <button
+            onClick={handleFetchModels}
+            disabled={fetching || !apiKey.trim()}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-bgsoft border border-line text-xs font-medium text-muted hover:text-ink transition-colors disabled:opacity-40"
+          >
+            <CloudLightning size={12} />
+            {fetching ? "Modeller getiriliyor..." : "↻ Modelleri Getir / Yenile"}
+          </button>
+        </div>
+
+        {/* Fetched model listesi */}
+        {fetchedModels.length > 0 && (
+          <div className="mt-3 space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">
+              Bulunan Modeller ({fetchedModels.length})
+            </p>
+            {fetchedModels.map((m) => (
+              <div
+                key={m.id}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bgsoft/50 border border-line/30"
+              >
+                <span className="text-xs flex-1 truncate">{m.name || m.id}</span>
+                <button
+                  onClick={() => handleAddModel(m.id, m.name || m.id)}
+                  className="text-[10px] text-amber-400 hover:text-amber-300 font-medium"
+                >
+                  + Ekle
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Eklenmiş modeller */}
+      {models.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">
+            Eklenen Modeller ({models.length})
+          </p>
+          <div className="space-y-1">
+            {models.map((m) => (
+              <div
+                key={m.id}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bgsoft/50 border border-line/30 group"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium truncate">{m.name}</div>
+                  <div className="text-[10px] text-muted/60 font-mono truncate">{m.modelId}</div>
+                </div>
+                <button
+                  onClick={() => handleTestModel(m)}
+                  disabled={testingId === m.id}
+                  className="p-1 text-muted/40 hover:text-green-400 transition-colors"
+                  title="Test et"
+                >
+                  {testingId === m.id ? (
+                    <span className="animate-spin text-[10px]">⟳</span>
+                  ) : (
+                    <Play size={12} />
+                  )}
+                </button>
+                <button
+                  onClick={() => handleToggleModel(m.id, m.enabled)}
+                  className={`p-1 transition-colors ${m.enabled ? "text-amber-400" : "text-muted/40 hover:text-amber-400"}`}
+                  title={m.enabled ? "Devre dışı bırak" : "Etkinleştir"}
+                >
+                  <Check size={14} className={m.enabled ? "" : "opacity-30"} />
+                </button>
+                <button
+                  onClick={() => handleDeleteModel(m.id)}
+                  className="p-1 text-muted/40 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                  title="Sil"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Git Sekmesi ──
+
+function GitTab({
+  gitAccounts,
+  addGitAccount,
+  removeGitAccount,
+  projects,
+  setProjects,
+  addToast,
+}: {
+  gitAccounts: GitAccount[];
+  addGitAccount: (a: GitAccount) => void;
+  removeGitAccount: (id: string) => void;
+  projects: Project[];
+  setProjects: (p: Project[]) => void;
+  addToast: (t: { message: string; type?: "info" | "success" | "error" | "warning" }) => void;
+}) {
+  const [gitProvider, setGitProvider] = useState<"github" | "gitlab">("github");
+  const [gitUsername, setGitUsername] = useState("");
+  const [gitToken, setGitToken] = useState("");
+  const [repoInput, setRepoInput] = useState(""); // sahip/repo:dal
+  const [repoBranch, setRepoBranch] = useState("main");
+
+  const handleAddAccount = () => {
+    if (!gitUsername.trim() || !gitToken.trim()) {
+      addToast({ message: "Kullanıcı adı ve token gerekli", type: "warning" });
+      return;
+    }
+    addGitAccount({
+      id: `git_${Date.now()}`,
+      provider: gitProvider,
+      username: gitUsername.trim(),
+      token: gitToken.trim(),
+    });
+    setGitUsername("");
+    setGitToken("");
+    addToast({ message: `${gitProvider} hesabı eklendi`, type: "success" });
+  };
+
+  const handleAddRepo = () => {
+    const parts = repoInput.trim().split("/");
+    if (parts.length < 2) {
+      addToast({ message: "Format: sahip/repo[:dal]", type: "warning" });
+      return;
+    }
+    const owner = parts[0];
+    const repoAndBranch = parts.slice(1).join("/");
+    const [repo, branch = repoBranch || "main"] = repoAndBranch.split(":");
+    const project: Project = {
+      id: `project_${Date.now()}`,
+      name: `${owner}/${repo}`,
+      repoOwner: owner,
+      repoName: repo,
+      branch,
+      provider: gitProvider,
+    };
+    setProjects([...projects, project]);
+    setRepoInput("");
+    addToast({ message: `${owner}/${repo} eklendi`, type: "success" });
+  };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setOpen(false)}>
-      <div
-        ref={modalRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-title"
-        className="w-full max-w-lg rounded-2xl border border-line bg-surface p-6 max-h-[92dvh] overflow-auto"
-        onClick={(e) => e.stopPropagation()}
-        style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <h3 id="settings-title" className="text-lg font-bold">Ayarlar</h3>
-          <button onClick={() => setOpen(false)} className="text-muted hover:text-ink p-1 rounded-lg hover:bg-bgsoft"><X size={18} /></button>
-        </div>
-
-        <div className="relative mb-4">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted/50" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Ayar ara — örn. font, github, webcontainer…"
-            className="w-full bg-bgsoft/60 border border-line/60 rounded-xl pl-9 pr-8 py-2 text-sm outline-none focus:border-brand/50 placeholder:text-muted/40 transition-colors"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted/40 hover:text-ink p-1 rounded transition-colors"
-              title="Temizle"
+    <div className="space-y-5">
+      {/* Git hesabı ekle */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-3">Git Hesabı Ekle</p>
+        <div className="space-y-3">
+          <div>
+            <label className="text-[10px] text-muted/70 mb-1 block">Sağlayıcı</label>
+            <select
+              value={gitProvider}
+              onChange={(e) => setGitProvider(e.target.value as "github" | "gitlab")}
+              className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50"
             >
-              <X size={12} />
-            </button>
-          )}
+              <option value="github">GitHub</option>
+              <option value="gitlab">GitLab</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] text-muted/70 mb-1 block">Kullanıcı Adı</label>
+            <input
+              value={gitUsername}
+              onChange={(e) => setGitUsername(e.target.value)}
+              placeholder="kullaniciadi"
+              className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted/70 mb-1 block">Token</label>
+            <input
+              type="password"
+              value={gitToken}
+              onChange={(e) => setGitToken(e.target.value)}
+              placeholder="ghp_... veya glpat-..."
+              className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs font-mono outline-none focus:border-amber-400/50"
+            />
+          </div>
+          <button
+            onClick={handleAddAccount}
+            disabled={!gitUsername.trim() || !gitToken.trim()}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-400 text-black text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40"
+          >
+            <Plus size={12} />
+            Hesap Ekle
+          </button>
         </div>
 
-        <div className="flex gap-1 mb-5 border-b border-line">
-          {([["model", "Model"], ["github", "Git"], ["general", "Genel"], ["advanced", "Gelişmiş"], ["mcp", "MCP"]] as const).map(([key, lbl]) => {
-            const hit = matchingTabs.has(key);
-            return (
-              <button
-                key={key}
-                onClick={() => setTab(key)}
-                className={`relative px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
-                  tab === key ? "border-brand text-brand" : "border-transparent text-muted hover:text-ink"
-                }`}
-              >
-                {lbl}
-                {hit && tab !== key && (
-                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* MODEL */}
-        {tab === "model" && (
-          <section>
-            <p className="text-xs text-muted mb-3">Birden fazla model ekleyebilirsin. Anahtarlar yalnızca bu tarayıcıda saklanır.</p>
-            
-            {/* Hızlı kurulum: ücretsiz, güvenilir model */}
-            <div className="mb-4 rounded-xl border border-brand/30 bg-brand/8 p-3.5">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-brand mb-1.5">
-                <Zap size={14} /> Hızlı kurulum — bir sağlayıcı seç, anahtarı yapıştır
+        {/* Mevcut hesaplar */}
+        {gitAccounts.length > 0 && (
+          <div className="mt-3 space-y-1">
+            {gitAccounts.map((a) => (
+              <div key={a.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bgsoft/50 border border-line/30 group">
+                <GitBranch size={12} className="text-muted/60" />
+                <span className="text-xs flex-1">{a.username} ({a.provider})</span>
+                <button
+                  onClick={() => removeGitAccount(a.id)}
+                  className="text-muted/40 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                >
+                  <Trash2 size={12} />
+                </button>
               </div>
-              <p className="text-[11px] text-muted leading-relaxed mb-2.5">
-                Sağlayıcıyı seç, anahtarını yapıştır — base URL ve varsayılan model otomatik
-                ayarlanır, eklenip test edilir ve aktif olur. Anahtar yalnızca tarayıcında kalır.
-              </p>
-              <select
-                value={quickProvider}
-                onChange={(e) => { setQuickProvider(e.target.value as Provider); setQuickResult(null); }}
-                className="input-mono w-full mb-2.5"
-              >
-                {QUICK_PROVIDERS.map((p) => (
-                  <option key={p} value={p}>{PRESETS[p].label}</option>
-                ))}
-              </select>
-              {QUICK_KEY_URL[quickProvider] && (
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Repo ekle */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-3">Repo Bağla</p>
+        <div className="space-y-3">
+          <div>
+            <label className="text-[10px] text-muted/70 mb-1 block">Depo (sahip/repo[:dal])</label>
+            <input
+              value={repoInput}
+              onChange={(e) => setRepoInput(e.target.value)}
+              placeholder="sahip/repo:main"
+              className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs font-mono outline-none focus:border-amber-400/50"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              value={repoBranch}
+              onChange={(e) => setRepoBranch(e.target.value)}
+              placeholder="main"
+              className="flex-1 bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50"
+            />
+            <button
+              onClick={handleAddRepo}
+              disabled={!repoInput.trim()}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-400 text-black text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40"
+            >
+              <Plus size={12} />
+              Bağla
+            </button>
+          </div>
+        </div>
+
+        {/* Mevcut repolar */}
+        {projects.length > 0 && (
+          <div className="mt-3 space-y-1">
+            {projects.map((p) => (
+              <div key={p.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bgsoft/50 border border-line/30 group">
+                <Globe size={12} className="text-muted/60" />
+                <span className="text-xs flex-1 font-mono">
+                  {p.repoOwner}/{p.repoName}
+                  <span className="text-muted/60 ml-1">:{p.branch}</span>
+                </span>
                 <a
-                  href={QUICK_KEY_URL[quickProvider]}
+                  href={p.provider === "github"
+                    ? `https://github.com/${p.repoOwner}/${p.repoName}`
+                    : `https://gitlab.com/${p.repoOwner}/${p.repoName}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] text-brand hover:text-branddim underline mb-2"
+                  className="text-muted/40 hover:text-ink transition-colors"
                 >
-                  {cleanLabel(quickProvider)} anahtarı al <ExternalLink size={11} />
+                  <ExternalLink size={11} />
                 </a>
-              )}
-              <div className="flex gap-1.5">
-                <input
-                  value={quickKey}
-                  onChange={(e) => { setQuickKey(e.target.value); setQuickResult(null); }}
-                  placeholder={PRESETS[quickProvider].keyHint}
-                  className="input-mono flex-1"
-                  onKeyDown={(e) => { if (e.key === "Enter" && !quickBusy) quickSetup(); }}
-                />
                 <button
-                  onClick={quickSetup}
-                  disabled={quickBusy || !quickKey.trim()}
-                  className="px-3 py-2 rounded-lg bg-brand hover:bg-branddim text-white text-xs font-semibold disabled:opacity-40 flex items-center gap-1.5 shrink-0"
+                  onClick={() => setProjects(projects.filter((pr) => pr.id !== p.id))}
+                  className="text-muted/40 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
                 >
-                  {quickBusy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Ekle ve test et
+                  <Trash2 size={12} />
                 </button>
               </div>
-              {quickResult === "ok" && (
-                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-green font-semibold">
-                  <Check size={12} /> Çalışıyor — bu model artık aktif.
-                </div>
-              )}
-              {quickResult && quickResult !== "ok" && (
-                <div className="mt-2 text-[11px] text-red break-words">Test başarısız: {quickResult}</div>
-              )}
-            </div>
-
-            {config.models.length > 0 && (
-              <div className="flex flex-col gap-2 mb-4">
-                {config.models.map((m) => {
-                  const active = config.activeModelId === m.id;
-                  const ed = editId === m.id;
-                  return (
-                    <div key={m.id} className={`flex flex-col gap-2 px-3 py-2.5 rounded-xl border ${active ? "border-branddim bg-brand/10" : "border-line bg-bgsoft"}`}>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => setActiveModel(m.id)} className={`w-5 h-5 rounded-full grid place-items-center border ${active ? "bg-brand border-brand text-white" : "border-muted"}`}>
-                          {active && <Check size={11} />}
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          {ed ? <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} className="input-mono !py-1 text-sm" /> : <><div className="text-sm font-semibold truncate">{m.label}</div><div className="text-xs text-muted font-mono truncate">{m.model}</div></>}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {ed ? <button onClick={() => { updateModel(editId!, { label: editLabel.trim() || undefined, apiKey: editKey.trim() }); addToast("Güncellendi.", "success"); setEditId(null); }} className="text-muted hover:text-green p-1"><Check size={14} /></button>
-                            : <>
-                              <button onClick={() => testModel(m)} disabled={testing} className="text-muted hover:text-green p-1 disabled:opacity-40" title="Test et"><Play size={14} /></button>
-                              <button onClick={() => { setEditId(m.id); setEditLabel(m.label); setEditKey(m.apiKey); }} className="text-muted hover:text-ink p-1"><Pencil size={14} /></button>
-                            </>}
-                          <button onClick={() => removeModel(m.id)} className="text-muted hover:text-red p-1"><Trash2 size={14} /></button>
-                        </div>
-                      </div>
-                      {ed && <input type="password" value={editKey} onChange={(e) => setEditKey(e.target.value)} className="input-mono !py-1 text-sm" placeholder="API anahtarı" />}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50">
-              <div className="text-xs font-bold text-muted uppercase tracking-wide mb-3">+ Yeni Model Ekle</div>
-              <div className="grid gap-2.5">
-                <select value={provider} onChange={(e) => onProvider(e.target.value as Provider)} className="input-mono">{(Object.keys(PRESETS) as Provider[]).map((p) => <option key={p} value={p}>{PRESETS[p].label}</option>)}</select>
-                <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Görünen ad (opsiyonel)" className="input-mono" />
-                <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="Base URL" className="input-mono" />
-                <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={`API anahtarı — ${PRESETS[provider].keyHint}`} className="input-mono" />
-                {fetchedModels.length > 0 ? (
-                  <select value={model} onChange={(e) => setModel(e.target.value)} className="input-mono">
-                    {!fetchedModels.includes(model) && model && <option value={model}>{model}</option>}
-                    {fetchedModels.map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                ) : (
-                  <>
-                    <input value={model} onChange={(e) => setModel(e.target.value)} list="model-suggestions" placeholder="Model adı — anahtar girince otomatik dolar" className="input-mono" />
-                    <datalist id="model-suggestions">
-                      {(PROVIDER_MODELS[provider] ?? []).map((m) => <option key={m} value={m} />)}
-                    </datalist>
-                  </>
-                )}
-                <button
-                  type="button"
-                  onClick={() => loadModels()}
-                  disabled={loadingModels}
-                  className="flex items-center justify-center gap-1.5 py-2 rounded-xl border border-line hover:border-brand text-xs font-semibold text-muted hover:text-ink transition-colors disabled:opacity-50"
-                >
-                  {loadingModels ? "Modeller yükleniyor…" : fetchedModels.length > 0 ? `↻ Modelleri yenile (${fetchedModels.length})` : "↻ Anahtarla modelleri getir"}
-                </button>
-                <button onClick={submitModel} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-brand hover:bg-branddim text-white text-sm font-semibold"><Plus size={15} /> Model Ekle</button>
-              </div>
-            </div>
-          </section>
+            ))}
+          </div>
         )}
+      </div>
+    </div>
+  );
+}
 
-        {/* GITHUB + GITLAB */}
-        {tab === "github" && (
-          <section className="flex flex-col gap-5">
-            {/* GitHub Accounts */}
-            <div>
-              <h4 className="text-sm font-bold mb-1">GitHub Hesapları</h4>
-              <p className="text-xs text-muted mb-2">Birden fazla hesap ekleyebilirsin. Aktif hesap token gerektiren işlemlerde kullanılır.</p>
-              {config.githubAccounts.length > 0 && (
-                <div className="flex flex-col gap-2 mb-3">
-                  {config.githubAccounts.map((a) => {
-                    const isActive = config.activeGithubId === a.id;
-                    return (
-                      <div key={a.id} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${isActive ? "border-branddim bg-brand/10" : "border-line bg-bgsoft"}`}>
-                        <button
-                          onClick={() => setActiveGithub(a.id)}
-                          className={`w-5 h-5 rounded-full grid place-items-center border shrink-0 ${isActive ? "bg-brand border-brand text-white" : "border-muted"}`}
-                        >
-                          {isActive && <Check size={11} />}
-                        </button>
-                        <GitBranch size={13} className={isActive ? "text-brand" : "text-muted"} />
-                        <span className="flex-1 text-sm font-semibold truncate">{a.username}</span>
-                        {isActive && <span className="text-[10px] text-brand font-mono">aktif</span>}
-                        <button onClick={() => removeGithub(a.id)} className="text-muted hover:text-red p-1 shrink-0"><Trash2 size={13} /></button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50">
-                <div className="text-xs font-bold text-muted uppercase tracking-wide mb-2.5">+ Hesap Ekle</div>
-                <div className="grid gap-2">
-                  <input value={ghUser} onChange={(e) => setGhUser(e.target.value)} placeholder="Kullanıcı adı (opsiyonel)" className="input-mono" />
-                  <input type="password" value={ghToken} onChange={(e) => setGhToken(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !verifyingGithub) submitGithub(); }} placeholder="GitHub token (ghp_...)" className="input-mono" />
-                  <button onClick={submitGithub} disabled={verifyingGithub} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-line hover:border-brand text-sm font-semibold transition-colors disabled:opacity-50">{verifyingGithub ? <><Loader2 size={15} className="animate-spin" /> Doğrulanıyor…</> : <><Plus size={15} /> Bağla &amp; Doğrula</>}</button>
-                </div>
-              </div>
-            </div>
+// ── Genel Sekmesi ──
 
-            {/* Repositories */}
-            <div>
-              <h4 className="text-sm font-bold mb-1">Depolar</h4>
-              <p className="text-xs text-muted mb-2">Aktif depo Coder&apos;da otomatik bağlanır. En fazla 12 depo kaydedilir.</p>
-              {config.repos.length > 0 && (
-                <div className="flex flex-col gap-2 mb-3">
-                  {config.repos.map((r) => {
-                    const isActive = config.activeRepo === r;
-                    return (
-                      <div key={r} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${isActive ? "border-branddim bg-brand/10" : "border-line bg-bgsoft"}`}>
-                        <button
-                          onClick={() => setActiveRepo(r)}
-                          className={`w-5 h-5 rounded-full grid place-items-center border shrink-0 ${isActive ? "bg-brand border-brand text-white" : "border-muted"}`}
-                        >
-                          {isActive && <Check size={11} />}
-                        </button>
-                        <FolderGit2 size={13} className={isActive ? "text-brand" : "text-muted"} />
-                        <span className="flex-1 text-xs font-mono truncate">{r}</span>
-                        {isActive && <span className="text-[10px] text-brand font-mono">aktif</span>}
-                        <button onClick={() => removeRepo(r)} className="text-muted hover:text-red p-1 shrink-0"><Trash2 size={13} /></button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50">
-                <div className="text-xs font-bold text-muted uppercase tracking-wide mb-2.5">+ Depo Ekle</div>
-                <div className="grid gap-2">
-                  <input value={repoInput} onChange={(e) => setRepoInput(e.target.value)} placeholder="sahip/depo veya sahip/depo:dal" className="input-mono" onKeyDown={(e) => { if (e.key === "Enter") submitRepo(); }} />
-                  <button onClick={submitRepo} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-line hover:border-brand text-sm font-semibold transition-colors"><Plus size={15} /> Depo Ekle</button>
-                </div>
-              </div>
+function GeneralTab({ config, setConfig }: { config: Config; setConfig: (p: Partial<Config>) => void }) {
+  return (
+    <div className="space-y-5">
+      {/* Tema */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">Tema</p>
+        <div className="flex gap-2">
+          {[
+            { value: "dark", label: "Koyu", icon: "🌙" },
+            { value: "light", label: "Açık", icon: "☀️" },
+          ].map((t) => (
+            <button
+              key={t.value}
+              onClick={() => setConfig({ theme: t.value as Config["theme"] })}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-colors ${
+                config.theme === t.value
+                  ? "bg-amber-400 text-black"
+                  : "bg-bgsoft border border-line text-muted hover:text-ink"
+              }`}
+            >
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-              {/* Hesabındaki depolar — bağlı hesaptan otomatik gelir */}
-              {(loadingAccountRepos || accountRepos.length > 0) && (
-                <div className="mt-3 rounded-xl border border-line p-3.5 bg-bgsoft/50">
-                  <div className="flex items-center justify-between mb-2.5">
-                    <div className="text-xs font-bold text-muted uppercase tracking-wide">Hesabındaki depolar</div>
-                    {accountRepos.length > 0 && (
-                      <button
-                        onClick={() => { accountRepos.forEach((r) => addRepo(r)); addToast(`${accountRepos.length} depo eklendi.`, "success"); setAccountRepos([]); }}
-                        className="text-[11px] text-brand hover:underline font-semibold"
-                      >
-                        Tümünü ekle ({accountRepos.length})
-                      </button>
-                    )}
-                  </div>
-                  {loadingAccountRepos ? (
-                    <div className="flex items-center gap-2 text-xs text-muted"><Loader2 size={13} className="animate-spin" /> Depolar getiriliyor…</div>
-                  ) : (
-                    <div className="flex flex-col gap-1.5 max-h-48 overflow-auto">
-                      {accountRepos.map((r) => (
-                        <button
-                          key={r}
-                          onClick={() => { addRepo(r); setAccountRepos((prev) => prev.filter((x) => x !== r)); }}
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-line hover:border-brand bg-bg/40 text-left transition-colors"
-                        >
-                          <Plus size={12} className="text-brand shrink-0" />
-                          <span className="flex-1 text-xs font-mono truncate">{r}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+      {/* Yanıt stili */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">Yanıt Stili</p>
+        <select
+          value={config.responseStyle}
+          onChange={(e) => setConfig({ responseStyle: e.target.value as Config["responseStyle"] })}
+          className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50"
+        >
+          <option value="normal">Normal</option>
+          <option value="short">Kısa</option>
+          <option value="detailed">Detaylı</option>
+          <option value="code">Kod Odaklı</option>
+          <option value="formal">Resmi</option>
+        </select>
+      </div>
 
-            {/* GitLab Accounts */}
-            <div>
-              <h4 className="text-sm font-bold mb-1">GitLab Hesapları</h4>
-              <p className="text-xs text-muted mb-2">GitLab personal access token ekle. Aktif hesap GitLab repolarına erişimde kullanılır.</p>
-              {(config.gitlabAccounts ?? []).length > 0 && (
-                <div className="flex flex-col gap-2 mb-3">
-                  {(config.gitlabAccounts ?? []).map((a) => {
-                    const isActive = config.activeGitlabId === a.id;
-                    return (
-                      <div key={a.id} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${isActive ? "border-branddim bg-brand/10" : "border-line bg-bgsoft"}`}>
-                        <button
-                          onClick={() => setActiveGitlab(a.id)}
-                          className={`w-5 h-5 rounded-full grid place-items-center border shrink-0 ${isActive ? "bg-brand border-brand text-white" : "border-muted"}`}
-                        >
-                          {isActive && <Check size={11} />}
-                        </button>
-                        <GitBranch size={13} className={isActive ? "text-brand" : "text-muted"} />
-                        <span className="flex-1 text-sm font-semibold truncate">{a.username}</span>
-                        {isActive && <span className="text-[10px] text-brand font-mono">aktif</span>}
-                        <button onClick={() => removeGitlab(a.id)} className="text-muted hover:text-red p-1 shrink-0"><Trash2 size={13} /></button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50">
-                <div className="text-xs font-bold text-muted uppercase tracking-wide mb-2.5">+ GitLab Hesap Ekle</div>
-                <div className="grid gap-2">
-                  <input value={glUser} onChange={(e) => setGlUser(e.target.value)} placeholder="Kullanıcı adı" className="input-mono" />
-                  <input type="password" value={glToken} onChange={(e) => setGlToken(e.target.value)} placeholder="GitLab token (glpat-...)" className="input-mono" />
-                  <button onClick={submitGitlab} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-line hover:border-brand text-sm font-semibold transition-colors"><Plus size={15} /> Hesap Ekle</button>
-                </div>
-              </div>
-            </div>
+      {/* Bellek */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">Bellek (Sohbetler arası hatırlanacak notlar)</p>
+        <textarea
+          value={config.memory}
+          onChange={(e) => setConfig({ memory: e.target.value })}
+          placeholder="AI'ın sohbetler arası hatırlamasını istediğiniz bilgiler..."
+          rows={3}
+          className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50 resize-none"
+        />
+      </div>
 
-            {/* CLI Mode */}
-            <div>
-              <h4 className="text-sm font-bold mb-2">CLI Modu</h4>
-              <div className="flex flex-col gap-2.5">
-                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
-                  <input type="checkbox" checked={config.cliMode} onChange={() => saveConfig({ ...config, cliMode: !config.cliMode })} className="accent-brand mt-0.5" />
-                  <div>
-                    <div className="text-sm font-semibold">Otomatik bağlantı</div>
-                    <div className="text-xs text-muted mt-0.5">Coder sekmesi açılınca aktif depoyu otomatik olarak bağlar.</div>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
-                  <input type="checkbox" checked={config.autoTerminal} onChange={() => saveConfig({ ...config, autoTerminal: !config.autoTerminal })} className="accent-brand mt-0.5" />
-                  <div>
-                    <div className="text-sm font-semibold">Terminal&apos;i otomatik aç</div>
-                    <div className="text-xs text-muted mt-0.5">Coder sekmesi açılınca terminal panelini otomatik gösterir.</div>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
-                  <input type="checkbox" checked={config.inlineCompletion !== false} onChange={() => saveConfig({ ...config, inlineCompletion: config.inlineCompletion === false })} className="accent-brand mt-0.5" />
-                  <div>
-                    <div className="text-sm font-semibold">Satır içi AI tamamlama</div>
-                    <div className="text-xs text-muted mt-0.5">Editörde yazarken ghost-text önerisi (Tab ile kabul). Aktif modelin API kotasını kullanır.</div>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
-                  <input type="checkbox" checked={!!config.requireWriteApproval} onChange={() => saveConfig({ ...config, requireWriteApproval: !config.requireWriteApproval })} className="accent-brand mt-0.5" />
-                  <div>
-                    <div className="text-sm font-semibold">Yazma için onay iste</div>
-                    <div className="text-xs text-muted mt-0.5">Açıkken ajan dosyaları doğrudan commit etmez; değişiklikleri kod bloğu olarak önerir, sen commit arayüzüyle uygularsın.</div>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
-                  <input type="checkbox" checked={!!config.autoRunCommands} onChange={() => saveConfig({ ...config, autoRunCommands: !config.autoRunCommands })} className="accent-brand mt-0.5" />
-                  <div>
-                    <div className="text-sm font-semibold">Güvenli oto-çalıştır</div>
-                    <div className="text-xs text-muted mt-0.5">AI&apos;nın önerdiği SADECE izin listesindeki komutlar (npm test, lint vb.) otomatik çalışır; çıktı AI&apos;ya beslenir → kendi hatasını düzeltir. Diğer komutlar elle.</div>
-                  </div>
-                </label>
-                {config.autoRunCommands && (
-                  <div className="ml-7 -mt-1">
-                    <div className="text-xs text-muted mb-1">İzinli komutlar (her satıra bir önek):</div>
-                    <textarea
-                      value={(config.commandAllowlist ?? []).join("\n")}
-                      onChange={(e) => saveConfig({ ...config, commandAllowlist: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })}
-                      rows={4}
-                      className="input-mono !text-xs leading-relaxed w-full"
-                      placeholder="npm test&#10;npm run lint&#10;npx tsc"
-                    />
-                  </div>
-                )}
-                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
-                  <input type="checkbox" checked={!!config.planApprovalMode} onChange={() => saveConfig({ ...config, planApprovalMode: !config.planApprovalMode })} className="accent-brand mt-0.5" />
-                  <div>
-                    <div className="text-sm font-semibold">Plan onay modu</div>
-                    <div className="text-xs text-muted mt-0.5">Ajan önce bir plan sunar ve durur; değişiklik yapmaz. Sen &quot;Onayla &amp; Uygula&quot; deyince uygulamaya başlar.</div>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
-                  <input type="checkbox" checked={!!config.blockNetworkTools} onChange={() => saveConfig({ ...config, blockNetworkTools: !config.blockNetworkTools })} className="accent-brand mt-0.5" />
-                  <div>
-                    <div className="text-sm font-semibold">Ağ erişimini engelle</div>
-                    <div className="text-xs text-muted mt-0.5">Açıkken ajan internet araçlarını (web arama / sayfa okuma) kullanamaz. Gizlilik/güvenlik için.</div>
-                  </div>
-                </label>
-              </div>
-            </div>
+      {/* Sistem promptu */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">Sistem Promptu</p>
+        <textarea
+          value={config.systemPrompt}
+          onChange={(e) => setConfig({ systemPrompt: e.target.value })}
+          placeholder="Varsayılan sistem promptu..."
+          rows={4}
+          className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50 resize-none font-mono"
+        />
+      </div>
 
-            {/* .rules dosyası */}
-            <div>
-              <h4 className="text-sm font-bold mb-1">.rules — Proje Kuralları</h4>
-              <p className="text-xs text-muted mb-2">
-                Coder&apos;da her istekte sistem promptuna eklenir. Teknoloji tercihlerin, kod stili, kısıtlamalar.
-              </p>
-              <textarea
-                value={rulesFileDraft}
-                onChange={(e) => setRulesFileDraft(e.target.value)}
-                onBlur={() => saveConfig({ ...config, rulesFile: rulesFileDraft })}
-                rows={5}
-                placeholder={"Örn:\n- TypeScript strict mode kullan\n- Tailwind CSS tercih et\n- Yorum satırı yazma\n- Her fonksiyon max 20 satır"}
-                className="input-mono !text-xs leading-relaxed w-full"
-              />
-            </div>
-          </section>
-        )}
+      {/* Toggle'lar */}
+      <div className="space-y-2">
+        <label className="flex items-center justify-between px-3 py-2 rounded-lg bg-bgsoft/50 border border-line/30 cursor-pointer">
+          <span className="text-xs">Takip Soruları</span>
+          <input
+            type="checkbox"
+            checked={config.followUpQuestions}
+            onChange={(e) => setConfig({ followUpQuestions: e.target.checked })}
+            className="accent-amber-400"
+          />
+        </label>
+        <label className="flex items-center justify-between px-3 py-2 rounded-lg bg-bgsoft/50 border border-line/30 cursor-pointer">
+          <span className="text-xs">Web Arama</span>
+          <input
+            type="checkbox"
+            checked={config.webSearch}
+            onChange={(e) => setConfig({ webSearch: e.target.checked })}
+            className="accent-amber-400"
+          />
+        </label>
+      </div>
 
-        {/* GENEL */}
-        {tab === "general" && (
-          <section className="flex flex-col gap-5">
-            {/* Tema */}
-            <div>
-              <h4 className="text-sm font-bold mb-2">Tema</h4>
-              <button onClick={toggleTheme} className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-line bg-bgsoft hover:border-brand text-sm">
-                {config.theme === "dark" ? <><Moon size={15} /> Koyu tema</> : <><Sun size={15} /> Açık tema</>}
-                <span className="text-muted ml-auto text-xs">Değiştir</span>
-              </button>
-            </div>
+      {/* Bağlam penceresi */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">Bağlam Penceresi (Token)</p>
+        <input
+          type="number"
+          value={config.contextWindowTokens}
+          onChange={(e) => setConfig({ contextWindowTokens: parseInt(e.target.value) || 128000 })}
+          className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50"
+        />
+      </div>
+    </div>
+  );
+}
 
-            {/* Yanıt stili */}
-            <div>
-              <h4 className="text-sm font-bold mb-2">Yanıt Stili</h4>
-              <div className="grid grid-cols-3 gap-1.5">
-                {(Object.entries(STYLE_LABELS) as [ResponseStyle, typeof STYLE_LABELS.normal][]).map(([k, v]) => (
-                  <button key={k} onClick={() => saveConfig({ ...config, style: k })} className={`text-xs px-3 py-2 rounded-lg border ${config.style === k ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"}`}>{v.label}</button>
-                ))}
-              </div>
-            </div>
+// ── Gelişmiş Sekmesi ──
 
-            {/* Bellek */}
-            <div>
-              <h4 className="text-sm font-bold mb-1">Bellek</h4>
-              <p className="text-xs text-muted mb-2">Sohbetler arası hatırlanmasını istediğin bilgileri ekle.</p>
-              {config.memories.length > 0 && (
-                <div className="flex flex-col gap-1.5 mb-2">
-                  {config.memories.map((m) => (
-                    <div key={m.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-bgsoft border border-line text-xs">
-                      <Brain size={12} className="text-brand shrink-0" />
-                      <span className="flex-1 truncate">{m.content}</span>
-                      <button onClick={() => removeMemory(m.id)} className="text-muted hover:text-red"><Trash2 size={12} /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="flex gap-2">
-                <input value={memInput} onChange={(e) => setMemInput(e.target.value)} placeholder="Örn: Python tercih ederim" className="input-mono !py-1.5 text-xs flex-1" onKeyDown={(e) => { if (e.key === "Enter") { if (memInput.trim()) { addMemory(memInput.trim()); setMemInput(""); } } }} />
-                <button onClick={() => { if (memInput.trim()) { addMemory(memInput.trim()); setMemInput(""); } }} className="text-xs px-3 py-1.5 rounded-lg bg-brand text-white font-semibold shrink-0">Ekle</button>
-              </div>
-            </div>
+function AdvancedTab({
+  config,
+  setConfig,
+  user,
+}: {
+  config: Config;
+  setConfig: (p: Partial<Config>) => void;
+  user: { id: string; email?: string } | null;
+}) {
+  return (
+    <div className="space-y-5">
+      {/* Guest Mod */}
+      <label className="flex items-center justify-between px-3 py-2 rounded-lg bg-bgsoft/50 border border-line/30 cursor-pointer">
+        <div>
+          <span className="text-xs font-medium">Misafir Mod</span>
+          <p className="text-[10px] text-muted/60">Anahtarlar sekme kapanınca silinir</p>
+        </div>
+        <input
+          type="checkbox"
+          checked={config.guestMode}
+          onChange={(e) => setConfig({ guestMode: e.target.checked })}
+          className="accent-amber-400"
+        />
+      </label>
 
-            {/* Proje promptu */}
-            {activeProj && (
-              <div>
-                <h4 className="text-sm font-bold mb-1">Proje Promptu: {activeProj.name}</h4>
-                <textarea value={activeProj.systemPrompt} onChange={(e) => updateProject(activeProj.id, { systemPrompt: e.target.value })} rows={3} className="input-mono !text-xs" placeholder="Bu projenin için özel sistem promptu..." />
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  <label className="text-xs">
-                    <span className="text-muted block mb-1">Model</span>
-                    <select
-                      value={activeProj.modelId ?? ""}
-                      onChange={(e) => updateProject(activeProj.id, { modelId: e.target.value || undefined })}
-                      className="w-full bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs outline-none focus:border-brand"
-                    >
-                      <option value="">Varsayılan</option>
-                      {config.models.map((m) => (
-                        <option key={m.id} value={m.id}>{m.label || m.model}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="text-xs">
-                    <span className="text-muted block mb-1">Sıcaklık</span>
-                    <input
-                      type="number" min={0} max={2} step={0.1}
-                      value={activeProj.temperature ?? ""}
-                      onChange={(e) => updateProject(activeProj.id, { temperature: e.target.value === "" ? undefined : Number(e.target.value) })}
-                      placeholder="varsayılan"
-                      className="w-full bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs outline-none focus:border-brand"
-                    />
-                  </label>
-                  <label className="text-xs">
-                    <span className="text-muted block mb-1">Max token</span>
-                    <input
-                      type="number" min={1} step={256}
-                      value={activeProj.maxTokens ?? ""}
-                      onChange={(e) => updateProject(activeProj.id, { maxTokens: e.target.value === "" ? undefined : Number(e.target.value) })}
-                      placeholder="varsayılan"
-                      className="w-full bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs outline-none focus:border-brand"
-                    />
-                  </label>
-                </div>
-              </div>
-            )}
+      {/* WebContainer API key */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">WebContainer API Key (Gerçek Terminal)</p>
+        <input
+          type="password"
+          value={config.webContainerApiKey}
+          onChange={(e) => setConfig({ webContainerApiKey: e.target.value })}
+          placeholder="wca_..."
+          className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs font-mono outline-none focus:border-amber-400/50"
+        />
+      </div>
 
-            {/* Sistem promptu */}
-            <div>
-              <h4 className="text-sm font-bold mb-1">Sistem Promptu</h4>
-              <textarea value={systemPromptDraft} onChange={(e) => setSystemPromptDraft(e.target.value)} onBlur={() => saveConfig({ ...config, systemPrompt: systemPromptDraft })} rows={4} className="input-mono !text-xs leading-relaxed" />
-              <button onClick={() => { saveConfig({ ...config, systemPrompt: DEFAULT_SYSTEM_PROMPT }); setSystemPromptDraft(DEFAULT_SYSTEM_PROMPT); }} className="text-xs text-muted hover:text-brand mt-1">Varsayılana sıfırla</button>
-            </div>
+      {/* Vurgu rengi */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">Vurgu Rengi</p>
+        <div className="flex gap-2">
+          {[
+            { value: "amber", label: "Amber", class: "bg-amber-400" },
+            { value: "green", label: "Yeşil", class: "bg-green-500" },
+            { value: "orange", label: "Turuncu", class: "bg-orange-500" },
+          ].map((c) => (
+            <button
+              key={c.value}
+              onClick={() => setConfig({ accentColor: c.value as Config["accentColor"] })}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-colors ${
+                config.accentColor === c.value
+                  ? "bg-amber-400 text-black"
+                  : "bg-bgsoft border border-line text-muted hover:text-ink"
+              }`}
+            >
+              <span className={`w-3 h-3 rounded-full ${c.class}`} />
+              {c.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-            {/* Togglelar */}
-            <div className="flex flex-col gap-2">
-              <label className="flex items-center gap-3 text-sm cursor-pointer">
-                <input type="checkbox" checked={config.followUps} onChange={() => saveConfig({ ...config, followUps: !config.followUps })} className="accent-brand" />
-                Takip soruları öner
-              </label>
-              <label className="flex items-center gap-3 text-sm cursor-pointer">
-                <input type="checkbox" checked={config.webSearch} onChange={() => saveConfig({ ...config, webSearch: !config.webSearch })} className="accent-brand" />
-                Web arama (varsayılan açık)
-              </label>
-            </div>
+      {/* Yazı tipi ölçeği */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">Yazı Tipi Boyutu</p>
+        <div className="flex gap-2">
+          {[
+            { value: "sm", label: "Küçük" },
+            { value: "base", label: "Normal" },
+            { value: "lg", label: "Büyük" },
+          ].map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setConfig({ fontScale: f.value as Config["fontScale"] })}
+              className={`px-4 py-2 rounded-xl text-xs font-medium transition-colors ${
+                config.fontScale === f.value
+                  ? "bg-amber-400 text-black"
+                  : "bg-bgsoft border border-line text-muted hover:text-ink"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-            {/* Bağlam limiti */}
-            <div>
-              <h4 className="text-sm font-bold mb-2">Bağlam Penceresi</h4>
-              <select value={config.maxContext} onChange={(e) => saveConfig({ ...config, maxContext: Number(e.target.value) })} className="input-mono text-xs">
-                {[4096, 8192, 16384, 32768, 65536, 131072, 200000].map((n) => (
-                  <option key={n} value={n}>{(n / 1024).toFixed(0)}K token</option>
-                ))}
-              </select>
-            </div>
+      {/* Bildirim sesi */}
+      <label className="flex items-center justify-between px-3 py-2 rounded-lg bg-bgsoft/50 border border-line/30 cursor-pointer">
+        <div className="flex items-center gap-2">
+          <Volume2 size={14} className="text-muted/60" />
+          <span className="text-xs">Bildirim Sesi</span>
+        </div>
+        <input
+          type="checkbox"
+          checked={config.notificationSound}
+          onChange={(e) => setConfig({ notificationSound: e.target.checked })}
+          className="accent-amber-400"
+        />
+      </label>
 
-            {/* Kısayollar */}
-            <div>
-              <h4 className="text-sm font-bold mb-2">Klavye Kısayolları</h4>
-              <div className="grid gap-1.5 text-xs">
-                {[["Ctrl + N", "Yeni sohbet"], ["Ctrl + Shift + N", "Gizli sohbet"], ["Ctrl + ,", "Ayarlar"]].map(([key, desc]) => (
-                  <div key={key} className="flex items-center gap-3">
-                    <kbd className="px-2 py-0.5 rounded bg-bgsoft border border-line font-mono text-[11px] text-muted">{key}</kbd>
-                    <span className="text-muted">{desc}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* GELİŞMİŞ */}
-        {tab === "advanced" && (
-          <section className="flex flex-col gap-5">
-            {/* Guest mode */}
-            <div>
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={guestMode}
-                  onChange={(e) => {
-                    setGuestModeState(e.target.checked);
-                    setGuestMode(e.target.checked);
-                    addToast(
-                      e.target.checked
-                        ? "Misafir mod açık — anahtarlar sekme kapanınca silinir. Yenile."
-                        : "Misafir mod kapalı — yenile.",
-                      "info",
-                    );
-                  }}
-                  className="accent-brand mt-0.5"
-                />
-                <span>
-                  <span className="text-sm font-semibold block">Misafir mod</span>
-                  <span className="text-xs text-muted/70 leading-relaxed">
-                    Açıkken API anahtarları ve GitHub token&apos;ları yalnızca bu sekmede saklanır
-                    (sessionStorage), sekme kapanınca silinir. Paylaşılan bilgisayarlarda öner.
-                    Değişiklikten sonra sayfayı yenile.
-                  </span>
-                </span>
-              </label>
-            </div>
-
-            {/* WebContainer API key */}
-            <div>
-              <h4 className="text-sm font-bold mb-1">WebContainer API Key</h4>
-              <p className="text-xs text-muted/70 mb-2 leading-relaxed">
-                Gerçek terminal için gerekli. <strong className="text-muted">localhost&apos;ta gerekmez</strong>;
-                production domain&apos;de (Vercel vb.){" "}
-                <a href="https://webcontainer.io/enterprise" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
-                  webcontainer.io
-                </a>
-                {" "}üzerinden bireysel/OSS hesaplara ücretsiz verilen key&apos;i buraya yapıştır.
-                Key tarayıcında saklanır, sunucuya gönderilmez.
-              </p>
-              <input
-                type="password"
-                value={config.webcontainerApiKey}
-                onChange={(e) => saveConfig({ ...config, webcontainerApiKey: e.target.value })}
-                placeholder="wc_..."
-                className="input-mono w-full"
-                autoComplete="off"
-              />
-            </div>
-
-            {/* Yazı tipi boyutu */}
-            <div>
-              <h4 className="text-sm font-bold mb-2">Kod Yazı Tipi Boyutu</h4>
-              <div className="flex gap-2">
-                {(["sm", "base", "lg"] as const).map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => {
-                      saveConfig({ ...config, fontScale: s });
-                      document.documentElement.className = document.documentElement.className
-                        .replace(/font-\w+/g, "")
-                        .concat(` font-${s}`);
-                    }}
-                    className={`flex-1 py-2 rounded-lg border text-sm transition-colors ${
-                      config.fontScale === s ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
-                    }`}
-                  >
-                    {s === "sm" ? "Küçük" : s === "base" ? "Normal" : "Büyük"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Vurgu rengi */}
-            <div>
-              <h4 className="text-sm font-bold mb-2">Vurgu Rengi</h4>
-              <div className="flex gap-2">
-                {([
-                  { k: "amber",  label: "Amber",   color: "bg-[#c8a87e]" },
-                  { k: "green",  label: "Yeşil",   color: "bg-[#3ddc84]" },
-                  { k: "orange", label: "Turuncu", color: "bg-[#f97316]" },
-                ] as { k: "amber" | "green" | "orange"; label: string; color: string }[]).map(({ k, label, color }) => (
-                  <button
-                    key={k}
-                    onClick={() => {
-                      saveConfig({ ...config, accentColor: k });
-                      const cls = document.documentElement.classList;
-                      cls.remove("accent-amber", "accent-green", "accent-orange");
-                      cls.add(`accent-${k}`);
-                    }}
-                    className={`flex-1 py-2 rounded-lg border text-xs flex items-center justify-center gap-1.5 transition-colors ${
-                      config.accentColor === k ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
-                    }`}
-                  >
-                    <span className={`w-2.5 h-2.5 rounded-full ${color} shrink-0`} />
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Bildirim sesi + Browser bildirimi */}
-            <div>
-              <h4 className="text-sm font-bold mb-2">Bildirimler</h4>
-              <div className="flex flex-col gap-2">
-                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={config.soundEnabled}
-                    onChange={() => saveConfig({ ...config, soundEnabled: !config.soundEnabled })}
-                    className="accent-brand"
-                  />
-                  <div>
-                    <div className="text-sm font-semibold">Ses bildirimi</div>
-                    <div className="text-xs text-muted mt-0.5">Yanıt tamamlanınca kısa bir bip sesi çalar.</div>
-                  </div>
-                </label>
-                <button
-                  onClick={async () => {
-                    if (!("Notification" in window)) { addToast("Bu tarayıcı bildirimleri desteklemiyor.", "error"); return; }
-                    const perm = await Notification.requestPermission();
-                    if (perm === "granted") addToast("Bildirimler açık — sekme arka plandayken uyarı alacaksın.", "success");
-                    else addToast("Bildirim izni verilmedi.", "error");
-                  }}
-                  className="flex items-center gap-3 p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 text-sm text-left transition-colors"
-                >
-                  <span className="text-lg">🔔</span>
-                  <div>
-                    <div className="text-sm font-semibold">Tarayıcı bildirimi aç</div>
-                    <div className="text-xs text-muted mt-0.5">Sekme arka planda iken yanıt hazır olunca bildirim gelir.</div>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* İstatistikler */}
-            <div>
-              <h4 className="text-sm font-bold mb-2">İstatistikler & Harcama</h4>
-              {(() => {
-                const totalIn = chats.reduce((n, c) => n + (c.totalInTokens ?? 0), 0);
-                const totalOut = chats.reduce((n, c) => n + (c.totalOutTokens ?? 0), 0);
-                const activeModel = config.models.find((m) => m.id === config.activeModelId);
-                const totalCost = activeModel ? calculateCost(activeModel.model, totalIn, totalOut) : null;
-                return (
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { label: "Toplam Oturum", value: chats.length },
-                      { label: "Toplam Mesaj", value: chats.reduce((n, c) => n + c.messages.length, 0) },
-                      { label: "Giriş Token", value: totalIn.toLocaleString() },
-                      { label: "Çıkış Token", value: totalOut.toLocaleString() },
-                    ].map(({ label, value }) => (
-                      <div key={label} className="bg-bgsoft border border-line rounded-xl px-3 py-2.5">
-                        <div className="text-xs text-muted">{label}</div>
-                        <div className="text-lg font-bold mt-0.5">{value}</div>
-                      </div>
-                    ))}
-                    {totalCost !== null && (
-                      <div className="col-span-2 bg-brand/5 border border-brand/20 rounded-xl px-3 py-2.5 flex items-center justify-between">
-                        <div>
-                          <div className="text-xs text-muted">Tahmini API Maliyeti</div>
-                          <div className="text-xs text-muted/60 mt-0.5">(aktif model · tüm oturumlar)</div>
-                        </div>
-                        <div className="text-xl font-bold text-brand">{formatCost(totalCost)}</div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          </section>
-        )}
-
-        {/* MCP */}
-        {tab === "mcp" && (
-          <section className="space-y-5">
-            <div>
-              <h4 className="text-sm font-bold mb-1">MCP Sunucuları</h4>
-              <p className="text-xs text-muted mb-3">Model Context Protocol — AI&apos;ya harici araçlar bağla (veritabanı, dosya sistemi, API vb.). Sunucu JSON-RPC 2.0 üzerinden HTTP ile erişilebilir olmalı.</p>
-
-              {(config.mcpServers ?? []).length > 0 && (
-                <div className="flex flex-col gap-2 mb-4">
-                  {(config.mcpServers ?? []).map((srv) => (
-                    <div key={srv.id} className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-line bg-bgsoft">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold truncate">{srv.name}</div>
-                        <div className="text-xs text-muted font-mono truncate">{srv.url}</div>
-                      </div>
-                      <label className="flex items-center gap-1.5 text-xs text-muted cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={srv.enabled}
-                          onChange={() => updateMcpServer(srv.id, { enabled: !srv.enabled })}
-                          className="accent-brand"
-                        />
-                        Aktif
-                      </label>
-                      <button
-                        onClick={async () => {
-                          setMcpTesting(srv.id);
-                          try {
-                            const res = await fetch("/api/mcp", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ action: "list", server: { url: srv.url, headers: srv.headers } }),
-                            });
-                            const data = await res.json() as { tools?: { name: string }[]; error?: string };
-                            if (data.tools) addToast(`${data.tools.length} araç bulundu`, "success");
-                            else addToast(data.error ?? "Bağlanamadı", "error");
-                          } catch { addToast("Bağlantı hatası", "error"); }
-                          finally { setMcpTesting(null); }
-                        }}
-                        disabled={mcpTesting === srv.id}
-                        className="text-xs px-2.5 py-1.5 rounded-lg border border-line text-muted hover:text-brand hover:border-brand transition-colors disabled:opacity-50"
-                      >
-                        {mcpTesting === srv.id ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-                      </button>
-                      <button onClick={() => removeMcpServer(srv.id)} className="text-muted hover:text-red/80 transition-colors"><Trash2 size={14} /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="space-y-2 border border-line/60 rounded-xl p-3 bg-bgsoft/40">
-                <div className="text-xs font-semibold text-muted mb-2">Yeni Sunucu Ekle</div>
-                <input value={mcpName} onChange={(e) => setMcpName(e.target.value)} placeholder="Sunucu adı (örn. My DB Tools)" className="input-mono w-full" />
-                <input value={mcpUrl} onChange={(e) => setMcpUrl(e.target.value)} placeholder="URL (örn. http://localhost:3001)" className="input-mono w-full" />
-                <div className="flex gap-2">
-                  <input value={mcpHeaderKey} onChange={(e) => setMcpHeaderKey(e.target.value)} placeholder="Header adı (opsiyonel)" className="input-mono flex-1" />
-                  <input value={mcpHeaderVal} onChange={(e) => setMcpHeaderVal(e.target.value)} placeholder="Değer" className="input-mono flex-1" />
-                </div>
-                <button
-                  onClick={() => {
-                    if (!mcpName.trim() || !mcpUrl.trim()) { addToast("Ad ve URL zorunlu.", "error"); return; }
-                    const headers: Record<string, string> = {};
-                    if (mcpHeaderKey.trim()) headers[mcpHeaderKey.trim()] = mcpHeaderVal.trim();
-                    addMcpServer({ name: mcpName.trim(), url: mcpUrl.trim(), headers: Object.keys(headers).length ? headers : undefined, enabled: true });
-                    setMcpName(""); setMcpUrl(""); setMcpHeaderKey(""); setMcpHeaderVal("");
-                    addToast("MCP sunucusu eklendi.", "success");
-                  }}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-branddim transition-colors"
-                >
-                  <Plus size={14} /> Ekle
-                </button>
-              </div>
-            </div>
-
-            <div className="p-3 bg-brand/5 border border-brand/20 rounded-xl text-xs text-muted space-y-1.5">
-              <div className="font-semibold text-brand">MCP nedir?</div>
-              <p>Model Context Protocol, Anthropic tarafından geliştirilen bir standarttır. Kendi araçlarını (veritabanı sorgu, dosya okuma, API çağrısı vb.) Craft.Coder&apos;a bağlayarak AI&apos;ın bunları otomatik kullanmasını sağlar.</p>
-              <p>Aktif sunucuların araçları, araç kullanımı açıkken her sohbette AI&apos;a sunulur.</p>
-            </div>
-          </section>
-        )}
+      {/* İstatistikler */}
+      <div className="p-4 rounded-xl bg-bgsoft/50 border border-line/30">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">İstatistikler</p>
+        <p className="text-xs text-muted">
+          {user ? `Giriş yapan: ${user.email}` : "Misafir kullanıcı — giriş yapılmadı"}
+        </p>
+        <p className="text-[10px] text-muted/60 mt-1">
+          Kullanım istatistikleri yakında eklenecek.
+        </p>
       </div>
     </div>
   );
