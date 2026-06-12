@@ -1196,9 +1196,8 @@ export function CoderView() {
   };
 
   const editAndResend = async (index: number, content: string) => {
-    const store = useStore.getState();
-    store.editMessageAt(index, content);
-    store.truncateAfter(index);
+    /* Non-destructive: eski sürümü dal olarak korur, yeni dalı açıp regenere eder. */
+    useStore.getState().editMessageBranch(index, content);
     await callApi();
   };
 
@@ -1497,6 +1496,11 @@ export function CoderView() {
                         onRegenerate={regenerate}
                         onContinue={isLastAssistant && m.content ? continueLast : undefined}
                         onEdit={m.role === "user" ? editAndResend : undefined}
+                        onSwitchVersion={
+                          m.branches && m.branches.length > 1
+                            ? (bIdx: number) => useStore.getState().switchMessageVersion(i, bIdx)
+                            : undefined
+                        }
                       />
                       {isLastAssistant && !streaming && pendingCommit && pendingCommit.length > 0 && repo && (
                         <div className="ml-11 max-w-2xl">

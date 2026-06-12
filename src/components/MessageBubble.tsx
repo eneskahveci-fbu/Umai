@@ -8,7 +8,7 @@ import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import {
-  BookMarked, Brain, Check, ChevronDown, ChevronRight, ChevronUp,
+  BookMarked, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
   Circle, CircleDot, ListChecks,
   Code2, Copy, FileText, FolderOpen, GitBranch, GitCommit, Globe,
   Loader2, Pencil, RefreshCw, Search, ThumbsDown, ThumbsUp, Wrench, X,
@@ -246,6 +246,7 @@ export function MessageBubble({
   onRegenerate,
   onContinue,
   onEdit,
+  onSwitchVersion,
 }: {
   message: ChatMessage;
   index: number;
@@ -254,6 +255,7 @@ export function MessageBubble({
   onRegenerate?: () => void;
   onContinue?: () => void;
   onEdit?: (index: number, content: string) => void;
+  onSwitchVersion?: (branchIndex: number) => void;
 }) {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
@@ -414,6 +416,27 @@ export function MessageBubble({
             <ActionBtn onClick={copyMessage} icon={copied ? <Check size={13} /> : <Copy size={13} />} label={copied ? "Kopyalandı" : "Kopyala"} />
             {isUser && onEdit && (
               <ActionBtn onClick={startEdit} icon={<Pencil size={13} />} label="Düzenle" />
+            )}
+            {isUser && onSwitchVersion && message.branches && message.branches.length > 1 && (
+              <div className="flex items-center gap-0.5 text-[11px] text-muted/70">
+                <button
+                  onClick={() => onSwitchVersion(Math.max(0, (message.branchIndex ?? 0) - 1))}
+                  disabled={(message.branchIndex ?? 0) === 0}
+                  className="p-0.5 rounded hover:bg-bgsoft disabled:opacity-30 transition-colors"
+                  title="Önceki sürüm"
+                >
+                  <ChevronLeft size={13} />
+                </button>
+                <span className="font-mono tabular-nums">{(message.branchIndex ?? 0) + 1}/{message.branches.length}</span>
+                <button
+                  onClick={() => onSwitchVersion(Math.min(message.branches!.length - 1, (message.branchIndex ?? 0) + 1))}
+                  disabled={(message.branchIndex ?? 0) === message.branches.length - 1}
+                  className="p-0.5 rounded hover:bg-bgsoft disabled:opacity-30 transition-colors"
+                  title="Sonraki sürüm"
+                >
+                  <ChevronRight size={13} />
+                </button>
+              </div>
             )}
             {showRegenerate && onRegenerate && (
               <ActionBtn onClick={onRegenerate} icon={<RefreshCw size={13} />} label="Yeniden" />
