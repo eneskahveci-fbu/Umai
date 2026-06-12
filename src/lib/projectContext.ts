@@ -1,65 +1,59 @@
-// ── Proje bağlamı: framework algılama, bağımlılık çıkarma, .gitignore ayrıştırma ──
+/**
+ * Proje bağlamı tespiti: framework'leri, bağımlılıkları ve .gitignore kalıplarını çıkarır.
+ */
 
-export interface ProjectContext {
+interface ProjectInfo {
   frameworks: string[];
   deps: Record<string, string>;
   gitignorePatterns: string[];
 }
 
-/**
- * Dosya adlarına ve içeriklere bakarak framework'leri algılar.
- */
-export function detectFrameworks(files: { path: string; content?: string }[]): string[] {
-  const paths = files.map((f) => f.path.toLowerCase());
-  const detected: string[] = [];
+export function detectFrameworks(deps: Record<string, string>): string[] {
+  const frameworks: string[] = [];
 
-  if (paths.some((p) => p === "package.json")) detected.push("Node.js");
-  if (paths.some((p) => p.includes("next.config"))) detected.push("Next.js");
-  if (paths.some((p) => p.includes("vite.config"))) detected.push("Vite");
-  if (paths.some((p) => p.includes("tailwind.config") || p.includes("tailwind"))) detected.push("Tailwind CSS");
-  if (paths.some((p) => p.endsWith(".tsx") || p.endsWith(".ts"))) detected.push("TypeScript");
-  if (paths.some((p) => p.endsWith(".jsx") || p.endsWith(".js"))) detected.push("JavaScript");
-  if (paths.some((p) => p === "go.mod")) detected.push("Go");
-  if (paths.some((p) => p === "cargo.toml")) detected.push("Rust");
-  if (paths.some((p) => p === "requirements.txt" || p === "pyproject.toml")) detected.push("Python");
-  if (paths.some((p) => p === "gemfile")) detected.push("Ruby");
-  if (paths.some((p) => p === "composer.json")) detected.push("PHP");
-  if (paths.some((p) => p.includes("docker"))) detected.push("Docker");
-  if (paths.some((p) => p === ".github/workflows" || p.startsWith(".github/workflows/")))
-    detected.push("GitHub Actions");
-  if (paths.some((p) => p.includes(".gitlab-ci"))) detected.push("GitLab CI");
-  if (paths.some((p) => p.includes("vitest") || p.includes("jest.config"))) detected.push("Test (Vitest/Jest)");
-  if (paths.some((p) => p.includes("playwright.config"))) detected.push("Playwright");
+  const depNames = Object.keys(deps);
 
-  return [...new Set(detected)];
+  if (depNames.some((d) => d === "next" || d === "@next")) frameworks.push("Next.js");
+  if (depNames.some((d) => d === "react")) frameworks.push("React");
+  if (depNames.some((d) => d === "vue")) frameworks.push("Vue");
+  if (depNames.some((d) => d === "svelte") || depNames.some((d) => d === "@sveltejs")) frameworks.push("Svelte");
+  if (depNames.some((d) => d === "astro")) frameworks.push("Astro");
+  if (depNames.some((d) => d === "tailwindcss")) frameworks.push("Tailwind CSS");
+  if (depNames.some((d) => d === "typescript" || d === "tsx" || d === "ts-node")) frameworks.push("TypeScript");
+  if (depNames.some((d) => d === "vitest")) frameworks.push("Vitest");
+  if (depNames.some((d) => d === "jest")) frameworks.push("Jest");
+  if (depNames.some((d) => d === "prisma")) frameworks.push("Prisma");
+  if (depNames.some((d) => d === "drizzle-orm")) frameworks.push("Drizzle");
+  if (depNames.some((d) => d === "express")) frameworks.push("Express");
+  if (depNames.some((d) => d === "fastify")) frameworks.push("Fastify");
+  if (depNames.some((d) => d === "nestjs" || d === "@nestjs")) frameworks.push("NestJS");
+
+  return frameworks;
 }
 
-/**
- * package.json içeriğinden bağımlılıkları çıkarır.
- */
-export function extractDeps(packageJsonContent: string): Record<string, string> {
+export function extractDeps(
+  packageJsonContent: string,
+): Record<string, string> {
   try {
-    const pkg = JSON.parse(packageJsonContent) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-      peerDependencies?: Record<string, string>;
-    };
-    return {
-      ...(pkg.dependencies ?? {}),
-      ...(pkg.devDependencies ?? {}),
-      ...(pkg.peerDependencies ?? {}),
-    };
+    const pkg = JSON.parse(packageJsonContent);
+    const deps: Record<string, string> = {};
+
+    for (const [name, version] of Object.entries(pkg.dependencies ?? {})) {
+      if (typeof version === "string") deps[name] = version;
+    }
+    for (const [name, version] of Object.entries(pkg.devDependencies ?? {})) {
+      if (typeof version === "string") deps[name] = version;
+    }
+
+    return deps;
   } catch {
     return {};
   }
 }
 
-/**
- * .gitignore içeriğini satırlara böler, yorum ve boş satırları atlar.
- */
 export function parseGitignore(content: string): string[] {
   return content
     .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith("#"));
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"));
 }
