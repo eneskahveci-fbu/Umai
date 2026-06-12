@@ -188,7 +188,7 @@ export function SettingsModal({ open, onClose }: Props) {
                       )}
                     </div>
                     <div className="text-[11px] text-[var(--color-ink)]/40 font-mono truncate">
-                      {m.baseUrl}
+                      {m.baseURL}
                     </div>
                     {testResult[m.id] && (
                       <div className="text-[11px] mt-1">{testResult[m.id]}</div>
