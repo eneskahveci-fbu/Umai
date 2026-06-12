@@ -1,88 +1,78 @@
+// ── Sistem prompt'u birleştirici ──
+
+import type { MemoryItem, SkillPayload } from "./types";
 import { DEFAULT_SYSTEM_PROMPT } from "./constants";
+import { PLATFORM_KNOWLEDGE } from "./platform-knowledge";
 
-/**
- * Skill ve referans dosyaları sistem prompt'una ekler.
- * Skills: [Eğitim seti] başlığı altında
- * Dosya skill'leri: [Referans dosyalar] başlığı altında
- */
+export { SkillPayload as SkillLike };
 
-interface SkillLike {
-  title: string;
-  content: string;
-  source?: "manual" | "file";
-}
-
-interface PromptOptions {
-  skills?: SkillLike[];
+interface BuildContextOptions {
+  systemPrompt?: string;
+  memories?: MemoryItem[];
+  skills?: SkillPayload[];
   searchContext?: string;
   projectPrompt?: string;
-  customSystemPrompt?: string;
-  memories?: { content: string }[];
-  skillSections?: { title: string; content: string }[];
-  repoRules?: string;
+  repoInfo?: string;
 }
 
 /**
- * Ana sistem prompt'unu tüm eklentilerle birleştirir.
+ * Tüm parçaları birleştirerek nihai sistem prompt'unu oluşturur.
  */
-export function buildSystemPrompt(opts: PromptOptions): string {
-  const parts: string[] = [];
+export function buildContextSections(opts: BuildContextOptions): string {
+  const sections: string[] = [];
 
-  // 1. Temel prompt
-  const base = opts.customSystemPrompt || DEFAULT_SYSTEM_PROMPT;
-  parts.push(base);
+  // 1. Taban sistem prompt'u
+  sections.push(opts.systemPrompt || DEFAULT_SYSTEM_PROMPT);
 
-  // 2. Search context (web arama sonucu)
-  if (opts.searchContext?.trim()) {
-    parts.push(`\n[Arama sonucu]:\n${opts.searchContext}`);
+  // 2. Platform bilgisi
+  if (opts.systemPrompt?.includes("Craft.Coder") || !opts.systemPrompt) {
+    sections.push(PLATFORM_KNOWLEDGE);
   }
 
-  // 3. Anılar
-  if (opts.memories?.length) {
-    parts.push(`\n[Hafıza]:\n${opts.memories.map((m) => `- ${m.content}`).join("\n")}`);
+  // 3. Proje bağlamı
+  if (opts.projectPrompt) {
+    sections.push(`[Proje bağlamı — SOUL.md]:\n${opts.projectPrompt}`);
   }
 
-  // 4. Skill bölümleri
-  const manualSkills = (opts.skills || []).filter((s) => s.source !== "file");
-  const fileSkills = (opts.skills || []).filter((s) => s.source === "file");
+  // 4. Repo bilgisi
+  if (opts.repoInfo) {
+    sections.push(`[Ajan modu — Repo: ${opts.repoInfo}]`);
+  }
 
-  if (manualSkills.length > 0) {
-    parts.push(`\n[Eğitim seti]:`);
-    for (const sk of manualSkills) {
-      parts.push(`--- ${sk.title} ---\n${sk.content}`);
+  // 5. Skills / referans dosyalar
+  if (opts.skills && opts.skills.length > 0) {
+    const manualSkills = opts.skills.filter((s) => s.source === "manual" || !s.source);
+    const fileSkills = opts.skills.filter((s) => s.source === "file");
+
+    if (manualSkills.length > 0) {
+      sections.push(
+        "[Eğitim seti]:\n" +
+          manualSkills.map((s) => `--- ${s.title} ---\n${s.content}`).join("\n\n"),
+      );
+    }
+
+    if (fileSkills.length > 0) {
+      sections.push(
+        "[Referans dosyalar — örnek olarak kullan]:\n" +
+          fileSkills
+            .map((s) => `--- ${s.fileName || s.title} ---\n${s.content}`)
+            .join("\n\n"),
+      );
     }
   }
 
-  if (fileSkills.length > 0) {
-    parts.push(`\n[Referans dosyalar — örnek olarak kullan]:`);
-    for (const sk of fileSkills) {
-      parts.push(`--- ${sk.title} ---\n${sk.content}`);
-    }
+  // 6. Anılar (memories)
+  if (opts.memories && opts.memories.length > 0) {
+    sections.push(
+      "[Kullanıcı anıları]:\n" +
+        opts.memories.map((m) => `- ${m.key}: ${m.value}`).join("\n"),
+    );
   }
 
-  // 5. Ek skill bölümleri
-  if (opts.skillSections?.length) {
-    for (const sec of opts.skillSections) {
-      parts.push(`\n[${sec.title}]:\n${sec.content}`);
-    }
+  // 7. Web arama bağlamı
+  if (opts.searchContext) {
+    sections.push(`[Web arama sonucu]:\n${opts.searchContext}`);
   }
 
-  // 6. Proje bağlamı
-  if (opts.projectPrompt?.trim()) {
-    parts.push(`\n[Proje bağlamı — SOUL.md]:\n${opts.projectPrompt}`);
-  }
-
-  // 7. Repo .rules
-  if (opts.repoRules?.trim()) {
-    parts.push(`\n[Proje kuralları — .rules]:\n${opts.repoRules}`);
-  }
-
-  return parts.join("\n");
-}
-
-/**
- * Karşılaştırma (compare) modunda kullanılan, araç çağrısı yapmayan, yalnızca yanıt üreten prompt.
- */
-export function buildComparePrompt(): string {
-  return `Sen kısa ve öz karşılaştırmalar yapan bir asistansın. Verilen iki model çıktısını karşılaştır, farkları ve benzerlikleri sırala. Tarafsız ol.`;
+  return sections.join("\n\n");
 }
