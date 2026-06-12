@@ -47,6 +47,18 @@ interface StoreState {
   projects: Project[];
   memories: MemoryItem[];
 
+  // Toast notifications
+  toasts: Toast[];
+
+  // Artifact preview
+  artifact: Artifact | null;
+
+  // Diff view
+  diff: { left: string; right: string; title?: string } | null;
+
+  // Onboarding
+  onboardingCompleted: boolean;
+
   // Actions — UI
   setSidebarOpen: (v: boolean) => void;
   toggleSidebar: () => void;
