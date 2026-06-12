@@ -1,67 +1,58 @@
-// ── Bağlam penceresi yönetimi (token-aware mesaj budama) ──
-
-import type { ChatMessage } from "./types";
+import type { ChatMessage } from "@/lib/types";
 
 /**
- * Basit token tahmini: her ~4 karakter ≈ 1 token.
- */
-function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
-}
-
-/**
- * Mesajları en son mesajdan geriye doğru budar;
- * sistem prompt'unu korur, toplam token sınırını aşmaz.
+ * Token limitine göre mesajları budar.
+ * En eski mesajlardan başlayarak, sistem prompt'unu koruyarak keser.
+ * Yaklaşık token hesaplaması: 1 token ≈ 4 karakter (İngilizce) veya ≈ 3 karakter (Türkçe).
  */
 export function pruneMessages(
-  messages: (ChatMessage | { role: string; content: unknown })[],
-  systemPrompt: string,
-  maxTokens = 128_000,
-  reserveForResponse = 4096,
-): (ChatMessage | { role: string; content: unknown })[] {
-  const budget = maxTokens - reserveForResponse;
-  const sysTokens = estimateTokens(systemPrompt);
+  messages: ChatMessage[],
+  maxTokens: number,
+): ChatMessage[] {
+  if (messages.length === 0) return [];
 
-  // Sistem mesajı zaten ayrı yollanır, burada varsa onu da sayalım
-  let used = sysTokens;
+  // Türkçe için karakter başına token oranı daha yüksek
+  const charsPerToken = 3;
+  const maxChars = maxTokens * charsPerToken;
 
-  const result: (ChatMessage | { role: string; content: unknown })[] = [];
-  const systemMessages: typeof result = [];
+  // Sistem mesajlarını koru
+  const systemMessages = messages.filter((m) => m.role === "system");
+  const nonSystemMessages = messages.filter((m) => m.role !== "system");
 
-  // Sistem mesajlarını ayır
-  for (const m of messages) {
-    if (m.role === "system") {
-      systemMessages.push(m);
-      used += estimateTokens(String(m.content));
+  let totalChars = systemMessages.reduce(
+    (sum, m) => sum + estimateChars(m),
+    0,
+  );
+
+  const kept: ChatMessage[] = [];
+
+  // Sondan başa doğru ekle (en yeni mesajlar öncelikli)
+  for (let i = nonSystemMessages.length - 1; i >= 0; i--) {
+    const msg = nonSystemMessages[i];
+    const msgChars = estimateChars(msg);
+
+    if (totalChars + msgChars <= maxChars) {
+      kept.unshift(msg);
+      totalChars += msgChars;
+    } else {
+      // İlk kullanıcı mesajını korumaya çalış
+      if (i === 0 && kept.length === 0) {
+        kept.unshift(msg);
+      }
+      break;
     }
   }
 
-  // Son mesajlardan geriye doğru ekle
-  const nonSystem = messages.filter((m) => m.role !== "system");
-  const reversed = [...nonSystem].reverse();
-
-  for (const m of reversed) {
-    const tokenEstimate = estimateTokens(String(m.content));
-    if (used + tokenEstimate > budget) break;
-    used += tokenEstimate;
-    result.unshift(m);
-  }
-
-  // En az son kullanıcı mesajını koru
-  if (result.length === 0 && nonSystem.length > 0) {
-    const last = nonSystem[nonSystem.length - 1];
-    result.push(last);
-  }
-
-  return [...systemMessages, ...result];
+  return [...systemMessages, ...kept];
 }
 
-/**
- * Son N mesajı al (son user + assistant çiftlerini koruyarak).
- */
-export function lastNMessages(
-  messages: (ChatMessage | { role: string; content: unknown })[],
-  n: number,
-): typeof messages {
-  return messages.slice(-n);
+function estimateChars(msg: ChatMessage): number {
+  let chars = msg.content?.length ?? 0;
+  if (msg.tool_calls) {
+    chars += JSON.stringify(msg.tool_calls).length;
+  }
+  if (msg.tool_call_id) {
+    chars += msg.tool_call_id.length;
+  }
+  return chars;
 }
