@@ -1,788 +1,484 @@
 "use client";
 
-import {
-  X,
-  Plus,
-  Trash2,
-  Play,
-  Check,
-  Globe,
-  Cpu,
-  GitBranch,
-  Palette,
-  Type,
-  Volume2,
-  Eye,
-  Key,
-  CloudLightning,
-  TestTube,
-  ExternalLink,
-} from "lucide-react";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useStore } from "@/lib/store";
-import type { Provider, ModelEntry, Config, GitAccount, Project } from "@/lib/types";
+import type { ModelConfig, Provider, AppConfig, ResponseStyle } from "@/lib/types";
+import { PROVIDER_DEFAULTS } from "@/lib/constants";
 
-// ── Sağlayıcı bilgileri ──
+interface Props {
+  open?: boolean;
+  onClose?: () => void;
+}
 
-const PROVIDERS: Array<{ id: Provider; label: string; defaultUrl: string }> = [
-  { id: "hf", label: "Hugging Face", defaultUrl: "https://api-inference.huggingface.co/v1" },
-  { id: "openrouter", label: "OpenRouter", defaultUrl: "https://openrouter.ai/api/v1" },
-  { id: "deepseek", label: "DeepSeek", defaultUrl: "https://api.deepseek.com/v1" },
-  { id: "groq", label: "Groq", defaultUrl: "https://api.groq.com/openai/v1" },
-  { id: "google", label: "Google Gemini", defaultUrl: "https://generativelanguage.googleapis.com/v1beta/openai" },
-  { id: "mistral", label: "Mistral", defaultUrl: "https://api.mistral.ai/v1" },
-  { id: "cerebras", label: "Cerebras", defaultUrl: "https://api.cerebras.ai/v1" },
-  { id: "together", label: "Together AI", defaultUrl: "https://api.together.xyz/v1" },
-  { id: "xai", label: "xAI (Grok)", defaultUrl: "https://api.x.ai/v1" },
-  { id: "ollama", label: "Ollama (Yerel)", defaultUrl: "http://localhost:11434/v1" },
-  { id: "custom", label: "Özel", defaultUrl: "" },
+type TabId = "model" | "git" | "general" | "advanced";
+
+const PROVIDERS: { id: Provider; label: string }[] = [
+  { id: "hf", label: "Hugging Face" },
+  { id: "deepseek", label: "DeepSeek" },
+  { id: "openrouter", label: "OpenRouter" },
+  { id: "groq", label: "Groq" },
+  { id: "google", label: "Google Gemini" },
+  { id: "mistral", label: "Mistral" },
+  { id: "cerebras", label: "Cerebras" },
+  { id: "togetherai", label: "Together AI" },
+  { id: "xai", label: "xAI (Grok)" },
+  { id: "ollama", label: "Ollama (Yerel)" },
+  { id: "custom", label: "Özel" },
 ];
 
-type SettingsTab = "model" | "git" | "general" | "advanced";
+const RESPONSE_STYLES: { id: ResponseStyle; label: string; desc: string }[] = [
+  { id: "normal", label: "Normal", desc: "Dengeli yanıtlar" },
+  { id: "short", label: "Kısa", desc: "Özlü ve doğrudan" },
+  { id: "detailed", label: "Detaylı", desc: "Kapsamlı açıklamalar" },
+  { id: "code-focused", label: "Kod odaklı", desc: "Ağırlıklı kod" },
+  { id: "formal", label: "Resmi", desc: "Profesyonel dil" },
+];
 
-// ── Ana bileşen ──
+export function SettingsModal({ open, onClose }: Props) {
+  const { models, addModel, removeModel, setActiveModel, activeModelId, config, updateConfig } =
+    useStore();
 
-export function SettingsModal() {
-  const open = useStore((s) => s.settingsOpen);
-  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
-  const config = useStore((s) => s.config);
-  const setConfig = useStore((s) => s.setConfig);
-  const models = useStore((s) => s.models);
-  const addModel = useStore((s) => s.addModel);
-  const removeModel = useStore((s) => s.removeModel);
-  const setModels = useStore((s) => s.setModels);
-  const gitAccounts = useStore((s) => s.gitAccounts);
-  const addGitAccount = useStore((s) => s.addGitAccount);
-  const removeGitAccount = useStore((s) => s.removeGitAccount);
-  const projects = useStore((s) => s.projects);
-  const setProjects = useStore((s) => s.setProjects);
-  const user = useStore((s) => s.user);
-  const addToast = useStore((s) => s.addToast);
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>("model");
 
-  const [tab, setTab] = useState<SettingsTab>("model");
-  const panelRef = useRef<HTMLDivElement>(null);
+  // Yeni model formu
+  const [showNewModel, setShowNewModel] = useState(false);
+  const [newProvider, setNewProvider] = useState<Provider>("deepseek");
+  const [newBaseUrl, setNewBaseUrl] = useState("");
+  const [newApiKey, setNewApiKey] = useState("");
+  const [newName, setNewName] = useState("");
+  const [testing, setTesting] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<Record<string, string>>({});
+
+  // Git formu
+  const [gitUsername, setGitUsername] = useState("");
+  const [gitToken, setGitToken] = useState("");
+  const [gitProvider, setGitProvider] = useState<"github" | "gitlab">("github");
+
+  const isControlled = open !== undefined;
+  const visible = isControlled ? open : isOpen;
+
+  const close = useCallback(() => {
+    if (isControlled) onClose?.();
+    else setIsOpen(false);
+  }, [isControlled, onClose]);
 
   useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSettingsOpen(false);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open, setSettingsOpen]);
+    const handler = () => setIsOpen(true);
+    window.addEventListener("open-settings", handler);
+    return () => window.removeEventListener("open-settings", handler);
+  }, []);
 
-  if (!open) return null;
+  useEffect(() => {
+    // Sağlayıcı değişince Base URL'yi otomatik doldur
+    const def = PROVIDER_DEFAULTS[newProvider];
+    if (def && !newBaseUrl) {
+      setNewBaseUrl(def.baseUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newProvider]);
 
-  const tabs: Array<{ id: SettingsTab; label: string; icon: typeof Cpu }> = [
-    { id: "model", label: "Model", icon: Cpu },
-    { id: "git", label: "Git", icon: GitBranch },
-    { id: "general", label: "Genel", icon: Palette },
-    { id: "advanced", label: "Gelişmiş", icon: Key },
+  const handleAddModel = () => {
+    if (!newApiKey.trim()) return;
+    const id = `${newProvider}-${Date.now()}`;
+    addModel({
+      id,
+      name: newName.trim() || PROVIDER_DEFAULTS[newProvider]?.name || newProvider,
+      provider: newProvider,
+      baseUrl: newBaseUrl.trim() || PROVIDER_DEFAULTS[newProvider]?.baseUrl || "",
+      apiKey: newApiKey.trim(),
+      active: models.length === 0,
+    });
+    setNewApiKey("");
+    setNewName("");
+    setNewBaseUrl("");
+    setShowNewModel(false);
+  };
+
+  const handleTest = async (model: ModelConfig) => {
+    setTesting(model.id);
+    setTestResult((prev) => ({ ...prev, [model.id]: "" }));
+    try {
+      const res = await fetch("/api/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baseUrl: model.baseUrl, apiKey: model.apiKey }),
+      });
+      if (res.ok) {
+        setTestResult((prev) => ({ ...prev, [model.id]: "✅ Bağlantı başarılı" }));
+      } else {
+        setTestResult((prev) => ({ ...prev, [model.id]: `❌ HTTP ${res.status}` }));
+      }
+    } catch {
+      setTestResult((prev) => ({ ...prev, [model.id]: "❌ Ağ hatası" }));
+    }
+    setTesting(null);
+  };
+
+  if (!visible) return null;
+
+  const tabs: { id: TabId; label: string; icon: string }[] = [
+    { id: "model", label: "Model", icon: "🤖" },
+    { id: "git", label: "Git", icon: "🔀" },
+    { id: "general", label: "Genel", icon: "⚙️" },
+    { id: "advanced", label: "Gelişmiş", icon: "🔧" },
   ];
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[5vh] bg-bg/70 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) setSettingsOpen(false);
-      }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Ayarlar"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) close(); }}
     >
-      <div
-        ref={panelRef}
-        className="bg-surface border border-line rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col overflow-hidden"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-line shrink-0">
-          <h2 className="text-sm font-semibold">Ayarlar</h2>
-          <button
-            onClick={() => setSettingsOpen(false)}
-            className="text-muted hover:text-ink p-1 rounded hover:bg-bgsoft transition-colors"
-            aria-label="Kapat"
-          >
-            <X size={15} />
+      <div className="w-full max-w-2xl max-h-[85vh] bg-[var(--color-bg)] border border-[var(--color-surface)] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        {/* Başlık */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-surface)]">
+          <h2 className="text-lg font-semibold">⚙️ Ayarlar</h2>
+          <button onClick={close} className="text-[var(--color-ink)]/40 hover:text-[var(--color-ink)] transition-colors text-lg">
+            ✕
           </button>
         </div>
 
         {/* Sekmeler */}
-        <div className="flex gap-1 px-4 pt-3 pb-2 shrink-0 border-b border-line/50">
+        <div className="flex border-b border-[var(--color-surface)] px-5">
           {tabs.map((t) => (
             <button
               key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                tab === t.id ? "bg-amber-400 text-black" : "bg-bgsoft text-muted hover:text-ink"
+              onClick={() => setActiveTab(t.id)}
+              className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-[1px] ${
+                activeTab === t.id
+                  ? "border-[var(--color-brand)] text-[var(--color-brand)]"
+                  : "border-transparent text-[var(--color-ink)]/50 hover:text-[var(--color-ink)]/70"
               }`}
             >
-              <t.icon size={12} />
+              <span className="text-base">{t.icon}</span>
               {t.label}
             </button>
           ))}
         </div>
 
-        {/* Sekme içerikleri */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {tab === "model" && <ModelTab models={models} addModel={addModel} removeModel={removeModel} setModels={setModels} addToast={addToast} />}
-          {tab === "git" && <GitTab gitAccounts={gitAccounts} addGitAccount={addGitAccount} removeGitAccount={removeGitAccount} projects={projects} setProjects={setProjects} addToast={addToast} />}
-          {tab === "general" && <GeneralTab config={config} setConfig={setConfig} />}
-          {tab === "advanced" && <AdvancedTab config={config} setConfig={setConfig} user={user} />}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Model Sekmesi ──
-
-function ModelTab({
-  models,
-  addModel,
-  removeModel,
-  setModels,
-  addToast,
-}: {
-  models: ModelEntry[];
-  addModel: (m: ModelEntry) => void;
-  removeModel: (id: string) => void;
-  setModels: (models: ModelEntry[]) => void;
-  addToast: (t: { message: string; type?: "info" | "success" | "error" | "warning" }) => void;
-}) {
-  const [provider, setProvider] = useState<Provider>("openrouter");
-  const [apiKey, setApiKey] = useState("");
-  const [baseUrl, setBaseUrl] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [fetchedModels, setFetchedModels] = useState<Array<{ id: string; name: string }>>([]);
-  const [fetching, setFetching] = useState(false);
-  const [testingId, setTestingId] = useState<string | null>(null);
-
-  const selectedProvider = PROVIDERS.find((p) => p.id === provider);
-
-  useEffect(() => {
-    if (selectedProvider) setBaseUrl(selectedProvider.defaultUrl);
-  }, [provider, selectedProvider]);
-
-  const handleFetchModels = useCallback(async () => {
-    if (!apiKey.trim() || !baseUrl.trim()) {
-      addToast({ message: "API anahtarı ve Base URL gerekli", type: "warning" });
-      return;
-    }
-    setFetching(true);
-    try {
-      const res = await fetch("/api/models", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ baseUrl: baseUrl.trim(), apiKey: apiKey.trim() }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setFetchedModels(data.models ?? []);
-      addToast({ message: `${(data.models ?? []).length} model bulundu`, type: "success" });
-    } catch (err) {
-      addToast({ message: `Model listesi alınamadı: ${err instanceof Error ? err.message : "Hata"}`, type: "error" });
-    } finally {
-      setFetching(false);
-    }
-  }, [apiKey, baseUrl, addToast]);
-
-  const handleAddModel = (modelId: string, modelName: string) => {
-    const model: ModelEntry = {
-      id: `model_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      name: displayName.trim() || modelName,
-      provider,
-      baseUrl: baseUrl.trim(),
-      apiKey: apiKey.trim(),
-      modelId,
-      enabled: true,
-    };
-    addModel(model);
-    addToast({ message: `${model.name} eklendi`, type: "success" });
-  };
-
-  const handleDeleteModel = (id: string) => {
-    removeModel(id);
-    addToast({ message: "Model kaldırıldı", type: "info" });
-  };
-
-  const handleToggleModel = (id: string, enabled: boolean) => {
-    setModels(models.map((m) => (m.id === id ? { ...m, enabled: !enabled } : m)));
-  };
-
-  const handleTestModel = async (model: ModelEntry) => {
-    setTestingId(model.id);
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [{ role: "user", content: "Merhaba" }],
-          model: model.modelId,
-          provider: model.provider,
-          baseUrl: model.baseUrl,
-          apiKey: model.apiKey,
-          max_tokens: 10,
-        }),
-      });
-      if (res.ok) {
-        addToast({ message: `${model.name}: Bağlantı başarılı ✅`, type: "success" });
-      } else {
-        addToast({ message: `${model.name}: HTTP ${res.status}`, type: "error" });
-      }
-    } catch (err) {
-      addToast({ message: `${model.name}: ${err instanceof Error ? err.message : "Hata"}`, type: "error" });
-    } finally {
-      setTestingId(null);
-    }
-  };
-
-  return (
-    <div className="space-y-5">
-      {/* Model ekle */}
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-3">+ Yeni Model Ekle</p>
-        <div className="space-y-3">
-          {/* Sağlayıcı seçici */}
-          <div>
-            <label className="text-[10px] text-muted/70 mb-1 block">Sağlayıcı</label>
-            <select
-              value={provider}
-              onChange={(e) => setProvider(e.target.value as Provider)}
-              className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50"
-            >
-              {PROVIDERS.map((p) => (
-                <option key={p.id} value={p.id}>{p.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Görünen ad */}
-          <div>
-            <label className="text-[10px] text-muted/70 mb-1 block">Görünen Ad (opsiyonel)</label>
-            <input
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Örn: GPT-4o Hızlı"
-              className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50"
-            />
-          </div>
-
-          {/* Base URL */}
-          <div>
-            <label className="text-[10px] text-muted/70 mb-1 block">Base URL</label>
-            <input
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder="https://api.example.com/v1"
-              className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs font-mono outline-none focus:border-amber-400/50"
-            />
-          </div>
-
-          {/* API Anahtarı */}
-          <div>
-            <label className="text-[10px] text-muted/70 mb-1 block">API Anahtarı</label>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-..."
-              className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs font-mono outline-none focus:border-amber-400/50"
-            />
-          </div>
-
-          {/* Model listesini getir */}
-          <button
-            onClick={handleFetchModels}
-            disabled={fetching || !apiKey.trim()}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-bgsoft border border-line text-xs font-medium text-muted hover:text-ink transition-colors disabled:opacity-40"
-          >
-            <CloudLightning size={12} />
-            {fetching ? "Modeller getiriliyor..." : "↻ Modelleri Getir / Yenile"}
-          </button>
-        </div>
-
-        {/* Fetched model listesi */}
-        {fetchedModels.length > 0 && (
-          <div className="mt-3 space-y-1">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">
-              Bulunan Modeller ({fetchedModels.length})
-            </p>
-            {fetchedModels.map((m) => (
-              <div
-                key={m.id}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bgsoft/50 border border-line/30"
-              >
-                <span className="text-xs flex-1 truncate">{m.name || m.id}</span>
-                <button
-                  onClick={() => handleAddModel(m.id, m.name || m.id)}
-                  className="text-[10px] text-amber-400 hover:text-amber-300 font-medium"
+        {/* İçerik */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* ─── MODEL SEKMESİ ─── */}
+          {activeTab === "model" && (
+            <div className="space-y-4">
+              {models.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-[var(--color-surface)]/30 hover:bg-[var(--color-surface)]/50 transition-colors"
                 >
-                  + Ekle
+                  {/* Aktif radyo */}
+                  <input
+                    type="radio"
+                    name="activeModel"
+                    checked={activeModelId === m.id}
+                    onChange={() => setActiveModel(m.id)}
+                    className="accent-[var(--color-brand)]"
+                    title="Aktif model yap"
+                  />
+
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium flex items-center gap-2">
+                      {m.name}
+                      {activeModelId === m.id && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-brand)]/10 text-[var(--color-brand)]">
+                          Aktif
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-[var(--color-ink)]/40 font-mono truncate">
+                      {m.baseUrl}
+                    </div>
+                    {testResult[m.id] && (
+                      <div className="text-[11px] mt-1">{testResult[m.id]}</div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => handleTest(m)}
+                    disabled={testing === m.id}
+                    className="px-2 py-1 text-[10px] rounded-lg bg-[var(--color-surface)] hover:bg-[var(--color-brand)]/10 transition-colors disabled:opacity-50"
+                    title="Test et"
+                  >
+                    {testing === m.id ? "⏳" : "▶"}
+                  </button>
+                  <button
+                    onClick={() => removeModel(m.id)}
+                    className="text-xs text-[var(--color-ink)]/30 hover:text-red-400 transition-colors"
+                    title="Sil"
+                  >
+                    🗑
+                  </button>
+                </div>
+              ))}
+
+              {models.length === 0 && (
+                <p className="text-center text-sm text-[var(--color-ink)]/40 py-6">
+                  Henüz model eklenmemiş
+                </p>
+              )}
+
+              {/* Yeni model ekle */}
+              {showNewModel ? (
+                <div className="p-4 border border-[var(--color-brand)]/30 rounded-xl space-y-3 bg-[var(--color-surface)]/20">
+                  <select
+                    value={newProvider}
+                    onChange={(e) => setNewProvider(e.target.value as Provider)}
+                    className="w-full bg-[var(--color-surface)] rounded-lg px-3 py-2 text-sm outline-none border-none text-[var(--color-ink)]"
+                  >
+                    {PROVIDERS.map((p) => (
+                      <option key={p.id} value={p.id}>{p.label}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Görünen ad (opsiyonel)"
+                    className="w-full bg-[var(--color-surface)] rounded-lg px-3 py-2 text-sm outline-none text-[var(--color-ink)] placeholder:text-[var(--color-ink)]/40"
+                  />
+                  <input
+                    type="text"
+                    value={newBaseUrl}
+                    onChange={(e) => setNewBaseUrl(e.target.value)}
+                    placeholder="Base URL"
+                    className="w-full bg-[var(--color-surface)] rounded-lg px-3 py-2 text-sm outline-none text-[var(--color-ink)] placeholder:text-[var(--color-ink)]/40"
+                  />
+                  <input
+                    type="password"
+                    value={newApiKey}
+                    onChange={(e) => setNewApiKey(e.target.value)}
+                    placeholder="API Anahtarı"
+                    className="w-full bg-[var(--color-surface)] rounded-lg px-3 py-2 text-sm outline-none text-[var(--color-ink)] placeholder:text-[var(--color-ink)]/40"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleAddModel}
+                      disabled={!newApiKey.trim()}
+                      className="px-4 py-2 text-sm rounded-lg bg-[var(--color-brand)] text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
+                    >
+                      + Ekle
+                    </button>
+                    <button
+                      onClick={() => setShowNewModel(false)}
+                      className="px-4 py-2 text-sm rounded-lg border border-[var(--color-surface)] hover:bg-[var(--color-surface)] transition-colors"
+                    >
+                      İptal
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowNewModel(true)}
+                  className="w-full py-3 text-sm border border-dashed border-[var(--color-surface)] rounded-xl hover:border-[var(--color-brand)]/30 hover:bg-[var(--color-brand)]/5 transition-all"
+                >
+                  + Yeni Model Ekle
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ─── GIT SEKMESİ ─── */}
+          {activeTab === "git" && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-[var(--color-surface)]/20 space-y-3">
+                <label className="block text-xs font-medium text-[var(--color-ink)]/60">
+                  Sağlayıcı
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setGitProvider("github")}
+                    className={`flex-1 py-2 text-sm rounded-lg border transition-colors ${
+                      gitProvider === "github"
+                        ? "border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]"
+                        : "border-[var(--color-surface)] text-[var(--color-ink)]/60"
+                    }`}
+                  >
+                    GitHub
+                  </button>
+                  <button
+                    onClick={() => setGitProvider("gitlab")}
+                    className={`flex-1 py-2 text-sm rounded-lg border transition-colors ${
+                      gitProvider === "gitlab"
+                        ? "border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]"
+                        : "border-[var(--color-surface)] text-[var(--color-ink)]/60"
+                    }`}
+                  >
+                    GitLab
+                  </button>
+                </div>
+
+                <label className="block text-xs font-medium text-[var(--color-ink)]/60">
+                  Kullanıcı Adı
+                </label>
+                <input
+                  type="text"
+                  value={gitUsername}
+                  onChange={(e) => setGitUsername(e.target.value)}
+                  placeholder={gitProvider === "github" ? "GitHub kullanıcı adı" : "GitLab kullanıcı adı"}
+                  className="w-full bg-[var(--color-surface)] rounded-lg px-3 py-2 text-sm outline-none text-[var(--color-ink)] placeholder:text-[var(--color-ink)]/40"
+                />
+
+                <label className="block text-xs font-medium text-[var(--color-ink)]/60">
+                  Token
+                </label>
+                <input
+                  type="password"
+                  value={gitToken}
+                  onChange={(e) => setGitToken(e.target.value)}
+                  placeholder="Personal Access Token"
+                  className="w-full bg-[var(--color-surface)] rounded-lg px-3 py-2 text-sm outline-none text-[var(--color-ink)] placeholder:text-[var(--color-ink)]/40"
+                />
+
+                <button className="w-full py-2 text-sm rounded-lg bg-[var(--color-brand)] text-white hover:opacity-90 transition-opacity">
+                  Hesabı Kaydet
                 </button>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      {/* Eklenmiş modeller */}
-      {models.length > 0 && (
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">
-            Eklenen Modeller ({models.length})
-          </p>
-          <div className="space-y-1">
-            {models.map((m) => (
-              <div
-                key={m.id}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bgsoft/50 border border-line/30 group"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium truncate">{m.name}</div>
-                  <div className="text-[10px] text-muted/60 font-mono truncate">{m.modelId}</div>
+              <p className="text-xs text-[var(--color-ink)]/40 text-center">
+                Birden fazla hesap ekleyebilirsiniz. Her repo için farklı hesap seçilebilir.
+              </p>
+            </div>
+          )}
+
+          {/* ─── GENEL SEKMESİ ─── */}
+          {activeTab === "general" && (
+            <div className="space-y-5">
+              {/* Tema */}
+              <div>
+                <label className="block text-xs font-medium text-[var(--color-ink)]/60 mb-2">
+                  Tema
+                </label>
+                <div className="flex gap-2">
+                  {(["dark", "light"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => updateConfig({ theme: t })}
+                      className={`flex-1 py-2 text-sm rounded-lg border transition-colors capitalize ${
+                        config.theme === t
+                          ? "border-[var(--color-brand)] bg-[var(--color-brand)]/10 text-[var(--color-brand)]"
+                          : "border-[var(--color-surface)] text-[var(--color-ink)]/60"
+                      }`}
+                    >
+                      {t === "dark" ? "🌙 Koyu" : "☀️ Açık"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Yanıt stili */}
+              <div>
+                <label className="block text-xs font-medium text-[var(--color-ink)]/60 mb-2">
+                  Yanıt Stili
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {RESPONSE_STYLES.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => updateConfig({ responseStyle: s.id })}
+                      className={`p-3 text-left rounded-xl border transition-colors ${
+                        config.responseStyle === s.id
+                          ? "border-[var(--color-brand)] bg-[var(--color-brand)]/10"
+                          : "border-[var(--color-surface)] hover:bg-[var(--color-surface)]/50"
+                      }`}
+                    >
+                      <div className="text-sm font-medium">{s.label}</div>
+                      <div className="text-[11px] text-[var(--color-ink)]/40">{s.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Bildirim sesi */}
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <div className="text-sm">Bildirim Sesi</div>
+                  <div className="text-[11px] text-[var(--color-ink)]/40">
+                    Yanıt gelince ses çal
+                  </div>
                 </div>
                 <button
-                  onClick={() => handleTestModel(m)}
-                  disabled={testingId === m.id}
-                  className="p-1 text-muted/40 hover:text-green-400 transition-colors"
-                  title="Test et"
+                  onClick={() => updateConfig({ notificationSound: !config.notificationSound })}
+                  className={`w-11 h-6 rounded-full transition-colors relative ${
+                    config.notificationSound ? "bg-[var(--color-brand)]" : "bg-[var(--color-surface)]"
+                  }`}
                 >
-                  {testingId === m.id ? (
-                    <span className="animate-spin text-[10px]">⟳</span>
-                  ) : (
-                    <Play size={12} />
-                  )}
-                </button>
-                <button
-                  onClick={() => handleToggleModel(m.id, m.enabled)}
-                  className={`p-1 transition-colors ${m.enabled ? "text-amber-400" : "text-muted/40 hover:text-amber-400"}`}
-                  title={m.enabled ? "Devre dışı bırak" : "Etkinleştir"}
-                >
-                  <Check size={14} className={m.enabled ? "" : "opacity-30"} />
-                </button>
-                <button
-                  onClick={() => handleDeleteModel(m.id)}
-                  className="p-1 text-muted/40 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                  title="Sil"
-                >
-                  <Trash2 size={12} />
+                  <span
+                    className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                      config.notificationSound ? "translate-x-[26px]" : "translate-x-[2px]"
+                    }`}
+                  />
                 </button>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+            </div>
+          )}
 
-// ── Git Sekmesi ──
-
-function GitTab({
-  gitAccounts,
-  addGitAccount,
-  removeGitAccount,
-  projects,
-  setProjects,
-  addToast,
-}: {
-  gitAccounts: GitAccount[];
-  addGitAccount: (a: GitAccount) => void;
-  removeGitAccount: (id: string) => void;
-  projects: Project[];
-  setProjects: (p: Project[]) => void;
-  addToast: (t: { message: string; type?: "info" | "success" | "error" | "warning" }) => void;
-}) {
-  const [gitProvider, setGitProvider] = useState<"github" | "gitlab">("github");
-  const [gitUsername, setGitUsername] = useState("");
-  const [gitToken, setGitToken] = useState("");
-  const [repoInput, setRepoInput] = useState(""); // sahip/repo:dal
-  const [repoBranch, setRepoBranch] = useState("main");
-
-  const handleAddAccount = () => {
-    if (!gitUsername.trim() || !gitToken.trim()) {
-      addToast({ message: "Kullanıcı adı ve token gerekli", type: "warning" });
-      return;
-    }
-    addGitAccount({
-      id: `git_${Date.now()}`,
-      provider: gitProvider,
-      username: gitUsername.trim(),
-      token: gitToken.trim(),
-    });
-    setGitUsername("");
-    setGitToken("");
-    addToast({ message: `${gitProvider} hesabı eklendi`, type: "success" });
-  };
-
-  const handleAddRepo = () => {
-    const parts = repoInput.trim().split("/");
-    if (parts.length < 2) {
-      addToast({ message: "Format: sahip/repo[:dal]", type: "warning" });
-      return;
-    }
-    const owner = parts[0];
-    const repoAndBranch = parts.slice(1).join("/");
-    const [repo, branch = repoBranch || "main"] = repoAndBranch.split(":");
-    const project: Project = {
-      id: `project_${Date.now()}`,
-      name: `${owner}/${repo}`,
-      repoOwner: owner,
-      repoName: repo,
-      branch,
-      provider: gitProvider,
-    };
-    setProjects([...projects, project]);
-    setRepoInput("");
-    addToast({ message: `${owner}/${repo} eklendi`, type: "success" });
-  };
-
-  return (
-    <div className="space-y-5">
-      {/* Git hesabı ekle */}
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-3">Git Hesabı Ekle</p>
-        <div className="space-y-3">
-          <div>
-            <label className="text-[10px] text-muted/70 mb-1 block">Sağlayıcı</label>
-            <select
-              value={gitProvider}
-              onChange={(e) => setGitProvider(e.target.value as "github" | "gitlab")}
-              className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50"
-            >
-              <option value="github">GitHub</option>
-              <option value="gitlab">GitLab</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-[10px] text-muted/70 mb-1 block">Kullanıcı Adı</label>
-            <input
-              value={gitUsername}
-              onChange={(e) => setGitUsername(e.target.value)}
-              placeholder="kullaniciadi"
-              className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] text-muted/70 mb-1 block">Token</label>
-            <input
-              type="password"
-              value={gitToken}
-              onChange={(e) => setGitToken(e.target.value)}
-              placeholder="ghp_... veya glpat-..."
-              className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs font-mono outline-none focus:border-amber-400/50"
-            />
-          </div>
-          <button
-            onClick={handleAddAccount}
-            disabled={!gitUsername.trim() || !gitToken.trim()}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-400 text-black text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40"
-          >
-            <Plus size={12} />
-            Hesap Ekle
-          </button>
-        </div>
-
-        {/* Mevcut hesaplar */}
-        {gitAccounts.length > 0 && (
-          <div className="mt-3 space-y-1">
-            {gitAccounts.map((a) => (
-              <div key={a.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bgsoft/50 border border-line/30 group">
-                <GitBranch size={12} className="text-muted/60" />
-                <span className="text-xs flex-1">{a.username} ({a.provider})</span>
-                <button
-                  onClick={() => removeGitAccount(a.id)}
-                  className="text-muted/40 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                >
-                  <Trash2 size={12} />
+          {/* ─── GELİŞMİŞ SEKMESİ ─── */}
+          {activeTab === "advanced" && (
+            <div className="space-y-5">
+              {/* Misafir mod */}
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <div className="text-sm">Misafir Mod</div>
+                  <div className="text-[11px] text-[var(--color-ink)]/40">
+                    Sekme kapanınca API anahtarları silinir
+                  </div>
+                </div>
+                <button className="w-11 h-6 rounded-full bg-[var(--color-surface)] transition-colors relative">
+                  <span className="absolute top-1 w-4 h-4 rounded-full bg-white transition-transform translate-x-[2px]" />
                 </button>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      {/* Repo ekle */}
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-3">Repo Bağla</p>
-        <div className="space-y-3">
-          <div>
-            <label className="text-[10px] text-muted/70 mb-1 block">Depo (sahip/repo[:dal])</label>
-            <input
-              value={repoInput}
-              onChange={(e) => setRepoInput(e.target.value)}
-              placeholder="sahip/repo:main"
-              className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs font-mono outline-none focus:border-amber-400/50"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              value={repoBranch}
-              onChange={(e) => setRepoBranch(e.target.value)}
-              placeholder="main"
-              className="flex-1 bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50"
-            />
-            <button
-              onClick={handleAddRepo}
-              disabled={!repoInput.trim()}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-400 text-black text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-40"
-            >
-              <Plus size={12} />
-              Bağla
-            </button>
-          </div>
-        </div>
+              {/* Yazı tipi boyutu */}
+              <div>
+                <label className="block text-xs font-medium text-[var(--color-ink)]/60 mb-2">
+                  Yazı Tipi Boyutu: {config.fontSize}px
+                </label>
+                <input
+                  type="range"
+                  min={12}
+                  max={20}
+                  value={config.fontSize}
+                  onChange={(e) => updateConfig({ fontSize: Number(e.target.value) })}
+                  className="w-full accent-[var(--color-brand)]"
+                />
+              </div>
 
-        {/* Mevcut repolar */}
-        {projects.length > 0 && (
-          <div className="mt-3 space-y-1">
-            {projects.map((p) => (
-              <div key={p.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bgsoft/50 border border-line/30 group">
-                <Globe size={12} className="text-muted/60" />
-                <span className="text-xs flex-1 font-mono">
-                  {p.repoOwner}/{p.repoName}
-                  <span className="text-muted/60 ml-1">:{p.branch}</span>
-                </span>
-                <a
-                  href={p.provider === "github"
-                    ? `https://github.com/${p.repoOwner}/${p.repoName}`
-                    : `https://gitlab.com/${p.repoOwner}/${p.repoName}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-muted/40 hover:text-ink transition-colors"
-                >
-                  <ExternalLink size={11} />
+              {/* Vurgu rengi */}
+              <div>
+                <label className="block text-xs font-medium text-[var(--color-ink)]/60 mb-2">
+                  Vurgu Rengi
+                </label>
+                <div className="flex gap-2">
+                  {(["amber", "green", "orange"] as const).map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => updateConfig({ accentColor: c })}
+                      className={`w-10 h-10 rounded-full border-2 transition-colors ${
+                        config.accentColor === c
+                          ? "border-white"
+                          : "border-transparent hover:border-white/50"
+                      }`}
+                      style={{
+                        backgroundColor:
+                          c === "amber" ? "#f59e0b" : c === "green" ? "#22c55e" : "#f97316",
+                      }}
+                      title={c}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <hr className="border-[var(--color-surface)]" />
+
+              <p className="text-xs text-[var(--color-ink)]/30">
+                WebContainer API, gerçek terminal deneyimi için gereklidir.{" "}
+                <a href="https://webcontainers.io" className="underline hover:text-[var(--color-ink)]/50" target="_blank">
+                  Daha fazla bilgi
                 </a>
-                <button
-                  onClick={() => setProjects(projects.filter((pr) => pr.id !== p.id))}
-                  className="text-muted/40 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Genel Sekmesi ──
-
-function GeneralTab({ config, setConfig }: { config: Config; setConfig: (p: Partial<Config>) => void }) {
-  return (
-    <div className="space-y-5">
-      {/* Tema */}
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">Tema</p>
-        <div className="flex gap-2">
-          {[
-            { value: "dark", label: "Koyu", icon: "🌙" },
-            { value: "light", label: "Açık", icon: "☀️" },
-          ].map((t) => (
-            <button
-              key={t.value}
-              onClick={() => setConfig({ theme: t.value as Config["theme"] })}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-colors ${
-                config.theme === t.value
-                  ? "bg-amber-400 text-black"
-                  : "bg-bgsoft border border-line text-muted hover:text-ink"
-              }`}
-            >
-              {t.icon} {t.label}
-            </button>
-          ))}
+              </p>
+            </div>
+          )}
         </div>
-      </div>
-
-      {/* Yanıt stili */}
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">Yanıt Stili</p>
-        <select
-          value={config.responseStyle}
-          onChange={(e) => setConfig({ responseStyle: e.target.value as Config["responseStyle"] })}
-          className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50"
-        >
-          <option value="normal">Normal</option>
-          <option value="short">Kısa</option>
-          <option value="detailed">Detaylı</option>
-          <option value="code">Kod Odaklı</option>
-          <option value="formal">Resmi</option>
-        </select>
-      </div>
-
-      {/* Bellek */}
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">Bellek (Sohbetler arası hatırlanacak notlar)</p>
-        <textarea
-          value={config.memory}
-          onChange={(e) => setConfig({ memory: e.target.value })}
-          placeholder="AI'ın sohbetler arası hatırlamasını istediğiniz bilgiler..."
-          rows={3}
-          className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50 resize-none"
-        />
-      </div>
-
-      {/* Sistem promptu */}
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">Sistem Promptu</p>
-        <textarea
-          value={config.systemPrompt}
-          onChange={(e) => setConfig({ systemPrompt: e.target.value })}
-          placeholder="Varsayılan sistem promptu..."
-          rows={4}
-          className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50 resize-none font-mono"
-        />
-      </div>
-
-      {/* Toggle'lar */}
-      <div className="space-y-2">
-        <label className="flex items-center justify-between px-3 py-2 rounded-lg bg-bgsoft/50 border border-line/30 cursor-pointer">
-          <span className="text-xs">Takip Soruları</span>
-          <input
-            type="checkbox"
-            checked={config.followUpQuestions}
-            onChange={(e) => setConfig({ followUpQuestions: e.target.checked })}
-            className="accent-amber-400"
-          />
-        </label>
-        <label className="flex items-center justify-between px-3 py-2 rounded-lg bg-bgsoft/50 border border-line/30 cursor-pointer">
-          <span className="text-xs">Web Arama</span>
-          <input
-            type="checkbox"
-            checked={config.webSearch}
-            onChange={(e) => setConfig({ webSearch: e.target.checked })}
-            className="accent-amber-400"
-          />
-        </label>
-      </div>
-
-      {/* Bağlam penceresi */}
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">Bağlam Penceresi (Token)</p>
-        <input
-          type="number"
-          value={config.contextWindowTokens}
-          onChange={(e) => setConfig({ contextWindowTokens: parseInt(e.target.value) || 128000 })}
-          className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs outline-none focus:border-amber-400/50"
-        />
-      </div>
-    </div>
-  );
-}
-
-// ── Gelişmiş Sekmesi ──
-
-function AdvancedTab({
-  config,
-  setConfig,
-  user,
-}: {
-  config: Config;
-  setConfig: (p: Partial<Config>) => void;
-  user: { id: string; email?: string } | null;
-}) {
-  return (
-    <div className="space-y-5">
-      {/* Guest Mod */}
-      <label className="flex items-center justify-between px-3 py-2 rounded-lg bg-bgsoft/50 border border-line/30 cursor-pointer">
-        <div>
-          <span className="text-xs font-medium">Misafir Mod</span>
-          <p className="text-[10px] text-muted/60">Anahtarlar sekme kapanınca silinir</p>
-        </div>
-        <input
-          type="checkbox"
-          checked={config.guestMode}
-          onChange={(e) => setConfig({ guestMode: e.target.checked })}
-          className="accent-amber-400"
-        />
-      </label>
-
-      {/* WebContainer API key */}
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">WebContainer API Key (Gerçek Terminal)</p>
-        <input
-          type="password"
-          value={config.webContainerApiKey}
-          onChange={(e) => setConfig({ webContainerApiKey: e.target.value })}
-          placeholder="wca_..."
-          className="w-full bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs font-mono outline-none focus:border-amber-400/50"
-        />
-      </div>
-
-      {/* Vurgu rengi */}
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">Vurgu Rengi</p>
-        <div className="flex gap-2">
-          {[
-            { value: "amber", label: "Amber", class: "bg-amber-400" },
-            { value: "green", label: "Yeşil", class: "bg-green-500" },
-            { value: "orange", label: "Turuncu", class: "bg-orange-500" },
-          ].map((c) => (
-            <button
-              key={c.value}
-              onClick={() => setConfig({ accentColor: c.value as Config["accentColor"] })}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-colors ${
-                config.accentColor === c.value
-                  ? "bg-amber-400 text-black"
-                  : "bg-bgsoft border border-line text-muted hover:text-ink"
-              }`}
-            >
-              <span className={`w-3 h-3 rounded-full ${c.class}`} />
-              {c.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Yazı tipi ölçeği */}
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">Yazı Tipi Boyutu</p>
-        <div className="flex gap-2">
-          {[
-            { value: "sm", label: "Küçük" },
-            { value: "base", label: "Normal" },
-            { value: "lg", label: "Büyük" },
-          ].map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setConfig({ fontScale: f.value as Config["fontScale"] })}
-              className={`px-4 py-2 rounded-xl text-xs font-medium transition-colors ${
-                config.fontScale === f.value
-                  ? "bg-amber-400 text-black"
-                  : "bg-bgsoft border border-line text-muted hover:text-ink"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Bildirim sesi */}
-      <label className="flex items-center justify-between px-3 py-2 rounded-lg bg-bgsoft/50 border border-line/30 cursor-pointer">
-        <div className="flex items-center gap-2">
-          <Volume2 size={14} className="text-muted/60" />
-          <span className="text-xs">Bildirim Sesi</span>
-        </div>
-        <input
-          type="checkbox"
-          checked={config.notificationSound}
-          onChange={(e) => setConfig({ notificationSound: e.target.checked })}
-          className="accent-amber-400"
-        />
-      </label>
-
-      {/* İstatistikler */}
-      <div className="p-4 rounded-xl bg-bgsoft/50 border border-line/30">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted/50 mb-2">İstatistikler</p>
-        <p className="text-xs text-muted">
-          {user ? `Giriş yapan: ${user.email}` : "Misafir kullanıcı — giriş yapılmadı"}
-        </p>
-        <p className="text-[10px] text-muted/60 mt-1">
-          Kullanım istatistikleri yakında eklenecek.
-        </p>
       </div>
     </div>
   );
