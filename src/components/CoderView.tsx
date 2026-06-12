@@ -1786,7 +1786,7 @@ export function CoderView() {
 
               {/* Alt araç çubuğu */}
               <div className="flex items-center justify-between mt-2 px-0.5">
-                <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-none pb-0.5 flex-nowrap">
+                <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5 flex-nowrap">
                   <ComposerButton onClick={() => setFilesOpen((v) => !v)} active={filesOpen} title="Depo dosyaları">
                     <FolderOpen size={13} />
                     <span>Dosyalar</span>
@@ -1794,13 +1794,6 @@ export function CoderView() {
                   <ComposerButton onClick={() => fileRef.current?.click()} title="Dosya ekle">
                     <Paperclip size={13} />
                     <span>Ekle</span>
-                  </ComposerButton>
-                  <ComposerButton onClick={() => imgRef.current?.click()} title="Görsel ekle">
-                    <ImageIcon size={13} />
-                  </ComposerButton>
-                  <ComposerButton onClick={() => setSearchOn(!searchOn)} active={searchOn} title="Web arama">
-                    <Globe size={13} />
-                    <span>Web</span>
                   </ComposerButton>
                   <ComposerButton
                     onClick={() => setTeamMode((v) => !v)}
@@ -1825,7 +1818,9 @@ export function CoderView() {
                     <Wrench size={13} />
                     <span>Tools</span>
                   </ComposerButton>
-                  <MoreMenu active={!!artifact || !!activeAgent}>
+                  <MoreMenu active={!!artifact || !!activeAgent || searchOn}>
+                    <MoreItem icon={<Globe size={14} />} label="Web arama" active={searchOn} onClick={() => setSearchOn(!searchOn)} />
+                    <MoreItem icon={<ImageIcon size={14} />} label="Görsel ekle" onClick={() => imgRef.current?.click()} />
                     <MoreItem
                       icon={<Palette size={14} />}
                       label="Canvas önizleme"
