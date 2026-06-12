@@ -64,6 +64,10 @@ interface AppState {
   addProject: (project: Project) => void;
   removeProject: (id: string) => void;
   setActiveProject: (id: string | null) => void;
+
+  // UI state
+  settingsOpen: boolean;
+  setSettingsOpen: (open: boolean) => void;
 }
 
 export const useStore = create<AppState>()(
