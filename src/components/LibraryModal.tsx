@@ -91,7 +91,7 @@ export function LibraryModal() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{p.name}</p>
                 <p className="text-xs text-muted truncate">
-                  {p.repoOwner}/{p.repoName}
+                  {p.repo.owner}/{p.repo.repo}
                 </p>
               </div>
               {activeProjectId === p.id && (
