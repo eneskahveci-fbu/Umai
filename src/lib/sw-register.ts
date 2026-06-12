@@ -1,39 +1,34 @@
-// ── Service Worker kayıt ve çevrimiçi/çevrimdışı izleme ──
+"use client";
 
-let online = typeof navigator !== "undefined" ? navigator.onLine : true;
-const listeners = new Set<(online: boolean) => void>();
+let reg: ServiceWorkerRegistration | null = null;
 
-if (typeof window !== "undefined") {
-  window.addEventListener("online", () => {
-    online = true;
-    listeners.forEach((fn) => fn(true));
-  });
-  window.addEventListener("offline", () => {
-    online = false;
-    listeners.forEach((fn) => fn(false));
-  });
-}
-
-export function isOnline(): boolean {
-  return online;
-}
-
-export function watchConnection(fn: (online: boolean) => void): () => void {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
-}
-
-export function registerSW(): void {
+export function registerServiceWorker(): void {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("/sw.js")
-      .then(() => {
-        console.log("[SW] registered");
-      })
-      .catch((err) => {
-        console.warn("[SW] registration failed:", err);
-      });
-  });
+  navigator.serviceWorker
+    .register("/sw.js", { scope: "/" })
+    .then((r) => {
+      reg = r;
+    })
+    .catch(() => {
+      // SW kaydı başarısız olursa sessizce geç
+    });
+}
+
+export function watchConnection(): () => void {
+  if (typeof window === "undefined") return () => {};
+
+  const handler = () => {
+    document.documentElement.classList.toggle("offline", !navigator.onLine);
+  };
+
+  window.addEventListener("online", handler);
+  window.addEventListener("offline", handler);
+  // Başlangıç durumu
+  handler();
+
+  return () => {
+    window.removeEventListener("online", handler);
+    window.removeEventListener("offline", handler);
+  };
 }
