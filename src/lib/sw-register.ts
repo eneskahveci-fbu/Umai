@@ -1,6 +1,7 @@
 // src/lib/sw-register.ts — Service Worker kaydı
 
 let registration: ServiceWorkerRegistration | null = null;
+let connectionCleanup: (() => void) | null = null;
 
 export async function registerSW(): Promise<void> {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
@@ -17,6 +18,9 @@ export async function registerSW(): Promise<void> {
   }
 }
 
+// Aliases for app/page.tsx compatibility
+export const registerServiceWorker = registerSW;
+
 export async function unregisterSW(): Promise<void> {
   if (!registration) return;
 
@@ -28,8 +32,9 @@ export async function unregisterSW(): Promise<void> {
   }
 }
 
-// Periyodik güncelleme kontrolü
-if (typeof window !== "undefined") {
+// Periyodik güncelleme kontrolü (yalnızca tarayıcıda)
+function startPeriodicUpdate(): void {
+  if (typeof window === "undefined") return;
   setInterval(async () => {
     if (!registration) return;
     try {
@@ -38,4 +43,24 @@ if (typeof window !== "undefined") {
       // sessiz
     }
   }, 60 * 60 * 1000);
+}
+
+// watchConnection — app/page.tsx tarafından çağrılır
+export function watchConnection(): () => void {
+  if (typeof window === "undefined") return () => {};
+
+  const onOnline = () => console.log("[Bağlantı] Çevrimiçi");
+  const onOffline = () => console.log("[Bağlantı] Çevrimdışı");
+
+  window.addEventListener("online", onOnline);
+  window.addEventListener("offline", onOffline);
+
+  connectionCleanup = () => {
+    window.removeEventListener("online", onOnline);
+    window.removeEventListener("offline", onOffline);
+  };
+
+  startPeriodicUpdate();
+
+  return connectionCleanup;
 }
