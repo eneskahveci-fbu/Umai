@@ -1,80 +1,160 @@
-/**
- * RepoReadCtx — repoyu salt-okunur araçlarla okumak için bağlam.
- * /api/orchestrate ve /api/chat tarafından kullanılır.
- */
+// src/lib/repoRead.ts — GitHub/GitLab API üzerinden repo okuma
 
-export interface RepoReadCtx {
-  owner: string;
-  repo: string;
-  branch: string;
-  token?: string;
-  provider?: "github" | "gitlab";
+import type { GitRepo, GitAccount } from "./types";
+
+const GITHUB_API = "https://api.github.com";
+const GITLAB_API = "https://gitlab.com/api/v4";
+
+interface RepoFileInfo {
+  path: string;
+  type: "file" | "dir";
+  size?: number;
 }
 
-/**
- * GitHub API'sinden recursive tree çekip tüm dosya yollarını döndürür.
- */
-export async function fetchAllPaths(ctx: RepoReadCtx): Promise<string[]> {
-  if (ctx.provider === "gitlab") {
-    const proj = encodeURIComponent(`${ctx.owner}/${ctx.repo}`);
-    const res = await fetch(
-      `https://gitlab.com/api/v4/projects/${proj}/repository/tree?recursive=true&ref=${encodeURIComponent(ctx.branch)}&per_page=100`,
-      {
-        headers: ctx.token
-          ? { "PRIVATE-TOKEN": ctx.token, "Content-Type": "application/json" }
-          : {},
-      },
-    );
-    if (!res.ok) throw new Error(`GitLab tree hatası: ${res.status}`);
-    const data = (await res.json()) as { path: string; type: string }[];
-    return data.filter((t) => t.type === "blob").map((t) => t.path);
+//─────── Dosya listeleme ───────
+export async function listRepoFiles(
+  repo: GitRepo,
+  account: GitAccount,
+  path?: string,
+): Promise<RepoFileInfo[]> {
+  if (account.provider === "github") {
+    return listGitHubFiles(repo, account.token, path);
+  }
+  return listGitLabFiles(repo, account.token, path);
+}
+
+async function listGitHubFiles(
+  repo: GitRepo,
+  token: string,
+  dirPath: string = "",
+): Promise<RepoFileInfo[]> {
+  const url = `${GITHUB_API}/repos/${repo.owner}/${repo.repo}/contents/${dirPath}`;
+  const branch = repo.branch ?? "main";
+  const response = await fetch(`${url}?ref=${branch}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) return [];
+    throw new Error(`GitHub API hatası: ${response.status}`);
   }
 
-  const headers: Record<string, string> = { Accept: "application/vnd.github+json" };
-  if (ctx.token) headers["Authorization"] = `Bearer ${ctx.token}`;
+  const data = (await response.json()) as Array<{
+    path: string;
+    type: string;
+    size?: number;
+  }>;
 
-  const res = await fetch(
-    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/trees/${ctx.branch}?recursive=1`,
-    { headers },
-  );
-  if (!res.ok) throw new Error(`GitHub tree hatası: ${res.status}`);
-  const data = (await res.json()) as { tree: { path: string; type: string }[] };
-  return data.tree.filter((t) => t.type === "blob").map((t) => t.path);
+  return data.map((item) => ({
+    path: item.path,
+    type: item.type === "dir" ? "dir" : "file",
+    size: item.size,
+  }));
 }
 
-/**
- * Tek bir dosyanın içeriğini çeker (base64 decode eder).
- */
-export async function fetchFileContent(
-  ctx: RepoReadCtx,
+async function listGitLabFiles(
+  repo: GitRepo,
+  token: string,
+  dirPath: string = "",
+): Promise<RepoFileInfo[]> {
+  const encodedPath = encodeURIComponent(`${repo.owner}/${repo.repo}`);
+  const branch = repo.branch ?? "main";
+  const url = `${GITLAB_API}/projects/${encodedPath}/repository/tree?ref=${branch}&path=${dirPath}&per_page=100`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) return [];
+    throw new Error(`GitLab API hatası: ${response.status}`);
+  }
+
+  const data = (await response.json()) as Array<{
+    path: string;
+    type: string;
+  }>;
+
+  return data.map((item) => ({
+    path: item.path,
+    type: item.type === "tree" ? "dir" : "file",
+  }));
+}
+
+//─────── Dosya içeriği okuma ───────
+export async function readRepoFile(
   path: string,
+  repo: GitRepo,
+  account: GitAccount,
 ): Promise<string> {
-  if (ctx.provider === "gitlab") {
-    const proj = encodeURIComponent(`${ctx.owner}/${ctx.repo}`);
-    const encodedPath = encodeURIComponent(path);
-    const res = await fetch(
-      `https://gitlab.com/api/v4/projects/${proj}/repository/files/${encodedPath}/raw?ref=${encodeURIComponent(ctx.branch)}`,
-      {
-        headers: ctx.token
-          ? { "PRIVATE-TOKEN": ctx.token }
-          : {},
-      },
-    );
-    if (!res.ok) throw new Error(`GitLab dosya hatası: ${res.status}`);
-    return res.text();
+  if (account.provider === "github") {
+    return readGitHubFile(path, repo, account.token);
+  }
+  return readGitLabFile(path, repo, account.token);
+}
+
+async function readGitHubFile(
+  filePath: string,
+  repo: GitRepo,
+  token: string,
+): Promise<string> {
+  const url = `${GITHUB_API}/repos/${repo.owner}/${repo.repo}/contents/${filePath}`;
+  const branch = repo.branch ?? "main";
+  const response = await fetch(`${url}?ref=${branch}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Dosya okunamadı (${filePath}): ${response.status}`);
   }
 
-  const headers: Record<string, string> = { Accept: "application/vnd.github+json" };
-  if (ctx.token) headers["Authorization"] = `Bearer ${ctx.token}`;
+  const data = (await response.json()) as {
+    content?: string;
+    encoding?: string;
+  };
 
-  const res = await fetch(
-    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ctx.branch)}`,
-    { headers },
-  );
-  if (!res.ok) throw new Error(`GitHub dosya hatası: ${res.status}`);
-  const data = (await res.json()) as { content?: string; encoding?: string };
   if (data.encoding === "base64" && data.content) {
     return Buffer.from(data.content, "base64").toString("utf-8");
   }
-  return "";
+
+  throw new Error(`Beklenmeyen dosya formatı: ${filePath}`);
+}
+
+async function readGitLabFile(
+  filePath: string,
+  repo: GitRepo,
+  token: string,
+): Promise<string> {
+  const encodedPath = encodeURIComponent(`${repo.owner}/${repo.repo}`);
+  const encodedFilePath = encodeURIComponent(filePath);
+  const branch = repo.branch ?? "main";
+  const url = `${GITLAB_API}/projects/${encodedPath}/repository/files/${encodedFilePath}/raw?ref=${branch}`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Dosya okunamadı (${filePath}): ${response.status}`);
+  }
+
+  return response.text();
+}
+
+//─────── Dosya içeriğini satır numaralarıyla formatla ───────
+export function formatFileWithLineNumbers(content: string): string {
+  const lines = content.split("\n");
+  const width = String(lines.length).length;
+  return lines
+    .map((line, i) => {
+      const num = String(i + 1).padStart(width, " ");
+      return ` ${num} │ ${line}`;
+    })
+    .join("\n");
 }
