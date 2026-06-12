@@ -236,6 +236,7 @@ async function execStrReplace(
   ctx: RepoCtx,
   args: { path: string; old_string: string; new_string: string; commit_message?: string; replace_all?: boolean | string },
   cache?: Map<string, string>,
+  writeBuffer?: Map<string, WriteEntry>,
 ): Promise<string> {
   if (!args.path || args.old_string == null || args.new_string == null) {
     return "Hata: path, old_string ve new_string zorunlu";
@@ -269,7 +270,7 @@ async function execStrReplace(
     updated = content.slice(0, idx) + args.new_string + content.slice(idx + oldStr.length);
   }
   const msg = args.commit_message || `chore: update ${args.path}`;
-  const writeRes = await execWriteFile(ctx, { path: args.path, content: updated, commit_message: msg });
+  const writeRes = await execWriteFile(ctx, { path: args.path, content: updated, commit_message: msg }, cache, writeBuffer);
   if (writeRes.startsWith("Hata")) return writeRes;
   cache?.set(args.path, updated); // önbelleği güncel tut
   return `✅ ${args.path}: ${replaceAll ? occurrences + " eşleşme" : "1 eşleşme"} değiştirildi. ${writeRes}`;
@@ -361,9 +362,115 @@ async function execSearchCode(ctx: RepoCtx, args: { query: string; extension?: s
   return data.items.map((r) => r.path).join("\n");
 }
 
-async function execWriteFile(ctx: RepoCtx, args: { path: string; content: string; commit_message: string }): Promise<string> {
+type WriteEntry = { content: string; isNew: boolean };
+
+/* Bir turun tüm dosya yazımlarını tek Git commit olarak kaydeder.
+   GitLab: /api/v4/projects/{id}/repository/commits (actions array)
+   GitHub: blob + tree + commit + ref-update (atomic tree API) */
+async function flushAtomicCommit(
+  ctx: RepoCtx,
+  writes: Map<string, WriteEntry>,
+  commitMessage: string,
+): Promise<string> {
+  if (writes.size === 0) return "Değişiklik yok";
+
+  if (ctx.provider === "gitlab") {
+    const proj = encodeGlProject(ctx.owner, ctx.repo);
+    const actions = [...writes.entries()].map(([path, { content, isNew }]) => ({
+      action: isNew ? "create" : "update",
+      file_path: path,
+      content: Buffer.from(content, "utf-8").toString("base64"),
+      encoding: "base64",
+    }));
+    const res = await fetch(`https://gitlab.com/api/v4/projects/${proj}/repository/commits`, {
+      method: "POST",
+      headers: { ...glHeaders(ctx.token), "Content-Type": "application/json" },
+      body: JSON.stringify({ branch: ctx.branch, commit_message: commitMessage, actions }),
+    });
+    if (!res.ok) return `Hata: ${res.status} — ${(await res.text().catch(() => "")).slice(0, 200)}`;
+    const d = await res.json() as { short_id?: string };
+    return `✅ ${writes.size} dosya tek commit'te kaydedildi (${d.short_id ?? "?"})`;
+  }
+
+  /* GitHub: tree API — atomik */
+  const refRes = await fetch(
+    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/ref/heads/${encodeURIComponent(ctx.branch)}`,
+    { headers: ghHeaders(ctx.token) },
+  );
+  if (!refRes.ok) return `Hata: branch ref alınamadı (${refRes.status})`;
+  const baseSha = ((await refRes.json()) as { object?: { sha: string } }).object?.sha;
+  if (!baseSha) return "Hata: branch SHA alınamadı";
+
+  /* Create blobs for each file */
+  const treeItems: { path: string; mode: string; type: string; sha: string }[] = [];
+  for (const [path, { content }] of writes.entries()) {
+    const blobRes = await fetch(
+      `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/blobs`,
+      {
+        method: "POST",
+        headers: { ...ghHeaders(ctx.token), "Content-Type": "application/json" },
+        body: JSON.stringify({ content: Buffer.from(content, "utf-8").toString("base64"), encoding: "base64" }),
+      },
+    );
+    if (!blobRes.ok) return `Hata: blob oluşturulamadı (${path}, ${blobRes.status})`;
+    const { sha } = await blobRes.json() as { sha: string };
+    treeItems.push({ path, mode: "100644", type: "blob", sha });
+  }
+
+  /* Create tree */
+  const treeRes = await fetch(
+    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/trees`,
+    {
+      method: "POST",
+      headers: { ...ghHeaders(ctx.token), "Content-Type": "application/json" },
+      body: JSON.stringify({ base_tree: baseSha, tree: treeItems }),
+    },
+  );
+  if (!treeRes.ok) return `Hata: tree oluşturulamadı (${treeRes.status})`;
+  const { sha: treeSha } = await treeRes.json() as { sha: string };
+
+  /* Create commit */
+  const commitRes = await fetch(
+    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/commits`,
+    {
+      method: "POST",
+      headers: { ...ghHeaders(ctx.token), "Content-Type": "application/json" },
+      body: JSON.stringify({ message: commitMessage, tree: treeSha, parents: [baseSha] }),
+    },
+  );
+  if (!commitRes.ok) return `Hata: commit oluşturulamadı (${commitRes.status})`;
+  const { sha: commitSha } = await commitRes.json() as { sha: string };
+
+  /* Update ref */
+  const updateRes = await fetch(
+    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/refs/heads/${encodeURIComponent(ctx.branch)}`,
+    {
+      method: "PATCH",
+      headers: { ...ghHeaders(ctx.token), "Content-Type": "application/json" },
+      body: JSON.stringify({ sha: commitSha }),
+    },
+  );
+  if (!updateRes.ok) return `Hata: ref güncellenemedi (${updateRes.status})`;
+  return `✅ ${writes.size} dosya tek commit'te kaydedildi (${commitSha.slice(0, 7)})`;
+}
+
+async function execWriteFile(
+  ctx: RepoCtx,
+  args: { path: string; content: string; commit_message: string },
+  cache?: Map<string, string>,
+  writeBuffer?: Map<string, WriteEntry>,
+): Promise<string> {
   if (!args.path || !args.content) return "Hata: path ve content zorunlu";
   const msg = args.commit_message || `chore: update ${args.path}`;
+
+  /* Toplu commit modu: dosyayı buffer'a ekle, cache'i güncelle, commit yapma. */
+  if (writeBuffer) {
+    const isNew = !cache?.has(args.path);
+    cache?.set(args.path, args.content);
+    writeBuffer.set(args.path, { content: args.content, isNew });
+    return `✅ ${args.path} ${isNew ? "oluşturuldu" : "güncellendi"} (toplu commit bekleniyor)`;
+  }
+
   if (ctx.provider === "gitlab") {
     const proj = encodeGlProject(ctx.owner, ctx.repo);
     const encoded = encodeURIComponent(args.path);
@@ -540,6 +647,7 @@ async function executeTool(
   ctx?: RepoCtx,
   mcpServers?: McpServerConfig[],
   cache?: Map<string, string>,
+  writeBuffer?: Map<string, WriteEntry>,
 ): Promise<string> {
   try {
     if (!ctx && ["list_files","read_file","read_files","glob","grep","search_files","search_code","write_file","str_replace","list_branches","create_branch","create_pr","get_commit_history"].includes(name))
@@ -551,11 +659,11 @@ async function executeTool(
     if (name === "read_file") return await execReadFile(ctx!, args as { path: string }, cache);
     if (name === "search_files") return await execSearchFiles(ctx!, args as { query: string });
     if (name === "search_code") return await execSearchCode(ctx!, args as { query: string; extension?: string });
-    if (name === "str_replace") return await execStrReplace(ctx!, args as { path: string; old_string: string; new_string: string; commit_message?: string; replace_all?: boolean | string }, cache);
+    if (name === "str_replace") return await execStrReplace(ctx!, args as { path: string; old_string: string; new_string: string; commit_message?: string; replace_all?: boolean | string }, cache, writeBuffer);
     if (name === "write_file") {
-      const res = await execWriteFile(ctx!, args as { path: string; content: string; commit_message: string });
-      if (!res.startsWith("Hata") && typeof args.path === "string" && typeof args.content === "string") {
-        cache?.set(args.path, args.content); // önbelleği güncel tut
+      const res = await execWriteFile(ctx!, args as { path: string; content: string; commit_message: string }, cache, writeBuffer);
+      if (!res.startsWith("Hata") && typeof args.path === "string" && typeof args.content === "string" && !writeBuffer) {
+        cache?.set(args.path, args.content); // önbelleği güncel tut (buffer yoksa)
       }
       return res;
     }
@@ -979,6 +1087,10 @@ export async function POST(req: Request) {
         }
         const MUTATING = new Set(["write_file", "str_replace"]);
         const resultById = new Map<string, string>();
+        /* Tur başına tek-commit buffer: tüm write_file/str_replace bu Map'e eklenir,
+           tur sonunda tek bir atomik commit olarak kaydedilir. */
+        const roundWrites = new Map<string, WriteEntry>();
+
         const runOne = async (tc: AccumulatedToolCall) => {
           let args: Record<string, unknown> = {};
           try { args = JSON.parse(tc.arguments || "{}"); } catch { /* invalid */ }
@@ -1050,7 +1162,11 @@ export async function POST(req: Request) {
             if (old.ok) prevContent = old.content;
             else if (tc.name === "write_file") prevContent = null;
           }
-          const result = await executeTool(tc.name, args, repoCtx, activeMcpServers, readCache);
+          /* Yazma araçları → toplu commit buffer'ına ekle; diğerleri anında çalış. */
+          const result = await executeTool(
+            tc.name, args, repoCtx, activeMcpServers, readCache,
+            MUTATING.has(tc.name) ? roundWrites : undefined,
+          );
           if (prevContent !== undefined && result.startsWith("✅") && typeof args.path === "string") {
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ checkpoint_event: { path: args.path, previous: prevContent } })}\n\n`),
@@ -1063,6 +1179,32 @@ export async function POST(req: Request) {
         };
         await Promise.all(toolCalls.filter((tc) => !MUTATING.has(tc.name)).map(runOne));
         for (const tc of toolCalls.filter((tc) => MUTATING.has(tc.name))) await runOne(tc);
+
+        /* Toplu commit: turun tüm yazımlarını tek Git commit olarak kaydet. */
+        if (roundWrites.size > 0 && repoCtx) {
+          /* Commit mesajını tool argümanlarından topla; yoksa otomatik üret. */
+          const commitMsg = toolCalls
+            .filter((tc) => MUTATING.has(tc.name))
+            .map((tc) => { try { return (JSON.parse(tc.arguments || "{}") as { commit_message?: string }).commit_message; } catch { return ""; } })
+            .find((m) => m && m.trim())
+            || (() => {
+              const paths = [...roundWrites.keys()];
+              return paths.length === 1
+                ? `chore: update ${paths[0]}`
+                : `chore: update ${paths.length} files (${paths.map((p) => p.split("/").pop()).join(", ")})`;
+            })();
+          const batchResult = await flushAtomicCommit(repoCtx, roundWrites, commitMsg);
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ batch_commit_event: { count: roundWrites.size, result: batchResult } })}\n\n`));
+          /* Tool sonuçlarını gerçek commit bilgisiyle güncelle (AI sonraki turda görsün). */
+          if (batchResult.startsWith("✅")) {
+            for (const tc of toolCalls.filter((tc) => MUTATING.has(tc.name))) {
+              const prev = resultById.get(tc.id) ?? "";
+              if (prev.startsWith("✅")) {
+                resultById.set(tc.id, prev.replace(" (toplu commit bekleniyor)", "") + ` → ${batchResult}`);
+              }
+            }
+          }
+        }
         for (const tc of toolCalls) {
           convo.push({ role: "tool", tool_call_id: tc.id, content: resultById.get(tc.id) ?? "" });
         }

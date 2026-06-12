@@ -6,6 +6,10 @@ export interface ToolCallRecord {
   arguments: string;
   result?: string;
   status: "pending" | "done" | "error";
+  /** Araç çağrısının başlangıç zamanı (ms). */
+  startedAt?: number;
+  /** Araç çağrısının bitiş zamanı (ms). */
+  endedAt?: number;
 }
 
 /** Ajanın bir turda değiştirdiği dosyanın yazma-öncesi anlık görüntüsü.
