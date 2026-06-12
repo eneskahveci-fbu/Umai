@@ -1,38 +1,85 @@
-// Glob desen eşleştirme (saf, test edilebilir). Claude Code'un Glob aracı gibi
-// yıldızlı desenleri (ör. çift-yıldız + nokta-uzantı) yol eşleştirmesine çevirir.
+/**
+ * Basit glob desen eşleştirme (minimatch olmadan).
+ * *, **, ? destekler.
+ */
 
-/** Glob desenini ankor'lu bir RegExp'e çevirir.
-    * → tek dizin segmenti (/ hariç), ** → dizinler arası, ? → tek karakter. */
-export function globToRegExp(glob: string): RegExp {
-  let re = "";
-  for (let i = 0; i < glob.length; i++) {
-    const c = glob[i];
-    if (c === "*") {
-      if (glob[i + 1] === "*") {
-        re += ".*";
+/**
+ * Glob desenini regex'e çevirir.
+ * *      → tek segmentte herhangi karakter (dosya adı)
+ * **     → sıfır veya daha fazla dizin
+ * ?      → tek karakter
+ * [abc]  → karakter sınıfı
+ */
+function globToRegex(pattern: string): RegExp {
+  let regex = "";
+  let i = 0;
+
+  while (i < pattern.length) {
+    const ch = pattern[i];
+    const next = pattern[i + 1];
+
+    if (ch === "*" && next === "*") {
+      // ** → herhangi dizin zinciri
+      regex += ".*";
+      i += 2;
+      // /**/ veya sondaki /**
+      if (pattern[i] === "/") {
+        regex += "/?";
         i++;
-        if (glob[i + 1] === "/") i++; // '**/' → kök eşleşmesine de izin ver
-      } else {
-        re += "[^/]*";
       }
-    } else if (c === "?") {
-      re += "[^/]";
-    } else if (".+^${}()|[]\\".includes(c)) {
-      re += "\\" + c;
+    } else if (ch === "*") {
+      regex += "[^/]*";
+      i++;
+    } else if (ch === "?") {
+      regex += "[^/]";
+      i++;
+    } else if (ch === ".") {
+      regex += "\\.";
+      i++;
+    } else if (ch === "/") {
+      regex += "/";
+      i++;
     } else {
-      re += c;
+      // Normal karakter
+      regex += ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      i++;
     }
   }
-  return new RegExp("^" + re + "$");
+
+  return new RegExp(`^${regex}$`);
 }
 
-/** Bir yolun glob deseniyle eşleşip eşleşmediği. */
-export function matchGlob(path: string, glob: string): boolean {
-  return globToRegExp(glob).test(path);
+/**
+ * Dosya yollarını glob desenine göre filtreler.
+ * Birden çok desen verilebilir (virgül veya noktalı virgül ile ayrılmış).
+ */
+export function filterByGlob(paths: string[], pattern: string): string[] {
+  if (!pattern || pattern === "*" || pattern === "**") return paths;
+
+  const patterns = pattern
+    .split(/[,;]/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (patterns.length === 0) return paths;
+
+  const regexes = patterns.map(globToRegex);
+
+  return paths.filter((path) => {
+    // Baştaki /'yi kaldır
+    const clean = path.startsWith("/") ? path.slice(1) : path;
+    return regexes.some((re) => re.test(clean));
+  });
 }
 
-/** Yol listesini glob deseniyle filtreler. */
-export function filterByGlob(paths: string[], glob: string): string[] {
-  const re = globToRegExp(glob);
-  return paths.filter((p) => re.test(p));
+/**
+ * Glob deseni geçerli mi?
+ */
+export function isValidGlob(pattern: string): boolean {
+  if (!pattern || typeof pattern !== "string") return false;
+  // Çok uzun desenleri reddet
+  if (pattern.length > 200) return false;
+  // Geçersiz karakterler
+  if (/[\0\n\r]/.test(pattern)) return false;
+  return true;
 }
