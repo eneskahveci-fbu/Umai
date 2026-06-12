@@ -1,51 +1,56 @@
-/**
- * Glob deseni ile dosya filtreleme.
- * Desteklenen: * (tek segment), ** (dizinler arası), ? (tek karakter)
- */
-export function filterByGlob(paths: string[], pattern: string): string[] {
-  const regex = globToRegex(pattern);
-  return paths.filter((p) => regex.test(p));
-}
+// src/lib/glob.ts — Basit glob deseni eşleştirme (repodaki dosya filtreleme)
 
-function globToRegex(pattern: string): RegExp {
+/**
+ * Glob desenini regex'e çevirir:
+ * - `**` → dizinler arası her şey
+ * - `*` → tek segment (dizin sınırını aşmaz)
+ * - `?` → tek karakter
+ */
+export function globToRegex(pattern: string): RegExp {
   let regexStr = "";
   let i = 0;
-
   while (i < pattern.length) {
-    const ch = pattern[i];
-
-    if (ch === "*") {
-      if (pattern[i + 1] === "*") {
-        // ** — dizinler arası
-        if (pattern[i + 2] === "/") {
-          regexStr += "(.*/)?";
-          i += 3;
-          continue;
-        }
-        regexStr += ".*";
-        i += 2;
-        continue;
+    if (pattern[i] === "*" && pattern[i + 1] === "*") {
+      // ** → .*
+      regexStr += ".*";
+      i += 2;
+      // /**/ veya sondaki /** hali
+      if (pattern[i] === "/") {
+        regexStr += "/?";
+        i++;
       }
-      // * — tek segment içinde
+    } else if (pattern[i] === "*") {
       regexStr += "[^/]*";
       i++;
-      continue;
-    }
-
-    if (ch === "?") {
+    } else if (pattern[i] === "?") {
       regexStr += "[^/]";
       i++;
-      continue;
-    }
-
-    // Özel regex karakterlerini escape et
-    if ("\\^$.[]{}()+|".includes(ch)) {
-      regexStr += "\\" + ch;
+    } else if (".+^${}()|[]\\".includes(pattern[i])) {
+      regexStr += "\\" + pattern[i];
+      i++;
     } else {
-      regexStr += ch;
+      regexStr += pattern[i];
+      i++;
     }
-    i++;
   }
-
   return new RegExp(`^${regexStr}$`);
 }
+
+/**
+ * Bir glob deseni dosya yoluna uyar mı?
+ */
+export function matchesGlob(filePath: string, pattern: string): boolean {
+  return globToRegex(pattern).test(filePath);
+}
+
+/**
+ * Birden çok glob deseninden herhangi birine uyan dosya var mı?
+ */
+export function matchesAnyGlob(
+  filePath: string,
+  patterns: string[],
+): boolean {
+  return patterns.some((p) => matchesGlob(filePath, p));
+}
+
+// basit alternatif: https://www.npmjs.com/package/tiny-glob alternatifi
