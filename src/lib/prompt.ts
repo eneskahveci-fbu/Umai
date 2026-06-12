@@ -1,60 +1,88 @@
-import { STYLE_LABELS } from "./constants";
-import type { MemoryItem, ResponseStyle } from "./types";
+import { DEFAULT_SYSTEM_PROMPT } from "./constants";
 
-/* Sistem prompt'una eklenen bağlam blokları için TEK kaynak.
-   Hem sunucu (/api/chat, /api/orchestrate) hem istemci (Pollinations doğrudan
-   çağrısı) aynı fonksiyonu kullanır → biçim ve davranış her yerde tutarlı. */
+/**
+ * Skill ve referans dosyaları sistem prompt'una ekler.
+ * Skills: [Eğitim seti] başlığı altında
+ * Dosya skill'leri: [Referans dosyalar] başlığı altında
+ */
 
-export interface SkillLike {
+interface SkillLike {
   title: string;
   content: string;
-  tags?: string[];
   source?: "manual" | "file";
-  fileName?: string;
 }
 
-export interface ContextSectionsInput {
-  style?: ResponseStyle;
-  memories?: MemoryItem[];
+interface PromptOptions {
   skills?: SkillLike[];
   searchContext?: string;
+  projectPrompt?: string;
+  customSystemPrompt?: string;
+  memories?: { content: string }[];
+  skillSections?: { title: string; content: string }[];
+  repoRules?: string;
 }
 
-/** Stil + hafıza + eğitim seti (skills) + web arama bağlamını tutarlı,
-    etiketli bloklar halinde döndürür. Boş girdiler atlanır. */
-export function buildContextSections(input: ContextSectionsInput): string {
-  let out = "";
+/**
+ * Ana sistem prompt'unu tüm eklentilerle birleştirir.
+ */
+export function buildSystemPrompt(opts: PromptOptions): string {
+  const parts: string[] = [];
 
-  const stylePrompt = STYLE_LABELS[input.style || "normal"]?.prompt;
-  if (stylePrompt) out += `\n\n[Stil]: ${stylePrompt}`;
+  // 1. Temel prompt
+  const base = opts.customSystemPrompt || DEFAULT_SYSTEM_PROMPT;
+  parts.push(base);
 
-  if (input.memories?.length) {
-    out += `\n\n[Kullanıcı hakkında bildiklerin]:\n${input.memories.map((m) => `- ${m.content}`).join("\n")}`;
+  // 2. Search context (web arama sonucu)
+  if (opts.searchContext?.trim()) {
+    parts.push(`\n[Arama sonucu]:\n${opts.searchContext}`);
   }
 
-  if (input.skills?.length) {
-    const fileSkills = input.skills.filter((s) => s.source === "file");
-    const manualSkills = input.skills.filter((s) => s.source !== "file");
-    if (manualSkills.length) {
-      out +=
-        `\n\n[Eğitim seti — bu kurallara her zaman uy]:\n` +
-        manualSkills
-          .map((s) => {
-            const tags = s.tags?.length ? ` (${s.tags.join(", ")})` : "";
-            return `### ${s.title}${tags}\n${s.content}`;
-          })
-          .join("\n\n");
+  // 3. Anılar
+  if (opts.memories?.length) {
+    parts.push(`\n[Hafıza]:\n${opts.memories.map((m) => `- ${m.content}`).join("\n")}`);
+  }
+
+  // 4. Skill bölümleri
+  const manualSkills = (opts.skills || []).filter((s) => s.source !== "file");
+  const fileSkills = (opts.skills || []).filter((s) => s.source === "file");
+
+  if (manualSkills.length > 0) {
+    parts.push(`\n[Eğitim seti]:`);
+    for (const sk of manualSkills) {
+      parts.push(`--- ${sk.title} ---\n${sk.content}`);
     }
-    if (fileSkills.length) {
-      out +=
-        `\n\n[Referans dosyalar — örnek olarak kullan]:\n` +
-        fileSkills.map((s) => `--- ${s.fileName || s.title} ---\n${s.content}`).join("\n\n");
+  }
+
+  if (fileSkills.length > 0) {
+    parts.push(`\n[Referans dosyalar — örnek olarak kullan]:`);
+    for (const sk of fileSkills) {
+      parts.push(`--- ${sk.title} ---\n${sk.content}`);
     }
   }
 
-  if (input.searchContext) {
-    out += `\n\n[Web arama sonuçları]:\n${input.searchContext}`;
+  // 5. Ek skill bölümleri
+  if (opts.skillSections?.length) {
+    for (const sec of opts.skillSections) {
+      parts.push(`\n[${sec.title}]:\n${sec.content}`);
+    }
   }
 
-  return out;
+  // 6. Proje bağlamı
+  if (opts.projectPrompt?.trim()) {
+    parts.push(`\n[Proje bağlamı — SOUL.md]:\n${opts.projectPrompt}`);
+  }
+
+  // 7. Repo .rules
+  if (opts.repoRules?.trim()) {
+    parts.push(`\n[Proje kuralları — .rules]:\n${opts.repoRules}`);
+  }
+
+  return parts.join("\n");
+}
+
+/**
+ * Karşılaştırma (compare) modunda kullanılan, araç çağrısı yapmayan, yalnızca yanıt üreten prompt.
+ */
+export function buildComparePrompt(): string {
+  return `Sen kısa ve öz karşılaştırmalar yapan bir asistansın. Verilen iki model çıktısını karşılaştır, farkları ve benzerlikleri sırala. Tarafsız ol.`;
 }
