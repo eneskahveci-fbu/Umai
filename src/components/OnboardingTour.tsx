@@ -1,133 +1,153 @@
 "use client";
 
-import { useState } from "react";
-import { useStore } from "@/lib/store";
-import { X, ChevronRight, ChevronLeft, Check } from "lucide-react";
+// src/components/OnboardingTour.tsx — İlk kullanım rehberi turu
 
-const STEPS = [
+import { useState, useCallback } from "react";
+import { useStore } from "@/lib/store";
+import { X, ArrowRight, ArrowLeft, Check } from "lucide-react";
+
+interface TourStep {
+  target: string; // CSS selector açıklaması (görsel değil, metinsel)
+  title: string;
+  description: string;
+  position: "bottom" | "top" | "right" | "left";
+}
+
+const TOUR_STEPS: TourStep[] = [
   {
-    title: "Hoş Geldiniz!",
+    target: "üst bar",
+    title: "Model Seçici",
     description:
-      "Craft.Coder, yapay zekâ destekli bir kodlama asistanıdır. Kod yazabilir, açıklayabilir ve hata ayıklayabilirsiniz.",
+      "Üst bardan aktif yapay zeka modelini seçebilir, yeni modeller ekleyebilirsiniz.",
+    position: "bottom",
   },
   {
-    title: "Model Ekleme",
+    target: "sohbet alanı",
+    title: "Sohbet",
     description:
-      "Kendi API anahtarınızla istediğiniz modeli ekleyin. Tüm anahtarlar yalnızca tarayıcınızda saklanır.",
+      "Mesajınızı yazın, Enter'a basın. Shift+Enter ile alt satıra geçin. Dosya ekleyebilir, sesli giriş yapabilirsiniz.",
+    position: "top",
   },
   {
-    title: "GitHub Entegrasyonu",
+    target: "kenar çubuğu",
+    title: "Sohbet Geçmişi",
     description:
-      "GitHub deponuza bağlanın, dosyaları gezin, düzenleyin ve doğrudan sohbetten PR açın.",
+      "Sol tarafta sohbet geçmişiniz bulunur. Gizli sohbet başlatabilir, mesajları paylaşabilirsiniz.",
+    position: "right",
   },
   {
-    title: "Skills & Agents",
+    target: "alt araçlar",
+    title: "Araçlar",
     description:
-      "Özel kurallar (Skills) ekleyerek yapay zekânın davranışını özelleştirin. Slash komutlarıyla hızlı işlem yapın.",
+      "Web arama, Canvas önizleme ve dosya ekleme araçlarını kullanın. Coder görünümünde kod editörü ve terminal mevcuttur.",
+    position: "top",
   },
   {
-    title: "Hazırsınız!",
+    target: "ayarlar",
+    title: "Ayarlar",
     description:
-      'Yeni bir sohbet başlatın ve "Merhaba" deyin. İyi kodlamalar! 🚀',
+      "⚙️ Ayarlar menüsünden modelleri yönetebilir, Git hesaplarınızı bağlayabilir, temayı ve yanıt stilini özelleştirebilirsiniz.",
+    position: "bottom",
   },
 ];
 
 export function OnboardingTour() {
-  const open = useStore((s) => s.onboardingOpen);
-  const setOpen = useStore((s) => s.setOnboardingOpen);
-
   const [step, setStep] = useState(0);
+  const onboardingOpen = useStore((s) => s.onboardingOpen);
+  const setOnboardingOpen = useStore((s) => s.setOnboardingOpen);
 
-  if (!open) return null;
+  const current = TOUR_STEPS[step];
 
-  const current = STEPS[step];
-  const isFirst = step === 0;
-  const isLast = step === STEPS.length - 1;
-
-  const next = () => {
-    if (isLast) {
-      setOpen(false);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("craftai_onboarding_done", "1");
-      }
+  const next = useCallback(() => {
+    if (step < TOUR_STEPS.length - 1) {
+      setStep(step + 1);
     } else {
-      setStep((s) => s + 1);
+      setOnboardingOpen(false);
+      setStep(0);
     }
-  };
+  }, [step, setOnboardingOpen]);
 
-  const prev = () => setStep((s) => Math.max(0, s - 1));
+  const prev = useCallback(() => {
+    if (step > 0) setStep(step - 1);
+  }, [step]);
 
-  const close = () => {
-    setOpen(false);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("craftai_onboarding_done", "1");
-    }
-  };
+  const skip = useCallback(() => {
+    setOnboardingOpen(false);
+    setStep(0);
+  }, [setOnboardingOpen]);
+
+  if (!onboardingOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 backdrop-blur-sm">
-      <div
-        className="bg-surface border border-line rounded-2xl p-6 w-full max-w-md shadow-2xl"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Başlangıç turu"
-      >
-        {/* Close */}
-        <button
-          onClick={close}
-          className="absolute top-4 right-4 hover:bg-bgsoft rounded-lg p-1 transition-colors"
-          title="Kapat"
-          aria-label="Kapat"
-        >
-          <X size={18} />
-        </button>
-
-        {/* Progress dots */}
-        <div className="flex gap-1.5 mb-4">
-          {STEPS.map((_, i) => (
-            <div
-              key={i}
-              className={`h-1 rounded-full flex-1 transition-colors ${
-                i <= step ? "bg-amber-400" : "bg-bgsoft"
-              }`}
-            />
-          ))}
+    <div
+      className="fixed inset-0 z-[110] flex items-end justify-center pb-8 bg-bg/80 backdrop-blur-sm"
+      role="dialog"
+      aria-modal
+      aria-label="Kullanım rehberi"
+    >
+      <div className="w-full max-w-md mx-4 bg-surface border border-line rounded-2xl shadow-2xl p-5 space-y-4">
+        {/* Adım göstergesi */}
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted">
+            {step + 1} / {TOUR_STEPS.length}
+          </span>
+          <button
+            onClick={skip}
+            className="p-1 hover:bg-bgsoft rounded-lg transition-colors text-muted hover:text-ink"
+            title="Turu kapat"
+            aria-label="Turu kapat"
+          >
+            <X size={14} />
+          </button>
         </div>
 
-        {/* Content */}
-        <h3 className="text-lg font-semibold mb-2">{current.title}</h3>
-        <p className="text-sm text-muted mb-6 leading-relaxed">
-          {current.description}
-        </p>
+        {/* İlerleme çubuğu */}
+        <div className="h-1 bg-bgsoft rounded-full overflow-hidden">
+          <div
+            className="h-full bg-amber-400 transition-all duration-300"
+            style={{
+              width: `${((step + 1) / TOUR_STEPS.length) * 100}%`,
+            }}
+          />
+        </div>
 
-        {/* Actions */}
-        <div className="flex items-center justify-between">
+        {/* İçerik */}
+        <div>
+          <h3 className="text-base font-semibold text-ink mb-1.5">
+            {current.title}
+          </h3>
+          <p className="text-sm text-muted leading-relaxed">
+            {current.description}
+          </p>
+          <p className="text-[10px] text-muted mt-2 opacity-60">
+            📍 Konum: {current.target}
+          </p>
+        </div>
+
+        {/* Butonlar */}
+        <div className="flex items-center justify-between pt-1">
           <button
             onClick={prev}
-            disabled={isFirst}
-            className="flex items-center gap-1 text-sm text-muted hover:text-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            disabled={step === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-line text-muted hover:text-ink hover:bg-bgsoft transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            <ChevronLeft size={16} />
+            <ArrowLeft size={12} />
             Geri
           </button>
 
-          <span className="text-xs text-muted">
-            {step + 1} / {STEPS.length}
-          </span>
-
           <button
             onClick={next}
-            className="flex items-center gap-1 px-4 py-2 bg-amber-400 text-black rounded-xl text-sm font-medium hover:bg-amber-300 transition-colors"
+            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-xl bg-amber-400 text-black hover:bg-amber-300 transition-colors"
           >
-            {isLast ? (
+            {step < TOUR_STEPS.length - 1 ? (
               <>
-                <Check size={16} />
-                Başla
+                İleri
+                <ArrowRight size={12} />
               </>
             ) : (
               <>
-                İleri
-                <ChevronRight size={16} />
+                Tamam
+                <Check size={12} />
               </>
             )}
           </button>
