@@ -1,28 +1,111 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useStore } from "@/lib/store";
-import { Search, Plus, Settings, Globe, FileText, MessageSquare } from "lucide-react";
+// src/components/CommandPalette.tsx — ⌘K komut paleti (hızlı erişim)
 
-interface CommandItem {
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useStore } from "@/lib/store";
+import { useRouter } from "next/navigation";
+import {
+  Search,
+  MessageSquare,
+  Settings,
+  BookOpen,
+  GitBranch,
+  Code2,
+  Columns2,
+  User,
+  Moon,
+  Sun,
+  ArrowRight,
+} from "lucide-react";
+
+interface Command {
   id: string;
   label: string;
+  description: string;
   icon: React.ReactNode;
   action: () => void;
-  category: "sohbet" | "görünüm" | "ayarlar" | "diğer";
 }
 
 export function CommandPalette() {
   const open = useStore((s) => s.commandPaletteOpen);
   const setOpen = useStore((s) => s.setCommandPaletteOpen);
-  const newChat = useStore((s) => s.newChat);
-  const setActiveChat = useStore((s) => s.setActiveChat);
+  const config = useStore((s) => s.config);
+  const updateConfig = useStore((s) => s.updateConfig);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
-  const chats = useStore((s) => s.chats);
+  const newChat = useStore((s) => s.newChat);
 
   const [query, setQuery] = useState("");
   const [selectedIdx, setSelectedIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+
+  const commands: Command[] = [
+    {
+      id: "new-chat",
+      label: "Yeni Sohbet",
+      description: "Yeni bir sohbet başlat",
+      icon: <MessageSquare size={16} />,
+      action: () => { newChat(false); setOpen(false); },
+    },
+    {
+      id: "new-incognito",
+      label: "Gizli Sohbet",
+      description: "Geçmişe kaydedilmeyen sohbet",
+      icon: <MessageSquare size={16} className="opacity-50" />,
+      action: () => { newChat(true); setOpen(false); },
+    },
+    {
+      id: "settings",
+      label: "Ayarlar",
+      description: "Model, Git, tema ayarları",
+      icon: <Settings size={16} />,
+      action: () => { setSettingsOpen(true); setOpen(false); },
+    },
+    {
+      id: "coder",
+      label: "Coder Görünümü",
+      description: "Kod editörü ve terminal",
+      icon: <Code2 size={16} />,
+      action: () => { router.push("/app?view=coder"); setOpen(false); },
+    },
+    {
+      id: "compare",
+      label: "Karşılaştırma Görünümü",
+      description: "Farklı model yanıtlarını karşılaştır",
+      icon: <Columns2 size={16} />,
+      action: () => { router.push("/app?view=compare"); setOpen(false); },
+    },
+    {
+      id: "theme",
+      label: "Tema Değiştir",
+      description: `Koyu ↔ Açık (şu an: ${config.theme})`,
+      icon: config.theme === "dark" ? <Moon size={16} /> : <Sun size={16} />,
+      action: () => { updateConfig("theme", config.theme === "dark" ? "light" : "dark"); },
+    },
+    {
+      id: "docs",
+      label: "Dokümantasyon",
+      description: "Kullanım kılavuzunu aç",
+      icon: <BookOpen size={16} />,
+      action: () => { window.open("/docs", "_blank"); setOpen(false); },
+    },
+    {
+      id: "login",
+      label: "Giriş Yap",
+      description: "Hesabınla oturum aç",
+      icon: <User size={16} />,
+      action: () => { router.push("/login"); setOpen(false); },
+    },
+  ];
+
+  const filtered = query
+    ? commands.filter(
+        (c) =>
+          c.label.toLowerCase().includes(query.toLowerCase()) ||
+          c.description.toLowerCase().includes(query.toLowerCase()),
+      )
+    : commands;
 
   useEffect(() => {
     if (open) {
@@ -32,144 +115,81 @@ export function CommandPalette() {
     }
   }, [open]);
 
-  const commands: CommandItem[] = [
-    {
-      id: "new-chat",
-      label: "Yeni Sohbet",
-      icon: <Plus size={16} />,
-      action: () => {
-        newChat(false);
+  useEffect(() => {
+    setSelectedIdx(0);
+  }, [query]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedIdx((i) => (i + 1) % filtered.length);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedIdx((i) => (i - 1 + filtered.length) % filtered.length);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        filtered[selectedIdx]?.action();
+      } else if (e.key === "Escape") {
         setOpen(false);
-      },
-      category: "sohbet",
+      }
     },
-    {
-      id: "new-incognito",
-      label: "Gizli Sohbet",
-      icon: <MessageSquare size={16} />,
-      action: () => {
-        newChat(true);
-        setOpen(false);
-      },
-      category: "sohbet",
-    },
-    {
-      id: "settings",
-      label: "Ayarları Aç",
-      icon: <Settings size={16} />,
-      action: () => {
-        setSettingsOpen(true);
-        setOpen(false);
-      },
-      category: "ayarlar",
-    },
-    {
-      id: "web-search",
-      label: "Web Arama",
-      icon: <Globe size={16} />,
-      action: () => setOpen(false),
-      category: "diğer",
-    },
-  ];
-
-  // Sohbetleri de komut listesine ekle
-  const chatCommands: CommandItem[] = chats
-    .filter((c) => !c.incognito)
-    .slice(0, 10)
-    .map((c) => ({
-      id: `chat-${c.id}`,
-      label: c.title,
-      icon: <FileText size={16} />,
-      action: () => {
-        setActiveChat(c.id);
-        setOpen(false);
-      },
-      category: "sohbet" as const,
-    }));
-
-  const allCommands = [...commands, ...chatCommands];
-
-  const filtered = query.trim()
-    ? allCommands.filter((c) =>
-        c.label.toLowerCase().includes(query.toLowerCase()),
-      )
-    : allCommands;
-
-  const safeIdx = Math.min(selectedIdx, Math.max(0, filtered.length - 1));
-
-  const execute = (item: CommandItem) => {
-    item.action();
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setSelectedIdx((i) => Math.min(i + 1, filtered.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setSelectedIdx((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter" && filtered[safeIdx]) {
-      e.preventDefault();
-      execute(filtered[safeIdx]);
-    } else if (e.key === "Escape") {
-      setOpen(false);
-    }
-  };
+    [filtered, selectedIdx, setOpen],
+  );
 
   if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] bg-bg/80 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-start justify-center pt-[22vh] bg-bg/70 backdrop-blur-sm"
       onClick={() => setOpen(false)}
       role="dialog"
-      aria-modal="true"
+      aria-modal
       aria-label="Komut paleti"
     >
       <div
-        className="bg-surface border border-line rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden"
+        className="w-full max-w-lg bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={handleKeyDown}
       >
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-line">
-          <Search size={18} className="text-muted shrink-0" />
+        {/* Arama çubuğu */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-line">
+          <Search size={16} className="text-muted shrink-0" />
           <input
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setSelectedIdx(0);
-            }}
-            onKeyDown={handleKeyDown}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Komut ara..."
-            className="flex-1 bg-transparent outline-none text-sm text-ink placeholder:text-muted"
+            className="flex-1 bg-transparent border-none outline-none text-sm text-ink placeholder:text-muted"
+            aria-label="Komut ara"
           />
-          <kbd className="px-1.5 py-0.5 rounded-md bg-bgsoft border border-line text-[10px] text-muted font-mono">
+          <kbd className="text-[10px] text-muted bg-bgsoft px-1.5 py-0.5 rounded border border-line">
             ESC
           </kbd>
         </div>
 
-        <div className="max-h-64 overflow-y-auto p-2">
+        {/* Komut listesi */}
+        <div className="max-h-72 overflow-y-auto p-2">
           {filtered.length === 0 ? (
-            <p className="text-sm text-muted text-center py-6">
-              Sonuç bulunamadı
-            </p>
+            <p className="text-sm text-muted text-center py-6">Komut bulunamadı</p>
           ) : (
-            filtered.map((item, idx) => (
+            filtered.map((cmd, i) => (
               <button
-                key={item.id}
-                onClick={() => execute(item)}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-colors text-left ${
-                  idx === safeIdx
-                    ? "bg-amber-400/15 text-amber-400"
+                key={cmd.id}
+                onClick={() => cmd.action()}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${
+                  i === selectedIdx
+                    ? "bg-amber-400/10 text-amber-400"
                     : "text-ink hover:bg-bgsoft"
                 }`}
               >
-                <span className="shrink-0">{item.icon}</span>
-                <span className="truncate">{item.label}</span>
-                <span className="ml-auto text-[10px] text-muted uppercase">
-                  {item.category}
-                </span>
+                <span className="shrink-0">{cmd.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{cmd.label}</p>
+                  <p className="text-xs text-muted">{cmd.description}</p>
+                </div>
+                {i === selectedIdx && <ArrowRight size={14} className="shrink-0" />}
               </button>
             ))
           )}
