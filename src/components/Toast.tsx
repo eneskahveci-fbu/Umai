@@ -1,91 +1,54 @@
 "use client";
 
-// src/components/Toast.tsx — Bildirim toast bileşeni + useToast hook
+import { useEffect, useRef } from "react";
+import { CheckCircle, AlertTriangle, Info, X } from "lucide-react";
+import { useStore } from "@/lib/store";
 
-import { useState, useCallback, createContext, useContext, type ReactNode } from "react";
-
-type ToastVariant = "success" | "error" | "warning" | "info";
-
-interface Toast {
-  id: string;
-  message: string;
-  variant: ToastVariant;
-  duration?: number;
-}
-
-interface ToastContextType {
-  toast: (message: string, variant?: ToastVariant, duration?: number) => void;
-  removeToast: (id: string) => void;
-}
-
-const ToastContext = createContext<ToastContextType>({
-  toast: () => {},
-  removeToast: () => {},
-});
-
-// ToastContainer alias — app/page.tsx uyumluluğu için
-export const ToastContainer = ToastProvider;
-
-const variantStyles: Record<ToastVariant, string> = {
-  success: "bg-green-600 text-white border-green-500",
-  error: "bg-red-600 text-white border-red-500",
-  warning: "bg-amber-600 text-white border-amber-500",
-  info: "bg-blue-600 text-white border-blue-500",
+const ICONS = {
+  success: <CheckCircle size={16} className="text-green" />,
+  error: <AlertTriangle size={16} className="text-red" />,
+  info: <Info size={16} className="text-blue" />,
 };
 
-const variantIcons: Record<ToastVariant, string> = {
-  success: "✓",
-  error: "✕",
-  warning: "⚠",
-  info: "ℹ",
-};
+function ToastItem({ id, type, message }: { id: string; type: "success" | "error" | "info"; message: string }) {
+  const removeToast = useStore((s) => s.removeToast);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
-  const toast = useCallback(
-    (message: string, variant: ToastVariant = "info", duration = 4000) => {
-      const id = `toast_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-      setToasts((prev) => [...prev, { id, message, variant, duration }]);
-
-      if (duration > 0) {
-        setTimeout(() => removeToast(id), duration);
-      }
-    },
-    [removeToast],
-  );
+  useEffect(() => {
+    timer.current = setTimeout(() => removeToast(id), type === "error" ? 5000 : 3000);
+    return () => clearTimeout(timer.current);
+  }, [id, type, removeToast]);
 
   return (
-    <ToastContext.Provider value={{ toast, removeToast }}>
-      {children}
-      <div
-        className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"
-        aria-live="polite"
-        aria-label="Bildirimler"
+    <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl border border-line bg-surface/95 backdrop-blur-sm shadow-xl toast-enter">
+      <span className="shrink-0 mt-0.5">{ICONS[type]}</span>
+      <p className="flex-1 text-sm leading-relaxed">{message}</p>
+      <button
+        onClick={() => removeToast(id)}
+        className="shrink-0 text-muted hover:text-ink"
       >
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            className={`pointer-events-auto px-4 py-3 rounded-xl border text-sm font-medium shadow-lg flex items-center gap-2 min-w-[280px] max-w-[420px] animate-slideUp ${variantStyles[t.variant]}`}
-            role="status"
-          >
-            <span className="text-lg leading-none">{variantIcons[t.variant]}</span>
-            <span className="flex-1">{t.message}</span>
-            <button
-              onClick={() => removeToast(t.id)}
-              className="ml-2 text-white/70 hover:text-white transition-colors text-lg leading-none"
-              aria-label="Kapat"
-              title="Kapat"
-            >
-              ×
-            </button>
-          </div>
-        ))}
-      </div>
-    </ToastContext.Provider>
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
+
+export function ToastContainer() {
+  const toasts = useStore((s) => s.toasts);
+  if (toasts.length === 0) return null;
+
+  return (
+    <div
+      className="fixed z-[100] flex flex-col gap-2 max-w-[calc(100vw-2rem)] sm:max-w-sm"
+      style={{
+        right: "max(1.25rem, env(safe-area-inset-right))",
+        bottom: "max(1.25rem, env(safe-area-inset-bottom))",
+        left: "auto",
+      }}
+    >
+      {toasts.map((t) => (
+        <ToastItem key={t.id} id={t.id} type={t.type} message={t.message} />
+      ))}
+    </div>
   );
 }

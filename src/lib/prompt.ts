@@ -1,84 +1,60 @@
-// src/lib/prompt.ts — Sistem promptu oluşturma
+import { STYLE_LABELS } from "./constants";
+import type { MemoryItem, ResponseStyle } from "./types";
 
-import type { PromptContext, Skill, ResponseStyle } from "./types";
-import { RESPONSE_STYLE_PROMPTS, PLATFORM_KNOWLEDGE } from "./constants";
+/* Sistem prompt'una eklenen bağlam blokları için TEK kaynak.
+   Hem sunucu (/api/chat, /api/orchestrate) hem istemci (Pollinations doğrudan
+   çağrısı) aynı fonksiyonu kullanır → biçim ve davranış her yerde tutarlı. */
 
-function buildSkillsSection(skills: Skill[]): string {
-  if (!skills.length) return "";
+export interface SkillLike {
+  title: string;
+  content: string;
+  tags?: string[];
+  source?: "manual" | "file";
+  fileName?: string;
+}
 
-  const manual = skills.filter((s) => s.enabled && s.type === "manual");
-  const file = skills.filter((s) => s.enabled && s.type === "file");
+export interface ContextSectionsInput {
+  style?: ResponseStyle;
+  memories?: MemoryItem[];
+  skills?: SkillLike[];
+  searchContext?: string;
+}
 
-  const parts: string[] = [];
+/** Stil + hafıza + eğitim seti (skills) + web arama bağlamını tutarlı,
+    etiketli bloklar halinde döndürür. Boş girdiler atlanır. */
+export function buildContextSections(input: ContextSectionsInput): string {
+  let out = "";
 
-  if (manual.length > 0) {
-    parts.push("[Eğitim seti — manuel skill'ler]:");
-    for (const s of manual) {
-      parts.push(`--- ${s.title} ---`);
-      parts.push(s.content);
+  const stylePrompt = STYLE_LABELS[input.style || "normal"]?.prompt;
+  if (stylePrompt) out += `\n\n[Stil]: ${stylePrompt}`;
+
+  if (input.memories?.length) {
+    out += `\n\n[Kullanıcı hakkında bildiklerin]:\n${input.memories.map((m) => `- ${m.content}`).join("\n")}`;
+  }
+
+  if (input.skills?.length) {
+    const fileSkills = input.skills.filter((s) => s.source === "file");
+    const manualSkills = input.skills.filter((s) => s.source !== "file");
+    if (manualSkills.length) {
+      out +=
+        `\n\n[Eğitim seti — bu kurallara her zaman uy]:\n` +
+        manualSkills
+          .map((s) => {
+            const tags = s.tags?.length ? ` (${s.tags.join(", ")})` : "";
+            return `### ${s.title}${tags}\n${s.content}`;
+          })
+          .join("\n\n");
+    }
+    if (fileSkills.length) {
+      out +=
+        `\n\n[Referans dosyalar — örnek olarak kullan]:\n` +
+        fileSkills.map((s) => `--- ${s.fileName || s.title} ---\n${s.content}`).join("\n\n");
     }
   }
 
-  if (file.length > 0) {
-    parts.push("[Referans dosyalar — örnek olarak kullan]:");
-    for (const s of file) {
-      parts.push(`--- ${s.title} ---`);
-      parts.push(s.content);
-    }
+  if (input.searchContext) {
+    out += `\n\n[Web arama sonuçları]:\n${input.searchContext}`;
   }
 
-  return parts.join("\n");
-}
-
-export function buildSystemPrompt(ctx: PromptContext): string {
-  const parts: string[] = [];
-
-  // Ana direktif
-  parts.push(
-    `Sen Craft.Coder, deneyimli bir yazılım geliştirme asistanısın. Kod yazabilir, açıklayabilir, hata ayıklayabilir, mimari önerebilirsin. Kullanıcı sana GitHub deposundan dosya içeriği gösterebilir; bunları dikkate al. Adım adım düşün. Cevapların Türkçe ve markdown formatında olsun; kod bloklarını dilini belirterek yaz. Bir dosya içeriği yazarken code-fence'i \`dil:dosya/yolu\` biçiminde başlat (örn. \` \`\`ts:src/utils/helper.ts \` \`\`), böylece editörde otomatik açılabilsin.`,
-  );
-
-  // Platform bilgisi
-  if (ctx.platformKnowledge) {
-    parts.push(ctx.platformKnowledge);
-  } else {
-    parts.push(PLATFORM_KNOWLEDGE);
-  }
-
-  // Skill'ler
-  const skillsSection = buildSkillsSection(ctx.skills);
-  if (skillsSection) {
-    parts.push(skillsSection);
-  }
-
-  // Proje bağlamı
-  if (ctx.projectContext) {
-    parts.push("[Proje bağlamı — SOUL.md]:");
-    parts.push(ctx.projectContext);
-  }
-
-  // Bellek
-  if (ctx.memory) {
-    parts.push(`[Kullanıcı belleği — sohbetler arası hatırlanan notlar]:\n${ctx.memory}`);
-  }
-
-  // Yanıt stili
-  const stylePrompt = RESPONSE_STYLE_PROMPTS[ctx.responseStyle];
-  if (stylePrompt) {
-    parts.push(stylePrompt);
-  }
-
-  // Sistem prompt override
-  if (ctx.systemPrompt) {
-    parts.push(ctx.systemPrompt);
-  }
-
-  return parts.join("\n\n");
-}
-
-// Tool-use talimatlarını prompt'a ekle
-export function buildToolUsePrompt(): string {
-  return `Sen uzman bir yazılım geliştiricisisin. Claude Code tarzında çalış: kullanıcının kod tabanını anla, dosya içeriklerini incele, sorunlara adım adım yaklaş. Kod yazarken best practice'leri uygula, okunabilir ve sürdürülebilir çözümler sun.
-
-[Düşünme: YÜKSEK] Adım adım analiz et. Sorunu içselleştir, olası yaklaşımları kıyasla, edge case'leri düşün, ardından gerekçeli çözümü ver.`;
+  return out;
 }

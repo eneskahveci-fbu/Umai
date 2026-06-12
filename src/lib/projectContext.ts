@@ -1,108 +1,86 @@
-// src/lib/projectContext.ts — Proje bağlamı çıkarma (SOUL.md, .rules, package.json)
+/* Proje farkındalığı için saf yardımcılar (ağ/yan etki yok → test edilebilir):
+   - .gitignore ayrıştırma + basit eşleştirme
+   - package.json bağımlılıkları + dosya işaretlerinden framework algılama */
 
-/**
- * Bir repodaki proje profilini çıkar.
- * Algılanan teknolojileri, .gitignore kalıplarını,
- * Next.js agent kurallarını derler.
- */
-export interface ProjectProfile {
-  technologies: string[];
-  gitignorePatterns: string[];
-  hasNextJsAgentRules: boolean;
-  soulMd: string;
-  workspaceRules: string;
-}
-
-const TECH_INDICATORS: Record<string, string[]> = {
-  nextjs: ["next.config.", "next-env.d.ts", "app/layout.tsx", "app/page.tsx"],
-  react: ["react", "react-dom"],
-  tailwind: ["tailwind.config", "postcss.config", "@tailwindcss"],
-  vitest: ["vitest.config", "vitest"],
-  typescript: ["tsconfig.json", "typescript"],
-  prisma: ["prisma/schema.prisma", "@prisma/client"],
-  trpc: ["@trpc"],
-  zustand: ["zustand"],
-};
-
-export function detectTechnologies(files: string[], packageJson?: Record<string, unknown>): string[] {
-  const techs = new Set<string>();
-
-  // Dosya isimlerinden tespit
-  for (const file of files) {
-    for (const [tech, indicators] of Object.entries(TECH_INDICATORS)) {
-      if (indicators.some((ind) => file.includes(ind))) {
-        techs.add(tech);
-      }
-    }
-  }
-
-  // package.json'dan tespit
-  if (packageJson) {
-    const deps = {
-      ...((packageJson.dependencies as Record<string, string>) ?? {}),
-      ...((packageJson.devDependencies as Record<string, string>) ?? {}),
-    };
-    for (const dep of Object.keys(deps)) {
-      for (const [tech, indicators] of Object.entries(TECH_INDICATORS)) {
-        if (indicators.includes(dep)) {
-          techs.add(tech);
-        }
-      }
-    }
-    if (deps["typescript"]) techs.add("typescript");
-  }
-
-  return [...techs];
-}
-
-const DEFAULT_GITIGNORE = [
-  "/node_modules",
-  "/.next/",
-  "/out/",
-  "/build",
-  ".DS_Store",
-  "*.pem",
-  ".env*",
-  "!.env.example",
-  ".vercel",
-  "*.tsbuildinfo",
-  "next-env.d.ts",
-];
-
+/** .gitignore içeriğini desenlere ayırır (yorum/boş satır atlanır). */
 export function parseGitignore(content: string): string[] {
   return content
     .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith("#"));
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !l.startsWith("#"));
 }
 
-export function buildProjectContext(profile: ProjectProfile): string {
-  const parts: string[] = [];
+/** Bir yolun .gitignore desenlerinden biriyle eşleşip eşleşmediğini döndürür.
+    Desteklenen: birebir, `dir/`, `*.ext`, baştaki `/`, alt dizin eşleşmesi. */
+export function isIgnored(path: string, patterns: string[]): boolean {
+  const p = path.replace(/^\/+/, "");
+  for (const raw of patterns) {
+    if (raw.startsWith("!")) continue; // negasyon — basitlik için atla
+    let pat = raw.replace(/^\/+/, "");
+    const dirOnly = pat.endsWith("/");
+    if (dirOnly) pat = pat.slice(0, -1);
 
-  parts.push("[Proje profili]");
-  parts.push(
-    `• Algılanan teknolojiler: ${profile.technologies.join(", ")} — bu ekosistemin en iyi pratiklerini uygula.`,
-  );
-
-  if (profile.gitignorePatterns.length > 0) {
-    parts.push(
-      `• .gitignore kalıpları (bunlara dokunma/oluşturma): ${profile.gitignorePatterns.join(", ")}`,
-    );
+    if (pat.startsWith("*.")) {
+      const ext = pat.slice(1); // ".ext"
+      if (p.endsWith(ext)) return true;
+      continue;
+    }
+    // Yol bileşenlerinden herhangi biri desene eşitse (dizin/dosya adı) eşleş
+    const segments = p.split("/");
+    if (segments.includes(pat)) return true;
+    if (p === pat || p.startsWith(pat + "/")) return true;
   }
-
-  if (profile.hasNextJsAgentRules) {
-    parts.push(
-      "[Ajan modu — Next.js agent kuralları geçerli]",
-    );
-  }
-
-  if (profile.soulMd) {
-    parts.push(`[SOUL.md]:\n${profile.soulMd}`);
-  }
-
-  return parts.join("\n");
+  return false;
 }
 
-export function getDefaultGitignorePatterns(): string[] {
-  return [...DEFAULT_GITIGNORE];
+const DEP_FRAMEWORKS: { dep: string; label: string }[] = [
+  { dep: "next", label: "Next.js" },
+  { dep: "@angular/core", label: "Angular" },
+  { dep: "vue", label: "Vue" },
+  { dep: "svelte", label: "Svelte" },
+  { dep: "@nestjs/core", label: "NestJS" },
+  { dep: "express", label: "Express" },
+  { dep: "fastify", label: "Fastify" },
+  { dep: "react", label: "React" },
+  { dep: "vite", label: "Vite" },
+  { dep: "tailwindcss", label: "Tailwind CSS" },
+  { dep: "vitest", label: "Vitest" },
+  { dep: "jest", label: "Jest" },
+];
+
+const PATH_FRAMEWORKS: { marker: string; label: string }[] = [
+  { marker: "manage.py", label: "Django" },
+  { marker: "pyproject.toml", label: "Python (pyproject)" },
+  { marker: "requirements.txt", label: "Python" },
+  { marker: "Cargo.toml", label: "Rust (Cargo)" },
+  { marker: "go.mod", label: "Go" },
+  { marker: "pom.xml", label: "Java (Maven)" },
+  { marker: "build.gradle", label: "Java/Kotlin (Gradle)" },
+  { marker: "Gemfile", label: "Ruby" },
+  { marker: "composer.json", label: "PHP (Composer)" },
+];
+
+/** package.json bağımlılıkları ve dosya yollarından framework/araç listesi. */
+export function detectFrameworks(input: { deps?: Record<string, string>; paths?: string[] }): string[] {
+  const found = new Set<string>();
+  const deps = input.deps ?? {};
+  for (const { dep, label } of DEP_FRAMEWORKS) {
+    if (deps[dep]) found.add(label);
+  }
+  const paths = input.paths ?? [];
+  const baseNames = new Set(paths.map((p) => p.split("/").pop() ?? p));
+  for (const { marker, label } of PATH_FRAMEWORKS) {
+    if (baseNames.has(marker)) found.add(label);
+  }
+  return [...found];
+}
+
+/** package.json metninden { ...deps, ...devDeps } çıkarır (hata toleranslı). */
+export function extractDeps(packageJson: string): Record<string, string> {
+  try {
+    const pkg = JSON.parse(packageJson) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    return { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
+  } catch {
+    return {};
+  }
 }

@@ -1,190 +1,281 @@
-// src/lib/tools.ts — AI tool-use yönetimi (Claude Code tarzı araçlar)
-
 export interface ToolDefinition {
-  name: string;
-  description: string;
-  parameters: Record<string, unknown>;
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: "object";
+      properties: Record<string, { type: string; description: string; enum?: string[] }>;
+      required: string[];
+    };
+  };
 }
 
-export interface ToolCall {
-  id: string;
-  name: string;
-  arguments: Record<string, unknown>;
-}
-
-export interface ToolResult {
-  tool_call_id: string;
-  content: string;
-}
-
-//─────── Araç tanımları (LLM'ye gönderilecek) ───────
-export function getAvailableTools(): ToolDefinition[] {
-  return [
-    {
+export const CODER_TOOLS: ToolDefinition[] = [
+  {
+    type: "function",
+    function: {
       name: "list_files",
-      description:
-        "Bağlı repodaki tüm dosyaların yollarını listeler. Filtre ile daralt.",
+      description: "Bağlı repodaki tüm dosyaların yollarını listeler. Filtre ile daralt.",
       parameters: {
         type: "object",
         properties: {
-          filter: {
-            type: "string",
-            description: "Dosya yolunda aranacak alt-string (opsiyonel). Örn: 'components' veya '.tsx'",
-          },
+          filter: { type: "string", description: "Dosya yolunda aranacak alt-string (opsiyonel). Örn: 'components' veya '.tsx'" },
         },
         required: [],
       },
     },
-    {
+  },
+  {
+    type: "function",
+    function: {
       name: "read_file",
-      description:
-        "Bağlı repodan bir dosyanın içeriğini okur. İçerik SATIR NUMARALARIYLA döner.",
+      description: "Bağlı repodan bir dosyanın içeriğini okur. İçerik SATIR NUMARALARIYLA döner (referans için). Not: str_replace'te old_string olarak satır numarasını DEĞİL, ham kod metnini kullan. Dosya yolu repo köküne göre relatif olmalı.",
       parameters: {
         type: "object",
         properties: {
-          path: {
-            type: "string",
-            description: "Repo köküne göre dosya yolu. Örn: 'src/components/Button.tsx'",
-          },
+          path: { type: "string", description: "Repo köküne göre dosya yolu. Örn: 'src/components/Button.tsx'" },
         },
         required: ["path"],
       },
     },
-    {
+  },
+  {
+    type: "function",
+    function: {
       name: "read_files",
-      description: "Birden çok dosyayı TEK çağrıda okur (satır numaralı).",
+      description: "Birden çok dosyayı TEK çağrıda okur (satır numaralı). Bağımsız dosyaları ayrı ayrı read_file ile çağırmak yerine bunu kullan — daha hızlı.",
       parameters: {
         type: "object",
         properties: {
-          paths: {
-            type: "array",
-            description: "Okunacak dosya yolları dizisi (en çok 10)",
-          },
+          paths: { type: "array", description: "Okunacak dosya yolları dizisi (en çok 10)" },
         },
         required: ["paths"],
       },
     },
-    {
+  },
+  {
+    type: "function",
+    function: {
       name: "glob",
-      description: "Yıldızlı desenle dosya bulur.",
+      description: "Yıldızlı desenle dosya bulur. '*' tek segment, çift-yıldız dizinler arası, '?' tek karakter. Örn: 'src/**/*.tsx', '*.json'.",
       parameters: {
         type: "object",
         properties: {
-          pattern: {
-            type: "string",
-            description: "Glob deseni. Örn: 'src/**/*.ts'",
-          },
+          pattern: { type: "string", description: "Glob deseni. Örn: 'src/**/*.ts'" },
         },
         required: ["pattern"],
       },
     },
-    {
+  },
+  {
+    type: "function",
+    function: {
       name: "grep",
-      description: "REGEX ile dosya İÇERİKLERİnde arar.",
+      description: "REGEX ile dosya İÇERİKLERİnde arar; 'dosya:satır: eşleşen satır' döndürür. 'glob' ile kapsamı daralt (büyük repolarda gerekli).",
       parameters: {
         type: "object",
         properties: {
-          pattern: { type: "string", description: "Aranacak regex" },
-          glob: { type: "string", description: "Dosya deseni (opsiyonel)" },
-          ignore_case: { type: "boolean", description: "Büyük/küçük harf duyarsız" },
+          pattern: { type: "string", description: "Aranacak regex. Örn: 'function\\s+\\w+', 'TODO'" },
+          glob: { type: "string", description: "Aramayı sınırlayan dosya deseni (opsiyonel). Örn: 'src/**/*.ts'" },
+          ignore_case: { type: "boolean", description: "Büyük/küçük harf duyarsız (opsiyonel)" },
         },
         required: ["pattern"],
       },
     },
-    {
-      name: "search_code",
-      description: "Dosya İÇERİKLERİnde basit metin arar.",
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_files",
+      description: "Dosya adlarında anahtar kelime arar (içerik değil, yol arar).",
       parameters: {
         type: "object",
         properties: {
-          query: { type: "string", description: "Aranacak metin" },
-          extension: { type: "string", description: "Uzantı filtresi (opsiyonel)" },
+          query: { type: "string", description: "Aranacak metin (dosya yolunda)" },
         },
         required: ["query"],
       },
     },
-    {
-      name: "write_file",
-      description: "YENİ dosya oluşturur veya bir dosyayı TAMAMEN değiştirir.",
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_code",
+      description: "Dosya İÇERİKLERinde kod veya metin arar. Belirli bir fonksiyon, değişken veya pattern aramak için kullan.",
       parameters: {
         type: "object",
         properties: {
-          path: { type: "string", description: "Dosya yolu" },
+          query: { type: "string", description: "Aranacak kod/metin. Örn: 'useState', 'async function', 'TODO:'" },
+          extension: { type: "string", description: "Uzantı filtresi (opsiyonel). Örn: 'ts', 'tsx', 'py'" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "write_file",
+      description: "YENİ dosya oluşturur veya bir dosyayı TAMAMEN değiştirir (tüm içerik). Var olan bir dosyada KÜÇÜK değişiklik yapacaksan write_file yerine str_replace kullan — daha hızlı ve ucuz. Yazdıktan sonra commit eder.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Dosya yolu. Örn: 'src/utils/helper.ts'" },
           content: { type: "string", description: "Dosyanın tam içeriği" },
-          commit_message: { type: "string", description: "Commit mesajı" },
+          commit_message: { type: "string", description: "Commit mesajı. Örn: 'feat: add helper utility'" },
         },
         required: ["path", "content", "commit_message"],
       },
     },
-    {
+  },
+  {
+    type: "function",
+    function: {
       name: "str_replace",
-      description: "Var olan bir dosyada HEDEFLİ düzenleme.",
+      description: "Var olan bir dosyada HEDEFLİ düzenleme: old_string'i new_string ile değiştirir (tüm dosyayı yeniden yazmaz — daha hızlı, ucuz, güvenli). old_string dosyada BENZERSİZ ve birebir eşleşmeli (girinti/boşluk dahil). Eşleşme yoksa veya birden çoksa hata döner; o zaman daha fazla bağlam ekle. Değişiklik commit edilir.",
       parameters: {
         type: "object",
         properties: {
-          path: { type: "string", description: "Dosya yolu" },
-          old_string: { type: "string", description: "Değiştirilecek MEVCUT metin" },
-          new_string: { type: "string", description: "Yeni metin" },
+          path: { type: "string", description: "Repo köküne göre dosya yolu" },
+          old_string: { type: "string", description: "Değiştirilecek MEVCUT metin — ham kod (satır numarası OLMADAN), girinti dahil birebir" },
+          new_string: { type: "string", description: "Yerine yazılacak yeni metin" },
           commit_message: { type: "string", description: "Commit mesajı (opsiyonel)" },
-          replace_all: { type: "boolean", description: "Tüm eşleşmeleri değiştir" },
+          replace_all: { type: "boolean", description: "true ise tüm eşleşmeleri değiştirir (opsiyonel, varsayılan false)" },
         },
         required: ["path", "old_string", "new_string"],
       },
     },
-  ];
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_file",
+      description: "Bir dosyanın SİLİNMESİNİ ÖNERİR. Doğrudan silmez — kullanıcıya onay olarak sunulur, ancak kullanıcı onaylarsa silinir. Yıkıcı işlem olduğu için yalnızca gerçekten gerektiğinde kullan.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Silinecek dosyanın repo köküne göre yolu" },
+          reason: { type: "string", description: "Neden silinmeli (kullanıcının onay ekranında görünür)" },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "rename_file",
+      description: "Bir dosyanın YENİDEN ADLANDIRILMASINI/TAŞINMASINI ÖNERİR. Doğrudan yapmaz — kullanıcı onayına sunulur. İçerik korunur; onaylanırsa yeni yola yazılıp eski yol silinir.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Mevcut dosya yolu" },
+          new_path: { type: "string", description: "Yeni dosya yolu" },
+          reason: { type: "string", description: "Neden (opsiyonel, onay ekranında görünür)" },
+        },
+        required: ["path", "new_path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "dispatch_agents",
+      description: "Karmaşık bir görevi PARALEL alt-ajanlara böler (Claude'daki Task/subagent gibi). Her alt-ajan repoyu salt-okunur araçlarla BAĞIMSIZ inceler ve sonucunu döndürür; sen sonuçları birleştirip uygularsın. Yalnızca birbirinden bağımsız, aynı anda yapılabilen 2-4 alt görev için kullan (ör. farklı modülleri/konuları paralel araştırmak). Basit görevlerde KULLANMA — kendin oku.",
+      parameters: {
+        type: "object",
+        properties: {
+          tasks: { type: "array", description: "Alt görevler dizisi: [{title, instruction}] (2-4 adet, bağımsız)" },
+        },
+        required: ["tasks"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_plan",
+      description: "Çok adımlı bir görev için canlı yapılacaklar listesini (plan) günceller; kullanıcı ilerlemeyi görür. Göreve başlarken tüm adımları yaz, her adım bitince listeyi yeniden gönder. Her satır bir adım: '[ ]' bekliyor, '[~]' devam ediyor, '[x]' tamamlandı. Örn: '[x] Dosyaları incele\\n[~] Bug'ı düzelt\\n[ ] Testi çalıştır'.",
+      parameters: {
+        type: "object",
+        properties: {
+          plan: { type: "string", description: "Her satırda bir adım: '[ ]' / '[~]' / '[x]' durum işaretiyle başlar" },
+        },
+        required: ["plan"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_branches",
+      description: "Repodaki dalları (branch) listeler.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_branch",
+      description: "Mevcut bir daldan yeni bir dal (branch) oluşturur.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Yeni dal adı. Örn: 'feature/login-page'" },
+          from: { type: "string", description: "Kaynak dal adı. Belirtilmezse aktif dal kullanılır." },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_pr",
+      description: "head dalından base dalına bir Pull Request (GitHub) / Merge Request (GitLab) açar. Değişiklikleri ayrı bir dala yazıp sonra bu araçla PR açmak iyi pratiktir. Başlık ve açıklamayı sen üret.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "PR/MR başlığı" },
+          head: { type: "string", description: "Kaynak dal (değişikliklerin olduğu)" },
+          base: { type: "string", description: "Hedef dal (genelde ana dal)" },
+          body: { type: "string", description: "PR/MR açıklaması (markdown, opsiyonel)" },
+        },
+        required: ["title", "head", "base"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_commit_history",
+      description: "Repodaki son commit'leri listeler.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "string", description: "Kaç commit gösterilsin (varsayılan 10, max 30)" },
+          path: { type: "string", description: "Sadece belirli dosyayı etkileyen commit'ler (opsiyonel)" },
+        },
+        required: [],
+      },
+    },
+  },
+];
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: string;
 }
 
-// LLM yanıtındaki tool_call'leri ayıkla
-export function parseToolCalls(
-  content: string,
-): { text: string; toolCalls: ToolCall[] } {
-  const toolCalls: ToolCall[] = [];
-  const regex =
-    /<invoke name="([^"]+)">\s*([\s\S]*?)\s*<\/invoke>/g;
-
-  let match: RegExpExecArray | null;
-  let cleanedContent = content;
-
-  while ((match = regex.exec(content)) !== null) {
-    const name = match[1];
-    const rawParams = match[2];
-
-    const args: Record<string, unknown> = {};
-    const paramRegex =
-      /<parameter name="([^"]+)"(?: string="([^"]*)")?>([\s\S]*?)<\/parameter>/g;
-    let paramMatch: RegExpExecArray | null;
-
-    while ((paramMatch = paramRegex.exec(rawParams)) !== null) {
-      const pName = paramMatch[1];
-      const isString = paramMatch[2] === "true";
-      let pValue: unknown = paramMatch[3].trim();
-
-      if (isString) {
-        args[pName] = pValue;
-      } else {
-        try {
-          args[pName] = JSON.parse(pValue as string);
-        } catch {
-          args[pName] = pValue;
-        }
-      }
-    }
-
-    toolCalls.push({
-      id: `call_${Date.now()}_${toolCalls.length}`,
-      name,
-      arguments: args,
-    });
-
-    cleanedContent = cleanedContent.replace(match[0], "");
-  }
-
-  return { text: cleanedContent.trim(), toolCalls };
-}
-
-// Tool sonuçlarını formatla
-export function formatToolResults(results: ToolResult[]): string {
-  return results
-    .map((r) => `<result id="${r.tool_call_id}">\n${r.content}\n</result>`)
-    .join("\n\n");
+export interface ToolResult {
+  toolCallId: string;
+  name: string;
+  result: string;
+  error?: string;
 }

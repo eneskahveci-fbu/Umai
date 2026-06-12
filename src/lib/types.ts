@@ -1,138 +1,212 @@
-// src/lib/types.ts — Tüm uygulama genelinde kullanılan tip tanımları
+export type Role = "user" | "assistant" | "system" | "tool";
 
-//─────── Skill / Rules ───────
+export interface ToolCallRecord {
+  id: string;
+  name: string;
+  arguments: string;
+  result?: string;
+  status: "pending" | "done" | "error";
+}
+
+export interface ChatMessage {
+  role: Role;
+  content: string;
+  images?: string[];
+  agentId?: string;
+  tokenIn?: number;
+  tokenOut?: number;
+  toolCalls?: ToolCallRecord[];
+  thinking?: string;
+  rating?: "up" | "down";
+  /** Ajan görev planı (update_plan aracıyla canlı güncellenen checklist). */
+  plan?: string;
+  /** Mesaj dallandırma: bu (kullanıcı) mesajı düzenlendiğinde her sürümün
+      kendi yanıt zinciri. Her dal = bu mesajdan sonraki mesajların anlık görüntüsü. */
+  branches?: ChatMessage[][];
+  /** Aktif dalın indeksi. */
+  branchIndex?: number;
+}
+
+export interface McpServer {
+  id: string;
+  name: string;
+  url: string;
+  headers?: Record<string, string>;
+  enabled: boolean;
+}
+
+export interface Snippet {
+  id: string;
+  title: string;
+  language: string;
+  code: string;
+  created_at: number;
+  tags?: string[];
+}
+
+export interface Chat {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  created_at: number;
+  incognito?: boolean;
+  projectId?: string;
+  totalInTokens?: number;
+  totalOutTokens?: number;
+  tags?: string[];
+  pinned?: boolean;
+}
+
+export type Provider =
+  | "hf"
+  | "deepseek"
+  | "openrouter"
+  | "groq"
+  | "gemini"
+  | "mistral"
+  | "cerebras"
+  | "together"
+  | "xai"
+  | "ollama"
+  | "anthropic"
+  | "pollinations"
+  | "custom";
+
+export interface ModelProfile {
+  id: string;
+  label: string;
+  provider: Provider;
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+}
+
+export interface GitHubAccount {
+  id: string;
+  username: string;
+  token: string;
+}
+
+export interface GitLabAccount {
+  id: string;
+  username: string;
+  token: string;
+}
+
+export type ResponseStyle = "normal" | "concise" | "detailed" | "code" | "formal";
+
+export interface Project {
+  id: string;
+  name: string;
+  systemPrompt: string;
+  created_at: number;
+  /** Bu proje aktifken kullanılacak model (boşsa global aktif model). */
+  modelId?: string;
+  /** Bu projeye özel örnekleme sıcaklığı (0-2). Tanımsız = sağlayıcı varsayılanı. */
+  temperature?: number;
+  /** Bu projeye özel maksimum yanıt token'ı. Tanımsız = sağlayıcı varsayılanı. */
+  maxTokens?: number;
+}
+
+export interface MemoryItem {
+  id: string;
+  content: string;
+}
+
 export interface Skill {
   id: string;
   title: string;
   content: string;
-  type: "manual" | "file";
+  tags: string[];
   enabled: boolean;
-}
-
-//─────── AI Provider / Model ───────
-export type ProviderKind =
-  | "huggingface"
-  | "deepseek"
-  | "openrouter"
-  | "groq"
-  | "google"
-  | "mistral"
-  | "cerebras"
-  | "togetherai"
-  | "xai"
-  | "ollama"
-  | "custom";
-
-export interface AIModel {
-  id: string;
-  name: string;
-  provider: ProviderKind;
-  apiKey: string;
-  baseURL: string;
-  enabled: boolean;
-}
-
-//─────── Chat ───────
-export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  createdAt: number;
-  artifacts?: ArtifactData[];
-  modelId?: string;
-}
-
-//─────── Chat share ───────
-export interface SharedChat {
-  id: string;
-  messages: ChatMessage[];
+  source: "manual" | "file";
+  fileName?: string;
+  usageCount: number;
   createdAt: number;
 }
 
-//─────── Artifact (Canvas) ───────
-export interface ArtifactData {
-  id: string;
-  type: "html" | "svg" | "mermaid" | "code";
+export interface Artifact {
+  type: "html" | "svg" | "mermaid";
   content: string;
-  language?: string;
-  title?: string;
+  title: string;
 }
 
-//─────── GitHub ───────
-export interface GitAccount {
+export interface PromptTemplate {
   id: string;
-  username: string;
-  token: string;
-  provider: "github" | "gitlab";
+  category: string;
+  title: string;
+  prompt: string;
 }
 
-export interface GitRepo {
+export interface Config {
+  models: ModelProfile[];
+  activeModelId: string | null;
+  githubAccounts: GitHubAccount[];
+  activeGithubId: string | null;
+  gitlabAccounts: GitLabAccount[];
+  activeGitlabId: string | null;
+  repos: string[];
+  activeRepo: string | null;
+  systemPrompt: string;
+  theme: "dark" | "light";
+  style: ResponseStyle;
+  memories: MemoryItem[];
+  skills: Skill[];
+  projects: Project[];
+  activeProjectId: string | null;
+  followUps: boolean;
+  webSearch: boolean;
+  cliMode: boolean;
+  autoTerminal: boolean;
+  /** Editörde satır içi (ghost text) AI tamamlama. Aktif modelin API kotasını
+      kullandığı için kapatılabilir. Tanımsız = açık. */
+  inlineCompletion?: boolean;
+  /** Açıksa ajan dosyaları doğrudan yazıp commit edemez; değişiklikleri kod
+      bloğu olarak ÖNERİR, kullanıcı commit arayüzüyle uygular. Tanımsız = kapalı. */
+  requireWriteApproval?: boolean;
+  /** Açıksa AI'nın önerdiği SADECE allowlist'teki komutlar otomatik çalışır
+      (çıktı AI'ya beslenir → güvenli oto-düzelt). Tanımsız = kapalı. */
+  autoRunCommands?: boolean;
+  /** Otomatik çalıştırılmasına izin verilen komut önekleri. */
+  commandAllowlist?: string[];
+  /** Açıksa ajan önce PLAN sunar ve değişiklik yapmadan durur; kullanıcı
+      onaylayınca uygular. Tanımsız = kapalı. */
+  planApprovalMode?: boolean;
+  /** Açıksa ajan internet (web_search/read_url) araçlarını kullanamaz.
+      Tanımsız = ağ erişimi serbest. */
+  blockNetworkTools?: boolean;
+  rulesFile: string;
+  fontScale: "sm" | "base" | "lg";
+  soundEnabled: boolean;
+  accentColor: "amber" | "green" | "orange";
+  maxContext: number;
+  webcontainerApiKey: string;
+  mcpServers?: McpServer[];
+}
+
+export interface RepoState {
   owner: string;
   repo: string;
-  branch?: string;
+  branch: string;
 }
 
-export interface GitBranch {
+export interface TreeFile {
   name: string;
-  sha: string;
+  path: string;
 }
 
-//─────── App Config ───────
-export interface AppConfig {
-  theme: "dark" | "light";
-  responseStyle: "normal" | "short" | "detailed" | "code-focused" | "formal";
-  fontSize: number;
-  fontScale: "sm" | "base" | "lg";
-  accentColor: string;
-  soundEnabled: boolean;
-  guestMode: boolean;
+export interface TreeNode {
+  dirs: Record<string, TreeNode>;
+  files: TreeFile[];
 }
 
-//─────── Project / Workspace ───────
-export interface Project {
+export interface OpenFile {
+  path: string;
+  content: string;
+}
+
+export interface Toast {
   id: string;
-  name: string;
-  repo: GitRepo;
-  gitAccountId: string;
-}
-
-//─────── Chat Summary (sidebar list) ───────
-export interface ChatSummary {
-  id: string;
-  title: string;
-  pinned: boolean;
-  incognito: boolean;
-  createdAt: number;
-}
-
-//─────── Sub-agent ───────
-export interface SubAgentTask {
-  title: string;
-  instruction: string;
-}
-
-export interface SubAgentResult {
-  title: string;
-  result: string;
-  error?: string;
-}
-
-//─────── MCP ───────
-export interface MCPTool {
-  name: string;
-  description: string;
-  parameters: Record<string, unknown>;
-}
-
-//─────── Response style options ───────
-export type ResponseStyle = AppConfig["responseStyle"];
-
-//─────── Prompt context ───────
-export interface PromptContext {
-  skills: Skill[];
-  projectContext: string;
-  platformKnowledge: string;
-  memory: string;
-  systemPrompt: string;
-  responseStyle: ResponseStyle;
+  message: string;
+  type: "success" | "error" | "info";
 }
