@@ -108,6 +108,19 @@ interface StoreState {
   // Actions — Memories
   setMemories: (memories: MemoryItem[]) => void;
 
+  // Actions — Toasts
+  addToast: (toast: Omit<Toast, "id">) => void;
+  removeToast: (id: string) => void;
+
+  // Actions — Artifact
+  setArtifact: (artifact: Artifact | null) => void;
+
+  // Actions — Diff
+  setDiff: (diff: { left: string; right: string; title?: string } | null) => void;
+
+  // Actions — Onboarding
+  setOnboardingCompleted: (v: boolean) => void;
+
   // Persistence helpers
   saveConfig: () => void;
   loadConfig: () => void;
