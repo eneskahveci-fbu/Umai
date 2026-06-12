@@ -1,114 +1,128 @@
-// ── Paylaşımlı tipler ──
+// src/lib/types.ts — Tüm uygulama genelinde kullanılan tip tanımları
 
-export type Provider =
-  | "openai"
-  | "anthropic"
-  | "google"
-  | "groq"
+//─────── Skill / Rules ───────
+export interface Skill {
+  id: string;
+  title: string;
+  content: string;
+  type: "manual" | "file";
+  enabled: boolean;
+}
+
+//─────── AI Provider / Model ───────
+export type ProviderKind =
+  | "huggingface"
   | "deepseek"
-  | "mistral"
-  | "ollama"
   | "openrouter"
+  | "groq"
+  | "google"
+  | "mistral"
   | "cerebras"
+  | "togetherai"
   | "xai"
-  | "together"
-  | "pollinations"
+  | "ollama"
   | "custom";
 
-export type ResponseStyle = "normal" | "short" | "detailed" | "code" | "formal";
-
-export interface ChatMessage {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string;
-  tool_calls?: ToolCall[];
-  tool_call_id?: string;
-  name?: string;
-}
-
-export interface ToolCall {
+export interface AIModel {
   id: string;
-  type: "function";
-  function: {
-    name: string;
-    arguments: string;
-  };
-}
-
-export interface MemoryItem {
-  id: string;
-  content: string;
-  createdAt: number;
-}
-
-export interface Skill {
-  title: string;
-  content: string;
-  tags?: string[];
-  source: "manual" | "file";
-  fileName?: string;
-  enabled: boolean;
-}
-
-export interface Config {
-  theme: "dark" | "light";
-  accentColor: "amber" | "green" | "orange";
-  fontScale: "sm" | "base" | "lg";
-  responseStyle: ResponseStyle;
-  followUpQuestions: boolean;
-  webSearch: boolean;
-  contextWindowTokens: number;
-  guestMode: boolean;
-  fontSize: number;
-  soundEnabled: boolean;
-}
-
-export interface ModelEntry {
-  id: string;
-  provider: Provider;
-  displayName?: string;
-  baseUrl: string;
+  name: string;
+  provider: ProviderKind;
   apiKey: string;
-  model: string;
+  baseURL: string;
   enabled: boolean;
 }
 
-export interface ChatSession {
+//─────── Chat ───────
+export interface ChatMessage {
   id: string;
-  title: string;
-  messages: ChatMessage[];
-  modelId?: string;
+  role: "user" | "assistant" | "system";
+  content: string;
   createdAt: number;
-  updatedAt: number;
-  incognito?: boolean;
-  pinned?: boolean;
+  artifacts?: ArtifactData[];
+  modelId?: string;
 }
 
+//─────── Chat share ───────
+export interface SharedChat {
+  id: string;
+  messages: ChatMessage[];
+  createdAt: number;
+}
+
+//─────── Artifact (Canvas) ───────
+export interface ArtifactData {
+  id: string;
+  type: "html" | "svg" | "mermaid" | "code";
+  content: string;
+  language?: string;
+  title?: string;
+}
+
+//─────── GitHub ───────
+export interface GitAccount {
+  id: string;
+  username: string;
+  token: string;
+  provider: "github" | "gitlab";
+}
+
+export interface GitRepo {
+  owner: string;
+  repo: string;
+  branch?: string;
+}
+
+export interface GitBranch {
+  name: string;
+  sha: string;
+}
+
+//─────── App Config ───────
+export interface AppConfig {
+  theme: "dark" | "light";
+  responseStyle: "normal" | "short" | "detailed" | "code-focused" | "formal";
+  fontSize: number;
+  accentColor: string;
+  soundEnabled: boolean;
+  guestMode: boolean;
+}
+
+//─────── Project / Workspace ───────
 export interface Project {
   id: string;
   name: string;
-  repoOwner?: string;
-  repoName?: string;
-  branch?: string;
-  provider?: "github" | "gitlab";
-  token?: string;
-  rulesContent?: string;
-  createdAt: number;
+  repo: GitRepo;
+  gitAccountId: string;
 }
 
-export interface ToolDef {
-  type: "function";
-  function: {
-    name: string;
-    description: string;
-    parameters: Record<string, unknown>;
-  };
+//─────── Sub-agent ───────
+export interface SubAgentTask {
+  title: string;
+  instruction: string;
 }
 
-// Repo bağlamı (API route'larda ortak kullanılır)
-export interface RepoCtx {
-  owner: string;
-  repo: string;
-  branch: string;
-  token?: string;
-  provider?: "github" | "gitlab";
+export interface SubAgentResult {
+  title: string;
+  result: string;
+  error?: string;
+}
+
+//─────── MCP ───────
+export interface MCPTool {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+}
+
+//─────── Response style options ───────
+export type ResponseStyle = AppConfig["responseStyle"];
+
+//─────── Prompt context ───────
+export interface PromptContext {
+  skills: Skill[];
+  projectContext: string;
+  platformKnowledge: string;
+  memory: string;
+  systemPrompt: string;
+  responseStyle: ResponseStyle;
 }
