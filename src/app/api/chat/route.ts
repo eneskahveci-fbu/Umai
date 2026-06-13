@@ -50,6 +50,8 @@ interface ChatRequest {
   tools?: boolean;
   webSearch?: boolean;
   requireWriteApproval?: boolean;
+  safeMode?: boolean;
+  toolPermissions?: Record<string, boolean>;
   planApprovalMode?: boolean;
   planApproved?: boolean;
   blockNetworkTools?: boolean;
@@ -721,6 +723,8 @@ interface RoundResult {
   content: string;
   toolCalls: AccumulatedToolCall[];
   finishReason: string | null;
+  /** Sağlayıcının bildirdiği GERÇEK token kullanımı (varsa). */
+  usage: { prompt: number; completion: number } | null;
 }
 
 async function streamRound(
@@ -734,6 +738,7 @@ async function streamRound(
   let content = "";
   const toolCalls: AccumulatedToolCall[] = [];
   let finishReason: string | null = null;
+  let usage: { prompt: number; completion: number } | null = null;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -757,6 +762,15 @@ async function streamRound(
             encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: delta.content } }] })}\n\n`),
           );
         }
+        /* Reasoning/düşünme token'larını da ilet (DeepSeek-R1: reasoning_content,
+           OpenRouter/o-serisi: reasoning). İstemci bunu "Düşünce süreci"
+           panelinde gösterir. */
+        const reasoningDelta: string | undefined = delta?.reasoning ?? delta?.reasoning_content;
+        if (reasoningDelta) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { reasoning: reasoningDelta } }] })}\n\n`),
+          );
+        }
         if (delta?.tool_calls) {
           for (const tc of delta.tool_calls) {
             const idx = tc.index ?? 0;
@@ -771,12 +785,19 @@ async function streamRound(
           }
         }
         if (choice?.finish_reason) finishReason = choice.finish_reason;
+        /* OpenAI-uyumlu akışta usage son chunk'ta gelir (stream_options.include_usage).
+           Anthropic stili: message_delta.usage. İkisini de yakala. */
+        if (json.usage) {
+          const p = Number(json.usage.prompt_tokens ?? json.usage.input_tokens ?? 0);
+          const c = Number(json.usage.completion_tokens ?? json.usage.output_tokens ?? 0);
+          if (p || c) usage = { prompt: p, completion: c };
+        }
       } catch {
         /* parçalı satır */
       }
     }
   }
-  return { content, toolCalls, finishReason };
+  return { content, toolCalls, finishReason, usage };
 }
 
 function friendlyApiError(status: number, rawDetail: string, ctx?: { model?: string; provider?: string }): string {
@@ -832,6 +853,10 @@ export async function POST(req: Request) {
   const model = body.model || process.env.LLM_MODEL || "";
   const apiKey = body.apiKey || process.env.LLM_API_KEY || "";
   const provider = body.provider || "hf";
+
+  /* Anahtar gerektirmeyen ücretsiz/yerel sağlayıcılar. Bunlar için "API anahtarı
+     yok" hatası verme ve boş Authorization header'ı gönderme. */
+  const keyless = provider === "pollinations" || provider === "ollama" || provider === "custom";
 
   if (!model) return new Response("Model seçilmedi.", { status: 400 });
   /* pollinations ve ollama API anahtarı gerektirmez */
@@ -920,7 +945,14 @@ export async function POST(req: Request) {
       `— Silme/yeniden adlandırma YIKICIDIR: delete_file/rename_file yalnızca ÖNERİR, kullanıcı onaylayana kadar gerçekleşmez; buna güvenip 'sildim' deme.\n` +
       `— Aynı dosyayı tekrar okuma; okuduklarını hatırla.\n` +
       `— Karmaşık görevde adım adım ilerle: keşfet → analiz et → değiştir → doğrula.`;
-    if (body.requireWriteApproval) {
+    if (body.safeMode) {
+      sysPrompt +=
+        `\n\n[ÖNEMLİ — Salt-okunur (Güvenli Mod) açık]\n` +
+        `Bu oturumda HİÇBİR değiştirici işlem yapamazsın: dosya yazma/düzenleme, ` +
+        `silme, yeniden adlandırma, dal/PR oluşturma ve komut çalıştırma araçları DEVRE DIŞI. ` +
+        `Yalnızca okuma, arama ve analiz yap. Bir değişiklik gerekiyorsa onu \`\`\`dil:dosya/yolu ` +
+        `kod bloğu olarak ÖNER; kullanıcı Güvenli Mod'u kapatıp kendisi uygular.`;
+    } else if (body.requireWriteApproval) {
       sysPrompt +=
         `\n\n[ÖNEMLİ — Onay modu açık]\n` +
         `Dosyaları DOĞRUDAN YAZMA/commit ETME (write_file/str_replace KULLANMA). ` +
@@ -1014,9 +1046,15 @@ export async function POST(req: Request) {
   let coderTools = CODER_TOOLS;
   if (blockWrites) coderTools = coderTools.filter((t) => t.function.name !== "write_file" && t.function.name !== "str_replace");
   if (planGate) coderTools = coderTools.filter((t) => t.function.name !== "delete_file" && t.function.name !== "rename_file");
+  /* Salt-okunur Güvenli Mod: TÜM değiştirici araçları kaldır (yazma/silme/
+     yeniden adlandırma/dal/PR/komut). Yalnızca okuma+arama kalır. */
+  if (body.safeMode) {
+    const MUTATING_TOOLS = new Set(["write_file", "str_replace", "delete_file", "rename_file", "create_branch", "create_pr", "run_command"]);
+    coderTools = coderTools.filter((t) => !MUTATING_TOOLS.has(t.function.name));
+  }
   /* run_command yalnızca istemcide terminal varsa sunulur (yoksa çıktı gelmez). */
   if (!body.terminalAvailable) coderTools = coderTools.filter((t) => t.function.name !== "run_command");
-  const allTools = [
+  let allTools = [
     ...(body.tools && body.repoCtx ? coderTools : []),
     ...(body.webSearch && !body.blockNetworkTools ? WEB_TOOLS : []),
     ...mcpToolDefs.map((t) => ({
@@ -1024,6 +1062,12 @@ export async function POST(req: Request) {
       function: { name: t.name, description: t.description, parameters: t.parameters },
     })),
   ];
+  /* Granüler izin: kullanıcının açıkça reddettiği (toolPermissions[name] === false)
+     araçlar ajana hiç sunulmaz. Anahtar yoksa veya true ise izinli. */
+  if (body.toolPermissions) {
+    const perms = body.toolPermissions;
+    allTools = allTools.filter((t) => perms[t.function.name] !== false);
+  }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -1032,6 +1076,10 @@ export async function POST(req: Request) {
       const url = `${baseUrl}/chat/completions`;
       /* İstek başına dosya-okuma önbelleği: aynı dosya tekrar çekilmez. */
       const readCache = new Map<string, string>();
+      /* Gerçek token kullanımı: OpenAI-uyumlu sağlayıcılar son chunk'ta usage
+         döndürebilir (stream_options.include_usage). Tüm turlar boyunca topla. */
+      const supportsUsageStream = !["pollinations", "ollama"].includes(provider);
+      const realUsage = { prompt: 0, completion: 0 };
       for (let round = 0; round < MAX_ROUNDS; round++) {
         let upstream: Response;
 
@@ -1045,6 +1093,7 @@ export async function POST(req: Request) {
               stream: true,
               tools: allTools,
               tool_choice: round === MAX_ROUNDS - 1 ? "none" : "auto",
+              ...(supportsUsageStream ? { stream_options: { include_usage: true } } : {}),
               ...sampling,
             }),
           });
@@ -1058,7 +1107,13 @@ export async function POST(req: Request) {
           break;
         }
 
-        const { content, toolCalls, finishReason } = await streamRound(upstream, controller, encoder);
+        const { content, toolCalls, finishReason, usage } = await streamRound(upstream, controller, encoder);
+        if (usage) {
+          /* prompt = en güncel turun bağlam boyutu; completion = turların toplamı. */
+          realUsage.prompt = usage.prompt || realUsage.prompt;
+          realUsage.completion += usage.completion;
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ usage_event: { prompt: realUsage.prompt, completion: realUsage.completion } })}\n\n`));
+        }
 
         if (toolCalls.length === 0 || finishReason === "stop") {
           /* Bitiş nedenini istemciye ilet: "length" ⇒ yanıt token sınırında

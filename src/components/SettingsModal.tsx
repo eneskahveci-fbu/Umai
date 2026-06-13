@@ -22,7 +22,7 @@ import {
   Zap,
 } from "lucide-react";
 import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
-import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS } from "@/lib/constants";
+import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, TOOL_CATALOG } from "@/lib/constants";
 import { calculateCost, formatCost } from "@/lib/pricing";
 import { fetchUserRepos } from "@/lib/github";
 import { fetchGitLabUserRepos } from "@/lib/gitlab";
@@ -706,6 +706,13 @@ export function SettingsModal() {
                     <div className="text-xs text-muted mt-0.5">Editörde yazarken ghost-text önerisi (Tab ile kabul). Aktif modelin API kotasını kullanır.</div>
                   </div>
                 </label>
+                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-amber-400/50 transition-colors">
+                  <input type="checkbox" checked={!!config.safeMode} onChange={() => saveConfig({ ...config, safeMode: !config.safeMode })} className="accent-amber-400 mt-0.5" />
+                  <div>
+                    <div className="text-sm font-semibold">Güvenli Mod (salt-okunur)</div>
+                    <div className="text-xs text-muted mt-0.5">Açıkken ajan HİÇBİR değişiklik yapamaz: yazma, silme, yeniden adlandırma, dal/PR ve komut araçları tamamen devre dışı. Yalnızca okuma, arama ve analiz. Değişiklik gerekirse kod bloğu olarak önerir. Composer&apos;daki ⋯ menüsünden de açılır.</div>
+                  </div>
+                </label>
                 <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
                   <input type="checkbox" checked={!!config.requireWriteApproval} onChange={() => saveConfig({ ...config, requireWriteApproval: !config.requireWriteApproval })} className="accent-brand mt-0.5" />
                   <div>
@@ -746,6 +753,7 @@ export function SettingsModal() {
                     <div className="text-xs text-muted mt-0.5">Açıkken ajan internet araçlarını (web arama / sayfa okuma) kullanamaz. Gizlilik/güvenlik için.</div>
                   </div>
                 </label>
+                <ToolPermissions />
               </div>
             </div>
 
@@ -1002,25 +1010,25 @@ export function SettingsModal() {
               />
             </div>
 
-            {/* Terminal WebSocket sunucusu */}
+            {/* Terminal WebSocket URL */}
             <div>
               <h4 className="text-sm font-bold mb-1">Terminal Sunucusu (WebSocket)</h4>
               <p className="text-xs text-muted/70 mb-2 leading-relaxed">
-                Kendi Linux sunucunu (Render, Oracle Cloud, vb.) bağla.{" "}
+                Kendi Linux sunucunu veya Oracle Cloud ücretsiz VM&apos;ini bağla.{" "}
                 <strong className="text-muted">Boş bırakırsan</strong> WebContainer sandbox kullanılır.
                 <br />
                 Örnek:{" "}
-                <code className="text-brand/80 bg-bgsoft px-1 rounded text-[11px]">wss://craft-terminal.onrender.com?token=ŞİFRE</code>
+                <code className="text-brand/80 bg-bgsoft px-1 rounded text-[11px]">wss://sunucu-ip:7071?token=SIFRE</code>
                 <br />
                 <span className="text-muted/50 text-[11px]">
-                  Sunucu kurulum scripti: depodaki <code className="bg-bgsoft px-1 rounded">terminal-server/</code> klasörü.
+                  Sunucu kurulum scripti: projedeki <code className="bg-bgsoft px-1 rounded">terminal-server/server.js</code>
                 </span>
               </p>
               <input
                 type="text"
                 value={config.terminalWsUrl ?? ""}
                 onChange={(e) => saveConfig({ ...config, terminalWsUrl: e.target.value.trim() })}
-                placeholder="wss://your-server?token=..."
+                placeholder="wss://your-server:7071?token=..."
                 className="input-mono w-full"
                 autoComplete="off"
                 spellCheck={false}
@@ -1230,6 +1238,80 @@ export function SettingsModal() {
             </div>
           </section>
         )}
+      </div>
+    </div>
+  );
+}
+
+/* Granüler araç-izin tablosu: her aracı kategori bazında allow/deny yapar.
+   Reddedilenler (toolPermissions[name] === false) ajana hiç sunulmaz. */
+function ToolPermissions() {
+  const config = useStore((s) => s.config);
+  const saveConfig = useStore((s) => s.saveConfig);
+  const perms = config.toolPermissions ?? {};
+  const isAllowed = (name: string) => perms[name] !== false;
+  const setPerm = (names: string[], allowed: boolean) => {
+    const next = { ...perms };
+    for (const n of names) { if (allowed) delete next[n]; else next[n] = false; }
+    saveConfig({ ...config, toolPermissions: next });
+  };
+
+  const categories: string[] = [];
+  for (const t of TOOL_CATALOG) if (!categories.includes(t.category)) categories.push(t.category);
+  const riskColor: Record<string, string> = { low: "bg-muted/40", medium: "bg-amber-400", high: "bg-red" };
+  const riskLabel: Record<string, string> = { low: "düşük", medium: "orta", high: "yüksek" };
+  const deniedCount = TOOL_CATALOG.filter((t) => !isAllowed(t.name)).length;
+
+  return (
+    <div className="rounded-xl border border-line bg-bgsoft overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-line/60">
+        <div className="flex-1">
+          <div className="text-sm font-semibold">Araç izinleri</div>
+          <div className="text-xs text-muted mt-0.5">
+            Ajanın kullanabileceği araçları tek tek aç/kapat. Kapatılan araç ajana hiç sunulmaz.
+            {deniedCount > 0 && <span className="text-amber-400"> · {deniedCount} araç kapalı</span>}
+          </div>
+        </div>
+        {deniedCount > 0 && (
+          <button
+            onClick={() => saveConfig({ ...config, toolPermissions: {} })}
+            className="text-xs text-brand hover:underline shrink-0"
+          >
+            Tümünü aç
+          </button>
+        )}
+      </div>
+      <div className="divide-y divide-line/40">
+        {categories.map((cat) => {
+          const tools = TOOL_CATALOG.filter((t) => t.category === cat);
+          const allOn = tools.every((t) => isAllowed(t.name));
+          return (
+            <div key={cat} className="px-3 py-2">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted/60 flex-1">{cat}</span>
+                <button
+                  onClick={() => setPerm(tools.map((t) => t.name), !allOn)}
+                  className="text-[10px] text-muted/60 hover:text-brand transition-colors"
+                >
+                  {allOn ? "kategoriyi kapat" : "kategoriyi aç"}
+                </button>
+              </div>
+              <div className="space-y-0.5">
+                {tools.map((t) => {
+                  const on = isAllowed(t.name);
+                  return (
+                    <label key={t.name} className="flex items-center gap-2.5 py-1 cursor-pointer group">
+                      <input type="checkbox" checked={on} onChange={() => setPerm([t.name], !on)} className="accent-brand" />
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${riskColor[t.risk]}`} title={`Risk: ${riskLabel[t.risk]}`} />
+                      <span className={`text-xs flex-1 ${on ? "text-ink" : "text-muted/40 line-through"}`}>{t.label}</span>
+                      <span className="text-[10px] font-mono text-muted/40">{t.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

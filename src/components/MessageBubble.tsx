@@ -22,59 +22,88 @@ import { AGENTS } from "@/lib/agents";
 
 const TOOL_LABEL: Record<string, string> = {
   read_file:          "Dosya okunuyor",
+  read_files:         "Dosyalar okunuyor",
   list_files:         "Dosyalar listeleniyor",
+  glob:               "Dosya aranıyor",
+  grep:               "Kod içeriği aranıyor",
   search_files:       "Dosya yolu aranıyor",
   search_code:        "Kod içeriği aranıyor",
   write_file:         "Dosya yazılıyor",
+  str_replace:        "Dosya düzenleniyor",
+  delete_file:        "Silme önerisi",
+  rename_file:        "Yeniden adlandırma önerisi",
   list_branches:      "Dallar listeleniyor",
   create_branch:      "Dal oluşturuluyor",
   get_commit_history: "Commit geçmişi alınıyor",
   web_search:         "Web'de aranıyor",
   read_url:           "Sayfa okunuyor",
+  dispatch_agents:    "Alt ajanlar çalışıyor",
+  update_plan:        "Plan güncelleniyor",
+  create_pr:          "PR oluşturuluyor",
 };
 
 const TOOL_DONE_LABEL: Record<string, string> = {
   read_file:          "Okundu",
+  read_files:         "Okundu",
   list_files:         "Listelendi",
+  glob:               "Bulundu",
+  grep:               "Arandı",
   search_files:       "Arandı",
   search_code:        "Arandı",
   write_file:         "Yazıldı",
+  str_replace:        "Düzenlendi",
+  delete_file:        "Silme önerildi",
+  rename_file:        "Taşıma önerildi",
   list_branches:      "Listelendi",
   create_branch:      "Oluşturuldu",
   get_commit_history: "Alındı",
   web_search:         "Arandı",
   read_url:           "Okundu",
+  dispatch_agents:    "Tamamlandı",
+  update_plan:        "Plan güncellendi",
+  create_pr:          "PR oluşturuldu",
 };
 
 function ToolIcon({ name, size = 11 }: { name: string; size?: number }) {
   switch (name) {
-    case "read_file":          return <FileText size={size} />;
-    case "list_files":         return <FolderOpen size={size} />;
-    case "search_files":       return <Search size={size} />;
-    case "search_code":        return <Code2 size={size} />;
-    case "write_file":         return <FileText size={size} className="text-green" />;
+    case "read_file":
+    case "read_files":        return <FileText size={size} />;
+    case "list_files":        return <FolderOpen size={size} />;
+    case "glob":
+    case "search_files":      return <Search size={size} />;
+    case "grep":
+    case "search_code":       return <Code2 size={size} />;
+    case "write_file":        return <FileText size={size} className="text-green" />;
+    case "str_replace":       return <Pencil size={size} className="text-brand" />;
     case "list_branches":
-    case "create_branch":      return <GitBranch size={size} />;
-    case "get_commit_history": return <GitCommit size={size} />;
+    case "create_branch":     return <GitBranch size={size} />;
+    case "get_commit_history":return <GitCommit size={size} />;
     case "web_search":
-    case "read_url":           return <Globe size={size} />;
-    default:                   return <Wrench size={size} />;
+    case "read_url":          return <Globe size={size} />;
+    case "dispatch_agents":   return <Loader2 size={size} className="text-purple" />;
+    case "update_plan":       return <ListChecks size={size} className="text-brand" />;
+    default:                  return <Wrench size={size} />;
   }
 }
 
 function getKeyArg(name: string, args: Record<string, unknown>): string {
   switch (name) {
-    case "read_file":   return String(args.path ?? "");
-    case "write_file":  return String(args.path ?? "");
+    case "read_file":
+    case "write_file":
+    case "str_replace":
+    case "delete_file":   return String(args.path ?? "");
+    case "rename_file":   return String(args.path ?? "");
     case "create_branch": return String(args.name ?? "");
+    case "glob":
     case "search_files":
-    case "search_code": return `"${args.query}"${args.extension ? ` (.${args.extension})` : ""}`;
-    case "web_search":  return `"${args.query}"`;
+    case "grep":
+    case "search_code":   return `"${args.query ?? args.pattern ?? ""}"${args.extension ? ` (.${args.extension})` : ""}`;
+    case "web_search":    return `"${args.query}"`;
     case "read_url": {
       const u = String(args.url ?? "");
       try { return new URL(u).hostname; } catch { return u.slice(0, 50); }
     }
-    case "list_files":  return args.filter ? `*${args.filter}*` : "";
+    case "list_files":    return args.filter ? `*${args.filter}*` : "";
     default: return "";
   }
 }
@@ -100,42 +129,40 @@ function ToolCallCard({
 
   return (
     <div className="relative">
-      {/* Vertical timeline connector */}
       {!isLast && (
-        <div className="absolute left-[11px] top-[22px] bottom-0 w-px bg-line/25 pointer-events-none" />
+        <div className="absolute left-[10px] top-[22px] bottom-0 w-px bg-line/20 pointer-events-none" />
       )}
       <div className="flex items-start gap-2.5 py-[3px] min-w-0 group/tool">
-        {/* Status indicator */}
         <div className="shrink-0 mt-0.5 w-5 h-5 flex items-center justify-center">
           {isRunning ? (
-            <Loader2 size={12} className="animate-spin text-brand" />
+            <Loader2 size={11} className="animate-spin text-brand" />
           ) : (
-            <div className="w-4 h-4 rounded-full bg-bgsoft border border-line/60 flex items-center justify-center">
-              <Check size={8} className="text-green/80" strokeWidth={2.5} />
+            <div className="w-4 h-4 rounded-full bg-bgsoft border border-line/50 flex items-center justify-center">
+              <Check size={7} className="text-green/70" strokeWidth={3} />
             </div>
           )}
         </div>
 
         <div className="flex items-center gap-1.5 flex-1 min-w-0 py-0.5">
-          <span className={`shrink-0 ${isRunning ? "text-brand" : "text-muted/50"}`}>
-            <ToolIcon name={call.name} size={12} />
+          <span className={`shrink-0 ${isRunning ? "text-brand" : "text-muted/40"}`}>
+            <ToolIcon name={call.name} size={11} />
           </span>
-          <span className={`text-[11px] font-medium shrink-0 ${isRunning ? "text-ink/80" : "text-muted/60"}`}>
+          <span className={`text-[11px] font-medium shrink-0 ${isRunning ? "text-ink/70" : "text-muted/50"}`}>
             {label}
           </span>
           {keyArg && (
-            <code className={`text-[11px] font-mono truncate min-w-0 ${isRunning ? "text-brand/80" : "text-muted/45"}`}>
+            <code className={`text-[11px] font-mono truncate min-w-0 ${isRunning ? "text-brand/70" : "text-muted/40"}`}>
               {keyArg}
             </code>
           )}
           <div className="ml-auto flex items-center gap-1 shrink-0">
             {elapsed && (
-              <span className="text-[10px] text-muted/35 font-mono tabular-nums">{elapsed}</span>
+              <span className="text-[10px] text-muted/30 font-mono tabular-nums">{elapsed}</span>
             )}
             {call.result && (
               <button
                 onClick={() => setOpen((o) => !o)}
-                className="opacity-0 group-hover/tool:opacity-100 transition-opacity flex items-center gap-0.5 text-[10px] text-muted/45 hover:text-muted/80 px-1.5 py-0.5 rounded hover:bg-bgsoft"
+                className="opacity-0 group-hover/tool:opacity-100 transition-opacity flex items-center gap-0.5 text-[10px] text-muted/40 hover:text-muted/70 px-1 py-0.5 rounded"
               >
                 {open ? <ChevronUp size={9} /> : <ChevronDown size={9} />}
               </button>
@@ -144,8 +171,8 @@ function ToolCallCard({
         </div>
       </div>
       {open && call.result && (
-        <div className="ml-7 mb-1 rounded-lg bg-bgsoft/40 border border-line/25 px-2.5 py-2">
-          <pre className="font-mono text-[10px] text-muted/65 whitespace-pre-wrap break-all max-h-40 overflow-y-auto">
+        <div className="ml-7 mb-1.5 rounded-lg bg-bgsoft/50 border border-line/20 px-2.5 py-2">
+          <pre className="font-mono text-[10px] text-muted/60 whitespace-pre-wrap break-all max-h-36 overflow-y-auto">
             {call.result}
           </pre>
         </div>
@@ -154,7 +181,7 @@ function ToolCallCard({
   );
 }
 
-/* ── Ajan plan paneli (update_plan) ─────────────────────────────────── */
+/* ── Plan paneli (update_plan) ─────────────────────────────────────── */
 
 function PlanPanel({ plan }: { plan: string }) {
   const steps = plan
@@ -171,23 +198,27 @@ function PlanPanel({ plan }: { plan: string }) {
   if (!steps.length) return null;
   const done = steps.filter((s) => s.status === "done").length;
   return (
-    <div className="mb-3 border border-line/60 rounded-xl overflow-hidden bg-bgsoft/40">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-line/40 text-xs">
-        <ListChecks size={13} className="text-brand" />
+    <div className="mb-3 border border-line/50 rounded-xl overflow-hidden bg-bgsoft/30">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-line/30 text-xs">
+        <ListChecks size={12} className="text-brand" />
         <span className="font-semibold">Plan</span>
-        <span className="text-muted/60 font-mono ml-auto">{done}/{steps.length}</span>
+        <span className="text-muted/50 font-mono ml-auto tabular-nums">{done}/{steps.length}</span>
       </div>
-      <div className="px-3 py-2 space-y-1.5">
+      <div className="px-3 py-2.5 space-y-1.5">
         {steps.map((s, i) => (
           <div key={i} className="flex items-start gap-2 text-xs">
             {s.status === "done" ? (
-              <Check size={13} className="text-green shrink-0 mt-0.5" />
+              <Check size={12} className="text-green shrink-0 mt-0.5" />
             ) : s.status === "active" ? (
-              <CircleDot size={13} className="text-brand shrink-0 mt-0.5 animate-pulse" />
+              <CircleDot size={12} className="text-brand shrink-0 mt-0.5 animate-pulse" />
             ) : (
-              <Circle size={13} className="text-muted/40 shrink-0 mt-0.5" />
+              <Circle size={12} className="text-muted/30 shrink-0 mt-0.5" />
             )}
-            <span className={s.status === "done" ? "text-muted/60 line-through" : s.status === "active" ? "text-ink font-medium" : "text-muted/80"}>
+            <span className={
+              s.status === "done" ? "text-muted/50 line-through" :
+              s.status === "active" ? "text-ink font-medium" :
+              "text-muted/70"
+            }>
               {s.text}
             </span>
           </div>
@@ -205,10 +236,9 @@ function ToolCallGroup({ calls }: { calls: NonNullable<ChatMessage["toolCalls"]>
   const [collapsed, setCollapsed] = useState(false);
 
   const headerText = running.length > 0
-    ? `${running.length > 1 ? `${running.length} işlem` : "1 işlem"} çalışıyor…`
+    ? running.length > 1 ? `${running.length} işlem çalışıyor…` : "Çalışıyor…"
     : `${calls.length} işlem tamamlandı`;
 
-  /* Total elapsed time across all finished calls */
   const totalMs = done.reduce((sum, c) => {
     if (c.startedAt && c.endedAt && c.endedAt > c.startedAt) return sum + (c.endedAt - c.startedAt);
     return sum;
@@ -217,65 +247,52 @@ function ToolCallGroup({ calls }: { calls: NonNullable<ChatMessage["toolCalls"]>
     ? totalMs >= 1000 ? (totalMs / 1000).toFixed(1) + "s" : totalMs + "ms"
     : null;
 
-  /* Count reads for cross-file summary */
   const readFiles = calls
     .filter((c) => c.name === "read_file")
     .map((c) => { try { return JSON.parse(c.arguments || "{}").path as string; } catch { return ""; } })
     .filter(Boolean);
 
   return (
-    <div className="mb-3 border border-line/40 rounded-xl overflow-hidden">
+    <div className="mb-3 border border-line/30 rounded-xl overflow-hidden bg-bgsoft/20">
       <button
         onClick={() => { if (running.length === 0) setCollapsed((v) => !v); }}
-        className="w-full flex items-center gap-2 px-3 py-2 bg-bgsoft/30 hover:bg-bgsoft/50 transition-colors text-left"
+        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bgsoft/30 transition-colors text-left"
       >
         {running.length > 0
           ? <Loader2 size={10} className="animate-spin text-brand shrink-0" />
-          : <Check size={10} className="text-green/80 shrink-0" />}
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted/60 flex-1">{headerText}</span>
+          : <Check size={10} className="text-green/60 shrink-0" />}
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted/50 flex-1">{headerText}</span>
         {totalElapsed && (
-          <span className="text-[10px] text-muted/35 font-mono tabular-nums mr-2">{totalElapsed}</span>
+          <span className="text-[10px] text-muted/30 font-mono tabular-nums mr-1">{totalElapsed}</span>
         )}
         {readFiles.length > 1 && running.length === 0 && (
-          <span className="text-[10px] text-muted/35 mr-2">{readFiles.length} dosya</span>
+          <span className="text-[10px] text-muted/30 mr-1">{readFiles.length} dosya</span>
         )}
         {running.length === 0 && (
-          collapsed ? <ChevronRight size={10} className="text-muted/40 shrink-0" /> : <ChevronDown size={10} className="text-muted/40 shrink-0" />
+          collapsed
+            ? <ChevronRight size={10} className="text-muted/30 shrink-0" />
+            : <ChevronDown size={10} className="text-muted/30 shrink-0" />
         )}
       </button>
 
       {!collapsed && (
-        <div className="px-3 pt-1 pb-0.5">
+        <div className="px-3 pt-0.5 pb-1">
           {calls.map((tc, i) => (
             <ToolCallCard key={tc.id} call={tc} isLast={i === calls.length - 1} />
           ))}
         </div>
       )}
 
-      {/* Cross-file reading summary */}
       {!collapsed && readFiles.length > 1 && done.length === calls.length && (
         <div className="px-3 pb-2 flex flex-wrap gap-1">
           {readFiles.map((f) => (
-            <span key={f} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-blue/8 text-blue/70 font-mono">
+            <span key={f} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-blue/8 text-blue/60 font-mono">
               <FileText size={9} /> {f.split("/").pop()}
             </span>
           ))}
         </div>
       )}
     </div>
-  );
-}
-
-/* ── Action button ─────────────────────────────────────────────────── */
-
-function ActionBtn({ onClick, icon, label }: { onClick: () => void; icon: React.ReactNode; label: string }) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-1.5 text-[11px] text-muted hover:text-ink px-2.5 py-1.5 rounded-lg hover:bg-bgsoft transition-colors"
-    >
-      {icon} {label}
-    </button>
   );
 }
 
@@ -300,7 +317,6 @@ export function MessageBubble({
   onContinue?: () => void;
   onEdit?: (index: number, content: string) => void;
   onSwitchVersion?: (branchIndex: number) => void;
-  /** Bu mesaj şu an akıyor (yanıp sönen imleç gösterilir). */
   streamingNow?: boolean;
 }) {
   const isUser = message.role === "user";
@@ -351,56 +367,145 @@ export function MessageBubble({
 
   const agent = message.agentId ? AGENTS.find((a) => a.id === message.agentId) : null;
 
+  /* ── USER BUBBLE ─────────────────────────────────────────────────── */
+  if (isUser) {
+    return (
+      <div className="group/msg flex justify-end gap-2.5 py-2.5 animate-fade-in">
+        <div className="flex flex-col items-end gap-1.5 max-w-[80%]">
+          {/* Images */}
+          {message.images?.map((img, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={i}
+              src={img}
+              alt=""
+              className="max-w-[260px] max-h-[200px] object-contain rounded-2xl border border-line/60 shadow-sm"
+            />
+          ))}
+
+          {editing ? (
+            <div className="flex flex-col gap-2 w-full">
+              <textarea
+                ref={taRef}
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                className="w-full bg-surface border border-line rounded-2xl p-3 text-sm resize-none outline-none focus:border-brand/50 min-h-[60px]"
+                rows={3}
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setEditing(false)}
+                  className="text-xs px-3 py-1.5 rounded-xl border border-line text-muted hover:text-ink transition-colors"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={submitEdit}
+                  className="text-xs px-3.5 py-1.5 rounded-xl bg-brand text-[#111110] font-semibold hover:bg-branddim transition-colors"
+                >
+                  Gönder
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="relative group/bubble">
+              <div className="user-bubble px-4 py-2.5 rounded-2xl rounded-br-sm text-[15px] leading-relaxed whitespace-pre-wrap">
+                {message.content}
+              </div>
+              {/* Hover actions */}
+              <div className="flex items-center gap-0.5 mt-1.5 justify-end [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 transition-opacity duration-150">
+                <button onClick={copyMessage} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink px-2 py-1 rounded-lg hover:bg-bgsoft transition-colors">
+                  {copied ? <Check size={11} /> : <Copy size={11} />}
+                </button>
+                {onEdit && (
+                  <button onClick={startEdit} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink px-2 py-1 rounded-lg hover:bg-bgsoft transition-colors">
+                    <Pencil size={11} />
+                  </button>
+                )}
+                {onSwitchVersion && message.branches && message.branches.length > 1 && (
+                  <div className="flex items-center gap-0.5 text-[11px] text-muted/50">
+                    <button
+                      onClick={() => onSwitchVersion(Math.max(0, (message.branchIndex ?? 0) - 1))}
+                      disabled={(message.branchIndex ?? 0) === 0}
+                      className="p-0.5 rounded hover:bg-bgsoft disabled:opacity-30 transition-colors"
+                    >
+                      <ChevronLeft size={12} />
+                    </button>
+                    <span className="font-mono tabular-nums text-[10px]">
+                      {(message.branchIndex ?? 0) + 1}/{message.branches.length}
+                    </span>
+                    <button
+                      onClick={() => onSwitchVersion(Math.min(message.branches!.length - 1, (message.branchIndex ?? 0) + 1))}
+                      disabled={(message.branchIndex ?? 0) === message.branches.length - 1}
+                      className="p-0.5 rounded hover:bg-bgsoft disabled:opacity-30 transition-colors"
+                    >
+                      <ChevronRight size={12} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* User avatar */}
+        <div className="shrink-0 w-7 h-7 rounded-full bg-blue/75 text-white grid place-items-center text-[11px] font-bold self-end mb-0.5 shadow-sm">
+          S
+        </div>
+      </div>
+    );
+  }
+
+  /* ── ASSISTANT BUBBLE ────────────────────────────────────────────── */
   return (
-    <div className="group/msg flex gap-3.5 py-5 animate-fade-in">
-      <div
-        className={`shrink-0 w-8 h-8 rounded-xl grid place-items-center text-sm font-bold shadow-sm ${
-          isUser ? "bg-blue/90 text-white" : "bg-brand/10 border border-brand/25 text-brand"
-        }`}
-      >
-        {isUser ? "S" : "✦"}
+    <div className="group/msg flex gap-3 py-3 animate-fade-in">
+      {/* Avatar */}
+      <div className="shrink-0 w-7 h-7 rounded-full bg-bgsoft border border-brand/20 grid place-items-center text-brand text-sm mt-0.5 shadow-sm">
+        ✦
       </div>
 
       <div className="flex-1 min-w-0 pt-0.5">
 
-        {/* Agent + model badge row */}
-        {!isUser && agent && (
+        {/* Agent badge */}
+        {agent && (
           <div className="flex items-center gap-2 mb-2">
-            <span className="inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-md bg-brand/10 border border-brand/25 text-brand/90 font-mono">
+            <span className="inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-md bg-brand/10 border border-brand/20 text-brand/80 font-mono">
               <span>{agent.icon}</span>
               <span className="font-semibold">{agent.label}</span>
             </span>
           </div>
         )}
 
-        {/* Ajan plan paneli */}
+        {/* Plan */}
         {message.plan && <PlanPanel plan={message.plan} />}
 
-        {/* Thinking block */}
+        {/* Thinking */}
         {message.thinking && (
-          <div className="mb-3 border border-brand/20 rounded-xl overflow-hidden bg-brand/4">
+          <div className="mb-3 border border-brand/15 rounded-xl overflow-hidden bg-brand/5">
             <button
               onClick={() => setThinkingOpen((o) => !o)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-brand/80 hover:text-brand transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-brand/70 hover:text-brand/90 transition-colors"
             >
               <Brain size={12} />
               <span className="font-semibold">Düşünce süreci</span>
-              {thinkingOpen ? <ChevronDown size={11} className="ml-auto" /> : <ChevronRight size={11} className="ml-auto" />}
+              {thinkingOpen
+                ? <ChevronDown size={11} className="ml-auto opacity-60" />
+                : <ChevronRight size={11} className="ml-auto opacity-60" />}
             </button>
             {thinkingOpen && (
-              <div className="px-3 pb-3 text-[11px] text-muted/70 font-mono whitespace-pre-wrap leading-relaxed border-t border-brand/10 pt-2">
+              <div className="px-3 pb-3 text-[11px] text-muted/60 font-mono whitespace-pre-wrap leading-relaxed border-t border-brand/10 pt-2">
                 {message.thinking}
               </div>
             )}
           </div>
         )}
 
-        {/* Tool call group — Claude Code style activity tracker */}
+        {/* Tool calls */}
         {message.toolCalls?.length ? (
           <ToolCallGroup calls={message.toolCalls} />
         ) : null}
 
-        {/* Images — arbitrary user/data-URI sources, so next/image isn't suitable */}
+        {/* Images */}
         {message.images?.map((img, i) => (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -412,37 +517,7 @@ export function MessageBubble({
         ))}
 
         {/* Content */}
-        {isUser ? (
-          editing ? (
-            <div className="flex flex-col gap-2">
-              <textarea
-                ref={taRef}
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-                className="w-full bg-bgsoft border border-line rounded-xl p-3 text-sm resize-none outline-none focus:border-brand min-h-[60px]"
-                rows={3}
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={submitEdit}
-                  className="text-xs px-3.5 py-1.5 rounded-lg bg-brand text-[#111110] font-semibold hover:bg-branddim transition-colors"
-                >
-                  Gönder
-                </button>
-                <button
-                  onClick={() => setEditing(false)}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-line text-muted hover:text-ink transition-colors"
-                >
-                  İptal
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="whitespace-pre-wrap leading-relaxed text-[15px]">
-              {message.content}
-            </div>
-          )
-        ) : message.content ? (
+        {message.content ? (
           <div className="prose-chat">
             <ReactMarkdown
               remarkPlugins={[remarkGfm, remarkMath]}
@@ -457,94 +532,76 @@ export function MessageBubble({
           <span className="caret" />
         )}
 
-        {/* Kesilme şeridi: yanıt token sınırında kesildi → tek tıkla aynı
-            baloncuk içinden sürdür (otomatik devam kapalıysa / tükendiyse) */}
-        {!isUser && !streamingNow && message.finishReason === "length" && onContinue && (
-          <div className="mt-2.5 flex items-center gap-2 px-3 py-2 rounded-xl border border-amber-400/25 bg-amber-400/5 text-xs animate-fade-in">
-            <ChevronRight size={13} className="text-amber-400 shrink-0" />
-            <span className="text-muted flex-1 min-w-0">Yanıt token sınırında kesildi.</span>
+        {/* Token limit cut-off strip */}
+        {!streamingNow && message.finishReason === "length" && onContinue && (
+          <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl border border-amber-400/20 bg-amber-400/5 text-xs animate-fade-in">
+            <ChevronRight size={12} className="text-amber-400/70 shrink-0" />
+            <span className="text-muted/60 flex-1 min-w-0">Yanıt token sınırında kesildi.</span>
             <button
               onClick={onContinue}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-400/10 text-amber-400 hover:bg-amber-400/20 font-semibold transition-colors shrink-0"
             >
-              <ChevronRight size={12} /> Devam et
+              <ChevronRight size={11} /> Devam et
             </button>
           </div>
         )}
 
-        {/* Action buttons */}
-        {message.content && !editing && (
-          <div className="flex items-center gap-0.5 mt-2.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 transition-opacity duration-200">
-            <ActionBtn onClick={copyMessage} icon={copied ? <Check size={13} /> : <Copy size={13} />} label={copied ? "Kopyalandı" : "Kopyala"} />
-            {isUser && onEdit && (
-              <ActionBtn onClick={startEdit} icon={<Pencil size={13} />} label="Düzenle" />
-            )}
-            {isUser && onSwitchVersion && message.branches && message.branches.length > 1 && (
-              <div className="flex items-center gap-0.5 text-[11px] text-muted/70">
-                <button
-                  onClick={() => onSwitchVersion(Math.max(0, (message.branchIndex ?? 0) - 1))}
-                  disabled={(message.branchIndex ?? 0) === 0}
-                  className="p-0.5 rounded hover:bg-bgsoft disabled:opacity-30 transition-colors"
-                  title="Önceki sürüm"
-                >
-                  <ChevronLeft size={13} />
-                </button>
-                <span className="font-mono tabular-nums">{(message.branchIndex ?? 0) + 1}/{message.branches.length}</span>
-                <button
-                  onClick={() => onSwitchVersion(Math.min(message.branches!.length - 1, (message.branchIndex ?? 0) + 1))}
-                  disabled={(message.branchIndex ?? 0) === message.branches.length - 1}
-                  className="p-0.5 rounded hover:bg-bgsoft disabled:opacity-30 transition-colors"
-                  title="Sonraki sürüm"
-                >
-                  <ChevronRight size={13} />
-                </button>
-              </div>
-            )}
+        {/* Action row */}
+        {message.content && (
+          <div className="flex items-center gap-0.5 mt-2 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 transition-opacity duration-150">
+            <button onClick={copyMessage} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink px-2 py-1.5 rounded-lg hover:bg-bgsoft transition-colors">
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+              <span>{copied ? "Kopyalandı" : "Kopyala"}</span>
+            </button>
             {showRegenerate && onRegenerate && (
-              <ActionBtn onClick={onRegenerate} icon={<RefreshCw size={13} />} label="Yeniden" />
+              <button onClick={onRegenerate} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink px-2 py-1.5 rounded-lg hover:bg-bgsoft transition-colors">
+                <RefreshCw size={12} /><span>Yeniden</span>
+              </button>
             )}
             {showRegenerate && onContinue && (
-              <ActionBtn onClick={onContinue} icon={<ChevronRight size={13} />} label="Devam et" />
+              <button onClick={onContinue} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink px-2 py-1.5 rounded-lg hover:bg-bgsoft transition-colors">
+                <ChevronRight size={12} /><span>Devam</span>
+              </button>
             )}
-            {!isUser && chatId && (
+
+            {chatId && (
               <>
-                <div className="w-px h-3.5 bg-line/60 mx-0.5" />
+                <div className="w-px h-3 bg-line/50 mx-0.5" />
                 <button
                   onClick={() => rateMessage(chatId, index, message.rating === "up" ? null : "up")}
-                  className={`flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg transition-colors ${message.rating === "up" ? "text-green-400 bg-green-400/10" : "text-muted hover:text-green-400 hover:bg-bgsoft"}`}
+                  className={`p-1.5 rounded-lg transition-colors ${message.rating === "up" ? "text-green bg-green/10" : "text-muted/40 hover:text-green hover:bg-bgsoft"}`}
                   title="Beğen"
                 >
                   <ThumbsUp size={12} />
                 </button>
                 <button
                   onClick={() => rateMessage(chatId, index, message.rating === "down" ? null : "down")}
-                  className={`flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg transition-colors ${message.rating === "down" ? "text-red/80 bg-red/10" : "text-muted hover:text-red/80 hover:bg-bgsoft"}`}
+                  className={`p-1.5 rounded-lg transition-colors ${message.rating === "down" ? "text-red bg-red/10" : "text-muted/40 hover:text-red hover:bg-bgsoft"}`}
                   title="Beğenme"
                 >
                   <ThumbsDown size={12} />
                 </button>
-                <div className="w-px h-3.5 bg-line/60 mx-0.5" />
+                <div className="w-px h-3 bg-line/50 mx-0.5" />
                 <button
                   onClick={openSkillSave}
-                  className="flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg transition-colors text-muted hover:text-brand hover:bg-bgsoft"
+                  className="flex items-center gap-1 text-[11px] text-muted/40 hover:text-brand hover:bg-bgsoft px-2 py-1.5 rounded-lg transition-colors"
                   title="Skill olarak kaydet"
                 >
                   <BookMarked size={12} />
-                  <span>Skill</span>
                 </button>
               </>
             )}
           </div>
         )}
 
-        {/* Skill save mini-modal */}
+        {/* Skill save mini-form */}
         {skillSaveOpen && (
-          <div className="mt-3 border border-brand/25 bg-brand/5 rounded-xl p-3 space-y-2">
+          <div className="mt-3 border border-brand/20 bg-brand/5 rounded-xl p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-brand flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold text-brand/80 flex items-center gap-1.5">
                 <BookMarked size={11} /> Skill olarak kaydet
               </span>
-              <button onClick={() => setSkillSaveOpen(false)} className="text-muted hover:text-ink transition-colors">
+              <button onClick={() => setSkillSaveOpen(false)} className="text-muted/50 hover:text-ink transition-colors">
                 <X size={12} />
               </button>
             </div>

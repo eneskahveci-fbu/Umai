@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { File } from "lucide-react";
 
-interface MentionItem { path: string; }
+interface MentionItem { path: string; attached?: boolean; }
 
 interface Props {
   query: string;
@@ -53,7 +53,7 @@ export function MentionMenu({ query, items, onSelect, onClose }: Props) {
   return (
     <div className="absolute bottom-full mb-2 left-3 right-3 max-h-60 overflow-y-auto bg-surface border border-line rounded-2xl shadow-2xl shadow-black/40 z-40 animate-fade-in">
       <div className="px-3 py-2 border-b border-line/40 text-[10px] uppercase tracking-widest text-muted/60 font-bold">
-        Eklenmiş dosyalar
+        Dosya ekle (@)
       </div>
       {filtered.map((item, i) => (
         <button
@@ -65,9 +65,12 @@ export function MentionMenu({ query, items, onSelect, onClose }: Props) {
           }`}
         >
           <File size={12} className={`shrink-0 ${i === active ? "text-brand" : "text-muted/50"}`} />
-          <span className={`text-xs font-mono truncate ${i === active ? "text-brand" : "text-ink"}`}>
+          <span className={`flex-1 min-w-0 text-xs font-mono truncate ${i === active ? "text-brand" : "text-ink"}`}>
             {item.path}
           </span>
+          {item.attached && (
+            <span className="shrink-0 text-[9px] uppercase tracking-wider text-green/80 font-bold">ekli</span>
+          )}
         </button>
       ))}
     </div>

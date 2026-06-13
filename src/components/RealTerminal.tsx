@@ -23,13 +23,13 @@ function codespaceUrl(owner: string, repo: string, branch?: string): string {
 type Status = "idle" | "booting" | "ready" | "error" | "needs-key";
 
 /* ── WebSocket PTY mode ─────────────────────────────────────────────
-   Uzak terminal-server'a bağlanır (ws/wss URL).
-   Protokol: istemci → {type:"input",data} | {type:"resize",cols,rows}
-             sunucu  → {type:"output",data} */
+   Connects to a remote terminal-server (ws/wss URL).
+   Protocol: client sends JSON {type:"input",data:"..."} | {type:"resize",cols,rows}
+             server sends JSON {type:"output",data:"..."} ── */
 async function bootWsTerminal(
   containerEl: HTMLDivElement,
   wsUrl: string,
-  isLight: boolean,
+  appTheme: "dark" | "light",
   onReady: () => void,
   onError: (msg: string) => void,
 ): Promise<() => void> {
@@ -39,6 +39,7 @@ async function bootWsTerminal(
   ]);
   await import("@xterm/xterm/css/xterm.css");
 
+  const isLight = appTheme === "light";
   const term = new Terminal({
     convertEol: true, cursorBlink: true,
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
@@ -55,7 +56,6 @@ async function bootWsTerminal(
   fit.fit();
 
   const ws = new WebSocket(wsUrl);
-  let outputBuffer = "";
 
   ws.onopen = () => {
     ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
@@ -69,11 +69,7 @@ async function bootWsTerminal(
   ws.onmessage = (ev) => {
     try {
       const msg = JSON.parse(ev.data as string) as { type: string; data?: string };
-      if (msg.type === "output" && msg.data) {
-        term.write(msg.data);
-        outputBuffer += msg.data;
-        if (outputBuffer.length > 4000) outputBuffer = outputBuffer.slice(-4000);
-      }
+      if (msg.type === "output" && msg.data) term.write(msg.data);
     } catch { term.write(ev.data as string); }
   };
 
@@ -90,7 +86,19 @@ async function bootWsTerminal(
   const ro = new ResizeObserver(resize);
   ro.observe(containerEl);
 
-  /* AI komut çalıştırma köprüsü */
+  /* AI run-command bridge */
+  let outputBuffer = "";
+  const origOnMsg = ws.onmessage;
+  ws.onmessage = (ev) => {
+    origOnMsg?.call(ws, ev);
+    try {
+      const msg = JSON.parse(ev.data as string) as { type: string; data?: string };
+      if (msg.type === "output" && msg.data) {
+        outputBuffer += msg.data;
+        if (outputBuffer.length > 4000) outputBuffer = outputBuffer.slice(-4000);
+      }
+    } catch { /* ignore */ }
+  };
   const handleRunCmd = (e: Event) => {
     const cmd = (e as CustomEvent<{ command: string }>).detail?.command;
     if (!cmd || ws.readyState !== WebSocket.OPEN) return;
@@ -111,11 +119,11 @@ async function bootWsTerminal(
   };
 }
 
-/* ── WebContainer mode ─────────────────────────────────────────────── */
+/* ── WebContainer mode (mevcut) ─────────────────────────────────── */
 async function bootWcTerminal(
   containerEl: HTMLDivElement,
   apiKey: string,
-  isLight: boolean,
+  appTheme: "dark" | "light",
   onReady: () => void,
   onError: (msg: string) => void,
   onNeedsKey: () => void,
@@ -129,6 +137,7 @@ async function bootWcTerminal(
   ]);
   await import("@xterm/xterm/css/xterm.css");
 
+  const isLight = appTheme === "light";
   const term = new Terminal({
     convertEol: true, cursorBlink: true,
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
@@ -201,6 +210,8 @@ async function bootWcTerminal(
   };
 }
 
+/* ── Component ─────────────────────────────────────────────────────── */
+
 export function RealTerminal({ onClose }: { onClose: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<Status>("idle");
@@ -229,16 +240,15 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
     if (!containerRef.current) return;
     setStatus("booting");
     setErrMsg("");
-    const isLight = appThemeRef.current === "light";
     try {
       const cleanup = useWs
         ? await bootWsTerminal(
-            containerRef.current, wsUrl, isLight,
+            containerRef.current, wsUrl, appThemeRef.current,
             () => setStatus("ready"),
             (msg) => { setStatus("error"); setErrMsg(msg); },
           )
         : await bootWcTerminal(
-            containerRef.current, apiKey, isLight,
+            containerRef.current, apiKey, appThemeRef.current,
             () => setStatus("ready"),
             (msg) => { setStatus("error"); setErrMsg(msg); },
             () => setStatus("needs-key"),
@@ -251,7 +261,6 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     boot();
     return () => { cleanupRef.current?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -297,13 +306,14 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
       className="h-64 shrink-0 border-t border-line/60 flex flex-col"
       style={{ backgroundColor: appTheme === "light" ? "#211d16" : "#0e0d0a" }}
     >
+      {/* Terminal toolbar */}
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-line/30 bg-black/20 shrink-0">
         <Power size={11} className={
           status === "ready" ? "text-green" :
           status === "booting" ? "text-amber-400 animate-pulse" :
           status === "error" ? "text-red" : "text-white/30"
         } />
-        <span className="text-[11px] font-mono text-white/50 truncate max-w-[150px]">
+        <span className="text-[11px] font-mono text-white/50 truncate max-w-[140px]">
           {modeLabel} · {
             status === "ready" ? "hazır" :
             status === "booting" ? "bağlanıyor…" :
@@ -326,7 +336,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
             href={codespaceHref}
             target="_blank"
             rel="noopener noreferrer"
-            title={`GitHub Codespaces'te aç (${repo!.owner}/${repo!.repo})`}
+            title={`GitHub Codespaces'te aç — ${repo!.owner}/${repo!.repo}`}
             className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors"
           >
             <Cloud size={11} />
@@ -343,20 +353,10 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
             {mounting ? <Loader2 size={11} className="animate-spin" /> : <FolderOpen size={11} />}
           </button>
         )}
-        <button
-          onClick={() => setSettingsOpen(true)}
-          aria-label="Terminal ayarları"
-          title="Terminal ayarları"
-          className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors"
-        >
+        <button onClick={() => setSettingsOpen(true)} title="Terminal ayarları" className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors">
           <SettingsIcon size={11} />
         </button>
-        <button
-          onClick={restart}
-          aria-label="Terminali yeniden başlat"
-          title="Yeniden başlat"
-          className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors"
-        >
+        <button onClick={restart} title="Yeniden başlat" className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors">
           <RefreshCw size={11} />
         </button>
         <button onClick={onClose} title="Kapat" className="text-white/40 hover:text-white/80 p-1 rounded transition-colors">
@@ -364,17 +364,18 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
+      {/* Status overlays */}
       {status === "needs-key" && (
         <div className="flex-1 grid place-items-center px-6">
           <div className="text-center max-w-md">
-            <p className="text-xs font-semibold text-white/80 mb-2">WebContainer API key gerekli</p>
+            <p className="text-xs font-semibold text-white/80 mb-1.5">WebContainer API key gerekli</p>
             <p className="text-[11px] text-white/40 leading-relaxed mb-3">
               Bu domain&apos;de terminal çalışmak için ücretsiz bir key istiyor.{" "}
               <a href="https://webcontainer.io/enterprise" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
                 webcontainer.io
               </a>
-              {" "}→ Ayarlar → Gelişmiş.{" "}
-              <strong className="text-white/60">Ya da kendi sunucunu bağla (Ayarlar → Terminal Sunucusu).</strong>
+              {" "}üzerinden al → Ayarlar → Gelişmiş.{" "}
+              <strong className="text-white/60">Ya da kendi sunucunu bağla (Ayarlar → Terminal).</strong>
             </p>
             <div className="flex items-center justify-center gap-2 flex-wrap">
               <button onClick={() => setSettingsOpen(true)} className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-white hover:bg-branddim transition-colors font-semibold">
@@ -385,9 +386,6 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
                   <Cloud size={11} /> Codespaces&apos;te aç
                 </a>
               )}
-              <button onClick={restart} className="text-[11px] px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 transition-colors text-white/60">
-                Tekrar dene
-              </button>
             </div>
           </div>
         </div>
@@ -396,7 +394,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
       {status === "error" && (
         <div className="flex-1 grid place-items-center px-6">
           <div className="text-center max-w-md">
-            <p className="text-xs text-red mb-2">Terminal başlatılamadı</p>
+            <p className="text-xs text-red mb-1.5">Terminal başlatılamadı</p>
             <p className="text-[11px] text-white/40 leading-relaxed mb-3">{errMsg}</p>
             <div className="flex items-center justify-center gap-2 flex-wrap">
               {useWs ? (

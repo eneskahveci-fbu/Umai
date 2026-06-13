@@ -17,6 +17,8 @@ import {
   FolderGit2,
   FolderOpen,
   Folder,
+  Circle,
+  CircleCheck,
   GitPullRequest,
   Globe,
   MoreHorizontal,
@@ -33,6 +35,8 @@ import {
   Trash2,
   Square,
   Terminal,
+  DollarSign,
+  ShieldCheck,
   VenetianMask,
   Wrench,
   X,
@@ -929,6 +933,8 @@ export function CoderView() {
     const priorLen = isContinuation ? (lastMsg?.content.length ?? 0) : 0;
     let full = isContinuation ? (lastMsg?.content ?? "") : ""; // try/catch ortak erişimi
     let cutAtLength = false; // finish_event: "length" ⇒ otomatik devam tetiklenebilir
+    let realUsage: { prompt: number; completion: number } | null = null; // sağlayıcı gerçek token
+    let thinkingFull = ""; // reasoning delta'ları birikir
     try {
       const allEnabledSkills = (store.config.skills ?? []).filter((s) => s.enabled);
       /* Relevance scoring: compare skill text against the last user message.
@@ -967,6 +973,8 @@ export function CoderView() {
           tools: toolsEnabled,
           webSearch: searchOnRef.current,
           requireWriteApproval: store.config.requireWriteApproval,
+          safeMode: store.config.safeMode,
+          toolPermissions: store.config.toolPermissions,
           planApprovalMode: store.config.planApprovalMode,
           planApproved: planApprovedRef.current,
           blockNetworkTools: store.config.blockNetworkTools,
@@ -1140,6 +1148,13 @@ export function CoderView() {
               useStore.getState().setFinishReasonOnLast(reason && reason !== "stop" ? reason : undefined);
               continue;
             }
+            /* Sağlayıcının bildirdiği GERÇEK token kullanımı → tahmini ezer. */
+            if (parsed.usage_event) {
+              const p = Number(parsed.usage_event.prompt) || 0;
+              const c = Number(parsed.usage_event.completion) || 0;
+              if (p || c) realUsage = { prompt: p, completion: c };
+              continue;
+            }
             /* checkpoint: ajan bir dosyayı değiştirdi → eski içeriği sakla (geri al).
                previous === null ⇒ dosya bu turda oluşturuldu (geri al = sil). */
             if (parsed.checkpoint_event) {
@@ -1176,7 +1191,7 @@ export function CoderView() {
             }
             const delta = parsed.choices?.[0]?.delta?.content ?? "";
             const reasoning = (parsed.choices?.[0]?.delta as Record<string, unknown>)?.reasoning as string | undefined;
-            if (reasoning) useStore.getState().updateLastThinking(reasoning);
+            if (reasoning) { thinkingFull += reasoning; useStore.getState().updateLastThinking(thinkingFull); }
             if (delta) { full += delta; useStore.getState().updateLastContent(full); }
           } catch { /* parçalı satır */ }
         }
@@ -1238,10 +1253,17 @@ export function CoderView() {
         }
       }
 
-      /* token tahmini (devamda yalnızca yeni üretilen kısım sayılır) */
-      const inputText = apiMessages.map((m) => typeof m.content === "string" ? m.content : "").join("\n");
-      const tokenIn = estimateTokens(inputText) + estimateTokens(coderSystemPrompt);
-      const tokenOut = estimateTokens(full.slice(priorLen));
+      /* Token: sağlayıcı gerçek usage döndürdüyse onu kullan (kesin); yoksa
+         karakter-tabanlı tahmine düş. */
+      let tokenIn: number, tokenOut: number;
+      if (realUsage) {
+        tokenIn = realUsage.prompt;
+        tokenOut = realUsage.completion;
+      } else {
+        const inputText = apiMessages.map((m) => typeof m.content === "string" ? m.content : "").join("\n");
+        tokenIn = estimateTokens(inputText) + estimateTokens(coderSystemPrompt);
+        tokenOut = estimateTokens(full.slice(priorLen));
+      }
       useStore.getState().updateLastTokens(tokenIn, tokenOut);
       /* geri-al noktalarını mesaja yaz → persistCurrent ile sohbetle kaydedilir,
          sayfa yenilense bile son turun "Geri Al" imkânı kaybolmaz */
@@ -1675,6 +1697,10 @@ export function CoderView() {
                           />
                         </div>
                       )}
+                      {/* Canlı görev paneli — her modda, akış sırasında da görünür. */}
+                      {isLastAssistant && m.plan && (
+                        <TaskPanel plan={m.plan} streaming={streaming} />
+                      )}
                       {isLastAssistant && !streaming && config.planApprovalMode && m.plan && (
                         <div className="ml-11 max-w-2xl mt-2 flex items-center gap-2 px-3 py-2 rounded-xl border border-brand/30 bg-brand/5 text-xs">
                           <ListChecks size={13} className="text-brand shrink-0" />
@@ -1758,11 +1784,11 @@ export function CoderView() {
                   );
                 })}
                 {streaming && messages[messages.length - 1]?.content === "" && (
-                  <div className="flex gap-3 py-4">
-                    <div className="shrink-0 w-8 h-8 rounded-lg bg-brand/15 border border-brand/25 grid place-items-center">
-                      <Code2 size={14} className="text-brand" />
+                  <div className="flex gap-3 py-3 animate-fade-in">
+                    <div className="shrink-0 w-7 h-7 rounded-full bg-bgsoft border border-brand/20 grid place-items-center text-brand text-sm mt-0.5 shadow-sm">
+                      ✦
                     </div>
-                    <div className="flex items-center gap-1 pt-2">
+                    <div className="flex items-center gap-1 pt-2.5">
                       <span className="typing-dot" />
                       <span className="typing-dot delay-1" />
                       <span className="typing-dot delay-2" />
@@ -1837,11 +1863,16 @@ export function CoderView() {
                 />
               )}
 
-              {/* Mention menu */}
-              {mentionOpen && attachedFiles.length > 0 && (
+              {/* Mention menu — ekli dosyalar + tüm proje ağacı */}
+              {mentionOpen && (attachedFiles.length > 0 || allFiles.length > 0) && (
                 <MentionMenu
                   query={mentionQuery}
-                  items={attachedFiles.map((f) => ({ path: f.path }))}
+                  items={[
+                    ...attachedFiles.map((f) => ({ path: f.path, attached: true })),
+                    ...allFiles
+                      .filter((f) => !attachedFiles.some((a) => a.path === f.path))
+                      .map((f) => ({ path: f.path, attached: false })),
+                  ]}
                   onSelect={(item) => {
                     const ta = taRef.current;
                     if (!ta) return;
@@ -1853,6 +1884,12 @@ export function CoderView() {
                     const newText = before.slice(0, atIdx) + `@${item.path} ` + after;
                     setInput(newText);
                     setMentionOpen(false);
+                    /* Henüz ekli değilse repo dosyasının içeriğini çekip ekle ki
+                       model dosyayı bağlamda görsün. */
+                    if (!item.attached) {
+                      const repoFile = allFiles.find((f) => f.path === item.path);
+                      if (repoFile) void attachRepoFile(repoFile);
+                    }
                     setTimeout(() => {
                       ta.focus();
                       const newPos = atIdx + item.path.length + 2;
@@ -1928,7 +1965,7 @@ export function CoderView() {
                     if (slashMatch) { setSlashQuery(slashMatch[2]); setSlashOpen(true); }
                     else setSlashOpen(false);
                     const mentionMatch = before.match(/(^|\s)@(\S*)$/);
-                    if (mentionMatch && attachedFiles.length > 0) {
+                    if (mentionMatch && (attachedFiles.length > 0 || allFiles.length > 0)) {
                       setMentionQuery(mentionMatch[2]); setMentionOpen(true);
                     } else setMentionOpen(false);
                   }}
@@ -1999,8 +2036,14 @@ export function CoderView() {
                     <Wrench size={13} />
                     <span>Tools</span>
                   </ComposerButton>
-                  <MoreMenu active={!!artifact || !!activeAgent || searchOn}>
+                  <MoreMenu active={!!artifact || !!activeAgent || searchOn || !!config.safeMode}>
                     <MoreItem icon={<Globe size={14} />} label="Web arama" active={searchOn} onClick={() => setSearchOn(!searchOn)} />
+                    <MoreItem
+                      icon={<ShieldCheck size={14} />}
+                      label="Güvenli Mod (salt-okunur)"
+                      active={!!config.safeMode}
+                      onClick={() => useStore.getState().saveConfig({ ...config, safeMode: !config.safeMode })}
+                    />
                     <MoreItem icon={<ImageIcon size={14} />} label="Görsel ekle" onClick={() => imgRef.current?.click()} />
                     <MoreItem
                       icon={<Palette size={14} />}
@@ -2040,6 +2083,11 @@ export function CoderView() {
                 </div>
 
                 <div className="flex items-center gap-1.5 text-[11px] text-muted/50 shrink-0">
+                  {config.safeMode && (
+                    <span className="flex items-center gap-1 text-amber-400 font-medium" title="Salt-okunur: ajan hiçbir değişiklik yapamaz">
+                      <ShieldCheck size={12} /> Güvenli
+                    </span>
+                  )}
                   {searchOn && <span className="text-brand font-medium">Web</span>}
                   {toolsEnabled && <span className="text-green/80 font-medium">Tools</span>}
                   {activeAgent && <span className="text-brand font-medium">{activeAgent.command}</span>}
@@ -2139,48 +2187,241 @@ function getTreeItems(node: import("@/lib/types").TreeNode): { path: string; typ
 }
 
 /* ── Token + cost rozeti ── */
+/* Canlı görev paneli — update_plan'in yazdığı [ ]/[~]/[x] listesini ikonlu
+   checklist olarak gösterir; akış sırasında gerçek zamanlı güncellenir. */
+type TaskStatus = "todo" | "doing" | "done";
+function parsePlan(plan: string): { status: TaskStatus; text: string }[] {
+  return plan
+    .split("\n")
+    .map((line) => {
+      const m = line.match(/^\s*(?:[-*]\s*)?\[([ ~xX])\]\s*(.*)$/);
+      if (!m) return null;
+      const mark = m[1].toLowerCase();
+      const status: TaskStatus = mark === "x" ? "done" : mark === "~" ? "doing" : "todo";
+      return { status, text: m[2].trim() };
+    })
+    .filter((s): s is { status: TaskStatus; text: string } => s !== null && s.text.length > 0);
+}
+
+function TaskPanel({ plan, streaming }: { plan: string; streaming: boolean }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const steps = parsePlan(plan);
+  if (steps.length === 0) return null;
+  const done = steps.filter((s) => s.status === "done").length;
+  const allDone = done === steps.length;
+
+  return (
+    <div className="ml-11 max-w-2xl mt-2 rounded-xl border border-line/60 bg-bgsoft/40 overflow-hidden">
+      <button
+        onClick={() => setCollapsed((c) => !c)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-bgsoft/60 transition-colors"
+      >
+        <ListChecks size={13} className={allDone ? "text-green shrink-0" : "text-brand shrink-0"} />
+        <span className="font-semibold flex-1 text-left">Görevler</span>
+        <span className="font-mono text-muted/70">{done}/{steps.length}</span>
+        {streaming && !allDone && <Loader2Icon size={11} className="animate-spin text-brand/70" />}
+        <ChevronDown size={13} className={`text-muted/50 transition-transform ${collapsed ? "-rotate-90" : ""}`} />
+      </button>
+      {!collapsed && (
+        <ul className="px-3 pb-2.5 pt-0.5 space-y-1.5">
+          {steps.map((s, i) => (
+            <li key={i} className="flex items-start gap-2 text-xs">
+              {s.status === "done" ? (
+                <CircleCheck size={14} className="text-green shrink-0 mt-px" />
+              ) : s.status === "doing" ? (
+                <Loader2Icon size={14} className="text-brand shrink-0 mt-px animate-spin" />
+              ) : (
+                <Circle size={14} className="text-muted/40 shrink-0 mt-px" />
+              )}
+              <span className={s.status === "done" ? "text-muted/60 line-through" : s.status === "doing" ? "text-ink font-medium" : "text-muted"}>
+                {s.text}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/* Sağlayıcıların ücretsiz katman limitleri (canlı uç yoksa gösterilen bilgi). */
+const FREE_TIER_INFO: Partial<Record<string, string>> = {
+  gemini: "Ücretsiz: ~15 istek/dakika, günde 1.500 istek (model bazlı). Her gün 00:00 PT'de sıfırlanır.",
+  groq: "Ücretsiz: dakikalık token + istek limiti. Her dakika başında yenilenir.",
+  openrouter: "Ücretsiz modeller (:free): günlük istek limiti. Gün başında sıfırlanır. Ücretli kredide canlı bakiye gösterilir.",
+  pollinations: "Ücretsiz ve gömülü — sınır pratikte yok.",
+  hf: "Ücretsiz katman: saatlik kredi. Saat başı yenilenir.",
+  cerebras: "Ücretsiz: günlük token limiti. Gün başında sıfırlanır.",
+  mistral: "Ücretsiz katman: aylık token kotası.",
+  ollama: "Yerel — sınır yok (kendi donanımın).",
+};
+
+interface UsageQuota {
+  supported: boolean;
+  creditRemaining?: number;
+  creditUsed?: number;
+  currency?: string;
+  limit?: number;
+  remaining?: number;
+  isFreeTier?: boolean;
+  resetText?: string;
+  label?: string;
+  note?: string;
+}
+
+/* Token + maliyet rozeti — tıklanınca canlı kota pop-up'ı açar. */
 function UsageBadge({ chat }: { chat: { totalInTokens?: number; totalOutTokens?: number } }) {
   const config = useStore((s) => s.config);
+  const [open, setOpen] = useState(false);
   const tokenIn = chat.totalInTokens ?? 0;
   const tokenOut = chat.totalOutTokens ?? 0;
   const total = tokenIn + tokenOut;
   const activeModel = config.models.find((m) => m.id === config.activeModelId);
   const cost = activeModel ? calculateCost(activeModel.model, tokenIn, tokenOut) : null;
   const hasPrice = activeModel ? getModelPrice(activeModel.model) !== null : false;
-  /* % of context window used by the *input* (chat history) */
   const pct = config.maxContext > 0 ? Math.min(100, (tokenIn / config.maxContext) * 100) : 0;
   const warn = pct >= 80;
   const danger = pct >= 95;
 
   return (
-    <div
-      className={`flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded-lg border mr-1 transition-colors ${
-        danger ? "border-red/40 bg-red/5 text-red"
-        : warn ? "border-amber-400/40 bg-amber-400/5 text-amber-400"
-        : "border-line/40 text-muted/70"
-      }`}
-      title={
-        `Girdi: ${tokenIn.toLocaleString()} · Çıktı: ${tokenOut.toLocaleString()} token` +
-        `\nBağlam penceresi: ${pct.toFixed(0)}% (${tokenIn.toLocaleString()}/${config.maxContext.toLocaleString()})` +
-        (cost ? `\nTahmini maliyet: ~$${cost.toFixed(4)}` : "")
-      }
-    >
-      {/* mini progress dot */}
-      <span className="relative w-3 h-3" aria-hidden>
-        <span className="absolute inset-0 rounded-full bg-current opacity-15" />
-        <span
-          className="absolute inset-0 rounded-full bg-current"
-          style={{ clipPath: `inset(${100 - pct}% 0 0 0)` }}
-        />
-      </span>
-      <span>{total.toLocaleString()} tok</span>
-      {cost !== null && hasPrice && (
-        <>
-          <span className="opacity-40">·</span>
-          <span className={danger || warn ? "" : "text-brand/80"}>{formatCost(cost)}</span>
-        </>
-      )}
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className={`flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded-lg border mr-1 transition-colors hover:border-brand/40 ${
+          danger ? "border-red/40 bg-red/5 text-red"
+          : warn ? "border-amber-400/40 bg-amber-400/5 text-amber-400"
+          : "border-line/40 text-muted/70"
+        }`}
+        title="Token & kota detayı için tıkla"
+      >
+        <span className="relative w-3 h-3" aria-hidden>
+          <span className="absolute inset-0 rounded-full bg-current opacity-15" />
+          <span className="absolute inset-0 rounded-full bg-current" style={{ clipPath: `inset(${100 - pct}% 0 0 0)` }} />
+        </span>
+        <span>{total.toLocaleString()} tok</span>
+        {cost !== null && hasPrice && (
+          <>
+            <span className="opacity-40">·</span>
+            <span className={danger || warn ? "" : "text-brand/80"}>{formatCost(cost)}</span>
+          </>
+        )}
+      </button>
+      {open && <UsageModal chat={chat} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+function UsageModal({ chat, onClose }: { chat: { totalInTokens?: number; totalOutTokens?: number }; onClose: () => void }) {
+  const config = useStore((s) => s.config);
+  const activeModel = config.models.find((m) => m.id === config.activeModelId);
+  const [quota, setQuota] = useState<UsageQuota | null>(null);
+  const [loading, setLoading] = useState(!!activeModel);
+
+  const tokenIn = chat.totalInTokens ?? 0;
+  const tokenOut = chat.totalOutTokens ?? 0;
+  const total = tokenIn + tokenOut;
+  const pct = config.maxContext > 0 ? Math.min(100, (tokenIn / config.maxContext) * 100) : 0;
+  const cost = activeModel ? calculateCost(activeModel.model, tokenIn, tokenOut) : null;
+  const price = activeModel ? getModelPrice(activeModel.model) : null;
+  const provider = activeModel?.provider ?? "";
+  const freeInfo = FREE_TIER_INFO[provider];
+
+  useEffect(() => {
+    if (!activeModel) return;
+    let alive = true;
+    fetch("/api/usage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: activeModel.provider, baseUrl: activeModel.baseUrl, apiKey: activeModel.apiKey }),
+    })
+      .then((r) => r.json())
+      .then((d: UsageQuota) => { if (alive) setQuota(d); })
+      .catch(() => { if (alive) setQuota({ supported: false }); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [activeModel]);
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 backdrop-blur-sm p-4 animate-modal-bg" onClick={onClose}>
+      <div className="w-full max-w-sm bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-modal-content" onClick={(e) => e.stopPropagation()}>
+        {/* Başlık */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-line/60">
+          <div className="flex items-center gap-2">
+            <DollarSign size={15} className="text-brand" />
+            <h3 className="font-bold text-sm">Kullanım & Kota</h3>
+          </div>
+          <button onClick={onClose} className="text-muted hover:text-ink transition-colors"><X size={15} /></button>
+        </div>
+
+        <div className="p-4 space-y-4 text-sm">
+          {/* Aktif model */}
+          <div className="flex items-center justify-between">
+            <span className="text-muted text-xs">Aktif model</span>
+            <span className="font-mono text-xs font-semibold truncate max-w-[180px]">{activeModel?.label || activeModel?.model || "—"}</span>
+          </div>
+
+          {/* Bu oturum */}
+          <div className="rounded-xl border border-line/60 bg-bgsoft/40 p-3 space-y-2">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-muted/50">Bu sohbet</div>
+            <div className="flex justify-between text-xs"><span className="text-muted">Girdi</span><span className="font-mono">{tokenIn.toLocaleString()} tok</span></div>
+            <div className="flex justify-between text-xs"><span className="text-muted">Çıktı</span><span className="font-mono">{tokenOut.toLocaleString()} tok</span></div>
+            <div className="flex justify-between text-xs font-semibold border-t border-line/40 pt-2"><span>Toplam</span><span className="font-mono">{total.toLocaleString()} tok</span></div>
+            {cost !== null && price && (
+              <div className="flex justify-between text-xs"><span className="text-muted">Tahmini maliyet</span><span className="font-mono text-brand">{formatCost(cost)}</span></div>
+            )}
+            {/* Bağlam doluluğu */}
+            <div className="pt-1">
+              <div className="flex justify-between text-[10px] text-muted/60 mb-1">
+                <span>Bağlam penceresi</span><span className="font-mono">{pct.toFixed(0)}%</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-bgsoft overflow-hidden">
+                <div className={`h-full transition-all ${pct >= 95 ? "bg-red" : pct >= 80 ? "bg-amber-400" : "bg-brand"}`} style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Hesap durumu (canlı kota) */}
+          <div className="rounded-xl border border-line/60 bg-bgsoft/40 p-3 space-y-2">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-muted/50">Hesap durumu</div>
+            {loading ? (
+              <div className="flex items-center gap-2 text-xs text-muted/60 py-1">
+                <Loader2Icon size={13} className="animate-spin" /> Sağlayıcıdan çekiliyor…
+              </div>
+            ) : quota?.supported ? (
+              <>
+                {quota.creditRemaining !== undefined && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted">Kalan kredi</span>
+                    <span className="font-mono font-semibold text-green">{quota.currency === "USD" ? "$" : ""}{quota.creditRemaining.toFixed(4)} {quota.currency !== "USD" ? quota.currency : ""}</span>
+                  </div>
+                )}
+                {quota.creditUsed !== undefined && (
+                  <div className="flex justify-between text-xs"><span className="text-muted">Harcanan</span><span className="font-mono">${quota.creditUsed.toFixed(4)}</span></div>
+                )}
+                {quota.isFreeTier !== undefined && (
+                  <div className="flex justify-between text-xs"><span className="text-muted">Katman</span><span className="font-mono">{quota.isFreeTier ? "Ücretsiz" : "Ücretli"}</span></div>
+                )}
+                {quota.note && <p className="text-[11px] text-muted/60 leading-relaxed pt-1">{quota.note}</p>}
+              </>
+            ) : (
+              <p className="text-[11px] text-muted/60 leading-relaxed">
+                {freeInfo ?? "Bu sağlayıcı canlı bakiye/kota uçları sunmuyor."}
+                {quota?.note && <span className="block mt-1 text-muted/40">{quota.note}</span>}
+              </p>
+            )}
+          </div>
+
+          {/* Fiyat tablosu */}
+          {price && (
+            <div className="flex items-center justify-between text-[11px] text-muted/60">
+              <span>Fiyat (1M token)</span>
+              <span className="font-mono">girdi ${price.inputPerMTok} · çıktı ${price.outputPerMTok}</span>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
+
 

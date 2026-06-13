@@ -7,8 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 COPY package*.json ./
-# package-lock.json yoksa npm ci başarısız olur; install kullanıyoruz
-RUN npm install --omit=dev
+RUN npm ci --omit=dev
 
 COPY server.js .
 

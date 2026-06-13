@@ -171,10 +171,15 @@ body {
 }
 .prose-chat h1,
 .prose-chat h2,
-.prose-chat h3 {
-  margin: 16px 0 8px;
+.prose-chat h3,
+.prose-chat h4 {
+  margin: 20px 0 8px;
   font-weight: 700;
+  line-height: 1.35;
 }
+.prose-chat h1 { font-size: 1.3em; }
+.prose-chat h2 { font-size: 1.15em; }
+.prose-chat h3 { font-size: 1.05em; }
 .prose-chat a {
   color: var(--color-brand);
   text-decoration: underline;
@@ -208,15 +213,33 @@ html.light .prose-chat pre {
 html.light .prose-chat :not(pre) > code {
   color: var(--color-brand);
 }
+.prose-chat hr {
+  border: none;
+  border-top: 1px solid var(--color-line);
+  margin: 16px 0;
+}
+.prose-chat blockquote {
+  border-left: 3px solid var(--color-brand);
+  margin: 10px 0;
+  padding: 4px 12px;
+  color: var(--color-muted);
+  font-style: italic;
+}
 .prose-chat table {
   border-collapse: collapse;
   margin: 10px 0;
   font-size: 14px;
+  width: 100%;
 }
 .prose-chat th,
 .prose-chat td {
   border: 1px solid var(--color-line);
   padding: 6px 12px;
+  text-align: left;
+}
+.prose-chat th {
+  background: var(--color-bgsoft);
+  font-weight: 600;
 }
 
 /* ─── Form elemanları ─── */
@@ -357,6 +380,17 @@ html { scroll-behavior: smooth; }
 /* ─── Mesaj ayracı ─── */
 .prose-chat > *:first-child {
   margin-top: 0;
+}
+
+/* ─── Kullanıcı mesaj balonu ─── */
+.user-bubble {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  color: var(--color-ink);
+}
+html.light .user-bubble {
+  background: color-mix(in srgb, var(--color-brand) 8%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-brand) 20%, var(--color-line));
 }
 
 /* ─── Smooth fade-in ─── */
