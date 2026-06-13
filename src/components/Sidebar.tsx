@@ -20,8 +20,32 @@ import {
   X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import type { Chat } from "@/lib/types";
 import { AuthButton } from "./AuthButton";
 import { AccordionSection } from "./Accordion";
+
+/* Sohbetleri tarih kovalarına böler (Claude Code tarzı): Bugün, Dün, Son 7 gün… */
+function groupChatsByDate(items: Chat[]): { label: string; items: Chat[] }[] {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const dayMs = 86_400_000;
+  const buckets: { label: string; items: Chat[] }[] = [
+    { label: "Bugün", items: [] },
+    { label: "Dün", items: [] },
+    { label: "Son 7 gün", items: [] },
+    { label: "Son 30 gün", items: [] },
+    { label: "Daha eski", items: [] },
+  ];
+  for (const c of items) {
+    const t = c.created_at;
+    if (t >= startOfToday) buckets[0].items.push(c);
+    else if (t >= startOfToday - dayMs) buckets[1].items.push(c);
+    else if (t >= startOfToday - 7 * dayMs) buckets[2].items.push(c);
+    else if (t >= startOfToday - 30 * dayMs) buckets[3].items.push(c);
+    else buckets[4].items.push(c);
+  }
+  return buckets.filter((b) => b.items.length > 0);
+}
 
 function SidebarLogo({ size = 22 }: { size?: number }) {
   return (
@@ -107,6 +131,76 @@ export function Sidebar() {
     if (editingId && editTitle.trim()) renameChat(editingId, editTitle.trim());
     setEditingId(null);
   };
+
+  /* Sabitlenenler ayrı bölümde; geri kalanlar tarihe göre gruplanır. */
+  const pinned = history.filter((c) => c.pinned);
+  const unpinned = history.filter((c) => !c.pinned);
+  const sections: { label: string; items: Chat[] }[] = [
+    ...(pinned.length ? [{ label: "Sabitlenenler", items: pinned }] : []),
+    ...groupChatsByDate(unpinned),
+  ];
+
+  const renderRow = (c: Chat) => (
+    <div
+      key={c.id}
+      onClick={() => selectChat(c.id)}
+      className={`group/item flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all duration-100 ${
+        currentId === c.id
+          ? "bg-brand/8 border border-brand/20 text-ink"
+          : "border border-transparent text-muted hover:text-ink hover:bg-bgsoft/60"
+      }`}
+    >
+      <Code2 size={11} className={`shrink-0 ${currentId === c.id ? "text-brand/60" : "opacity-30"}`} />
+      {editingId === c.id ? (
+        <input
+          ref={editRef}
+          value={editTitle}
+          onChange={(e) => setEditTitle(e.target.value)}
+          onBlur={commitRename}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitRename();
+            if (e.key === "Escape") setEditingId(null);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="flex-1 bg-transparent border-b border-brand outline-none text-xs min-w-0"
+        />
+      ) : (
+        <span
+          onDoubleClick={(e) => { e.stopPropagation(); startRename(c.id, c.title); }}
+          className="flex-1 truncate text-[12px]"
+          title="Çift tıkla yeniden adlandır"
+        >
+          {c.title}
+        </span>
+      )}
+      {c.pinned && <Pin size={9} className="text-brand/60 shrink-0" />}
+      {c.tags && c.tags.length > 0 && (
+        <span className="text-[9px] px-1 py-0.5 rounded bg-brand/10 text-brand/70 font-mono shrink-0 max-w-[60px] truncate">
+          {c.tags[0]}
+        </span>
+      )}
+      <div className="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0">
+        <ActionIcon title={c.pinned ? "Sabitlemeyi kaldır" : "Sabitle"} onClick={(e) => { e.stopPropagation(); pinChat(c.id, !c.pinned); }}>
+          <Pin size={10} className={c.pinned ? "text-brand" : ""} />
+        </ActionIcon>
+        <ActionIcon title="Etiket ekle" onClick={(e) => { e.stopPropagation(); const tag = window.prompt("Etiket (virgülle ayır):", c.tags?.join(", ") ?? ""); if (tag !== null) tagChat(c.id, tag.split(",").map(t => t.trim()).filter(Boolean)); }}>
+          <Tag size={10} />
+        </ActionIcon>
+        <ActionIcon title="Yeniden adlandır" onClick={(e) => { e.stopPropagation(); startRename(c.id, c.title); }}>
+          <Pencil size={10} />
+        </ActionIcon>
+        <ActionIcon title={sharingId === c.id ? "Paylaşılıyor…" : "Paylaş (link kopyala)"} onClick={(e) => { e.stopPropagation(); if (!sharingId) shareChat(c.id); }}>
+          <Share2 size={10} />
+        </ActionIcon>
+        <ActionIcon title="İndir" onClick={(e) => { e.stopPropagation(); exportChat(c.id); }}>
+          <Download size={10} />
+        </ActionIcon>
+        <ActionIcon title="Sil" danger onClick={(e) => { e.stopPropagation(); deleteChat(c.id); }}>
+          <Trash2 size={10} />
+        </ActionIcon>
+      </div>
+    </div>
+  );
 
   /* ── Collapsed icon-only ── */
   if (!sidebarOpen) {
@@ -283,65 +377,14 @@ export function Sidebar() {
               </p>
             </div>
           ) : (
-            <div className="space-y-0.5">
-              {history.map((c) => (
-                <div
-                  key={c.id}
-                  onClick={() => selectChat(c.id)}
-                  className={`group/item flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all duration-100 ${
-                    currentId === c.id
-                      ? "bg-brand/8 border border-brand/20 text-ink"
-                      : "border border-transparent text-muted hover:text-ink hover:bg-bgsoft/60"
-                  }`}
-                >
-                  <Code2 size={11} className={`shrink-0 ${currentId === c.id ? "text-brand/60" : "opacity-30"}`} />
-                  {editingId === c.id ? (
-                    <input
-                      ref={editRef}
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      onBlur={commitRename}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") commitRename();
-                        if (e.key === "Escape") setEditingId(null);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex-1 bg-transparent border-b border-brand outline-none text-xs min-w-0"
-                    />
-                  ) : (
-                    <span
-                      onDoubleClick={(e) => { e.stopPropagation(); startRename(c.id, c.title); }}
-                      className="flex-1 truncate text-[12px]"
-                      title="Çift tıkla yeniden adlandır"
-                    >
-                      {c.title}
-                    </span>
-                  )}
-                  {c.pinned && <Pin size={9} className="text-brand/60 shrink-0" />}
-                  {c.tags && c.tags.length > 0 && (
-                    <span className="text-[9px] px-1 py-0.5 rounded bg-brand/10 text-brand/70 font-mono shrink-0 max-w-[60px] truncate">
-                      {c.tags[0]}
-                    </span>
-                  )}
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0">
-                    <ActionIcon title={c.pinned ? "Sabitlemeyi kaldır" : "Sabitle"} onClick={(e) => { e.stopPropagation(); pinChat(c.id, !c.pinned); }}>
-                      <Pin size={10} className={c.pinned ? "text-brand" : ""} />
-                    </ActionIcon>
-                    <ActionIcon title="Etiket ekle" onClick={(e) => { e.stopPropagation(); const tag = window.prompt("Etiket (virgülle ayır):", c.tags?.join(", ") ?? ""); if (tag !== null) tagChat(c.id, tag.split(",").map(t => t.trim()).filter(Boolean)); }}>
-                      <Tag size={10} />
-                    </ActionIcon>
-                    <ActionIcon title="Yeniden adlandır" onClick={(e) => { e.stopPropagation(); startRename(c.id, c.title); }}>
-                      <Pencil size={10} />
-                    </ActionIcon>
-                    <ActionIcon title={sharingId === c.id ? "Paylaşılıyor…" : "Paylaş (link kopyala)"} onClick={(e) => { e.stopPropagation(); if (!sharingId) shareChat(c.id); }}>
-                      <Share2 size={10} />
-                    </ActionIcon>
-                    <ActionIcon title="İndir" onClick={(e) => { e.stopPropagation(); exportChat(c.id); }}>
-                      <Download size={10} />
-                    </ActionIcon>
-                    <ActionIcon title="Sil" danger onClick={(e) => { e.stopPropagation(); deleteChat(c.id); }}>
-                      <Trash2 size={10} />
-                    </ActionIcon>
+            <div className="space-y-2">
+              {sections.map((sec) => (
+                <div key={sec.label}>
+                  <div className="px-2.5 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted/40 select-none">
+                    {sec.label}
+                  </div>
+                  <div className="space-y-0.5">
+                    {sec.items.map(renderRow)}
                   </div>
                 </div>
               ))}
