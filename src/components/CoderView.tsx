@@ -17,6 +17,8 @@ import {
   FolderGit2,
   FolderOpen,
   Folder,
+  Circle,
+  CircleCheck,
   GitPullRequest,
   Globe,
   MoreHorizontal,
@@ -1693,6 +1695,10 @@ export function CoderView() {
                           />
                         </div>
                       )}
+                      {/* Canlı görev paneli — her modda, akış sırasında da görünür. */}
+                      {isLastAssistant && m.plan && (
+                        <TaskPanel plan={m.plan} streaming={streaming} />
+                      )}
                       {isLastAssistant && !streaming && config.planApprovalMode && m.plan && (
                         <div className="ml-11 max-w-2xl mt-2 flex items-center gap-2 px-3 py-2 rounded-xl border border-brand/30 bg-brand/5 text-xs">
                           <ListChecks size={13} className="text-brand shrink-0" />
@@ -2179,6 +2185,63 @@ function getTreeItems(node: import("@/lib/types").TreeNode): { path: string; typ
 }
 
 /* ── Token + cost rozeti ── */
+/* Canlı görev paneli — update_plan'in yazdığı [ ]/[~]/[x] listesini ikonlu
+   checklist olarak gösterir; akış sırasında gerçek zamanlı güncellenir. */
+type TaskStatus = "todo" | "doing" | "done";
+function parsePlan(plan: string): { status: TaskStatus; text: string }[] {
+  return plan
+    .split("\n")
+    .map((line) => {
+      const m = line.match(/^\s*(?:[-*]\s*)?\[([ ~xX])\]\s*(.*)$/);
+      if (!m) return null;
+      const mark = m[1].toLowerCase();
+      const status: TaskStatus = mark === "x" ? "done" : mark === "~" ? "doing" : "todo";
+      return { status, text: m[2].trim() };
+    })
+    .filter((s): s is { status: TaskStatus; text: string } => s !== null && s.text.length > 0);
+}
+
+function TaskPanel({ plan, streaming }: { plan: string; streaming: boolean }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const steps = parsePlan(plan);
+  if (steps.length === 0) return null;
+  const done = steps.filter((s) => s.status === "done").length;
+  const allDone = done === steps.length;
+
+  return (
+    <div className="ml-11 max-w-2xl mt-2 rounded-xl border border-line/60 bg-bgsoft/40 overflow-hidden">
+      <button
+        onClick={() => setCollapsed((c) => !c)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-bgsoft/60 transition-colors"
+      >
+        <ListChecks size={13} className={allDone ? "text-green shrink-0" : "text-brand shrink-0"} />
+        <span className="font-semibold flex-1 text-left">Görevler</span>
+        <span className="font-mono text-muted/70">{done}/{steps.length}</span>
+        {streaming && !allDone && <Loader2Icon size={11} className="animate-spin text-brand/70" />}
+        <ChevronDown size={13} className={`text-muted/50 transition-transform ${collapsed ? "-rotate-90" : ""}`} />
+      </button>
+      {!collapsed && (
+        <ul className="px-3 pb-2.5 pt-0.5 space-y-1.5">
+          {steps.map((s, i) => (
+            <li key={i} className="flex items-start gap-2 text-xs">
+              {s.status === "done" ? (
+                <CircleCheck size={14} className="text-green shrink-0 mt-px" />
+              ) : s.status === "doing" ? (
+                <Loader2Icon size={14} className="text-brand shrink-0 mt-px animate-spin" />
+              ) : (
+                <Circle size={14} className="text-muted/40 shrink-0 mt-px" />
+              )}
+              <span className={s.status === "done" ? "text-muted/60 line-through" : s.status === "doing" ? "text-ink font-medium" : "text-muted"}>
+                {s.text}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /* Sağlayıcıların ücretsiz katman limitleri (canlı uç yoksa gösterilen bilgi). */
 const FREE_TIER_INFO: Partial<Record<string, string>> = {
   gemini: "Ücretsiz: ~15 istek/dakika, günde 1.500 istek (model bazlı). Her gün 00:00 PT'de sıfırlanır.",
