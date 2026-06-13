@@ -1838,11 +1838,16 @@ export function CoderView() {
                 />
               )}
 
-              {/* Mention menu */}
-              {mentionOpen && attachedFiles.length > 0 && (
+              {/* Mention menu — ekli dosyalar + tüm proje ağacı */}
+              {mentionOpen && (attachedFiles.length > 0 || allFiles.length > 0) && (
                 <MentionMenu
                   query={mentionQuery}
-                  items={attachedFiles.map((f) => ({ path: f.path }))}
+                  items={[
+                    ...attachedFiles.map((f) => ({ path: f.path, attached: true })),
+                    ...allFiles
+                      .filter((f) => !attachedFiles.some((a) => a.path === f.path))
+                      .map((f) => ({ path: f.path, attached: false })),
+                  ]}
                   onSelect={(item) => {
                     const ta = taRef.current;
                     if (!ta) return;
@@ -1854,6 +1859,12 @@ export function CoderView() {
                     const newText = before.slice(0, atIdx) + `@${item.path} ` + after;
                     setInput(newText);
                     setMentionOpen(false);
+                    /* Henüz ekli değilse repo dosyasının içeriğini çekip ekle ki
+                       model dosyayı bağlamda görsün. */
+                    if (!item.attached) {
+                      const repoFile = allFiles.find((f) => f.path === item.path);
+                      if (repoFile) void attachRepoFile(repoFile);
+                    }
                     setTimeout(() => {
                       ta.focus();
                       const newPos = atIdx + item.path.length + 2;
@@ -1929,7 +1940,7 @@ export function CoderView() {
                     if (slashMatch) { setSlashQuery(slashMatch[2]); setSlashOpen(true); }
                     else setSlashOpen(false);
                     const mentionMatch = before.match(/(^|\s)@(\S*)$/);
-                    if (mentionMatch && attachedFiles.length > 0) {
+                    if (mentionMatch && (attachedFiles.length > 0 || allFiles.length > 0)) {
                       setMentionQuery(mentionMatch[2]); setMentionOpen(true);
                     } else setMentionOpen(false);
                   }}
