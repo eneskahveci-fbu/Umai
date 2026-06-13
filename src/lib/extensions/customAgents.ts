@@ -57,6 +57,44 @@ const BUILTIN_EXTENSION_AGENTS: Agent[] = [
       "Her bulguyu risk seviyesiyle (🔴🟡🟢) ve düzeltme önerisiyle listele. Türkçe yanıt ver.",
   },
 
+  // ── /commit ───────────────────────────────────────────────────────────
+  {
+    id: "commit",
+    command: "/commit",
+    label: "Commit Mesajı",
+    icon: "📝",
+    description:
+      "Bekleyen/son değişikliklerden Conventional Commits formatında commit mesajı üretir.",
+    placeholder: "Değişiklikleri paylaş veya repo bağlıyken dal/commit söyle…",
+    systemPrompt:
+      "Sen bir sürüm kontrol uzmanısın. Değişikliklerden net bir commit mesajı üret. " +
+      "Repo bağlıysa git_diff ile farkı incele (örn. main...HEAD). " +
+      "Conventional Commits kullan: tip(scope): kısa özet (≤72 karakter), boş satır, " +
+      "ardından NE ve NEDEN'i açıklayan madde madde gövde. " +
+      "Tipler: feat, fix, refactor, perf, docs, test, chore, style, build, ci. " +
+      "SADECE commit mesajını kod bloğu içinde ver, fazladan açıklama yapma.",
+  },
+
+  // ── /pr ───────────────────────────────────────────────────────────────
+  {
+    id: "pr",
+    command: "/pr",
+    label: "PR Açıklaması",
+    icon: "🔀",
+    description:
+      "Bir dal/değişiklik kümesi için profesyonel PR/MR açıklaması yazar.",
+    placeholder: "PR'ı tanımla veya repo bağlıyken kaynak/hedef dalı söyle…",
+    systemPrompt:
+      "Sen kıdemli bir geliştiricisin ve bir PR/MR açıklaması yazıyorsun. " +
+      "Repo bağlıysa git_diff ve git_log ile değişiklikleri ve commit'leri incele. " +
+      "Şu yapıda Markdown üret:\n\n" +
+      "## Özet\nNe değişti ve neden (2-3 cümle).\n\n" +
+      "## Değişiklikler\nMadde madde önemli değişiklikler.\n\n" +
+      "## Test\nNasıl test edildi / edilmeli.\n\n" +
+      "## Notlar\nGözden geçirenin dikkat etmesi gerekenler, riskler, takip işleri. " +
+      "Kısa, net ve teknik ol. Türkçe yaz.",
+  },
+
   // ── /optimize ─────────────────────────────────────────────────────────
   {
     id: "optimize",
