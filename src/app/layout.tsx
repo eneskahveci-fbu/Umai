@@ -105,7 +105,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Craft.Coder" />
-        <link rel="apple-touch-icon" href="/icon" />
+        {/* apple-touch-icon (180px) src/app/apple-icon.tsx'ten otomatik enjekte edilir */}
         {/* Tema flash'ını önle (private-mode safe) */}
         <script
           dangerouslySetInnerHTML={{

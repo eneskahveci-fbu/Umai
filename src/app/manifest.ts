@@ -12,16 +12,17 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     display_override: ["standalone", "minimal-ui"],
     background_color: "#111110",
-    theme_color: "#c8a87e",
+    theme_color: "#111110",
     orientation: "any",
     lang: "tr",
     dir: "ltr",
     categories: ["productivity", "developer"],
     icons: [
-      { src: "/favicon.ico", sizes: "any", type: "image/x-icon" },
-      { src: "/icon", sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: "/icon", sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: "/icon", sizes: "192x192", type: "image/png", purpose: "maskable" },
+      { src: "/favicon.ico", sizes: "48x48", type: "image/x-icon" },
+      { src: "/pwa-icon?size=192", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/pwa-icon?size=512", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/pwa-icon?size=192&maskable=1", sizes: "192x192", type: "image/png", purpose: "maskable" },
+      { src: "/pwa-icon?size=512&maskable=1", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
     shortcuts: [
       {

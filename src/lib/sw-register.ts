@@ -1,27 +1,18 @@
-/* Service worker artık KULLANILMIYOR. Eski sürüm gezinme HTML'ini önbelleğe
-   alıp bayat uygulama sunuyordu. Bu fonksiyon yeni SW kaydetmez; bunun yerine
-   mevcut tüm kayıtları düşürür ve cache'leri temizler ki kullanıcılar bayat
-   paketten kurtulsun. (public/sw.js de kendini unregister eden bir kill-switch.) */
-
+/* PWA service worker'ını kaydeder (public/sw.js — network-first, bayat-bundle
+   güvenli). Kurulabilir uygulama + çevrimdışı yedek sağlar; gezinmede daima
+   ağdan taze HTML çekildiği için eski "bayat paket" sorunu geri gelmez. */
 export function registerServiceWorker() {
   if (typeof window === "undefined") return;
   if (!("serviceWorker" in navigator)) return;
 
-  const cleanup = async () => {
+  const register = async () => {
     try {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map((r) => r.unregister()));
-    } catch { /* yok say */ }
-    try {
-      if (typeof caches !== "undefined") {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((k) => caches.delete(k)));
-      }
+      await navigator.serviceWorker.register("/sw.js", { scope: "/" });
     } catch { /* yok say */ }
   };
 
-  if (document.readyState === "complete") cleanup();
-  else window.addEventListener("load", cleanup, { once: true });
+  if (document.readyState === "complete") register();
+  else window.addEventListener("load", register, { once: true });
 }
 
 /* Lightweight online/offline notifier — emits a `craftai:online` /
