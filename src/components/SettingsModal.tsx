@@ -1002,6 +1002,31 @@ export function SettingsModal() {
               />
             </div>
 
+            {/* Terminal WebSocket URL */}
+            <div>
+              <h4 className="text-sm font-bold mb-1">Terminal Sunucusu (WebSocket)</h4>
+              <p className="text-xs text-muted/70 mb-2 leading-relaxed">
+                Kendi Linux sunucunu veya Oracle Cloud ücretsiz VM&apos;ini bağla.{" "}
+                <strong className="text-muted">Boş bırakırsan</strong> WebContainer sandbox kullanılır.
+                <br />
+                Örnek:{" "}
+                <code className="text-brand/80 bg-bgsoft px-1 rounded text-[11px]">wss://sunucu-ip:7071?token=SIFRE</code>
+                <br />
+                <span className="text-muted/50 text-[11px]">
+                  Sunucu kurulum scripti: projedeki <code className="bg-bgsoft px-1 rounded">terminal-server/server.js</code>
+                </span>
+              </p>
+              <input
+                type="text"
+                value={config.terminalWsUrl ?? ""}
+                onChange={(e) => saveConfig({ ...config, terminalWsUrl: e.target.value.trim() })}
+                placeholder="wss://your-server:7071?token=..."
+                className="input-mono w-full"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+
             {/* Yazı tipi boyutu */}
             <div>
               <h4 className="text-sm font-bold mb-2">Kod Yazı Tipi Boyutu</h4>

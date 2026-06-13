@@ -427,6 +427,7 @@ export const DEFAULT_CONFIG: Config = {
   accentColor: "amber",
   maxContext: 8192,
   webcontainerApiKey: "",
+  terminalWsUrl: "",
   mcpServers: [],
 };
 
