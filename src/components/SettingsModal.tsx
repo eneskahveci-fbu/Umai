@@ -1002,6 +1002,31 @@ export function SettingsModal() {
               />
             </div>
 
+            {/* Terminal WebSocket sunucusu */}
+            <div>
+              <h4 className="text-sm font-bold mb-1">Terminal Sunucusu (WebSocket)</h4>
+              <p className="text-xs text-muted/70 mb-2 leading-relaxed">
+                Kendi Linux sunucunu (Render, Oracle Cloud, vb.) bağla.{" "}
+                <strong className="text-muted">Boş bırakırsan</strong> WebContainer sandbox kullanılır.
+                <br />
+                Örnek:{" "}
+                <code className="text-brand/80 bg-bgsoft px-1 rounded text-[11px]">wss://craft-terminal.onrender.com?token=ŞİFRE</code>
+                <br />
+                <span className="text-muted/50 text-[11px]">
+                  Sunucu kurulum scripti: depodaki <code className="bg-bgsoft px-1 rounded">terminal-server/</code> klasörü.
+                </span>
+              </p>
+              <input
+                type="text"
+                value={config.terminalWsUrl ?? ""}
+                onChange={(e) => saveConfig({ ...config, terminalWsUrl: e.target.value.trim() })}
+                placeholder="wss://your-server?token=..."
+                className="input-mono w-full"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+
             {/* Yazı tipi boyutu */}
             <div>
               <h4 className="text-sm font-bold mb-2">Kod Yazı Tipi Boyutu</h4>

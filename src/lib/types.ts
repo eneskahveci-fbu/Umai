@@ -203,6 +203,9 @@ export interface Config {
   accentColor: "amber" | "green" | "orange";
   maxContext: number;
   webcontainerApiKey: string;
+  /** Uzak WebSocket PTY sunucusu URL'i (ör. wss://terminal.example.com?token=xxx).
+      Boşsa WebContainer sandbox kullanılır. */
+  terminalWsUrl?: string;
   mcpServers?: McpServer[];
 }
 
