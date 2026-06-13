@@ -679,23 +679,53 @@ async function executeTool(
     if (name === "get_commit_history") return await execGetCommitHistory(ctx!, args as { limit?: string; path?: string });
     if (name === "web_search") {
       const query = String(args.query ?? "");
+      if (!query.trim()) return "Arama sorgusu boş.";
+      /* DuckDuckGo HTML — anahtarsız, ücretsiz (Jina anonim katmanı artık 402/451
+         veriyordu). Sonuçları başlık + URL + özet olarak biçimlendir. */
       try {
-        const res = await fetch(`https://s.jina.ai/${encodeURIComponent(query)}`, {
-          headers: { "Accept": "text/plain", "X-Return-Format": "text" },
+        const res = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; Craft.Coder/1.0)" },
           signal: AbortSignal.timeout(12000),
         });
-        const text = await res.text();
-        return text.slice(0, 6000) || "Sonuç bulunamadı.";
+        if (!res.ok) return `Web araması başarısız (${res.status}).`;
+        const html = await res.text();
+        const out: string[] = [];
+        for (const block of html.split("result__body").slice(1, 9)) {
+          const title = block.match(/class="result__a"[^>]*>([\s\S]*?)<\/a>/)?.[1]?.replace(/<[^>]+>/g, "").trim();
+          const snippet = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/)?.[1]?.replace(/<[^>]+>/g, "").trim();
+          const urlText = block.match(/class="result__url"[^>]*>([\s\S]*?)<\/a>/)?.[1]?.replace(/<[^>]+>/g, "").trim();
+          if (title) out.push(`• ${title}${urlText ? `\n  ${urlText}` : ""}${snippet ? `\n  ${snippet}` : ""}`);
+        }
+        return out.length ? out.join("\n\n").slice(0, 6000) : "Sonuç bulunamadı.";
       } catch { return "Web araması başarısız oldu."; }
     }
     if (name === "read_url") {
-      const url = String(args.url ?? "");
+      let url = String(args.url ?? "").trim();
+      if (!url) return "URL boş.";
+      if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+      /* Önce Jina reader (temiz okunabilir metin); başarısız/boşsa doğrudan
+         getir + HTML etiketlerini temizle (anahtarsız yedek). */
       try {
         const res = await fetch(`https://r.jina.ai/${url}`, {
           headers: { "Accept": "text/plain", "X-Return-Format": "text" },
+          signal: AbortSignal.timeout(12000),
+        });
+        if (res.ok) { const t = await res.text(); if (t.trim()) return t.slice(0, 8000); }
+      } catch { /* yedeğe düş */ }
+      try {
+        const res = await fetch(url, {
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; Craft.Coder/1.0)" },
           signal: AbortSignal.timeout(15000),
         });
-        const text = await res.text();
+        if (!res.ok) return `Sayfa alınamadı (${res.status}).`;
+        const html = await res.text();
+        const text = html
+          .replace(/<script[\s\S]*?<\/script>/gi, "")
+          .replace(/<style[\s\S]*?<\/style>/gi, "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/&[a-z]+;/gi, " ")
+          .replace(/\s+/g, " ")
+          .trim();
         return text.slice(0, 8000) || "Sayfa boş döndü.";
       } catch { return "URL okunamadı."; }
     }
