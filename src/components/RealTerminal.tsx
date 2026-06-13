@@ -86,7 +86,10 @@ async function bootWsTerminal(
   const ro = new ResizeObserver(resize);
   ro.observe(containerEl);
 
-  /* AI run-command bridge */
+  /* AI run-command bridge — komut bitişini SENTINEL marker ile algılar (sabit
+     timeout yok), exit code'u yakalar ve ANSI'den temizlenmiş çıktı döndürür.
+     Böylece build/install/test gibi uzun komutlar eksiksiz ve doğru raporlanır
+     (Claude Code'un stdout+exit davranışına yakın). */
   let outputBuffer = "";
   const origOnMsg = ws.onmessage;
   ws.onmessage = (ev) => {
@@ -95,18 +98,38 @@ async function bootWsTerminal(
       const msg = JSON.parse(ev.data as string) as { type: string; data?: string };
       if (msg.type === "output" && msg.data) {
         outputBuffer += msg.data;
-        if (outputBuffer.length > 4000) outputBuffer = outputBuffer.slice(-4000);
+        if (outputBuffer.length > 200_000) outputBuffer = outputBuffer.slice(-200_000);
       }
     } catch { /* ignore */ }
   };
   const handleRunCmd = (e: Event) => {
     const cmd = (e as CustomEvent<{ command: string }>).detail?.command;
     if (!cmd || ws.readyState !== WebSocket.OPEN) return;
-    ws.send(JSON.stringify({ type: "input", data: cmd + "\n" }));
-    setTimeout(() => {
-      const out = outputBuffer.slice(-2000).trim();
-      if (out) window.dispatchEvent(new CustomEvent("craftai:terminal-output", { detail: { command: cmd, output: out } }));
-    }, 3000);
+    const id = Math.random().toString(36).slice(2, 8);
+    const START = `__CRAFT_S_${id}__`;
+    const DONE = `__CRAFT_D_${id}__`;
+    const from = outputBuffer.length;
+    /* echo START → komut → echo DONE:exitcode. Marker'lar gerçek çıktıyı sarar. */
+    ws.send(JSON.stringify({ type: "input", data: `printf '${START}\\n'; ${cmd}; printf '${DONE}:%s\\n' "$?"\n` }));
+    const startedAt = Date.now();
+    const doneRe = new RegExp(`${DONE}:(\\d+)`);
+    const poll = setInterval(() => {
+      const slice = outputBuffer.slice(from);
+      const m = slice.match(doneRe);
+      const timedOut = Date.now() - startedAt > 120_000;
+      if (!m && !timedOut) return;
+      clearInterval(poll);
+      const sIdx = slice.lastIndexOf(START, m ? m.index : undefined);
+      let out = sIdx >= 0 ? slice.slice(sIdx + START.length, m ? m.index : undefined) : slice;
+      out = out
+        .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")   // CSI ANSI dizileri
+        .replace(/\x1b\][^\x07]*(\x07|\x1b\\)/g, "") // OSC dizileri
+        .replace(/\r/g, "")
+        .trim();
+      const code = m ? m[1] : "timeout";
+      const body = `${out || "(çıktı yok)"}\n[exit: ${code}]`.slice(-6000);
+      window.dispatchEvent(new CustomEvent("craftai:terminal-output", { detail: { command: cmd, output: body } }));
+    }, 300);
   };
   window.addEventListener("craftai:terminal-run", handleRunCmd);
 
@@ -176,18 +199,38 @@ async function bootWcTerminal(
     write: (chunk) => {
       term.write(chunk);
       outputBuffer += chunk;
-      if (outputBuffer.length > 4000) outputBuffer = outputBuffer.slice(-4000);
+      if (outputBuffer.length > 200_000) outputBuffer = outputBuffer.slice(-200_000);
     },
   })).catch(() => {});
 
+  /* SENTINEL marker ile komut bitişi + exit code (WS modundaki ile aynı). */
   const handleRunCmd = (e: Event) => {
     const cmd = (e as CustomEvent<{ command: string }>).detail?.command;
     if (!cmd) return;
-    writer.write(cmd + "\n");
-    setTimeout(() => {
-      const out = outputBuffer.slice(-2000).trim();
-      if (out) window.dispatchEvent(new CustomEvent("craftai:terminal-output", { detail: { command: cmd, output: out } }));
-    }, 3000);
+    const id = Math.random().toString(36).slice(2, 8);
+    const START = `__CRAFT_S_${id}__`;
+    const DONE = `__CRAFT_D_${id}__`;
+    const from = outputBuffer.length;
+    writer.write(`printf '${START}\\n'; ${cmd}; printf '${DONE}:%s\\n' "$?"\n`);
+    const startedAt = Date.now();
+    const doneRe = new RegExp(`${DONE}:(\\d+)`);
+    const poll = setInterval(() => {
+      const slice = outputBuffer.slice(from);
+      const m = slice.match(doneRe);
+      const timedOut = Date.now() - startedAt > 120_000;
+      if (!m && !timedOut) return;
+      clearInterval(poll);
+      const sIdx = slice.lastIndexOf(START, m ? m.index : undefined);
+      let out = sIdx >= 0 ? slice.slice(sIdx + START.length, m ? m.index : undefined) : slice;
+      out = out
+        .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
+        .replace(/\x1b\][^\x07]*(\x07|\x1b\\)/g, "")
+        .replace(/\r/g, "")
+        .trim();
+      const code = m ? m[1] : "timeout";
+      const body = `${out || "(çıktı yok)"}\n[exit: ${code}]`.slice(-6000);
+      window.dispatchEvent(new CustomEvent("craftai:terminal-output", { detail: { command: cmd, output: body } }));
+    }, 300);
   };
   window.addEventListener("craftai:terminal-run", handleRunCmd);
 
