@@ -46,7 +46,7 @@ export function SkillsPanel() {
   const tabs: { id: Tab; label: string; icon: typeof Zap; count: number }[] = [
     { id: "skills", label: "Skills", icon: Zap, count: manualSkills.length },
     { id: "files", label: "Dosyalar", icon: FileText, count: fileSkills.length },
-    { id: "agents", label: "Agents", icon: Sparkles, count: AGENTS.length },
+    { id: "agents", label: "Agents", icon: Sparkles, count: ALL_AGENTS.length },
     { id: "progress", label: "İlerleme", icon: GitBranch, count: totalUsage },
   ];
 

@@ -14,7 +14,7 @@ export function SlashMenu({ query, onSelect, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   const q = query.toLowerCase();
-  const filtered = AGENTS.filter(
+  const filtered = ALL_AGENTS.filter(
     (a) => a.command.toLowerCase().includes(q) || a.label.toLowerCase().includes(q),
   );
 
