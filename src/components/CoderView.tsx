@@ -100,32 +100,6 @@ declare global {
 
 /* ─── helpers ─── */
 
-function ComposerButton({
-  onClick,
-  active,
-  title,
-  children,
-}: {
-  onClick: () => void;
-  active?: boolean;
-  title?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      title={title}
-      className={`flex items-center gap-1.5 text-[12px] px-2 py-2 sm:py-1.5 rounded-lg transition-colors active:scale-95 ${
-        active
-          ? "text-brand bg-brand/10"
-          : "text-muted hover:text-ink hover:bg-bgsoft active:bg-bgsoft"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
 /* "⋯ Daha fazla" — az kullanılan eylemleri tek menüde toplar.
    Açılır menü createPortal ile body'e render edilir (overflow kabı kırpmasın).
    placement: "top" (composer, yukarı açılır) | "bottom" (header, aşağı açılır). */
@@ -1994,6 +1968,63 @@ export function CoderView() {
                     }}
                   />
                 )}
+                {/* Daha fazla — mikrofon ile gönder arasında; tüm composer eylemleri burada */}
+                <MoreMenu active={filesOpen || toolsEnabled || !!artifact || !!activeAgent || searchOn || !!config.safeMode}>
+                  <MoreItem icon={<FolderOpen size={14} />} label="Dosyalar (depo)" active={filesOpen} onClick={() => setFilesOpen((v) => !v)} />
+                  <MoreItem icon={<Paperclip size={14} />} label="Dosya ekle" onClick={() => fileRef.current?.click()} />
+                  <MoreItem
+                    icon={<Wrench size={14} />}
+                    label="Tools (araç kullanımı)"
+                    active={toolsEnabled}
+                    onClick={() => {
+                      const store = useStore.getState();
+                      if (!store.repo) { addToast("Tool-use için önce bir GitHub deposu bağla", "error"); return; }
+                      store.setToolsEnabled(!store.toolsEnabled);
+                    }}
+                  />
+                  <MoreItem icon={<Globe size={14} />} label="Web arama" active={searchOn} onClick={() => setSearchOn(!searchOn)} />
+                  <MoreItem
+                    icon={<ShieldCheck size={14} />}
+                    label="Güvenli Mod (salt-okunur)"
+                    active={!!config.safeMode}
+                    onClick={() => useStore.getState().saveConfig({ ...config, safeMode: !config.safeMode })}
+                  />
+                  <MoreItem icon={<ImageIcon size={14} />} label="Görsel ekle" onClick={() => imgRef.current?.click()} />
+                  <MoreItem
+                    icon={<Palette size={14} />}
+                    label="Canvas önizleme"
+                    active={!!artifact}
+                    onClick={() => {
+                      const msgs = useStore.getState().current()?.messages ?? [];
+                      for (let i = msgs.length - 1; i >= 0; i--) {
+                        const content = msgs[i].content;
+                        if (!content) continue;
+                        const directMatch = /```(?:html|svg|mermaid)(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
+                        if (directMatch) {
+                          const lang = /```(html|svg|mermaid)/.exec(content)?.[1] ?? "html";
+                          useStore.getState().setArtifact({ type: lang as "html" | "svg" | "mermaid", content: directMatch[1], title: `${lang.toUpperCase()} Önizleme` });
+                          return;
+                        }
+                        const cssMatch = /```css(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
+                        if (cssMatch) {
+                          useStore.getState().setArtifact({ type: "html", content: `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${cssMatch[1]}</style></head><body></body></html>`, title: "CSS Önizleme" });
+                          return;
+                        }
+                        const jsMatch = /```(?:javascript|js|jsx|ts|tsx)(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
+                        if (jsMatch) {
+                          useStore.getState().setArtifact({ type: "html", content: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><script>${jsMatch[1]}<\/script></body></html>`, title: "JS Önizleme" });
+                          return;
+                        }
+                      }
+                      addToast("Önizlenecek HTML, SVG, CSS veya Mermaid kodu bulunamadı", "info");
+                    }}
+                  />
+                  <MoreItem
+                    icon={<BookOpen size={14} />}
+                    label="Kütüphane"
+                    onClick={() => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); }}
+                  />
+                </MoreMenu>
                 {streaming ? (
                   <button onClick={stop} className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-red hover:bg-red/80 active:bg-red/70 text-white grid place-items-center transition-colors" title="Durdur">
                     <Square size={13} />
@@ -2009,77 +2040,8 @@ export function CoderView() {
                 )}
               </div>
 
-              {/* Alt araç çubuğu */}
-              <div className="flex items-center justify-between mt-2 px-0.5">
-                <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5 flex-nowrap">
-                  <ComposerButton onClick={() => setFilesOpen((v) => !v)} active={filesOpen} title="Depo dosyaları">
-                    <FolderOpen size={13} />
-                    <span>Dosyalar</span>
-                  </ComposerButton>
-                  <ComposerButton onClick={() => fileRef.current?.click()} title="Dosya ekle">
-                    <Paperclip size={13} />
-                    <span>Ekle</span>
-                  </ComposerButton>
-                  <ComposerButton
-                    onClick={() => {
-                      const store = useStore.getState();
-                      if (!store.repo) {
-                        addToast("Tool-use için önce bir GitHub deposu bağla", "error");
-                        return;
-                      }
-                      store.setToolsEnabled(!store.toolsEnabled);
-                    }}
-                    active={toolsEnabled}
-                    title={toolsEnabled ? "Tool-use açık" : "Tool-use kapalı"}
-                  >
-                    <Wrench size={13} />
-                    <span>Tools</span>
-                  </ComposerButton>
-                  <MoreMenu active={!!artifact || !!activeAgent || searchOn || !!config.safeMode}>
-                    <MoreItem icon={<Globe size={14} />} label="Web arama" active={searchOn} onClick={() => setSearchOn(!searchOn)} />
-                    <MoreItem
-                      icon={<ShieldCheck size={14} />}
-                      label="Güvenli Mod (salt-okunur)"
-                      active={!!config.safeMode}
-                      onClick={() => useStore.getState().saveConfig({ ...config, safeMode: !config.safeMode })}
-                    />
-                    <MoreItem icon={<ImageIcon size={14} />} label="Görsel ekle" onClick={() => imgRef.current?.click()} />
-                    <MoreItem
-                      icon={<Palette size={14} />}
-                      label="Canvas önizleme"
-                      active={!!artifact}
-                      onClick={() => {
-                        const msgs = useStore.getState().current()?.messages ?? [];
-                        for (let i = msgs.length - 1; i >= 0; i--) {
-                          const content = msgs[i].content;
-                          if (!content) continue;
-                          const directMatch = /```(?:html|svg|mermaid)(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
-                          if (directMatch) {
-                            const lang = /```(html|svg|mermaid)/.exec(content)?.[1] ?? "html";
-                            useStore.getState().setArtifact({ type: lang as "html" | "svg" | "mermaid", content: directMatch[1], title: `${lang.toUpperCase()} Önizleme` });
-                            return;
-                          }
-                          const cssMatch = /```css(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
-                          if (cssMatch) {
-                            useStore.getState().setArtifact({ type: "html", content: `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${cssMatch[1]}</style></head><body></body></html>`, title: "CSS Önizleme" });
-                            return;
-                          }
-                          const jsMatch = /```(?:javascript|js|jsx|ts|tsx)(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
-                          if (jsMatch) {
-                            useStore.getState().setArtifact({ type: "html", content: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><script>${jsMatch[1]}<\/script></body></html>`, title: "JS Önizleme" });
-                            return;
-                          }
-                        }
-                        addToast("Önizlenecek HTML, SVG, CSS veya Mermaid kodu bulunamadı", "info");
-                      }}
-                    />
-                    <MoreItem
-                      icon={<BookOpen size={14} />}
-                      label="Kütüphane"
-                      onClick={() => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); }}
-                    />
-                  </MoreMenu>
-                </div>
+              {/* Alt durum çubuğu */}
+              <div className="flex items-center justify-end mt-2 px-0.5">
 
                 <div className="flex items-center gap-1.5 text-[11px] text-muted/50 shrink-0">
                   {config.safeMode && (
