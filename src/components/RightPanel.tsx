@@ -20,6 +20,8 @@ interface RightPanelProps {
   onAskAI: (text: string, context: string) => void;
   gitOpen: boolean;
   onCloseGit: () => void;
+  /** Git panelinden "PR/MR İncele" modalını açar (birleşik Git & PR butonu). */
+  onReviewPr?: () => void;
   artifact: Artifact | null;
 }
 
@@ -185,7 +187,7 @@ export function RightPanel(props: RightPanelProps) {
           )}
           {effectiveActive === "git" && (
             <ErrorBoundary variant="inline" label="Git paneli çöktü">
-              <GitPanel onClose={props.onCloseGit} />
+              <GitPanel onClose={props.onCloseGit} onReviewPr={props.onReviewPr} />
             </ErrorBoundary>
           )}
           {effectiveActive === "artifact" && props.artifact && (

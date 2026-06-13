@@ -1481,8 +1481,7 @@ export function CoderView() {
               active={terminalOpen}
               onClick={() => setTerminalOpen((v) => !v)}
             />
-            <MoreItem icon={<GitBranch size={14} />} label="Git (dal, PR)" active={gitPanelOpen} onClick={() => setGitPanelOpen((v) => !v)} />
-            {repo && <MoreItem icon={<GitPullRequest size={14} />} label="PR / MR incele" onClick={() => setPrModalOpen(true)} />}
+            <MoreItem icon={<GitBranch size={14} />} label="Git & PR (dal, PR/MR, incele)" active={gitPanelOpen} onClick={() => setGitPanelOpen((v) => !v)} />
             <MoreItem icon={<Zap size={14} />} label="Skills" onClick={() => useStore.getState().setSkillsOpen(true)} />
             {current && messages.length > 0 && (
               <>
@@ -2106,6 +2105,7 @@ export function CoderView() {
           }}
           gitOpen={gitPanelOpen}
           onCloseGit={() => setGitPanelOpen(false)}
+          onReviewPr={() => setPrModalOpen(true)}
           artifact={artifact}
         />
       </div>

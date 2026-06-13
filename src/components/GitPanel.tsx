@@ -4,7 +4,7 @@ import { useState } from "react";
 import { GitPullRequest, Loader2, Plus, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 
-export function GitPanel({ onClose }: { onClose: () => void }) {
+export function GitPanel({ onClose, onReviewPr }: { onClose: () => void; onReviewPr?: () => void }) {
   const repo = useStore((s) => s.repo);
   const addToast = useStore((s) => s.addToast);
   const [tab, setTab] = useState<"branch" | "pr">("branch");
@@ -64,10 +64,21 @@ export function GitPanel({ onClose }: { onClose: () => void }) {
   return (
     <div className="w-full h-full flex flex-col bg-surface/40 overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-line/60 shrink-0">
-        <span className="text-xs font-bold text-muted/70 uppercase tracking-wide">Git İşlemleri</span>
-        <button onClick={onClose} className="text-muted/40 hover:text-muted transition-colors">
-          <X size={13} />
-        </button>
+        <span className="text-xs font-bold text-muted/70 uppercase tracking-wide">Git & PR</span>
+        <div className="flex items-center gap-1.5">
+          {onReviewPr && (
+            <button
+              onClick={onReviewPr}
+              className="flex items-center gap-1 text-[11px] text-brand hover:text-branddim font-semibold transition-colors"
+              title="Mevcut bir PR/MR'ı AI ile incele"
+            >
+              <GitPullRequest size={12} /> İncele
+            </button>
+          )}
+          <button onClick={onClose} className="text-muted/40 hover:text-muted transition-colors">
+            <X size={13} />
+          </button>
+        </div>
       </div>
       <div className="flex gap-1 px-3 py-2 border-b border-line/40 shrink-0">
         {(["branch", "pr"] as const).map((t) => (
