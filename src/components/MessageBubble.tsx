@@ -528,7 +528,7 @@ export function MessageBubble({
             </ReactMarkdown>
             {streamingNow && <span className="caret" />}
           </div>
-        ) : streamingNow ? (
+        ) : streamingNow && !message.thinking && !message.toolCalls?.length ? (
           <span className="inline-flex items-center gap-1 py-1 text-muted/50" aria-label="Yazıyor">
             <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:-0.3s]" />
             <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:-0.15s]" />
