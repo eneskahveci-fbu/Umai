@@ -619,6 +619,26 @@ export function CoderView() {
     }
   };
 
+  /* Sidecar (Cursor/Claude Code tarzı): ajan bir dosyayı yazınca/düzenleyince
+     sağ editör panelini otomatik aç ve YENİ içeriği canlı göster. checkpoint_event
+     ile tetiklenir; içerik repodan taze çekilir (commit yeni atılmıştır). */
+  const showWrittenFile = useCallback(async (path: string) => {
+    const store = useStore.getState();
+    const r = store.repo;
+    if (!r) return;
+    try {
+      const activeRepo = store.config.activeRepo || "";
+      let content: string;
+      if (isGitLabRepo(activeRepo)) {
+        content = await fetchGitLabFileContent(r.owner, r.repo, r.branch, path, store.activeGitlab()?.token);
+      } else {
+        content = await fetchFileContent(r.owner, r.repo, r.branch, path, store.activeGithub()?.token);
+      }
+      setEditorFile({ path, content, language: detectLanguage(path) });
+      setEditorOpen(true);
+    } catch { /* dosya henüz okunamadıysa sessiz geç */ }
+  }, []);
+
   /* Komut paletinden (Cmd+P) dosya açma isteği → editörde aç. */
   useEffect(() => {
     const handler = async (e: Event) => {
@@ -942,6 +962,8 @@ export function CoderView() {
           planApprovalMode: store.config.planApprovalMode,
           planApproved: planApprovedRef.current,
           blockNetworkTools: store.config.blockNetworkTools,
+          /* Terminal varsa ajana run_command aracı sunulur (uzak WS veya WebContainer). */
+          terminalAvailable: !!(store.config.terminalWsUrl?.trim()) || terminalSupported,
           temperature: activeProjectCfg?.temperature,
           maxTokens: activeProjectCfg?.maxTokens,
           searchContext: webSearchContext || undefined,
@@ -1089,6 +1111,20 @@ export function CoderView() {
               useStore.getState().setPlanOnLast(String(parsed.plan_event.plan ?? ""));
               continue;
             }
+            /* run_command: ajan terminalde komut çalıştırmak istiyor → terminali
+               aç ve komutu gönder. Çıktı craftai:terminal-output ile geri döner. */
+            if (parsed.run_command_event) {
+              const command = String(parsed.run_command_event.command ?? "").trim();
+              if (command) {
+                setTerminalOpen(true);
+                /* Terminal mount olup dinleyiciyi kurana dek küçük gecikme. */
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent("craftai:terminal-run", { detail: { command } }));
+                }, 600);
+                addToast(`▶ Terminal: ${command}`, "info");
+              }
+              continue;
+            }
             /* bitiş nedeni: "length" ⇒ token sınırında kesildi → şerit + oto-devam */
             if (parsed.finish_event) {
               const reason = String(parsed.finish_event.reason ?? "");
@@ -1107,6 +1143,8 @@ export function CoderView() {
                 if (!turnCheckpoints.some((c) => c.path === path)) {
                   turnCheckpoints.push({ path, previous });
                 }
+                /* Sidecar: yazılan dosyayı canlı olarak editörde aç. */
+                void showWrittenFile(path);
               }
               continue;
             }
@@ -1223,7 +1261,7 @@ export function CoderView() {
        baloncuk içinden kendiliğinden sürdür — kullanıcı tıklamasına gerek yok.
        Sonsuz döngüye karşı en çok 2 ardışık otomatik devam. */
     const depth = opts?.depth ?? 0;
-    if (cutAtLength && useStore.getState().config.autoContinue !== false && depth < 2 && !abortCtl.signal.aborted) {
+    if (cutAtLength && useStore.getState().config.autoContinue !== false && depth < 5 && !abortCtl.signal.aborted) {
       useStore.getState().addToast("Yanıt sınırda kesildi — kaldığı yerden devam ediliyor…", "info");
       await callApi(overrideAgent, { continuation: true, depth: depth + 1 });
     }
@@ -1398,16 +1436,15 @@ export function CoderView() {
               <VenetianMask size={9} /> Gizli
             </span>
           )}
-          <button
-            onClick={() => setEditorOpen((v) => !v)}
-            title="IDE'yi aç/kapat"
-            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${editorOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
-          >
-            <Code2 size={14} />
-          </button>
           <ThinkingModeToggle />
-          {/* Birleşik ⋯ menüsü: Terminal · Git · PR · Skills · Dışa aktar */}
-          <MoreMenu placement="bottom" active={terminalOpen || gitPanelOpen}>
+          {/* Birleşik ⋯ menüsü: Editör · Terminal · Git · PR · Skills · Dışa aktar */}
+          <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen}>
+            <MoreItem
+              icon={<Code2 size={14} />}
+              label={editorOpen ? "Editörü kapat" : "Editör (IDE)"}
+              active={editorOpen}
+              onClick={() => setEditorOpen((v) => !v)}
+            />
             <MoreItem
               icon={<Terminal size={14} />}
               label={terminalSupported ? (terminalOpen ? "Terminal'i kapat" : "Terminal") : "Terminal (masaüstü Chrome/Edge)"}

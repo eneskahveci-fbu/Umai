@@ -209,6 +209,20 @@ export const CODER_TOOLS: ToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "run_command",
+      description: "Bağlı terminalde bir kabuk komutu ÇALIŞTIRIR ve çıktısını görür (Claude Code gibi). Test/lint/build/git gibi komutları çalıştırıp sonucuna göre devam et — ör. 'npm test', 'npm run build', 'ls', 'node -v', 'git status'. Komut terminalde çalışır; çıktısı sana ayrı bir mesaj olarak döner, ona göre düzelt/sürdür. Tehlikeli/yıkıcı komutlardan (rm -rf, sudo, format) kaçın.",
+      parameters: {
+        type: "object",
+        properties: {
+          command: { type: "string", description: "Çalıştırılacak tek satırlık kabuk komutu. Örn: 'npm test'" },
+        },
+        required: ["command"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "list_branches",
       description: "Repodaki dalları (branch) listeler.",
       parameters: {
