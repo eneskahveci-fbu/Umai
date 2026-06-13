@@ -33,6 +33,7 @@ import {
   Trash2,
   Square,
   Terminal,
+  DollarSign,
   VenetianMask,
   Wrench,
   X,
@@ -2139,48 +2140,184 @@ function getTreeItems(node: import("@/lib/types").TreeNode): { path: string; typ
 }
 
 /* ── Token + cost rozeti ── */
+/* Sağlayıcıların ücretsiz katman limitleri (canlı uç yoksa gösterilen bilgi). */
+const FREE_TIER_INFO: Partial<Record<string, string>> = {
+  gemini: "Ücretsiz: ~15 istek/dakika, günde 1.500 istek (model bazlı). Her gün 00:00 PT'de sıfırlanır.",
+  groq: "Ücretsiz: dakikalık token + istek limiti. Her dakika başında yenilenir.",
+  openrouter: "Ücretsiz modeller (:free): günlük istek limiti. Gün başında sıfırlanır. Ücretli kredide canlı bakiye gösterilir.",
+  pollinations: "Ücretsiz ve gömülü — sınır pratikte yok.",
+  hf: "Ücretsiz katman: saatlik kredi. Saat başı yenilenir.",
+  cerebras: "Ücretsiz: günlük token limiti. Gün başında sıfırlanır.",
+  mistral: "Ücretsiz katman: aylık token kotası.",
+  ollama: "Yerel — sınır yok (kendi donanımın).",
+};
+
+interface UsageQuota {
+  supported: boolean;
+  creditRemaining?: number;
+  creditUsed?: number;
+  currency?: string;
+  limit?: number;
+  remaining?: number;
+  isFreeTier?: boolean;
+  resetText?: string;
+  label?: string;
+  note?: string;
+}
+
+/* Token + maliyet rozeti — tıklanınca canlı kota pop-up'ı açar. */
 function UsageBadge({ chat }: { chat: { totalInTokens?: number; totalOutTokens?: number } }) {
   const config = useStore((s) => s.config);
+  const [open, setOpen] = useState(false);
   const tokenIn = chat.totalInTokens ?? 0;
   const tokenOut = chat.totalOutTokens ?? 0;
   const total = tokenIn + tokenOut;
   const activeModel = config.models.find((m) => m.id === config.activeModelId);
   const cost = activeModel ? calculateCost(activeModel.model, tokenIn, tokenOut) : null;
   const hasPrice = activeModel ? getModelPrice(activeModel.model) !== null : false;
-  /* % of context window used by the *input* (chat history) */
   const pct = config.maxContext > 0 ? Math.min(100, (tokenIn / config.maxContext) * 100) : 0;
   const warn = pct >= 80;
   const danger = pct >= 95;
 
   return (
-    <div
-      className={`flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded-lg border mr-1 transition-colors ${
-        danger ? "border-red/40 bg-red/5 text-red"
-        : warn ? "border-amber-400/40 bg-amber-400/5 text-amber-400"
-        : "border-line/40 text-muted/70"
-      }`}
-      title={
-        `Girdi: ${tokenIn.toLocaleString()} · Çıktı: ${tokenOut.toLocaleString()} token` +
-        `\nBağlam penceresi: ${pct.toFixed(0)}% (${tokenIn.toLocaleString()}/${config.maxContext.toLocaleString()})` +
-        (cost ? `\nTahmini maliyet: ~$${cost.toFixed(4)}` : "")
-      }
-    >
-      {/* mini progress dot */}
-      <span className="relative w-3 h-3" aria-hidden>
-        <span className="absolute inset-0 rounded-full bg-current opacity-15" />
-        <span
-          className="absolute inset-0 rounded-full bg-current"
-          style={{ clipPath: `inset(${100 - pct}% 0 0 0)` }}
-        />
-      </span>
-      <span>{total.toLocaleString()} tok</span>
-      {cost !== null && hasPrice && (
-        <>
-          <span className="opacity-40">·</span>
-          <span className={danger || warn ? "" : "text-brand/80"}>{formatCost(cost)}</span>
-        </>
-      )}
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className={`flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded-lg border mr-1 transition-colors hover:border-brand/40 ${
+          danger ? "border-red/40 bg-red/5 text-red"
+          : warn ? "border-amber-400/40 bg-amber-400/5 text-amber-400"
+          : "border-line/40 text-muted/70"
+        }`}
+        title="Token & kota detayı için tıkla"
+      >
+        <span className="relative w-3 h-3" aria-hidden>
+          <span className="absolute inset-0 rounded-full bg-current opacity-15" />
+          <span className="absolute inset-0 rounded-full bg-current" style={{ clipPath: `inset(${100 - pct}% 0 0 0)` }} />
+        </span>
+        <span>{total.toLocaleString()} tok</span>
+        {cost !== null && hasPrice && (
+          <>
+            <span className="opacity-40">·</span>
+            <span className={danger || warn ? "" : "text-brand/80"}>{formatCost(cost)}</span>
+          </>
+        )}
+      </button>
+      {open && <UsageModal chat={chat} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+function UsageModal({ chat, onClose }: { chat: { totalInTokens?: number; totalOutTokens?: number }; onClose: () => void }) {
+  const config = useStore((s) => s.config);
+  const activeModel = config.models.find((m) => m.id === config.activeModelId);
+  const [quota, setQuota] = useState<UsageQuota | null>(null);
+  const [loading, setLoading] = useState(!!activeModel);
+
+  const tokenIn = chat.totalInTokens ?? 0;
+  const tokenOut = chat.totalOutTokens ?? 0;
+  const total = tokenIn + tokenOut;
+  const pct = config.maxContext > 0 ? Math.min(100, (tokenIn / config.maxContext) * 100) : 0;
+  const cost = activeModel ? calculateCost(activeModel.model, tokenIn, tokenOut) : null;
+  const price = activeModel ? getModelPrice(activeModel.model) : null;
+  const provider = activeModel?.provider ?? "";
+  const freeInfo = FREE_TIER_INFO[provider];
+
+  useEffect(() => {
+    if (!activeModel) return;
+    let alive = true;
+    fetch("/api/usage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: activeModel.provider, baseUrl: activeModel.baseUrl, apiKey: activeModel.apiKey }),
+    })
+      .then((r) => r.json())
+      .then((d: UsageQuota) => { if (alive) setQuota(d); })
+      .catch(() => { if (alive) setQuota({ supported: false }); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [activeModel]);
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 backdrop-blur-sm p-4 animate-modal-bg" onClick={onClose}>
+      <div className="w-full max-w-sm bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-modal-content" onClick={(e) => e.stopPropagation()}>
+        {/* Başlık */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-line/60">
+          <div className="flex items-center gap-2">
+            <DollarSign size={15} className="text-brand" />
+            <h3 className="font-bold text-sm">Kullanım & Kota</h3>
+          </div>
+          <button onClick={onClose} className="text-muted hover:text-ink transition-colors"><X size={15} /></button>
+        </div>
+
+        <div className="p-4 space-y-4 text-sm">
+          {/* Aktif model */}
+          <div className="flex items-center justify-between">
+            <span className="text-muted text-xs">Aktif model</span>
+            <span className="font-mono text-xs font-semibold truncate max-w-[180px]">{activeModel?.label || activeModel?.model || "—"}</span>
+          </div>
+
+          {/* Bu oturum */}
+          <div className="rounded-xl border border-line/60 bg-bgsoft/40 p-3 space-y-2">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-muted/50">Bu sohbet</div>
+            <div className="flex justify-between text-xs"><span className="text-muted">Girdi</span><span className="font-mono">{tokenIn.toLocaleString()} tok</span></div>
+            <div className="flex justify-between text-xs"><span className="text-muted">Çıktı</span><span className="font-mono">{tokenOut.toLocaleString()} tok</span></div>
+            <div className="flex justify-between text-xs font-semibold border-t border-line/40 pt-2"><span>Toplam</span><span className="font-mono">{total.toLocaleString()} tok</span></div>
+            {cost !== null && price && (
+              <div className="flex justify-between text-xs"><span className="text-muted">Tahmini maliyet</span><span className="font-mono text-brand">{formatCost(cost)}</span></div>
+            )}
+            {/* Bağlam doluluğu */}
+            <div className="pt-1">
+              <div className="flex justify-between text-[10px] text-muted/60 mb-1">
+                <span>Bağlam penceresi</span><span className="font-mono">{pct.toFixed(0)}%</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-bgsoft overflow-hidden">
+                <div className={`h-full transition-all ${pct >= 95 ? "bg-red" : pct >= 80 ? "bg-amber-400" : "bg-brand"}`} style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Hesap durumu (canlı kota) */}
+          <div className="rounded-xl border border-line/60 bg-bgsoft/40 p-3 space-y-2">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-muted/50">Hesap durumu</div>
+            {loading ? (
+              <div className="flex items-center gap-2 text-xs text-muted/60 py-1">
+                <Loader2Icon size={13} className="animate-spin" /> Sağlayıcıdan çekiliyor…
+              </div>
+            ) : quota?.supported ? (
+              <>
+                {quota.creditRemaining !== undefined && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted">Kalan kredi</span>
+                    <span className="font-mono font-semibold text-green">{quota.currency === "USD" ? "$" : ""}{quota.creditRemaining.toFixed(4)} {quota.currency !== "USD" ? quota.currency : ""}</span>
+                  </div>
+                )}
+                {quota.creditUsed !== undefined && (
+                  <div className="flex justify-between text-xs"><span className="text-muted">Harcanan</span><span className="font-mono">${quota.creditUsed.toFixed(4)}</span></div>
+                )}
+                {quota.isFreeTier !== undefined && (
+                  <div className="flex justify-between text-xs"><span className="text-muted">Katman</span><span className="font-mono">{quota.isFreeTier ? "Ücretsiz" : "Ücretli"}</span></div>
+                )}
+                {quota.note && <p className="text-[11px] text-muted/60 leading-relaxed pt-1">{quota.note}</p>}
+              </>
+            ) : (
+              <p className="text-[11px] text-muted/60 leading-relaxed">
+                {freeInfo ?? "Bu sağlayıcı canlı bakiye/kota uçları sunmuyor."}
+                {quota?.note && <span className="block mt-1 text-muted/40">{quota.note}</span>}
+              </p>
+            )}
+          </div>
+
+          {/* Fiyat tablosu */}
+          {price && (
+            <div className="flex items-center justify-between text-[11px] text-muted/60">
+              <span>Fiyat (1M token)</span>
+              <span className="font-mono">girdi ${price.inputPerMTok} · çıktı ${price.outputPerMTok}</span>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
+
 
