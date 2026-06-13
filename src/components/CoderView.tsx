@@ -428,10 +428,18 @@ export function CoderView() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
   const prevLenRef = useRef(0);
+  const [showScrollDown, setShowScrollDown] = useState(false);
   const onMessagesScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
-    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickRef.current = dist < 120;
+    setShowScrollDown(dist > 300);
+  };
+  const scrollToBottom = () => {
+    stickRef.current = true;
+    setShowScrollDown(false);
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
   };
   const fileRef = useRef<HTMLInputElement>(null);
   const imgRef = useRef<HTMLInputElement>(null);
@@ -1534,11 +1542,21 @@ export function CoderView() {
             )}
 
             <div className="flex-1 overflow-y-auto py-1">
-              {!tree ? (
+              {!tree && connecting ? (
+                /* Profesyonel iskelet: ağaç yüklenirken titreşimli satırlar. */
+                <div className="px-2 py-1.5 space-y-1.5">
+                  {Array.from({ length: 9 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-2" style={{ paddingLeft: `${(i % 3) * 12 + 4}px` }}>
+                      <div className="w-3 h-3 rounded shimmer shrink-0" />
+                      <div className="h-3 rounded shimmer" style={{ width: `${45 + ((i * 7) % 40)}%` }} />
+                    </div>
+                  ))}
+                </div>
+              ) : !tree ? (
                 <div className="px-3 py-6 text-center">
                   <FolderGit2 size={22} className="mx-auto mb-2 text-muted/20" />
                   <p className="text-[10px] text-muted/40 leading-relaxed mb-2">
-                    {connecting ? "Yükleniyor…" : config.activeRepo ? config.activeRepo : "Depo seç veya ekle"}
+                    {config.activeRepo ? config.activeRepo : "Depo seç veya ekle"}
                   </p>
                   {!connecting && (
                     <div className="flex flex-col gap-1.5 items-center">
@@ -1793,6 +1811,17 @@ export function CoderView() {
             style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
           >
             <div className="max-w-3xl mx-auto px-5 relative">
+
+              {/* En alta in butonu (kullanıcı yukarı kaydırdıysa) */}
+              {showScrollDown && messages.length > 0 && (
+                <button
+                  onClick={scrollToBottom}
+                  title="En alta in"
+                  className="absolute -top-12 left-1/2 -translate-x-1/2 z-10 w-9 h-9 rounded-full bg-surface border border-line shadow-lg grid place-items-center text-muted hover:text-ink hover:border-brand/40 transition-colors animate-fade-in"
+                >
+                  <ArrowDown size={16} />
+                </button>
+              )}
 
               {/* Slash menu */}
               {slashOpen && (
