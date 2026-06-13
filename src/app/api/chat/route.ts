@@ -6,6 +6,7 @@ import { filterByGlob } from "@/lib/glob";
 import { pruneMessages } from "@/lib/contextWindow";
 import { detectFrameworks, extractDeps, parseGitignore } from "@/lib/projectContext";
 import { CODER_TOOLS } from "@/lib/tools";
+import { EXTENSION_TOOLS } from "@/lib/extensions/registry";
 import type { ChatMessage, MemoryItem, Provider, ResponseStyle } from "@/lib/types";
 
 export const runtime = "nodejs";
