@@ -81,7 +81,7 @@ import {
   parseGitLabRepo,
 } from "@/lib/gitlab";
 import type { TreeFile, TreeNode } from "@/lib/types";
-import { AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agents";
+import { ALL_AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agents";
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
 import { buildContextSections } from "@/lib/prompt";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
@@ -839,7 +839,7 @@ export function CoderView() {
       overrideAgent !== undefined
         ? overrideAgent
         : messageAgentId
-        ? AGENTS.find((a) => a.id === messageAgentId) ?? null
+        ? ALL_AGENTS.find((a) => a.id === messageAgentId) ?? null
         : null;
 
     /* Devam modu (Claude Code tarzı): kesilen asistan yanıtı YENİ baloncuk

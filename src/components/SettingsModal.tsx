@@ -22,7 +22,7 @@ import {
   Zap,
 } from "lucide-react";
 import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
-import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, TOOL_CATALOG } from "@/lib/constants";
+import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, ALL_TOOL_CATALOG } from "@/lib/constants";
 import { calculateCost, formatCost } from "@/lib/pricing";
 import { fetchUserRepos } from "@/lib/github";
 import { fetchGitLabUserRepos } from "@/lib/gitlab";
@@ -1257,7 +1257,7 @@ function ToolPermissions() {
   };
 
   const categories: string[] = [];
-  for (const t of TOOL_CATALOG) if (!categories.includes(t.category)) categories.push(t.category);
+  for (const t of ALL_TOOL_CATALOG) if (!categories.includes(t.category)) categories.push(t.category);
   const riskColor: Record<string, string> = { low: "bg-muted/40", medium: "bg-amber-400", high: "bg-red" };
   const riskLabel: Record<string, string> = { low: "düşük", medium: "orta", high: "yüksek" };
   const deniedCount = TOOL_CATALOG.filter((t) => !isAllowed(t.name)).length;
@@ -1283,7 +1283,7 @@ function ToolPermissions() {
       </div>
       <div className="divide-y divide-line/40">
         {categories.map((cat) => {
-          const tools = TOOL_CATALOG.filter((t) => t.category === cat);
+          const tools = ALL_TOOL_CATALOG.filter((t) => t.category === cat);
           const allOn = tools.every((t) => isAllowed(t.name));
           return (
             <div key={cat} className="px-3 py-2">

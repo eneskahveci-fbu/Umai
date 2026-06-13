@@ -16,7 +16,7 @@ import {
 import type { ChatMessage } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { CodeBlock } from "./CodeBlock";
-import { AGENTS } from "@/lib/agents";
+import { ALL_AGENTS } from "@/lib/agents";
 
 /* ── Tool metadata ─────────────────────────────────────────────────── */
 
@@ -365,7 +365,7 @@ export function MessageBubble({
     setEditing(false);
   };
 
-  const agent = message.agentId ? AGENTS.find((a) => a.id === message.agentId) : null;
+  const agent = message.agentId ? ALL_AGENTS.find((a) => a.id === message.agentId) : null;
 
   /* ── USER BUBBLE ─────────────────────────────────────────────────── */
   if (isUser) {

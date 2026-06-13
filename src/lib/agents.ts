@@ -115,7 +115,7 @@ export const ALL_AGENTS = [...AGENTS, ...EXTENSION_AGENTS];
 
 export function findAgentByCommand(text: string): Agent | null {
   const first = text.trim().split(/\s+/)[0].toLowerCase();
-  return AGENTS.find((a) => a.command === first) ?? null;
+  return ALL_AGENTS.find((a) => a.command === first) ?? null;
 }
 
 export function stripCommand(text: string): string {
