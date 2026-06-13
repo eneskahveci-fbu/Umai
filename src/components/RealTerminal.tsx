@@ -261,8 +261,11 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
   };
 
   useEffect(() => {
-    boot();
-    return () => { cleanupRef.current?.(); };
+    /* boot() ilk await'ten önce senkron setStatus çağırır; effect gövdesinde
+       doğrudan çağırmak yerine bir tık erteleyerek "cascading render" uyarısını
+       önleriz (davranış aynı — terminal yine mount'ta başlar). */
+    const id = setTimeout(() => { void boot(); }, 0);
+    return () => { clearTimeout(id); cleanupRef.current?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

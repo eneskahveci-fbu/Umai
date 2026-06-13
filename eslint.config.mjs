@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Bağımsız Node (CommonJS) PTY terminal servisi — Next.js app kaynağı değil,
+    // kendi çalışma zamanı/konvansiyonları var (require vb.).
+    "terminal-server/**",
   ]),
 ]);
 
