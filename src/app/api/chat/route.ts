@@ -761,6 +761,15 @@ async function streamRound(
             encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: delta.content } }] })}\n\n`),
           );
         }
+        /* Reasoning/düşünme token'larını da ilet (DeepSeek-R1: reasoning_content,
+           OpenRouter/o-serisi: reasoning). İstemci bunu "Düşünce süreci"
+           panelinde gösterir. */
+        const reasoningDelta: string | undefined = delta?.reasoning ?? delta?.reasoning_content;
+        if (reasoningDelta) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { reasoning: reasoningDelta } }] })}\n\n`),
+          );
+        }
         if (delta?.tool_calls) {
           for (const tc of delta.tool_calls) {
             const idx = tc.index ?? 0;

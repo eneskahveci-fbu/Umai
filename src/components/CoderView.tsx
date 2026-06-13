@@ -934,6 +934,7 @@ export function CoderView() {
     let full = isContinuation ? (lastMsg?.content ?? "") : ""; // try/catch ortak erişimi
     let cutAtLength = false; // finish_event: "length" ⇒ otomatik devam tetiklenebilir
     let realUsage: { prompt: number; completion: number } | null = null; // sağlayıcı gerçek token
+    let thinkingFull = ""; // reasoning delta'ları birikir
     try {
       const allEnabledSkills = (store.config.skills ?? []).filter((s) => s.enabled);
       /* Relevance scoring: compare skill text against the last user message.
@@ -1189,7 +1190,7 @@ export function CoderView() {
             }
             const delta = parsed.choices?.[0]?.delta?.content ?? "";
             const reasoning = (parsed.choices?.[0]?.delta as Record<string, unknown>)?.reasoning as string | undefined;
-            if (reasoning) useStore.getState().updateLastThinking(reasoning);
+            if (reasoning) { thinkingFull += reasoning; useStore.getState().updateLastThinking(thinkingFull); }
             if (delta) { full += delta; useStore.getState().updateLastContent(full); }
           } catch { /* parçalı satır */ }
         }
