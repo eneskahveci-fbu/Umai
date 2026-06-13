@@ -1703,11 +1703,11 @@ export function CoderView() {
                   );
                 })}
                 {streaming && messages[messages.length - 1]?.content === "" && (
-                  <div className="flex gap-3 py-4">
-                    <div className="shrink-0 w-8 h-8 rounded-lg bg-brand/15 border border-brand/25 grid place-items-center">
-                      <Code2 size={14} className="text-brand" />
+                  <div className="flex gap-3 py-3 animate-fade-in">
+                    <div className="shrink-0 w-7 h-7 rounded-full bg-bgsoft border border-brand/20 grid place-items-center text-brand text-sm mt-0.5 shadow-sm">
+                      ✦
                     </div>
-                    <div className="flex items-center gap-1 pt-2">
+                    <div className="flex items-center gap-1 pt-2.5">
                       <span className="typing-dot" />
                       <span className="typing-dot delay-1" />
                       <span className="typing-dot delay-2" />
