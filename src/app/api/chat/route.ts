@@ -656,7 +656,7 @@ async function executeTool(
   writeBuffer?: Map<string, WriteEntry>,
 ): Promise<string> {
   try {
-    if (!ctx && ["list_files","read_file","read_files","glob","grep","search_files","search_code","write_file","str_replace","list_branches","create_branch","create_pr","get_commit_history"].includes(name))
+    if (!ctx && ["list_files","read_file","read_files","glob","grep","search_files","search_code","write_file","str_replace","list_branches","create_branch","create_pr","get_commit_history","git_diff","git_log","git_blame","discover_rules","trigger_ci"].includes(name))
       return "Hata: repo bağlı değil. Kullanıcıya bir repo bağlamasını söyle.";
     if (name === "list_files") return await execListFiles(ctx!, args as { filter?: string });
     if (name === "glob") return await execGlob(ctx!, args as { pattern: string });
@@ -677,6 +677,66 @@ async function executeTool(
     if (name === "create_branch") return await execCreateBranch(ctx!, args as { name: string; from?: string });
     if (name === "create_pr") return await execCreatePR(ctx!, args as { title: string; head: string; base: string; body?: string });
     if (name === "get_commit_history") return await execGetCommitHistory(ctx!, args as { limit?: string; path?: string });
+    /* ── Extension araçları (DeepSeek): git diff/log/blame, kural keşfi, CI ── */
+    if (name === "git_diff") {
+      const base = String(args.base ?? ""); const head = String(args.head ?? "");
+      if (!base || !head) return "Hata: base ve head zorunlu.";
+      try {
+        if (ctx!.provider === "gitlab") {
+          const proj = encodeGlProject(ctx!.owner, ctx!.repo);
+          const res = await fetch(`https://gitlab.com/api/v4/projects/${proj}/repository/compare?from=${encodeURIComponent(base)}&to=${encodeURIComponent(head)}`, { headers: glHeaders(ctx!.token) });
+          if (!res.ok) return `Hata: ${res.status}`;
+          const data = await res.json() as { diffs?: { old_path: string; new_path: string; diff: string }[] };
+          return (data.diffs ?? []).map((d) => `--- ${d.old_path}\n+++ ${d.new_path}\n${d.diff}`).join("\n").slice(0, 8000) || "Fark yok.";
+        }
+        const res = await fetch(`https://api.github.com/repos/${ctx!.owner}/${ctx!.repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`, { headers: { ...ghHeaders(ctx!.token), Accept: "application/vnd.github.diff" } });
+        if (!res.ok) return `Hata: ${res.status} ${(await res.text().catch(() => "")).slice(0, 120)}`;
+        return (await res.text()).slice(0, 8000) || "Fark yok.";
+      } catch (e) { return `Hata: ${(e as Error).message}`; }
+    }
+    if (name === "git_log" || name === "git_blame") {
+      const branch = String(args.branch ?? ctx!.branch);
+      const path = args.path ? String(args.path) : "";
+      const limit = Math.min(30, Math.max(1, Number(args.limit) || 10));
+      const blameNote = name === "git_blame" ? "[Basitleştirilmiş blame: dosyayı etkileyen son commit'ler]\n" : "";
+      try {
+        if (ctx!.provider === "gitlab") {
+          const proj = encodeGlProject(ctx!.owner, ctx!.repo);
+          const res = await fetch(`https://gitlab.com/api/v4/projects/${proj}/repository/commits?ref_name=${encodeURIComponent(branch)}&per_page=${limit}${path ? `&path=${encodeURIComponent(path)}` : ""}`, { headers: glHeaders(ctx!.token) });
+          if (!res.ok) return `Hata: ${res.status}`;
+          const data = await res.json() as { short_id: string; title: string; author_name: string; created_at: string }[];
+          return blameNote + (data.map((c) => `${c.short_id} ${c.created_at.slice(0, 10)} ${c.author_name}: ${c.title}`).join("\n") || "Commit yok.");
+        }
+        const res = await fetch(`https://api.github.com/repos/${ctx!.owner}/${ctx!.repo}/commits?sha=${encodeURIComponent(branch)}&per_page=${limit}${path ? `&path=${encodeURIComponent(path)}` : ""}`, { headers: ghHeaders(ctx!.token) });
+        if (!res.ok) return `Hata: ${res.status}`;
+        const data = await res.json() as { sha: string; commit: { message: string; author: { name: string; date: string } } }[];
+        return blameNote + (data.map((c) => `${c.sha.slice(0, 7)} ${c.commit.author.date.slice(0, 10)} ${c.commit.author.name}: ${c.commit.message.split("\n")[0]}`).join("\n") || "Commit yok.");
+      } catch (e) { return `Hata: ${(e as Error).message}`; }
+    }
+    if (name === "discover_rules") {
+      const candidates = ["CLAUDE.md", "AGENTS.md", ".rules", ".cursorrules", ".craft.md", ".craftai.md", "SOUL.md", ".github/copilot-instructions.md"];
+      const out: string[] = [];
+      for (const f of candidates) {
+        const r = await getFileRaw(ctx!, f, cache);
+        if (r.ok && r.content.trim()) out.push(`### ${f}\n${r.content.slice(0, 3000)}`);
+      }
+      return out.length ? out.join("\n\n") : "Davranış kuralı dosyası bulunamadı (CLAUDE.md, AGENTS.md, .rules, .cursorrules vb.).";
+    }
+    if (name === "trigger_ci") {
+      const workflow = String(args.workflow ?? "");
+      const ref = String(args.ref ?? ctx!.branch);
+      if (!workflow) return "Hata: workflow zorunlu.";
+      if (ctx!.provider === "gitlab") return "GitLab CI tetikleme için ayrı bir trigger token gerekir (şu an desteklenmiyor).";
+      try {
+        const res = await fetch(`https://api.github.com/repos/${ctx!.owner}/${ctx!.repo}/actions/workflows/${encodeURIComponent(workflow)}/dispatches`, {
+          method: "POST",
+          headers: { ...ghHeaders(ctx!.token), "Content-Type": "application/json" },
+          body: JSON.stringify({ ref, ...(args.inputs && typeof args.inputs === "object" ? { inputs: args.inputs } : {}) }),
+        });
+        if (res.status === 204) return `✅ Workflow '${workflow}' tetiklendi (ref: ${ref}).`;
+        return `Hata: ${res.status} ${(await res.text().catch(() => "")).slice(0, 150)}`;
+      } catch (e) { return `Hata: ${(e as Error).message}`; }
+    }
     if (name === "web_search") {
       const query = String(args.query ?? "");
       if (!query.trim()) return "Arama sorgusu boş.";
@@ -959,6 +1019,11 @@ export async function POST(req: Request) {
       `• list_branches() / create_branch(name, from?) — dal işlemleri\n` +
       `• create_pr(title, head, base, body?) — PR/MR aç (başlık+açıklamayı sen üret)\n` +
       `• get_commit_history(limit?, path?) — commit geçmişi\n` +
+      `• git_diff(base, head) — iki dal/commit arasındaki farkı göster\n` +
+      `• git_log(branch?, path?, limit?) — commit geçmişini listele\n` +
+      `• git_blame(path, startLine?, endLine?) — dosyayı etkileyen son commit'ler\n` +
+      `• discover_rules() — CLAUDE.md/AGENTS.md/.rules gibi davranış dosyalarını otomatik tara\n` +
+      `• trigger_ci(workflow, ref?, inputs?) — GitHub Actions workflow'unu tetikle\n` +
       `• dispatch_agents(tasks[]) — karmaşık görevi PARALEL salt-okunur alt-ajanlara böl (Claude'daki gibi)\n` +
       `• update_plan(plan) — çok adımlı görevde canlı yapılacaklar listesi\n` +
       (body.webSearch ? `• web_search(query) — internette ara\n• read_url(url) — web sayfası oku\n` : "") +
