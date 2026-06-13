@@ -190,6 +190,9 @@ export interface Config {
       (write/str_replace/delete/rename/branch/PR/komut). Yalnızca okuma,
       arama ve analiz. Tanımsız = kapalı. */
   safeMode?: boolean;
+  /** Araç-bazlı izin politikası: toolName → false ise o araç ajana hiç
+      sunulmaz (deny). Anahtar yoksa veya true ise izinli. Granüler kontrol. */
+  toolPermissions?: Record<string, boolean>;
   /** Açıksa AI'nın önerdiği SADECE allowlist'teki komutlar otomatik çalışır
       (çıktı AI'ya beslenir → güvenli oto-düzelt). Tanımsız = kapalı. */
   autoRunCommands?: boolean;

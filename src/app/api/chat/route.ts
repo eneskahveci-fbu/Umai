@@ -51,6 +51,7 @@ interface ChatRequest {
   webSearch?: boolean;
   requireWriteApproval?: boolean;
   safeMode?: boolean;
+  toolPermissions?: Record<string, boolean>;
   planApprovalMode?: boolean;
   planApproved?: boolean;
   blockNetworkTools?: boolean;
@@ -1053,7 +1054,7 @@ export async function POST(req: Request) {
   }
   /* run_command yalnızca istemcide terminal varsa sunulur (yoksa çıktı gelmez). */
   if (!body.terminalAvailable) coderTools = coderTools.filter((t) => t.function.name !== "run_command");
-  const allTools = [
+  let allTools = [
     ...(body.tools && body.repoCtx ? coderTools : []),
     ...(body.webSearch && !body.blockNetworkTools ? WEB_TOOLS : []),
     ...mcpToolDefs.map((t) => ({
@@ -1061,6 +1062,12 @@ export async function POST(req: Request) {
       function: { name: t.name, description: t.description, parameters: t.parameters },
     })),
   ];
+  /* Granüler izin: kullanıcının açıkça reddettiği (toolPermissions[name] === false)
+     araçlar ajana hiç sunulmaz. Anahtar yoksa veya true ise izinli. */
+  if (body.toolPermissions) {
+    const perms = body.toolPermissions;
+    allTools = allTools.filter((t) => perms[t.function.name] !== false);
+  }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({

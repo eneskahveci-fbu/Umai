@@ -974,6 +974,7 @@ export function CoderView() {
           webSearch: searchOnRef.current,
           requireWriteApproval: store.config.requireWriteApproval,
           safeMode: store.config.safeMode,
+          toolPermissions: store.config.toolPermissions,
           planApprovalMode: store.config.planApprovalMode,
           planApproved: planApprovedRef.current,
           blockNetworkTools: store.config.blockNetworkTools,

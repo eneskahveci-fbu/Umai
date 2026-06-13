@@ -8,6 +8,45 @@ export interface Preset {
   keyHint: string;
 }
 
+/* Granüler izin sistemi: her ajan aracının kategorisi, etiketi ve risk düzeyi.
+   Kullanıcı SettingsModal'daki izin tablosundan tek tek allow/deny yapar. */
+export type ToolRisk = "low" | "medium" | "high";
+export interface ToolCatalogEntry {
+  name: string;
+  label: string;
+  category: string;
+  risk: ToolRisk;
+}
+export const TOOL_CATALOG: ToolCatalogEntry[] = [
+  // Okuma & arama — düşük risk
+  { name: "list_files", label: "Dosyaları listele", category: "Okuma & Arama", risk: "low" },
+  { name: "read_file", label: "Dosya oku", category: "Okuma & Arama", risk: "low" },
+  { name: "read_files", label: "Çoklu dosya oku", category: "Okuma & Arama", risk: "low" },
+  { name: "glob", label: "Glob ile dosya bul", category: "Okuma & Arama", risk: "low" },
+  { name: "grep", label: "İçerikte ara (grep)", category: "Okuma & Arama", risk: "low" },
+  { name: "search_files", label: "Dosya adı ara", category: "Okuma & Arama", risk: "low" },
+  { name: "search_code", label: "Kod ara", category: "Okuma & Arama", risk: "low" },
+  { name: "get_commit_history", label: "Commit geçmişi", category: "Okuma & Arama", risk: "low" },
+  { name: "list_branches", label: "Dalları listele", category: "Okuma & Arama", risk: "low" },
+  // Planlama — düşük
+  { name: "update_plan", label: "Görev planı güncelle", category: "Planlama", risk: "low" },
+  { name: "dispatch_agents", label: "Alt-ajan çalıştır", category: "Planlama", risk: "low" },
+  // Yazma — orta
+  { name: "write_file", label: "Dosya yaz / oluştur", category: "Yazma", risk: "medium" },
+  { name: "str_replace", label: "Hedefli düzenleme", category: "Yazma", risk: "medium" },
+  // Git / PR — orta
+  { name: "create_branch", label: "Dal oluştur", category: "Git & PR", risk: "medium" },
+  { name: "create_pr", label: "PR / MR aç", category: "Git & PR", risk: "medium" },
+  // Yıkıcı — yüksek
+  { name: "delete_file", label: "Dosya sil", category: "Yıkıcı", risk: "high" },
+  { name: "rename_file", label: "Yeniden adlandır / taşı", category: "Yıkıcı", risk: "high" },
+  // Terminal — yüksek
+  { name: "run_command", label: "Komut çalıştır", category: "Terminal", risk: "high" },
+  // Ağ — orta
+  { name: "web_search", label: "Web araması", category: "Ağ", risk: "medium" },
+  { name: "read_url", label: "Web sayfası oku", category: "Ağ", risk: "medium" },
+];
+
 export const PRESETS: Record<Provider, Preset> = {
   anthropic: {
     label: "🧠 Anthropic (Claude — Native)",

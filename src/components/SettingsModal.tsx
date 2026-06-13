@@ -22,7 +22,7 @@ import {
   Zap,
 } from "lucide-react";
 import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
-import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS } from "@/lib/constants";
+import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, TOOL_CATALOG } from "@/lib/constants";
 import { calculateCost, formatCost } from "@/lib/pricing";
 import { fetchUserRepos } from "@/lib/github";
 import { fetchGitLabUserRepos } from "@/lib/gitlab";
@@ -753,6 +753,7 @@ export function SettingsModal() {
                     <div className="text-xs text-muted mt-0.5">Açıkken ajan internet araçlarını (web arama / sayfa okuma) kullanamaz. Gizlilik/güvenlik için.</div>
                   </div>
                 </label>
+                <ToolPermissions />
               </div>
             </div>
 
@@ -1237,6 +1238,80 @@ export function SettingsModal() {
             </div>
           </section>
         )}
+      </div>
+    </div>
+  );
+}
+
+/* Granüler araç-izin tablosu: her aracı kategori bazında allow/deny yapar.
+   Reddedilenler (toolPermissions[name] === false) ajana hiç sunulmaz. */
+function ToolPermissions() {
+  const config = useStore((s) => s.config);
+  const saveConfig = useStore((s) => s.saveConfig);
+  const perms = config.toolPermissions ?? {};
+  const isAllowed = (name: string) => perms[name] !== false;
+  const setPerm = (names: string[], allowed: boolean) => {
+    const next = { ...perms };
+    for (const n of names) { if (allowed) delete next[n]; else next[n] = false; }
+    saveConfig({ ...config, toolPermissions: next });
+  };
+
+  const categories: string[] = [];
+  for (const t of TOOL_CATALOG) if (!categories.includes(t.category)) categories.push(t.category);
+  const riskColor: Record<string, string> = { low: "bg-muted/40", medium: "bg-amber-400", high: "bg-red" };
+  const riskLabel: Record<string, string> = { low: "düşük", medium: "orta", high: "yüksek" };
+  const deniedCount = TOOL_CATALOG.filter((t) => !isAllowed(t.name)).length;
+
+  return (
+    <div className="rounded-xl border border-line bg-bgsoft overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-line/60">
+        <div className="flex-1">
+          <div className="text-sm font-semibold">Araç izinleri</div>
+          <div className="text-xs text-muted mt-0.5">
+            Ajanın kullanabileceği araçları tek tek aç/kapat. Kapatılan araç ajana hiç sunulmaz.
+            {deniedCount > 0 && <span className="text-amber-400"> · {deniedCount} araç kapalı</span>}
+          </div>
+        </div>
+        {deniedCount > 0 && (
+          <button
+            onClick={() => saveConfig({ ...config, toolPermissions: {} })}
+            className="text-xs text-brand hover:underline shrink-0"
+          >
+            Tümünü aç
+          </button>
+        )}
+      </div>
+      <div className="divide-y divide-line/40">
+        {categories.map((cat) => {
+          const tools = TOOL_CATALOG.filter((t) => t.category === cat);
+          const allOn = tools.every((t) => isAllowed(t.name));
+          return (
+            <div key={cat} className="px-3 py-2">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted/60 flex-1">{cat}</span>
+                <button
+                  onClick={() => setPerm(tools.map((t) => t.name), !allOn)}
+                  className="text-[10px] text-muted/60 hover:text-brand transition-colors"
+                >
+                  {allOn ? "kategoriyi kapat" : "kategoriyi aç"}
+                </button>
+              </div>
+              <div className="space-y-0.5">
+                {tools.map((t) => {
+                  const on = isAllowed(t.name);
+                  return (
+                    <label key={t.name} className="flex items-center gap-2.5 py-1 cursor-pointer group">
+                      <input type="checkbox" checked={on} onChange={() => setPerm([t.name], !on)} className="accent-brand" />
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${riskColor[t.risk]}`} title={`Risk: ${riskLabel[t.risk]}`} />
+                      <span className={`text-xs flex-1 ${on ? "text-ink" : "text-muted/40 line-through"}`}>{t.label}</span>
+                      <span className="text-[10px] font-mono text-muted/40">{t.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
