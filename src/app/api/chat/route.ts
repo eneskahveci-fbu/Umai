@@ -1045,7 +1045,7 @@ export async function POST(req: Request) {
      - Plan modu (onaylanmadan): yıkıcı öneriler de kaldırılır → ajan yalnızca planlar. */
   const planGate = !!body.planApprovalMode && !body.planApproved;
   const blockWrites = !!body.requireWriteApproval || planGate;
-  let coderTools = CODER_TOOLS;
+  let coderTools = [...CODER_TOOLS, ...EXTENSION_TOOLS];
   if (blockWrites) coderTools = coderTools.filter((t) => t.function.name !== "write_file" && t.function.name !== "str_replace");
   if (planGate) coderTools = coderTools.filter((t) => t.function.name !== "delete_file" && t.function.name !== "rename_file");
   /* Salt-okunur Güvenli Mod: TÜM değiştirici araçları kaldır (yazma/silme/
