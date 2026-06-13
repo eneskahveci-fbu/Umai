@@ -7,7 +7,8 @@ import {
   Pencil, Plus, RotateCcw, Search, Sparkles, Trash2, X, Zap,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { ALL_AGENTS } from "@/lib/agents";
+import { ALL_AGENTS, type Agent } from "@/lib/agents";
+import { getUserAgents, saveUserAgents } from "@/lib/extensions/customAgents";
 import type { Skill } from "@/lib/types";
 
 type Tab = "skills" | "files" | "agents" | "progress";
@@ -364,31 +365,130 @@ function FilesTab({
 /* ───────── Agents Tab ───────── */
 
 function AgentsTab() {
+  const addToast = useStore((s) => s.addToast);
+  const [userAgents, setUserAgents] = useState<Agent[]>(() => getUserAgents());
+  const [creating, setCreating] = useState(false);
+  const [cmd, setCmd] = useState("");
+  const [label, setLabel] = useState("");
+  const [icon, setIcon] = useState("✨");
+  const [desc, setDesc] = useState("");
+  const [prompt, setPrompt] = useState("");
+
+  const userCommands = new Set(userAgents.map((a) => a.command));
+  const builtIn = ALL_AGENTS.filter((a) => !userCommands.has(a.command));
+
+  const persist = (next: Agent[]) => { setUserAgents(next); saveUserAgents(next); };
+  const reset = () => { setCmd(""); setLabel(""); setIcon("✨"); setDesc(""); setPrompt(""); };
+
+  const create = () => {
+    let command = cmd.trim().toLowerCase().replace(/\s+/g, "");
+    if (command && !command.startsWith("/")) command = "/" + command;
+    if (command.length < 2) { addToast("Komut gir (örn. /rapor)", "error"); return; }
+    if (!prompt.trim()) { addToast("Sistem prompt'u gir", "error"); return; }
+    if ([...ALL_AGENTS, ...userAgents].some((a) => a.command === command)) { addToast(`${command} zaten kullanılıyor`, "error"); return; }
+    const agent: Agent = {
+      id: "user_" + command.slice(1) + "_" + Date.now().toString(36),
+      command,
+      label: label.trim() || command.slice(1),
+      icon: icon.trim() || "✨",
+      description: desc.trim() || "Kullanıcı tanımlı agent",
+      systemPrompt: prompt.trim(),
+      placeholder: "Mesaj…",
+    };
+    persist([...userAgents, agent]);
+    reset(); setCreating(false);
+    addToast(`${command} eklendi`, "success");
+  };
+
   return (
-    <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
-      <p className="text-[11px] text-muted/50 mb-2">
-        Yerleşik agent&apos;lar — slash komutla (örn. <code className="font-mono bg-bgsoft px-1 py-0.5 rounded text-amber-400/80">/refactor</code>) tetiklenir.
-      </p>
-      {ALL_AGENTS.map((a) => (
-        <div key={a.id} className="bg-bgsoft/40 border border-line/60 rounded-xl px-3.5 py-3">
-          <div className="flex items-start gap-3">
-            <span className="text-xl leading-none mt-0.5 shrink-0">{a.icon}</span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-bold text-sm">{a.label}</h3>
-                <code className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-400/80">
-                  {a.command}
-                </code>
-              </div>
-              <p className="text-[12px] text-muted/70 leading-relaxed mb-2">{a.description}</p>
-              <details className="text-[11px]">
-                <summary className="text-muted/50 cursor-pointer hover:text-muted">Sistem prompt&apos;u gör</summary>
-                <pre className="mt-2 text-[11px] font-mono bg-[#0a0a0d] text-muted/70 px-3 py-2 rounded-lg whitespace-pre-wrap leading-relaxed">{a.systemPrompt}</pre>
-              </details>
+    <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
+      {/* Özel agent oluştur */}
+      <div className="rounded-xl border border-brand/30 bg-brand/5 overflow-hidden">
+        <button
+          onClick={() => setCreating((v) => !v)}
+          className="w-full flex items-center gap-2 px-3.5 py-2.5 text-sm font-semibold hover:bg-brand/10 transition-colors"
+        >
+          <Plus size={15} className={`text-brand transition-transform ${creating ? "rotate-45" : ""}`} />
+          Özel agent oluştur
+          <span className="ml-auto text-[11px] font-normal text-muted/60">kendi /komutun</span>
+        </button>
+        {creating && (
+          <div className="px-3.5 pb-3.5 space-y-2 border-t border-brand/15 pt-3">
+            <div className="flex gap-2">
+              <input value={icon} onChange={(e) => setIcon(e.target.value)} maxLength={2} placeholder="✨" className="w-12 text-center bg-bgsoft/60 rounded-lg px-2 py-2 text-base outline-none focus:ring-1 ring-brand/40" title="Emoji" />
+              <input value={cmd} onChange={(e) => setCmd(e.target.value)} placeholder="/komut (örn. /rapor)" className="w-40 bg-bgsoft/60 rounded-lg px-3 py-2 text-xs font-mono outline-none focus:ring-1 ring-brand/40 placeholder:text-muted/35" />
+              <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Etiket (örn. Rapor Üret)" className="flex-1 min-w-0 bg-bgsoft/60 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 ring-brand/40 placeholder:text-muted/35" />
+            </div>
+            <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Kısa açıklama (opsiyonel)" className="w-full bg-bgsoft/60 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 ring-brand/40 placeholder:text-muted/35" />
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              rows={4}
+              placeholder="Sistem prompt'u — bu komut tetiklenince ajanın rolü/talimatı. Örn: 'Sen bir teknik yazarsın. Verilen konuyu maddeler halinde Türkçe özetle…'"
+              className="w-full bg-bgsoft/60 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 ring-brand/40 placeholder:text-muted/35 resize-none leading-relaxed"
+            />
+            <div className="flex items-center justify-end gap-2">
+              <button onClick={() => { reset(); setCreating(false); }} className="px-3 py-1.5 rounded-lg text-xs text-muted hover:text-ink transition-colors">İptal</button>
+              <button onClick={create} disabled={!cmd.trim() || !prompt.trim()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-semibold hover:bg-branddim disabled:opacity-30 transition-colors">
+                <Check size={13} /> Oluştur
+              </button>
             </div>
           </div>
+        )}
+      </div>
+
+      {/* Kullanıcı agent'ları */}
+      {userAgents.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-brand/70">Senin agent&apos;ların ({userAgents.length})</div>
+          {userAgents.map((a) => (
+            <div key={a.id} className="bg-brand/5 border border-brand/20 rounded-xl px-3.5 py-3">
+              <div className="flex items-start gap-3">
+                <span className="text-xl leading-none mt-0.5 shrink-0">{a.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-bold text-sm truncate">{a.label}</h3>
+                    <code className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand/15 text-brand/90 shrink-0">{a.command}</code>
+                    <button onClick={() => persist(userAgents.filter((x) => x.id !== a.id))} className="ml-auto text-muted/40 hover:text-red transition-colors shrink-0" title="Sil"><Trash2 size={13} /></button>
+                  </div>
+                  <p className="text-[12px] text-muted/70 leading-relaxed mb-2">{a.description}</p>
+                  <details className="text-[11px]">
+                    <summary className="text-muted/50 cursor-pointer hover:text-muted">Sistem prompt&apos;u gör</summary>
+                    <pre className="mt-2 text-[11px] font-mono bg-[#0a0a0d] text-muted/70 px-3 py-2 rounded-lg whitespace-pre-wrap leading-relaxed">{a.systemPrompt}</pre>
+                  </details>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
+
+      {/* Yerleşik agent'lar */}
+      <div className="space-y-2">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-muted/50">
+          Yerleşik agent&apos;lar — slash komutla tetiklenir
+        </div>
+        {builtIn.map((a) => (
+          <div key={a.id} className="bg-bgsoft/40 border border-line/60 rounded-xl px-3.5 py-3">
+            <div className="flex items-start gap-3">
+              <span className="text-xl leading-none mt-0.5 shrink-0">{a.icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-bold text-sm">{a.label}</h3>
+                  <code className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-400/80">
+                    {a.command}
+                  </code>
+                </div>
+                <p className="text-[12px] text-muted/70 leading-relaxed mb-2">{a.description}</p>
+                <details className="text-[11px]">
+                  <summary className="text-muted/50 cursor-pointer hover:text-muted">Sistem prompt&apos;u gör</summary>
+                  <pre className="mt-2 text-[11px] font-mono bg-[#0a0a0d] text-muted/70 px-3 py-2 rounded-lg whitespace-pre-wrap leading-relaxed">{a.systemPrompt}</pre>
+                </details>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

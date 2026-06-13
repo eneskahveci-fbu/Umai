@@ -111,11 +111,15 @@ export const AGENTS: Agent[] = [
 ];
 
 import { EXTENSION_AGENTS } from "@/lib/extensions/registry";
+import { getUserAgents } from "@/lib/extensions/customAgents";
 export const ALL_AGENTS = [...AGENTS, ...EXTENSION_AGENTS];
 
 export function findAgentByCommand(text: string): Agent | null {
   const first = text.trim().split(/\s+/)[0].toLowerCase();
-  return ALL_AGENTS.find((a) => a.command === first) ?? null;
+  /* Canlı kullanıcı agent'larını da kat (yeni oluşturulanlar reload beklemeden
+     çalışsın). Komuta göre ilk eşleşme kazanır. */
+  const live = typeof window !== "undefined" ? getUserAgents() : [];
+  return [...live, ...ALL_AGENTS].find((a) => a.command === first) ?? null;
 }
 
 export function stripCommand(text: string): string {
