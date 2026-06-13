@@ -16,7 +16,7 @@ interface DiffRequest {
   token?: string;
 }
 
-async function ghHeaders(token?: string): Record<string, string> {
+function ghHeaders(token?: string): Record<string, string> {
   const h: Record<string, string> = {
     Accept: "application/vnd.github.diff",
   };

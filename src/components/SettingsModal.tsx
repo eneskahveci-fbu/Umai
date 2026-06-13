@@ -1260,7 +1260,7 @@ function ToolPermissions() {
   for (const t of ALL_TOOL_CATALOG) if (!categories.includes(t.category)) categories.push(t.category);
   const riskColor: Record<string, string> = { low: "bg-muted/40", medium: "bg-amber-400", high: "bg-red" };
   const riskLabel: Record<string, string> = { low: "düşük", medium: "orta", high: "yüksek" };
-  const deniedCount = TOOL_CATALOG.filter((t) => !isAllowed(t.name)).length;
+  const deniedCount = ALL_TOOL_CATALOG.filter((t) => !isAllowed(t.name)).length;
 
   return (
     <div className="rounded-xl border border-line bg-bgsoft overflow-hidden">

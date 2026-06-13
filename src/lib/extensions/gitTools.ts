@@ -56,6 +56,7 @@ export const GIT_TOOLS: ToolDefinition[] = [
             description: "Kaç commit gösterilsin? Varsayılan 10, max 30.",
           },
         },
+        required: [],
       },
     },
   },

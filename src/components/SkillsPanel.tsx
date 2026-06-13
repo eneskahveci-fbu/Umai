@@ -369,7 +369,7 @@ function AgentsTab() {
       <p className="text-[11px] text-muted/50 mb-2">
         Yerleşik agent&apos;lar — slash komutla (örn. <code className="font-mono bg-bgsoft px-1 py-0.5 rounded text-amber-400/80">/refactor</code>) tetiklenir.
       </p>
-      {AGENTS.map((a) => (
+      {ALL_AGENTS.map((a) => (
         <div key={a.id} className="bg-bgsoft/40 border border-line/60 rounded-xl px-3.5 py-3">
           <div className="flex items-start gap-3">
             <span className="text-xl leading-none mt-0.5 shrink-0">{a.icon}</span>
