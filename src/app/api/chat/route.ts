@@ -722,6 +722,8 @@ interface RoundResult {
   content: string;
   toolCalls: AccumulatedToolCall[];
   finishReason: string | null;
+  /** Sağlayıcının bildirdiği GERÇEK token kullanımı (varsa). */
+  usage: { prompt: number; completion: number } | null;
 }
 
 async function streamRound(
@@ -735,6 +737,7 @@ async function streamRound(
   let content = "";
   const toolCalls: AccumulatedToolCall[] = [];
   let finishReason: string | null = null;
+  let usage: { prompt: number; completion: number } | null = null;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -772,12 +775,19 @@ async function streamRound(
           }
         }
         if (choice?.finish_reason) finishReason = choice.finish_reason;
+        /* OpenAI-uyumlu akışta usage son chunk'ta gelir (stream_options.include_usage).
+           Anthropic stili: message_delta.usage. İkisini de yakala. */
+        if (json.usage) {
+          const p = Number(json.usage.prompt_tokens ?? json.usage.input_tokens ?? 0);
+          const c = Number(json.usage.completion_tokens ?? json.usage.output_tokens ?? 0);
+          if (p || c) usage = { prompt: p, completion: c };
+        }
       } catch {
         /* parçalı satır */
       }
     }
   }
-  return { content, toolCalls, finishReason };
+  return { content, toolCalls, finishReason, usage };
 }
 
 function friendlyApiError(status: number, rawDetail: string, ctx?: { model?: string; provider?: string }): string {
@@ -1050,6 +1060,10 @@ export async function POST(req: Request) {
       const url = `${baseUrl}/chat/completions`;
       /* İstek başına dosya-okuma önbelleği: aynı dosya tekrar çekilmez. */
       const readCache = new Map<string, string>();
+      /* Gerçek token kullanımı: OpenAI-uyumlu sağlayıcılar son chunk'ta usage
+         döndürebilir (stream_options.include_usage). Tüm turlar boyunca topla. */
+      const supportsUsageStream = !["pollinations", "ollama"].includes(provider);
+      const realUsage = { prompt: 0, completion: 0 };
       for (let round = 0; round < MAX_ROUNDS; round++) {
         let upstream: Response;
 
@@ -1063,6 +1077,7 @@ export async function POST(req: Request) {
               stream: true,
               tools: allTools,
               tool_choice: round === MAX_ROUNDS - 1 ? "none" : "auto",
+              ...(supportsUsageStream ? { stream_options: { include_usage: true } } : {}),
               ...sampling,
             }),
           });
@@ -1076,7 +1091,13 @@ export async function POST(req: Request) {
           break;
         }
 
-        const { content, toolCalls, finishReason } = await streamRound(upstream, controller, encoder);
+        const { content, toolCalls, finishReason, usage } = await streamRound(upstream, controller, encoder);
+        if (usage) {
+          /* prompt = en güncel turun bağlam boyutu; completion = turların toplamı. */
+          realUsage.prompt = usage.prompt || realUsage.prompt;
+          realUsage.completion += usage.completion;
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ usage_event: { prompt: realUsage.prompt, completion: realUsage.completion } })}\n\n`));
+        }
 
         if (toolCalls.length === 0 || finishReason === "stop") {
           /* Bitiş nedenini istemciye ilet: "length" ⇒ yanıt token sınırında

@@ -931,6 +931,7 @@ export function CoderView() {
     const priorLen = isContinuation ? (lastMsg?.content.length ?? 0) : 0;
     let full = isContinuation ? (lastMsg?.content ?? "") : ""; // try/catch ortak erişimi
     let cutAtLength = false; // finish_event: "length" ⇒ otomatik devam tetiklenebilir
+    let realUsage: { prompt: number; completion: number } | null = null; // sağlayıcı gerçek token
     try {
       const allEnabledSkills = (store.config.skills ?? []).filter((s) => s.enabled);
       /* Relevance scoring: compare skill text against the last user message.
@@ -1143,6 +1144,13 @@ export function CoderView() {
               useStore.getState().setFinishReasonOnLast(reason && reason !== "stop" ? reason : undefined);
               continue;
             }
+            /* Sağlayıcının bildirdiği GERÇEK token kullanımı → tahmini ezer. */
+            if (parsed.usage_event) {
+              const p = Number(parsed.usage_event.prompt) || 0;
+              const c = Number(parsed.usage_event.completion) || 0;
+              if (p || c) realUsage = { prompt: p, completion: c };
+              continue;
+            }
             /* checkpoint: ajan bir dosyayı değiştirdi → eski içeriği sakla (geri al).
                previous === null ⇒ dosya bu turda oluşturuldu (geri al = sil). */
             if (parsed.checkpoint_event) {
@@ -1241,10 +1249,17 @@ export function CoderView() {
         }
       }
 
-      /* token tahmini (devamda yalnızca yeni üretilen kısım sayılır) */
-      const inputText = apiMessages.map((m) => typeof m.content === "string" ? m.content : "").join("\n");
-      const tokenIn = estimateTokens(inputText) + estimateTokens(coderSystemPrompt);
-      const tokenOut = estimateTokens(full.slice(priorLen));
+      /* Token: sağlayıcı gerçek usage döndürdüyse onu kullan (kesin); yoksa
+         karakter-tabanlı tahmine düş. */
+      let tokenIn: number, tokenOut: number;
+      if (realUsage) {
+        tokenIn = realUsage.prompt;
+        tokenOut = realUsage.completion;
+      } else {
+        const inputText = apiMessages.map((m) => typeof m.content === "string" ? m.content : "").join("\n");
+        tokenIn = estimateTokens(inputText) + estimateTokens(coderSystemPrompt);
+        tokenOut = estimateTokens(full.slice(priorLen));
+      }
       useStore.getState().updateLastTokens(tokenIn, tokenOut);
       /* geri-al noktalarını mesaja yaz → persistCurrent ile sohbetle kaydedilir,
          sayfa yenilense bile son turun "Geri Al" imkânı kaybolmaz */
