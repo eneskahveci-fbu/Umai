@@ -34,9 +34,16 @@ export async function POST(req: Request) {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
 
+  /* Pollinations OpenAI-uyumlu uçta `/openai/models` YOKTUR; model listesi
+     kök `/models` ucundadır (ör. https://text.pollinations.ai/models). Bu yüzden
+     baseUrl'in sonundaki `/openai`'i atıp doğru ucu kullanırız. */
+  const modelsUrl = body.provider === "pollinations"
+    ? `${baseUrl.replace(/\/openai$/, "")}/models`
+    : `${baseUrl}/models`;
+
   let upstream: Response;
   try {
-    upstream = await fetch(`${baseUrl}/models`, { headers });
+    upstream = await fetch(modelsUrl, { headers });
   } catch (err) {
     return Response.json({ error: `Sağlayıcıya bağlanılamadı: ${(err as Error).message}` }, { status: 502 });
   }

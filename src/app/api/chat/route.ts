@@ -854,10 +854,6 @@ export async function POST(req: Request) {
   const apiKey = body.apiKey || process.env.LLM_API_KEY || "";
   const provider = body.provider || "hf";
 
-  /* Anahtar gerektirmeyen ücretsiz/yerel sağlayıcılar. Bunlar için "API anahtarı
-     yok" hatası verme ve boş Authorization header'ı gönderme. */
-  const keyless = provider === "pollinations" || provider === "ollama" || provider === "custom";
-
   if (!model) return new Response("Model seçilmedi.", { status: 400 });
   /* pollinations ve ollama API anahtarı gerektirmez */
   if (!apiKey && provider !== "pollinations" && provider !== "ollama") return new Response("API anahtarı yok.", { status: 400 });
@@ -978,7 +974,12 @@ export async function POST(req: Request) {
   if (!body.tools && !body.webSearch) {
     const messages = [{ role: "system", content: sysPrompt }, ...body.messages];
     let upstream: Response;
-    const url = `${baseUrl}/chat/completions`;
+    /* Pollinations token'ı klasik olarak `?token=` query param ile doğrulanır;
+       yalnızca Bearer header çoğu durumda yok sayılıp istek anonim sayılır →
+       rate-limit/hata. Token varsa query param olarak da geçir. */
+    const url = provider === "pollinations" && apiKey
+      ? `${baseUrl}/chat/completions?token=${encodeURIComponent(apiKey)}`
+      : `${baseUrl}/chat/completions`;
     /* Pollinations için referrer ekle (anonim isteklerin agresif kısıtlanmasını azaltır). */
     const upstreamBody: Record<string, unknown> = { model, messages, stream: true, ...sampling };
     if (provider === "pollinations") upstreamBody.referrer = "craft-coder";
@@ -1073,7 +1074,12 @@ export async function POST(req: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       const MAX_ROUNDS = 25;
-      const url = `${baseUrl}/chat/completions`;
+      /* Pollinations token'ı klasik olarak `?token=` query param ile doğrulanır;
+       yalnızca Bearer header çoğu durumda yok sayılıp istek anonim sayılır →
+       rate-limit/hata. Token varsa query param olarak da geçir. */
+    const url = provider === "pollinations" && apiKey
+      ? `${baseUrl}/chat/completions?token=${encodeURIComponent(apiKey)}`
+      : `${baseUrl}/chat/completions`;
       /* İstek başına dosya-okuma önbelleği: aynı dosya tekrar çekilmez. */
       const readCache = new Map<string, string>();
       /* Gerçek token kullanımı: OpenAI-uyumlu sağlayıcılar son chunk'ta usage
