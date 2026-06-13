@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AGENTS, type Agent } from "@/lib/agents";
+import { ALL_AGENTS, type Agent } from "@/lib/agents";
 
 interface Props {
   query: string;

@@ -7,7 +7,7 @@ import {
   Pencil, Plus, RotateCcw, Search, Sparkles, Trash2, X, Zap,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { AGENTS } from "@/lib/agents";
+import { ALL_AGENTS } from "@/lib/agents";
 import type { Skill } from "@/lib/types";
 
 type Tab = "skills" | "files" | "agents" | "progress";
