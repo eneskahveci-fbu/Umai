@@ -53,6 +53,9 @@ interface ChatRequest {
   planApprovalMode?: boolean;
   planApproved?: boolean;
   blockNetworkTools?: boolean;
+  /** İstemcide terminal (uzak WS veya WebContainer) mevcutsa true → run_command
+      aracı ajana sunulur. Aksi halde araç gizlenir (çıktısız komut = takılma). */
+  terminalAvailable?: boolean;
   repoCtx?: RepoCtx;
   mcpServers?: McpServerConfig[];
 }
@@ -839,10 +842,12 @@ export async function POST(req: Request) {
   if (!apiKey && provider !== "pollinations" && provider !== "ollama") return new Response("API anahtarı yok.", { status: 400 });
 
   /* Proje-başına örnekleme parametreleri (temperature/max_tokens). Tanımsızsa
-     sağlayıcı varsayılanı kullanılır. */
+     sağlayıcı varsayılanı kullanılır. max_tokens için cömert bir varsayılan
+     veririz; aksi halde çoğu sağlayıcı yanıtı ~2-4K token'da keser ve kullanıcı
+     sürekli "Devam et" tıklamak zorunda kalır (Claude Code'da uzun yanıtlar). */
   const sampling: Record<string, unknown> = {};
   if (typeof body.temperature === "number") sampling.temperature = body.temperature;
-  if (typeof body.maxTokens === "number") sampling.max_tokens = body.maxTokens;
+  sampling.max_tokens = typeof body.maxTokens === "number" && body.maxTokens > 0 ? body.maxTokens : 8192;
 
   const upstreamHeaders: Record<string, string> = { "Content-Type": "application/json" };
   if (provider === "anthropic") {
@@ -1013,6 +1018,8 @@ export async function POST(req: Request) {
   let coderTools = CODER_TOOLS;
   if (blockWrites) coderTools = coderTools.filter((t) => t.function.name !== "write_file" && t.function.name !== "str_replace");
   if (planGate) coderTools = coderTools.filter((t) => t.function.name !== "delete_file" && t.function.name !== "rename_file");
+  /* run_command yalnızca istemcide terminal varsa sunulur (yoksa çıktı gelmez). */
+  if (!body.terminalAvailable) coderTools = coderTools.filter((t) => t.function.name !== "run_command");
   const allTools = [
     ...(body.tools && body.repoCtx ? coderTools : []),
     ...(body.webSearch && !body.blockNetworkTools ? WEB_TOOLS : []),
@@ -1139,6 +1146,19 @@ export async function POST(req: Request) {
               ? `⏸ '${path}' silme önerisi kullanıcı onayına sunuldu. Kullanıcı onaylayana kadar dosya DURUYOR; buna güvenerek devam etme.`
               : `⏸ '${path}' → '${newPath}' yeniden adlandırma önerisi kullanıcı onayına sunuldu.`;
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: note } })}\n\n`));
+            resultById.set(tc.id, note);
+            return;
+          }
+          /* run_command: sunucuda terminal yok → komutu istemciye olay olarak yolla.
+             İstemci terminalde çalıştırır, çıktıyı yeni bir mesaj olarak geri gönderir
+             (craftai:terminal-output → callApi). Bu turda placeholder sonuç döner. */
+          if (tc.name === "run_command") {
+            const command = String(args.command ?? "").trim();
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ run_command_event: { command } })}\n\n`));
+            const note = `⏳ '${command}' komutu terminale gönderildi. Çıktısı ayrı bir mesaj olarak gelecek; ona göre devam et.`;
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: note } })}\n\n`),
+            );
             resultById.set(tc.id, note);
             return;
           }
