@@ -34,6 +34,7 @@ import {
   Square,
   Terminal,
   DollarSign,
+  ShieldCheck,
   VenetianMask,
   Wrench,
   X,
@@ -968,6 +969,7 @@ export function CoderView() {
           tools: toolsEnabled,
           webSearch: searchOnRef.current,
           requireWriteApproval: store.config.requireWriteApproval,
+          safeMode: store.config.safeMode,
           planApprovalMode: store.config.planApprovalMode,
           planApproved: planApprovedRef.current,
           blockNetworkTools: store.config.blockNetworkTools,
@@ -2011,8 +2013,14 @@ export function CoderView() {
                     <Wrench size={13} />
                     <span>Tools</span>
                   </ComposerButton>
-                  <MoreMenu active={!!artifact || !!activeAgent || searchOn}>
+                  <MoreMenu active={!!artifact || !!activeAgent || searchOn || !!config.safeMode}>
                     <MoreItem icon={<Globe size={14} />} label="Web arama" active={searchOn} onClick={() => setSearchOn(!searchOn)} />
+                    <MoreItem
+                      icon={<ShieldCheck size={14} />}
+                      label="Güvenli Mod (salt-okunur)"
+                      active={!!config.safeMode}
+                      onClick={() => useStore.getState().saveConfig({ ...config, safeMode: !config.safeMode })}
+                    />
                     <MoreItem icon={<ImageIcon size={14} />} label="Görsel ekle" onClick={() => imgRef.current?.click()} />
                     <MoreItem
                       icon={<Palette size={14} />}
@@ -2052,6 +2060,11 @@ export function CoderView() {
                 </div>
 
                 <div className="flex items-center gap-1.5 text-[11px] text-muted/50 shrink-0">
+                  {config.safeMode && (
+                    <span className="flex items-center gap-1 text-amber-400 font-medium" title="Salt-okunur: ajan hiçbir değişiklik yapamaz">
+                      <ShieldCheck size={12} /> Güvenli
+                    </span>
+                  )}
                   {searchOn && <span className="text-brand font-medium">Web</span>}
                   {toolsEnabled && <span className="text-green/80 font-medium">Tools</span>}
                   {activeAgent && <span className="text-brand font-medium">{activeAgent.command}</span>}

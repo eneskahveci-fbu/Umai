@@ -706,6 +706,13 @@ export function SettingsModal() {
                     <div className="text-xs text-muted mt-0.5">Editörde yazarken ghost-text önerisi (Tab ile kabul). Aktif modelin API kotasını kullanır.</div>
                   </div>
                 </label>
+                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-amber-400/50 transition-colors">
+                  <input type="checkbox" checked={!!config.safeMode} onChange={() => saveConfig({ ...config, safeMode: !config.safeMode })} className="accent-amber-400 mt-0.5" />
+                  <div>
+                    <div className="text-sm font-semibold">Güvenli Mod (salt-okunur)</div>
+                    <div className="text-xs text-muted mt-0.5">Açıkken ajan HİÇBİR değişiklik yapamaz: yazma, silme, yeniden adlandırma, dal/PR ve komut araçları tamamen devre dışı. Yalnızca okuma, arama ve analiz. Değişiklik gerekirse kod bloğu olarak önerir. Composer&apos;daki ⋯ menüsünden de açılır.</div>
+                  </div>
+                </label>
                 <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
                   <input type="checkbox" checked={!!config.requireWriteApproval} onChange={() => saveConfig({ ...config, requireWriteApproval: !config.requireWriteApproval })} className="accent-brand mt-0.5" />
                   <div>

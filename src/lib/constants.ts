@@ -417,6 +417,7 @@ export const DEFAULT_CONFIG: Config = {
   autoTerminal: false,
   inlineCompletion: true,
   requireWriteApproval: false,
+  safeMode: false,
   autoRunCommands: false,
   commandAllowlist: [...DEFAULT_COMMAND_ALLOWLIST],
   planApprovalMode: false,

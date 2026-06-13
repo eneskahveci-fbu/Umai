@@ -50,6 +50,7 @@ interface ChatRequest {
   tools?: boolean;
   webSearch?: boolean;
   requireWriteApproval?: boolean;
+  safeMode?: boolean;
   planApprovalMode?: boolean;
   planApproved?: boolean;
   blockNetworkTools?: boolean;
@@ -924,7 +925,14 @@ export async function POST(req: Request) {
       `— Silme/yeniden adlandırma YIKICIDIR: delete_file/rename_file yalnızca ÖNERİR, kullanıcı onaylayana kadar gerçekleşmez; buna güvenip 'sildim' deme.\n` +
       `— Aynı dosyayı tekrar okuma; okuduklarını hatırla.\n` +
       `— Karmaşık görevde adım adım ilerle: keşfet → analiz et → değiştir → doğrula.`;
-    if (body.requireWriteApproval) {
+    if (body.safeMode) {
+      sysPrompt +=
+        `\n\n[ÖNEMLİ — Salt-okunur (Güvenli Mod) açık]\n` +
+        `Bu oturumda HİÇBİR değiştirici işlem yapamazsın: dosya yazma/düzenleme, ` +
+        `silme, yeniden adlandırma, dal/PR oluşturma ve komut çalıştırma araçları DEVRE DIŞI. ` +
+        `Yalnızca okuma, arama ve analiz yap. Bir değişiklik gerekiyorsa onu \`\`\`dil:dosya/yolu ` +
+        `kod bloğu olarak ÖNER; kullanıcı Güvenli Mod'u kapatıp kendisi uygular.`;
+    } else if (body.requireWriteApproval) {
       sysPrompt +=
         `\n\n[ÖNEMLİ — Onay modu açık]\n` +
         `Dosyaları DOĞRUDAN YAZMA/commit ETME (write_file/str_replace KULLANMA). ` +
@@ -1018,6 +1026,12 @@ export async function POST(req: Request) {
   let coderTools = CODER_TOOLS;
   if (blockWrites) coderTools = coderTools.filter((t) => t.function.name !== "write_file" && t.function.name !== "str_replace");
   if (planGate) coderTools = coderTools.filter((t) => t.function.name !== "delete_file" && t.function.name !== "rename_file");
+  /* Salt-okunur Güvenli Mod: TÜM değiştirici araçları kaldır (yazma/silme/
+     yeniden adlandırma/dal/PR/komut). Yalnızca okuma+arama kalır. */
+  if (body.safeMode) {
+    const MUTATING_TOOLS = new Set(["write_file", "str_replace", "delete_file", "rename_file", "create_branch", "create_pr", "run_command"]);
+    coderTools = coderTools.filter((t) => !MUTATING_TOOLS.has(t.function.name));
+  }
   /* run_command yalnızca istemcide terminal varsa sunulur (yoksa çıktı gelmez). */
   if (!body.terminalAvailable) coderTools = coderTools.filter((t) => t.function.name !== "run_command");
   const allTools = [
