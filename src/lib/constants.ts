@@ -47,6 +47,9 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
   { name: "read_url", label: "Web sayfası oku", category: "Ağ", risk: "medium" },
 ];
 
+import { EXTENSION_CATALOG } from "@/lib/extensions/registry";
+export const ALL_TOOL_CATALOG = [...TOOL_CATALOG, ...EXTENSION_CATALOG];
+
 export const PRESETS: Record<Provider, Preset> = {
   anthropic: {
     label: "🧠 Anthropic (Claude — Native)",
