@@ -43,10 +43,12 @@ create table if not exists public.shared_chats (
 alter table public.shared_chats enable row level security;
 
 -- Herkes okuyabilir
+drop policy if exists "shared_chats - select" on public.shared_chats;
 create policy "shared_chats - select"
   on public.shared_chats for select using (true);
 
 -- Giriş yapmış kullanıcılar oluşturabilir
+drop policy if exists "shared_chats - insert" on public.shared_chats;
 create policy "shared_chats - insert"
   on public.shared_chats for insert with check (auth.role() = 'authenticated' or auth.role() = 'anon');
 
