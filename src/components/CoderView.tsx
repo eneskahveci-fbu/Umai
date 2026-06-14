@@ -1314,16 +1314,6 @@ export function CoderView() {
     await callApi(agent);
   };
 
-  const continueAnswer = async () => {
-    if (streaming) return;
-    const store = useStore.getState();
-    if (!store.activeModel()) { store.setSettingsOpen(true); return; }
-    const chat = store.current();
-    if (!chat || chat.messages.length === 0) return;
-    store.pushMessage({ role: "user", content: "Kaldığın yerden tam olarak devam et. Tekrarlama, baştan başlama." });
-    await callApi();
-  };
-
   const stop = () => { coderAbort?.abort(); coderAbort = null; };
 
   const regenerate = async () => {
@@ -1759,29 +1749,6 @@ export function CoderView() {
                     </div>
                   );
                 })}
-                {streaming && messages[messages.length - 1]?.content === "" && (
-                  <div className="flex gap-3 py-3 animate-fade-in">
-                    <div className="shrink-0 w-7 h-7 rounded-full bg-bgsoft border border-brand/20 grid place-items-center text-brand text-sm mt-0.5 shadow-sm">
-                      ✦
-                    </div>
-                    <div className="flex items-center gap-1 pt-2.5">
-                      <span className="typing-dot" />
-                      <span className="typing-dot delay-1" />
-                      <span className="typing-dot delay-2" />
-                    </div>
-                  </div>
-                )}
-                {!streaming && messages.length > 0 && messages[messages.length - 1].role === "assistant" && messages[messages.length - 1].content.length > 200 && (
-                  <div className="flex justify-center mt-2 mb-3">
-                    <button
-                      onClick={continueAnswer}
-                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-line bg-surface hover:border-brand/50 hover:text-ink transition-colors text-muted"
-                      title="Cevap kısaldıysa kaldığı yerden devam ettir"
-                    >
-                      <ArrowDown size={11} /> Devam Et
-                    </button>
-                  </div>
-                )}
                 {!streaming && followUpSuggestions.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-3 mb-4">
                     {followUpSuggestions.map((s, i) => (
