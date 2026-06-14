@@ -156,6 +156,9 @@ export interface PromptTemplate {
 export interface Config {
   models: ModelProfile[];
   activeModelId: string | null;
+  /** Sağlayıcı başına hatırlanan API anahtarı. Bir kez girilince o sağlayıcı
+      için tekrar girmeye gerek kalmaz (model değiştirsen bile dolu gelir). */
+  providerKeys?: Partial<Record<Provider, string>>;
   githubAccounts: GitHubAccount[];
   activeGithubId: string | null;
   gitlabAccounts: GitLabAccount[];

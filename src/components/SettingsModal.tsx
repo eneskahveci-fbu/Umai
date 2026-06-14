@@ -203,6 +203,9 @@ export function SettingsModal() {
     setProvider(p);
     setFetchedModels([]);
     if (p !== "custom") { setBaseUrl(PRESETS[p].baseUrl); setModel(PRESETS[p].model); }
+    /* Sağlayıcı için daha önce kaydedilmiş anahtar varsa otomatik doldur →
+       aynı sağlayıcıya tekrar anahtar girmeye gerek kalmaz. */
+    setApiKey(config.providerKeys?.[p] ?? "");
   };
 
   /* Girilen anahtar + Base URL ile sağlayıcının desteklediği gerçek modelleri
@@ -246,9 +249,15 @@ export function SettingsModal() {
 
   const submitModel = () => {
     if (!baseUrl.trim() || !model.trim()) { addToast("Base URL ve model gerekli.", "error"); return; }
-    addModel({ label: label.trim() || model.trim(), provider, baseUrl: baseUrl.trim(), model: model.trim(), apiKey: apiKey.trim() });
+    /* Anahtar boşsa sağlayıcı için kayıtlı anahtarı kullan; doluysa onu hem
+       modele yaz hem de sağlayıcı hafızasına kaydet (ömür boyu hatırlanır). */
+    const key = apiKey.trim() || config.providerKeys?.[provider] || "";
+    if (apiKey.trim()) {
+      saveConfig({ ...config, providerKeys: { ...config.providerKeys, [provider]: apiKey.trim() } });
+    }
+    addModel({ label: label.trim() || model.trim(), provider, baseUrl: baseUrl.trim(), model: model.trim(), apiKey: key });
     addToast("Model eklendi.", "success");
-    setLabel(""); setApiKey("");
+    setLabel("");
   };
 
   const submitGithub = async () => {
@@ -335,8 +344,14 @@ export function SettingsModal() {
       model: preset.model,
       apiKey: key,
     };
-    /* addModel mevcut aktif modeli korur; burada yeni modeli aktif yapıyoruz. */
-    saveConfig({ ...config, models: [...config.models, newModel], activeModelId: id });
+    /* addModel mevcut aktif modeli korur; burada yeni modeli aktif yapıyoruz.
+       Anahtar sağlayıcı hafızasına da kaydedilir → ömür boyu hatırlanır. */
+    saveConfig({
+      ...config,
+      models: [...config.models, newModel],
+      activeModelId: id,
+      providerKeys: { ...config.providerKeys, [quickProvider]: key },
+    });
     setQuickBusy(true);
     setQuickResult(null);
     try {
@@ -435,7 +450,7 @@ export function SettingsModal() {
               </p>
               <select
                 value={quickProvider}
-                onChange={(e) => { setQuickProvider(e.target.value as Provider); setQuickResult(null); }}
+                onChange={(e) => { const p = e.target.value as Provider; setQuickProvider(p); setQuickResult(null); setQuickKey(config.providerKeys?.[p] ?? ""); }}
                 className="input-mono w-full mb-2.5"
               >
                 {QUICK_PROVIDERS.map((p) => (

@@ -768,7 +768,7 @@ export function CoderView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: chat.messages.map((m) => ({ role: m.role, content: m.content })),
-          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey,
+          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey || useStore.getState().config.providerKeys?.[active.provider] || "",
         }),
       });
       const { suggestions } = await res.json();
@@ -797,7 +797,7 @@ export function CoderView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userText: lastUser, assistantText: lastAssistant, existing,
-          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey,
+          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey || useStore.getState().config.providerKeys?.[active.provider] || "",
         }),
       });
       const { facts } = await res.json();
@@ -956,7 +956,7 @@ export function CoderView() {
         signal: abortCtl.signal,
         body: JSON.stringify({
           messages: apiMessages,
-          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey,
+          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey || useStore.getState().config.providerKeys?.[active.provider] || "",
           provider: active.provider, systemPrompt: finalSystemPrompt,
           style: store.config.style,
           memories: store.config.memories,

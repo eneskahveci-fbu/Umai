@@ -437,6 +437,7 @@ export const POLLINATIONS_DEFAULT_MODEL: ModelProfile = {
 export const DEFAULT_CONFIG: Config = {
   models: [],
   activeModelId: null,
+  providerKeys: {},
   githubAccounts: [],
   activeGithubId: null,
   gitlabAccounts: [],
