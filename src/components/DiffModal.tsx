@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Check, Copy, X } from "lucide-react";
+import { diffLines } from "diff";
 import { useStore } from "@/lib/store";
 
 interface DiffLine {
@@ -11,41 +12,27 @@ interface DiffLine {
   newNo?: number;
 }
 
-/* Basic line-based diff using LCS */
+/* Satır bazlı diff — jsdiff (Myers algoritması). Naif LCS'e göre büyük
+   dosyalarda daha verimli ve hunk'ları daha isabetli. */
 function computeDiff(a: string, b: string): DiffLine[] {
-  const aLines = a.split("\n");
-  const bLines = b.split("\n");
-  const m = aLines.length;
-  const n = bLines.length;
-
-  /* LCS table */
-  const lcs: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (aLines[i - 1] === bLines[j - 1]) lcs[i][j] = lcs[i - 1][j - 1] + 1;
-      else lcs[i][j] = Math.max(lcs[i - 1][j], lcs[i][j - 1]);
-    }
-  }
-
+  const parts = diffLines(a, b);
   const result: DiffLine[] = [];
-  let i = m, j = n;
-  let oldNo = m, newNo = n;
-  const stack: DiffLine[] = [];
-  while (i > 0 && j > 0) {
-    if (aLines[i - 1] === bLines[j - 1]) {
-      stack.push({ type: "ctx", text: aLines[i - 1], oldNo, newNo });
-      i--; j--; oldNo--; newNo--;
-    } else if (lcs[i - 1][j] >= lcs[i][j - 1]) {
-      stack.push({ type: "del", text: aLines[i - 1], oldNo });
-      i--; oldNo--;
-    } else {
-      stack.push({ type: "add", text: bLines[j - 1], newNo });
-      j--; newNo--;
+  let oldNo = 1;
+  let newNo = 1;
+  for (const part of parts) {
+    /* Son parçanın sondaki boş satırı çift sayılmasın. */
+    const lines = part.value.split("\n");
+    if (lines.length && lines[lines.length - 1] === "") lines.pop();
+    for (const text of lines) {
+      if (part.added) {
+        result.push({ type: "add", text, newNo: newNo++ });
+      } else if (part.removed) {
+        result.push({ type: "del", text, oldNo: oldNo++ });
+      } else {
+        result.push({ type: "ctx", text, oldNo: oldNo++, newNo: newNo++ });
+      }
     }
   }
-  while (i > 0) { stack.push({ type: "del", text: aLines[i - 1], oldNo: oldNo-- }); i--; }
-  while (j > 0) { stack.push({ type: "add", text: bLines[j - 1], newNo: newNo-- }); j--; }
-  while (stack.length) result.push(stack.pop()!);
   return result;
 }
 
