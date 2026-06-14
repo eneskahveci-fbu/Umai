@@ -306,6 +306,11 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("localfs:changed", fn);
   }, []);
 
+  /* Hazır olunca haber ver → CoderView run_command'ı tam o an gönderir (kayıp yok). */
+  useEffect(() => {
+    if (status === "ready") window.dispatchEvent(new Event("craftai:terminal-ready"));
+  }, [status]);
+
   const boot = async () => {
     if (!containerRef.current) return;
     setStatus("booting");
@@ -525,7 +530,12 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      <div ref={containerRef} className="flex-1 min-h-0 px-2 py-1" />
+      <div
+        ref={containerRef}
+        role="group"
+        aria-label={`Terminal — ${modeLabel}`}
+        className="flex-1 min-h-0 px-2 py-1"
+      />
     </div>
   );
 }

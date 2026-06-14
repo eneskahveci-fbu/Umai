@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BookmarkPlus, Check, ChevronDown, ChevronUp, Copy, Eye, GitCompareArrows, Play } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { buildSingleBlockPreview } from "@/lib/preview";
 
 const COLLAPSE_LINE_THRESHOLD = 30;
 const COLLAPSED_PX = 240;
@@ -32,7 +33,7 @@ export function CodeBlock({
     .replace(/hljs/g, "")
     .trim();
 
-  const isPreviewable = ["html", "svg", "htm", "mermaid"].includes(lang);
+  const isPreviewable = ["html", "svg", "htm", "mermaid", "css", "js", "javascript", "mjs", "jsx", "tsx", "react"].includes(lang);
   const isRunnable = ["bash", "sh", "shell", "zsh"].includes(lang);
 
   const getText = () => preRef.current?.textContent || "";
@@ -46,12 +47,8 @@ export function CodeBlock({
   };
 
   const preview = () => {
-    const type = lang === "svg" ? "svg" : lang === "mermaid" ? "mermaid" : "html";
-    useStore.getState().setArtifact({
-      type,
-      content: getText(),
-      title: `${lang.toUpperCase()} Önizleme`,
-    });
+    const art = buildSingleBlockPreview(lang, getText());
+    if (art) useStore.getState().setArtifact(art);
   };
 
   const saveSnippet = () => {

@@ -8,6 +8,7 @@ import { detectFrameworks, extractDeps, parseGitignore } from "@/lib/projectCont
 import { CODER_TOOLS } from "@/lib/tools";
 import { EXTENSION_TOOLS } from "@/lib/extensions/registry";
 import { searchWeb, formatResults, fetchUrl } from "@/lib/webSearch";
+import { isSafeRemoteUrl } from "@/lib/urlSafety";
 import type { ChatMessage, MemoryItem, Provider, ResponseStyle } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -618,6 +619,7 @@ async function fetchSoulFile(ctx: RepoCtx): Promise<string | null> {
 }
 
 async function fetchMcpTools(server: McpServerConfig): Promise<{ name: string; description: string; parameters: object }[]> {
+  if (!server.url || !isSafeRemoteUrl(server.url)) return [];
   try {
     const res = await fetch(`${server.url}/tools/list`, {
       method: "POST",
@@ -636,6 +638,7 @@ async function fetchMcpTools(server: McpServerConfig): Promise<{ name: string; d
 }
 
 async function callMcpTool(server: McpServerConfig, toolName: string, args: Record<string, unknown>): Promise<string> {
+  if (!server.url || !isSafeRemoteUrl(server.url)) return "Error: güvenli olmayan MCP sunucu adresi.";
   try {
     const res = await fetch(`${server.url}/tools/call`, {
       method: "POST",

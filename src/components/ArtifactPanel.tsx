@@ -22,6 +22,8 @@ export function ArtifactPanel() {
 
   return (
     <div
+      role="region"
+      aria-label={artifact.title || "Önizleme"}
       className={`shrink-0 border-line bg-surface flex flex-col transition-all ${
         expanded ? "fixed inset-0 z-50" : "w-full h-full"
       }`}

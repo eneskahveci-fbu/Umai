@@ -62,3 +62,44 @@ alter table public.user_config enable row level security;
 drop policy if exists "kendi config - all" on public.user_config;
 create policy "kendi config - all"
   on public.user_config for all using (auth.uid() = user_id);
+
+-- ── shared_chats: sahiplik + silme (kullanıcı kendi paylaşımını kaldırabilsin) ──
+-- (Idempotent: tekrar çalıştırmak güvenlidir.)
+alter table public.shared_chats
+  add column if not exists user_id uuid references auth.users on delete set null;
+
+create index if not exists shared_chats_user_id_idx on public.shared_chats (user_id);
+create index if not exists shared_chats_created_at_idx on public.shared_chats (created_at desc);
+
+drop policy if exists "shared_chats - delete" on public.shared_chats;
+create policy "shared_chats - delete"
+  on public.shared_chats for delete using (auth.uid() = user_id);
+
+-- ── updated_at otomatik güncelleme (uygulama unutsa bile DB tutarlı kalır) ──
+create or replace function public.set_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists chats_set_updated_at on public.chats;
+create trigger chats_set_updated_at
+  before update on public.chats
+  for each row execute function public.set_updated_at();
+
+drop trigger if exists user_config_set_updated_at on public.user_config;
+create trigger user_config_set_updated_at
+  before update on public.user_config
+  for each row execute function public.set_updated_at();
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- DASHBOARD AYARLARI (SQL değil — Supabase panelinden bir kez yapılır):
+--   1) Authentication → Providers → GitLab'i (ve istiyorsan GitHub'ı) etkinleştir;
+--      OAuth App'in Client ID/Secret'ını gir.
+--   2) Authentication → URL Configuration:
+--        • Site URL = https://craft-coder.vercel.app  (kendi alan adın)
+--        • Redirect URLs'e ekle: https://craft-coder.vercel.app/auth/callback
+--   3) E-posta onayı kullanıyorsan SMTP'yi yapılandır (yoksa onay maili gitmez).
+-- ─────────────────────────────────────────────────────────────────────────

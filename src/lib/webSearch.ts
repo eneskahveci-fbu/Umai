@@ -1,3 +1,5 @@
+import { isSafeRemoteUrl } from "./urlSafety";
+
 /* Ücretsiz, anahtarsız web arama + sayfa okuma. Tek kaynak: chat route'unun
    web_search/read_url araçları, /api/web-search ve /api/search bunu kullanır.
 
@@ -133,6 +135,8 @@ export async function fetchUrl(rawUrl: string): Promise<string> {
   let url = rawUrl.trim();
   if (!url) return "URL boş.";
   if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+  /* SSRF koruması: iç ağ / loopback / bulut metadata adreslerini reddet. */
+  if (!isSafeRemoteUrl(url)) return "Bu adres güvenlik nedeniyle getirilemez (iç ağ/loopback engellendi).";
   try {
     const res = await fetch(`https://r.jina.ai/${url}`, {
       headers: { Accept: "text/plain", "X-Return-Format": "text" },
