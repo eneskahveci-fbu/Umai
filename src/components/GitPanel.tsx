@@ -3,10 +3,14 @@
 import { useState } from "react";
 import { GitPullRequest, Loader2, Plus, X } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { isGitLabRepo } from "@/lib/gitlab";
 
 export function GitPanel({ onClose, onReviewPr }: { onClose: () => void; onReviewPr?: () => void }) {
   const repo = useStore((s) => s.repo);
   const addToast = useStore((s) => s.addToast);
+  const activeRepo = useStore((s) => s.config.activeRepo) ?? "";
+  const repoIsGitLab = isGitLabRepo(activeRepo);
+  const prLabel = repoIsGitLab ? "MR" : "PR";
   const [tab, setTab] = useState<"branch" | "pr">("branch");
   const [branchName, setBranchName] = useState("");
   const [prTitle, setPrTitle] = useState("");
@@ -15,18 +19,22 @@ export function GitPanel({ onClose, onReviewPr }: { onClose: () => void; onRevie
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
-  const getToken = () => useStore.getState().activeGithub()?.token ?? "";
+  const getToken = () =>
+    (repoIsGitLab ? useStore.getState().activeGitlab()?.token : useStore.getState().activeGithub()?.token) ?? "";
 
   const createBranch = async () => {
     if (!repo || !branchName.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/github/git", {
+      /* Sağlayıcıya göre doğru uç noktayı/alan adlarını kullan (GitHub: owner, GitLab: namespace). */
+      const endpoint = repoIsGitLab ? "/api/gitlab/git" : "/api/github/git";
+      const idField = repoIsGitLab ? { namespace: repo.owner } : { owner: repo.owner };
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "create_branch",
-          owner: repo.owner, repo: repo.repo, token: getToken(),
+          ...idField, repo: repo.repo, token: getToken(),
           branchName: branchName.trim(), fromBranch: repo.branch,
         }),
       });
@@ -43,20 +51,30 @@ export function GitPanel({ onClose, onReviewPr }: { onClose: () => void; onRevie
     if (!repo || !prTitle.trim() || !prHead.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/github/git", {
+      /* GitHub PR ile GitLab MR farklı action + alan adları kullanır. */
+      const endpoint = repoIsGitLab ? "/api/gitlab/git" : "/api/github/git";
+      const payload = repoIsGitLab
+        ? {
+            action: "create_mr",
+            namespace: repo.owner, repo: repo.repo, token: getToken(),
+            title: prTitle.trim(), description: prBody.trim(),
+            sourceBranch: prHead.trim(), targetBranch: repo.branch,
+          }
+        : {
+            action: "create_pr",
+            owner: repo.owner, repo: repo.repo, token: getToken(),
+            title: prTitle.trim(), body: prBody.trim(),
+            head: prHead.trim(), base: repo.branch,
+          };
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "create_pr",
-          owner: repo.owner, repo: repo.repo, token: getToken(),
-          title: prTitle.trim(), body: prBody.trim(),
-          head: prHead.trim(), base: repo.branch,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      addToast("PR oluşturuldu!", "success");
-      window.open(data.url, "_blank");
+      addToast(`${prLabel} oluşturuldu!`, "success");
+      if (data.url) window.open(data.url, "_blank");
     } catch (e) { addToast(`Hata: ${(e as Error).message}`, "error"); }
     finally { setLoading(false); }
   };
@@ -84,7 +102,7 @@ export function GitPanel({ onClose, onReviewPr }: { onClose: () => void; onRevie
         {(["branch", "pr"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             className={`flex-1 text-[11px] py-1.5 rounded-lg transition-colors ${tab === t ? "bg-brand/10 text-brand font-semibold" : "text-muted hover:text-ink hover:bg-bgsoft"}`}>
-            {t === "branch" ? "Dal Oluştur" : "PR Aç"}
+            {t === "branch" ? "Dal Oluştur" : `${prLabel} Aç`}
           </button>
         ))}
       </div>
@@ -128,7 +146,7 @@ export function GitPanel({ onClose, onReviewPr }: { onClose: () => void; onRevie
               placeholder="Açıklama (opsiyonel)" rows={3} className="input-mono text-xs resize-none" />
             <button onClick={createPR} disabled={loading || !prTitle.trim() || !prHead.trim()}
               className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-brand hover:bg-branddim text-white text-xs font-semibold disabled:opacity-40 transition-colors">
-              {loading ? <Loader2 size={12} className="animate-spin" /> : <GitPullRequest size={12} />} PR Oluştur
+              {loading ? <Loader2 size={12} className="animate-spin" /> : <GitPullRequest size={12} />} {prLabel} Oluştur
             </button>
           </div>
         )}

@@ -365,6 +365,8 @@ export function CoderView() {
   const [filesOpen, setFilesOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [terminalSupported, setTerminalSupported] = useState(true);
+  /* Terminal "hazır" mı? run_command komutunu erken gönderip kaybetmemek için izlenir. */
+  const terminalReadyRef = useRef(false);
   const [activeAgent, setActiveAgent] = useState<Agent | null>(null);
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashQuery, setSlashQuery] = useState("");
@@ -563,6 +565,14 @@ export function CoderView() {
       if (isSupported()) setTerminalOpen(true);
     });
   }, [config.autoTerminal]);
+
+  /* Terminal hazır olduğunda işaretle; kapanınca sıfırla → run_command'ı doğru anda gönder. */
+  useEffect(() => {
+    const onReady = () => { terminalReadyRef.current = true; };
+    window.addEventListener("craftai:terminal-ready", onReady);
+    return () => window.removeEventListener("craftai:terminal-ready", onReady);
+  }, []);
+  useEffect(() => { if (!terminalOpen) terminalReadyRef.current = false; }, [terminalOpen]);
 
   /* Listen for terminal output events — auto-send to AI as follow-up context */
   useEffect(() => {
@@ -1116,10 +1126,21 @@ export function CoderView() {
               const command = String(parsed.run_command_event.command ?? "").trim();
               if (command) {
                 setTerminalOpen(true);
-                /* Terminal mount olup dinleyiciyi kurana dek küçük gecikme. */
-                setTimeout(() => {
-                  window.dispatchEvent(new CustomEvent("craftai:terminal-run", { detail: { command } }));
-                }, 600);
+                const fire = () => window.dispatchEvent(new CustomEvent("craftai:terminal-run", { detail: { command } }));
+                if (terminalReadyRef.current) {
+                  fire();
+                } else {
+                  /* Terminal hazır olunca gönder (WebContainer açılışı 5-10 sn
+                     sürebilir → sabit gecikme komutu kaybediyordu). 20 sn emniyet. */
+                  let done = false;
+                  const onReady = () => {
+                    if (done) return; done = true;
+                    window.removeEventListener("craftai:terminal-ready", onReady);
+                    fire();
+                  };
+                  window.addEventListener("craftai:terminal-ready", onReady);
+                  setTimeout(onReady, 20000);
+                }
                 addToast(`▶ Terminal: ${command}`, "info");
               }
               continue;

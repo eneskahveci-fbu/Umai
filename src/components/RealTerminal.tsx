@@ -306,6 +306,11 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("localfs:changed", fn);
   }, []);
 
+  /* Hazır olunca haber ver → CoderView run_command'ı tam o an gönderir (kayıp yok). */
+  useEffect(() => {
+    if (status === "ready") window.dispatchEvent(new Event("craftai:terminal-ready"));
+  }, [status]);
+
   const boot = async () => {
     if (!containerRef.current) return;
     setStatus("booting");

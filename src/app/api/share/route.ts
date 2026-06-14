@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { checkLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  /* Kötüye kullanım / spam'e karşı: dakikada en çok 10 paylaşım. */
+  const limited = checkLimit(req, "share", 10, 60_000);
+  if (limited) return NextResponse.json(limited.body, { status: limited.status, headers: { "Retry-After": String(limited.retryAfter) } });
   try {
     const { id, title, messages } = await req.json();
     if (!id || !title || !Array.isArray(messages)) {
@@ -16,9 +20,13 @@ export async function POST(req: NextRequest) {
     const sb = await createClient();
     if (!sb) return NextResponse.json({ error: "Veritabanı bağlantısı yok" }, { status: 503 });
 
+    /* Sahip bilgisini ekle → kullanıcı kendi paylaşımını sonradan silebilir (RLS delete policy). */
+    const { data: { user } } = await sb.auth.getUser();
+
     const shareId = `sh_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
     const { error } = await sb.from("shared_chats").insert({
       id: shareId,
+      user_id: user?.id ?? null,
       title: title.slice(0, 200),
       messages: messages.map((m: { role: string; content: string }) => ({
         role: m.role,
