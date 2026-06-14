@@ -46,6 +46,7 @@ import {
 import dynamic from "next/dynamic";
 import { detectLanguage, type EditorFile } from "@/lib/editor";
 import { extractAllFileFences } from "@/lib/parsers";
+import { buildPreview } from "@/lib/preview";
 
 import { RightPanel } from "./RightPanel";
 
@@ -1238,24 +1239,10 @@ export function CoderView() {
         }
       }
 
-      /* HTML / SVG / CSS içeren yanıtı canvas'ta otomatik önizle */
-      const directM = /```(html|svg|mermaid)(?::[^\n]*)?\n([\s\S]*?)```/.exec(full);
-      if (directM) {
-        useStore.getState().setArtifact({
-          type: directM[1] as "html" | "svg" | "mermaid",
-          content: directM[2],
-          title: `${directM[1].toUpperCase()} Önizleme`,
-        });
-      } else {
-        const cssM = /```css(?::[^\n]*)?\n([\s\S]*?)```/.exec(full);
-        if (cssM) {
-          useStore.getState().setArtifact({
-            type: "html",
-            content: `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${cssM[1]}</style></head><body></body></html>`,
-            title: "CSS Önizleme",
-          });
-        }
-      }
+      /* Yanıttaki HER önizlenebilir kodu (HTML/CSS/JS, React/JSX/TSX, SVG, mermaid)
+         canvas'ta otomatik CANLI önizle. Önizlenemeyen kod varsa mevcut önizleme korunur. */
+      const previewArtifact = buildPreview(full);
+      if (previewArtifact) useStore.getState().setArtifact(previewArtifact);
 
       /* Token: sağlayıcı gerçek usage döndürdüyse onu kullan (kesin); yoksa
          karakter-tabanlı tahmine düş. */
