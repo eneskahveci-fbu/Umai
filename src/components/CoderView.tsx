@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowDown,
@@ -46,6 +46,7 @@ import {
 import dynamic from "next/dynamic";
 import { detectLanguage, type EditorFile } from "@/lib/editor";
 import { extractAllFileFences } from "@/lib/parsers";
+import { fuzzyFiles } from "@/lib/fuzzy";
 import { buildPreview } from "@/lib/preview";
 
 import { RightPanel } from "./RightPanel";
@@ -1379,10 +1380,11 @@ export function CoderView() {
     await callApi();
   };
 
-  const allFiles = tree ? getAllFiles(tree) : [];
-  const filteredFiles = repoSearch
-    ? allFiles.filter((f) => f.name.toLowerCase().includes(repoSearch.toLowerCase()) || f.path.toLowerCase().includes(repoSearch.toLowerCase()))
-    : allFiles;
+  const allFiles = useMemo(() => (tree ? getAllFiles(tree) : []), [tree]);
+  const filteredFiles = useMemo(
+    () => fuzzyFiles(allFiles, repoSearch),
+    [allFiles, repoSearch],
+  );
   const attachedPaths = attachedFiles.map((f) => f.path);
 
   return (

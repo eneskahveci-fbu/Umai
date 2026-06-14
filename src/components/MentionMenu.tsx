@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Fuse from "fuse.js";
 import { File } from "lucide-react";
 
 interface MentionItem { path: string; attached?: boolean; }
@@ -14,9 +15,16 @@ interface Props {
 
 export function MentionMenu({ query, items, onSelect, onClose }: Props) {
   const [active, setActive] = useState(0);
-  const q = query.toLowerCase();
+
+  /* Bulanık (fuzzy) eşleştirme: "apprt" → src/app/.../route.ts gibi sıralı ama
+     bitişik olmayan harf dizilerini de bulur. Fuse skorla en alakalıyı öne alır. */
+  const fuse = useMemo(
+    () => new Fuse(items, { keys: ["path"], threshold: 0.4, ignoreLocation: true }),
+    [items],
+  );
+  const q = query.trim();
   const filtered = q
-    ? items.filter((i) => i.path.toLowerCase().includes(q)).slice(0, 8)
+    ? fuse.search(q).slice(0, 8).map((r) => r.item)
     : items.slice(0, 8);
 
   /* Reset the highlighted item whenever the query changes — adjusted during
