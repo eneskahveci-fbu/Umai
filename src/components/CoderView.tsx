@@ -37,6 +37,7 @@ import {
   Terminal,
   DollarSign,
   ShieldCheck,
+  Users,
   VenetianMask,
   Wrench,
   X,
@@ -378,7 +379,11 @@ export function CoderView() {
   const [searchOn, setSearchOn] = useState(false);
   const searchOnRef = useRef(false);
   useEffect(() => { searchOnRef.current = searchOn; }, [searchOn]);
-  /* Çoklu-ajan ("Ajan Ekibi") modu: planlayıcı → paralel işçiler → birleştirici. */
+  /* Çoklu-ajan ("Ajan Ekibi" / Swarm) modu: planlayıcı → paralel uzman işçiler
+     → birleştirici (/api/orchestrate). Tek mesajda bir ajan ekibi çalışır. */
+  const [swarmMode, setSwarmMode] = useState(false);
+  const swarmModeRef = useRef(false);
+  useEffect(() => { swarmModeRef.current = swarmMode; }, [swarmMode]);
   /* Plan onayı: bir sonraki istekte plan-modu kapısını geçici aşar. */
   const planApprovedRef = useRef(false);
   const [repoSearch, setRepoSearch] = useState("");
@@ -933,7 +938,7 @@ export function CoderView() {
          Sunucu Pollinations'ı anahtarsız destekler). */
       /* Ajan Ekibi modunda orkestrasyon endpoint'ine git (planlayıcı → paralel
          işçiler → birleştirici). Aynı gövdeyi alır, aynı OpenAI-uyumlu SSE'yi döner. */
-      const endpoint = "/api/chat";
+      const endpoint = swarmModeRef.current && !isContinuation ? "/api/orchestrate" : "/api/chat";
       const callViaServer = () => fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1986,10 +1991,11 @@ export function CoderView() {
                   />
                 )}
                 {/* Daha fazla — mikrofon ile gönder arasında; mesaj-oluşturma eylemleri */}
-                <MoreMenu active={searchOn}>
+                <MoreMenu active={searchOn || swarmMode}>
                   <MoreItem icon={<Paperclip size={14} />} label="Dosya ekle" onClick={() => fileRef.current?.click()} />
                   <MoreItem icon={<ImageIcon size={14} />} label="Görsel ekle" onClick={() => imgRef.current?.click()} />
                   <MoreItem icon={<Globe size={14} />} label="Web arama" active={searchOn} onClick={() => setSearchOn(!searchOn)} />
+                  <MoreItem icon={<Users size={14} />} label="Ajan Ekibi (Swarm)" active={swarmMode} onClick={() => setSwarmMode((v) => !v)} />
                 </MoreMenu>
                 {streaming ? (
                   <button onClick={stop} className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-red hover:bg-red/80 active:bg-red/70 text-white grid place-items-center transition-colors" title="Durdur">
@@ -2016,6 +2022,7 @@ export function CoderView() {
                     </span>
                   )}
                   {searchOn && <span className="text-brand font-medium">Web</span>}
+                  {swarmMode && <span className="flex items-center gap-1 text-brand font-medium" title="Ajan Ekibi: planlayıcı → paralel uzman işçiler → birleştirici"><Users size={12} /> Ekip</span>}
                   {toolsEnabled && <span className="text-green/80 font-medium">Tools</span>}
                   {activeAgent && <span className="text-brand font-medium">{activeAgent.command}</span>}
                 </div>
