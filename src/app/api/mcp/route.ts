@@ -1,9 +1,22 @@
+import type { NextRequest } from "next/server";
+import { checkLimit } from "@/lib/rate-limit";
+import { isSafeRemoteUrl } from "@/lib/urlSafety";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 interface McpServerConfig {
   url: string;
   headers?: Record<string, string>;
+}
+
+/* CSRF: yalnızca aynı origin'den gelen isteklere izin ver. */
+function sameOrigin(req: Request): boolean {
+  const origin = req.headers.get("origin");
+  if (!origin) return true; // tarayıcı-dışı/sunucu içi çağrı
+  const host = req.headers.get("host");
+  if (!host) return false;
+  try { return new URL(origin).host === host; } catch { return false; }
 }
 
 async function fetchMcpTools(server: McpServerConfig): Promise<{ name: string; description: string; inputSchema: object }[]> {
@@ -35,9 +48,16 @@ async function callMcpTool(
   return parts.filter((p) => p.type === "text").map((p) => p.text ?? "").join("\n") || "No result";
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  if (!sameOrigin(req)) return Response.json({ error: "Geçersiz origin" }, { status: 403 });
+  const limited = checkLimit(req, "mcp", 60, 60_000);
+  if (limited) return Response.json(limited.body, { status: limited.status, headers: { "Retry-After": String(limited.retryAfter) } });
   try {
     const body = await req.json() as { action: "list" | "call"; server: McpServerConfig; tool?: string; args?: Record<string, unknown> };
+    /* SSRF: MCP sunucu URL'i iç ağa/loopback'e işaret edemez. */
+    if (!body.server?.url || !isSafeRemoteUrl(body.server.url)) {
+      return Response.json({ error: "Geçersiz veya güvenli olmayan MCP sunucu adresi." }, { status: 400 });
+    }
     if (body.action === "list") {
       const tools = await fetchMcpTools(body.server);
       return Response.json({ tools });
