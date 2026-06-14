@@ -128,17 +128,38 @@ async function streamModel(
   }
 }
 
+/* Uzman rol rehberi — her işçi ajan rolüne göre farklı sistem talimatı alır. */
+const ROLE_GUIDE: Record<string, string> = {
+  mimar: "Sen bir YAZILIM MİMARISIN. Tasarım, dosya/modül yapısı, arayüzler, veri akışı ve mimari kararlara odaklan. Somut bir tasarım/plan üret; gerekirse iskelet kod ver.",
+  kodlayıcı: "Sen deneyimli bir GELİŞTİRİCİSİN. İstenen işlevi ÇALIŞAN, temiz kodla uygula. Tam kod blokları ver, kenar durumları ele al.",
+  test: "Sen bir TEST MÜHENDİSİSİN. Kapsamlı test senaryoları yaz: mutlu yol, kenar durumlar, hata senaryoları. Uygun framework'le (Vitest/pytest vb.) çalışan test kodu ver.",
+  inceleyici: "Sen kıdemli bir KOD İNCELEYİCİSİSİN. Bug, güvenlik açığı, performans sorunu ve kod kalitesi açısından titiz incele; her bulguya ciddiyet ve somut düzeltme öner.",
+  araştırmacı: "Sen bir ARAŞTIRMACI AJANSIN. Kod tabanını/dış kaynakları keşfedip ilgili gerçekleri topla ve özetle. Bulgularını kanıta (dosya/satır) dayandır.",
+  genel: "Sen uzman bir alt-ajansın. Sana verilen alt görevi eksiksiz, uygulanabilir biçimde tamamla.",
+};
+const VALID_ROLES = Object.keys(ROLE_GUIDE);
+const ROLE_ICON: Record<string, string> = {
+  mimar: "📐", kodlayıcı: "⌨️", test: "🧪", inceleyici: "🔍", araştırmacı: "🔬", genel: "⚙️",
+};
+
 /* Planlayıcı çıktısından JSON görevleri çıkar (kod bloğu/fazla metne dayanıklı). */
-function parseTasks(raw: string): { title: string; instruction: string }[] {
+function parseTasks(raw: string): { title: string; role: string; instruction: string }[] {
   const start = raw.indexOf("{");
   const end = raw.lastIndexOf("}");
   if (start === -1 || end === -1 || end < start) return [];
   try {
-    const obj = JSON.parse(raw.slice(start, end + 1)) as { tasks?: { title?: string; instruction?: string }[] };
+    const obj = JSON.parse(raw.slice(start, end + 1)) as { tasks?: { title?: string; role?: string; instruction?: string }[] };
     return (obj.tasks ?? [])
       .filter((t) => t && typeof t.instruction === "string" && t.instruction.trim())
       .slice(0, MAX_AGENTS)
-      .map((t) => ({ title: (t.title || "Alt görev").trim(), instruction: t.instruction!.trim() }));
+      .map((t) => {
+        const role = (t.role || "genel").trim().toLowerCase();
+        return {
+          title: (t.title || "Alt görev").trim(),
+          role: VALID_ROLES.includes(role) ? role : "genel",
+          instruction: t.instruction!.trim(),
+        };
+      });
   } catch { return []; }
 }
 
@@ -189,9 +210,12 @@ export async function POST(req: Request) {
         const planSys =
           `Sen bir baş planlayıcı ajansın. Kullanıcının isteğini, PARALEL ve BAĞIMSIZ ` +
           `çalışabilecek (birbirine bağımlı olmayan) en fazla ${MAX_AGENTS} alt göreve böl. ` +
+          `Her alt göreve en uygun UZMAN ROLÜ ata. Roller: ` +
+          `mimar (tasarım/mimari), kodlayıcı (uygulama), test (test yazımı), ` +
+          `inceleyici (bug/güvenlik/performans denetimi), araştırmacı (keşif/analiz), genel. ` +
           `Görev küçükse veya bölmeye değmezse TEK görev döndür. ` +
           `SADECE şu JSON ile yanıt ver, başka hiçbir şey yazma:\n` +
-          `{"tasks":[{"title":"kısa başlık","instruction":"o ajana net, bağımsız talimat"}]}`;
+          `{"tasks":[{"title":"kısa başlık","role":"kodlayıcı","instruction":"o ajana net, bağımsız talimat"}]}`;
         const planRaw = await callModel(cfg, [
           { role: "system", content: planSys },
           ...shared,
@@ -208,24 +232,25 @@ export async function POST(req: Request) {
         }
 
         send(
-          `**Plan — ${tasks.length} paralel ajan:**\n` +
-          tasks.map((t, i) => `${i + 1}. ${t.title}`).join("\n") +
+          `**Plan — ${tasks.length} uzman ajan:**\n` +
+          tasks.map((t, i) => `${i + 1}. ${ROLE_ICON[t.role] ?? "⚙️"} _${t.role}_ — ${t.title}`).join("\n") +
           `\n\n⚙️ Ajanlar paralel çalışıyor…\n\n`,
         );
 
-        /* ── 2) PARALEL İŞÇİ AJANLAR ── */
+        /* ── 2) PARALEL UZMAN İŞÇİ AJANLAR ── */
         const repoCtx = body.repoCtx;
-        const workerSys =
-          `Sen uzman bir alt-ajansın. SADECE sana verilen alt göreve odaklan ve onu ` +
-          `eksiksiz tamamla; diğer alt görevleri YAPMA. Net, uygulanabilir bir sonuç üret ` +
-          `(gerekiyorsa kod blokları kullan). Türkçe yaz.` +
-          (repoCtx ? ` Gerekirse read_file/list_files araçlarıyla repoyu kendin incele.` : ``);
         const results = await Promise.all(
-          tasks.map(async (t, i) => {
+          tasks.map(async (t) => {
+            /* Rol-özel sistem prompt'u → her ajan kendi uzmanlığıyla çalışır. */
+            const workerSys =
+              `${ROLE_GUIDE[t.role] ?? ROLE_GUIDE.genel} ` +
+              `SADECE sana verilen alt göreve odaklan; diğer alt görevleri YAPMA. ` +
+              `Net, uygulanabilir sonuç üret (gerekiyorsa kod blokları). Türkçe yaz.` +
+              (repoCtx ? ` Gerekirse read_file/list_files/grep araçlarıyla repoyu kendin incele.` : ``);
             const wmsgs = [
               { role: "system", content: workerSys },
               ...shared,
-              { role: "user", content: `ALT GÖREVİN: ${t.title}\n\n${t.instruction}` },
+              { role: "user", content: `ALT GÖREVİN (${t.role}): ${t.title}\n\n${t.instruction}` },
             ];
             try {
               /* repoCtx varsa işçi salt-okunur araçlarla repoyu kendi gezer
@@ -233,10 +258,10 @@ export async function POST(req: Request) {
               const r = repoCtx
                 ? await runReadOnlyAgent(cfg, wmsgs, repoCtx, signal)
                 : await callModel(cfg, wmsgs, signal);
-              send(`✅ Ajan ${i + 1} tamam — ${t.title}\n`);
+              send(`✅ ${ROLE_ICON[t.role] ?? "⚙️"} ${t.role} ajanı tamam — ${t.title}\n`);
               return r;
             } catch (e) {
-              send(`⚠️ Ajan ${i + 1} hata verdi — ${t.title}\n`);
+              send(`⚠️ ${t.role} ajanı hata verdi — ${t.title}\n`);
               return `(Bu alt görev tamamlanamadı: ${(e as Error).message})`;
             }
           }),
@@ -250,7 +275,7 @@ export async function POST(req: Request) {
           `orijinal isteğine doğrudan cevap ver. Alt ajanlardan/süreçten bahsetme, yalnızca ` +
           `nihai sonucu sun. Türkçe yaz.\n\n${baseSys}`;
         const combined = tasks
-          .map((t, i) => `### ${t.title}\n${results[i]}`)
+          .map((t, i) => `### ${ROLE_ICON[t.role] ?? "⚙️"} ${t.title} (${t.role})\n${results[i]}`)
           .join("\n\n");
         await streamModel(cfg, [
           { role: "system", content: synthSys },
