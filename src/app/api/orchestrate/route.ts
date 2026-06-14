@@ -24,6 +24,7 @@ interface OrchestrateRequest {
   apiKey?: string;
   provider?: Provider;
   systemPrompt?: string;
+  effort?: "low" | "medium" | "high" | "max";
   style?: ResponseStyle;
   memories?: MemoryItem[];
   skills?: SkillLike[];
@@ -66,7 +67,18 @@ function buildHeaders(provider: Provider, apiKey: string, req: Request): Record<
 type Cfg = {
   baseUrl: string; model: string; provider: Provider;
   headers: Record<string, string>;
+  effort?: "low" | "medium" | "high" | "max";
 };
+
+/* Efor → swarm çağrılarında da max_tokens + reasoning uygula (chat route ile aynı ölçek). */
+const EFFORT_TOKENS = { low: 4096, medium: 8192, high: 16384, max: 32768 } as const;
+function applyEffort(body: Record<string, unknown>, cfg: Cfg) {
+  if (!cfg.effort) return;
+  body.max_tokens = EFFORT_TOKENS[cfg.effort];
+  if (cfg.provider === "openrouter") {
+    body.reasoning = { effort: cfg.effort === "max" ? "high" : cfg.effort };
+  }
+}
 
 /* Tek, akışsız (non-streaming) model çağrısı → düz metin döndürür. */
 async function callModel(
@@ -76,6 +88,7 @@ async function callModel(
 ): Promise<string> {
   const body: Record<string, unknown> = { model: cfg.model, messages, stream: false };
   if (cfg.provider === "pollinations") body.referrer = "craft-coder";
+  applyEffort(body, cfg);
   const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
     method: "POST", headers: cfg.headers, body: JSON.stringify(body), signal,
   });
@@ -97,6 +110,7 @@ async function streamModel(
 ): Promise<void> {
   const body: Record<string, unknown> = { model: cfg.model, messages, stream: true };
   if (cfg.provider === "pollinations") body.referrer = "craft-coder";
+  applyEffort(body, cfg);
   const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
     method: "POST", headers: cfg.headers, body: JSON.stringify(body), signal,
   });
@@ -178,7 +192,7 @@ export async function POST(req: Request) {
     return new Response("API anahtarı yok.", { status: 400 });
   }
 
-  const cfg: Cfg = { baseUrl, model, provider, headers: buildHeaders(provider, apiKey, req) };
+  const cfg: Cfg = { baseUrl, model, provider, headers: buildHeaders(provider, apiKey, req), effort: body.effort };
   /* Kullanıcı bağlamı (stil + hafıza + skills + arama) /api/chat ile aynı kaynaktan
      → nihai cevap (birleştirici / tek-ajan) bu kurallara uyar. */
   const baseSys = (body.systemPrompt || DEFAULT_SYSTEM_PROMPT) + buildContextSections({

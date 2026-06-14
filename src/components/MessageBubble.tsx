@@ -323,7 +323,9 @@ export function MessageBubble({
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState("");
-  const [thinkingOpen, setThinkingOpen] = useState(false);
+  /* Düşünme süreci varsayılan AÇIK: üretim sürerken otomatik genişler ki
+     kullanıcı modelin gerçek zamanlı düşünmesini görsün. */
+  const [thinkingOpen, setThinkingOpen] = useState(true);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const rateMessage = useStore((s) => s.rateMessage);
   const addSkill = useStore((s) => s.addSkill);

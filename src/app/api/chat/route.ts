@@ -44,6 +44,7 @@ interface ChatRequest {
   systemPrompt?: string;
   temperature?: number;
   maxTokens?: number;
+  effort?: "low" | "medium" | "high" | "max";
   style?: ResponseStyle;
   memories?: MemoryItem[];
   skills?: SkillPayload[];
@@ -912,7 +913,28 @@ export async function POST(req: Request) {
      sürekli "Devam et" tıklamak zorunda kalır (Claude Code'da uzun yanıtlar). */
   const sampling: Record<string, unknown> = {};
   if (typeof body.temperature === "number") sampling.temperature = body.temperature;
-  sampling.max_tokens = typeof body.maxTokens === "number" && body.maxTokens > 0 ? body.maxTokens : 8192;
+  /* Efor seviyesi → GERÇEK API etkisi (yalnızca sistem-prompt yönlendirmesi değil):
+       1) max_tokens'ı efora göre ölçekle → daha yüksek efor = daha uzun, daha
+          kapsamlı, kesilmeyen yanıt.
+       2) Destekleyen sağlayıcıda reasoning/effort parametresini ilet → model
+          gerçekten daha fazla düşünme bütçesi harcar.
+     Kullanıcı projede açıkça max_tokens belirlediyse onun değeri korunur. */
+  const EFFORT_TOKENS = { low: 4096, medium: 8192, high: 16384, max: 32768 } as const;
+  const userMaxTokens = typeof body.maxTokens === "number" && body.maxTokens > 0 ? body.maxTokens : 0;
+  sampling.max_tokens = userMaxTokens || (body.effort ? EFFORT_TOKENS[body.effort] : 8192);
+  if (body.effort) {
+    /* OpenAI-uyumlu reasoning effort ölçeği low|medium|high (max → high). */
+    const apiEffort = body.effort === "max" ? "high" : body.effort;
+    if (provider === "openrouter") {
+      /* OpenRouter reasoning'i normalize eder; desteklemeyen modelde sessizce
+         yok sayar → 400 riski yok. Reasoning token'ları akışta döner ve UI'da
+         "Düşünce süreci" olarak gösterilir. */
+      sampling.reasoning = { effort: apiEffort };
+    }
+    /* deepseek/groq/xai gibi sağlayıcılarda reasoning modelleri zaten
+       reasoning_content yayar; bilinmeyen alanla 400 riskine girmeyiz —
+       max_tokens ölçeklemesi + sistem-prompt efor yönergesi yeterli etki sağlar. */
+  }
 
   const upstreamHeaders: Record<string, string> = { "Content-Type": "application/json" };
   if (provider === "anthropic") {

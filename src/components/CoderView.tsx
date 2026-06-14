@@ -220,7 +220,7 @@ function ThinkingModeToggle() {
       style={{ top: pos.top, right: pos.right, position: "fixed", zIndex: 9999 }}
       className="bg-surface border border-line rounded-xl shadow-2xl shadow-black/50 p-1 min-w-[140px] animate-fade-in"
     >
-      <div className="text-[9px] font-bold uppercase tracking-widest text-muted/50 px-2 pt-1 pb-1.5">Düşünce Derinliği</div>
+      <div className="text-[9px] font-bold uppercase tracking-widest text-muted/50 px-2 pt-1 pb-1.5">Efor Seviyesi</div>
       {THINKING_LEVELS.map((l) => (
         <button
           key={l.key}
@@ -243,7 +243,7 @@ function ThinkingModeToggle() {
       <button
         ref={btnRef}
         onClick={handleOpen}
-        title="Düşünce derinliği"
+        title="Efor seviyesi"
         className="flex items-center gap-1.5 text-[12px] px-2 py-1.5 rounded-lg transition-colors font-semibold text-brand bg-brand/10 hover:bg-brand/15"
       >
         <Brain size={13} />
@@ -880,14 +880,14 @@ export function CoderView() {
     const thinkingMode = store.thinkingMode;
     let finalSystemPrompt = coderSystemPrompt;
     if (thinkingMode === "medium") {
-      finalSystemPrompt += "\n\n[Düşünme: ORTA] Kısa bir iç değerlendirme yap, ardından net yanıt ver.";
+      finalSystemPrompt += "\n\n[EFOR: ORTA] Yanıtlamadan önce kısa bir iç değerlendirme yap, ardından net ve eksiksiz yanıt ver.";
     } else if (thinkingMode === "high") {
       finalSystemPrompt +=
-        "\n\n[Düşünme: YÜKSEK] Adım adım analiz et. Sorunu içselleştir, " +
-        "olası yaklaşımları kıyasla, edge case'leri düşün, ardından gerekçeli çözümü ver.";
+        "\n\n[EFOR: YÜKSEK] Bu göreve ciddi efor harca: adım adım analiz et, " +
+        "olası yaklaşımları kıyasla, edge case'leri düşün, ardından gerekçeli ve eksiksiz çözümü ver.";
     } else if (thinkingMode === "max") {
       finalSystemPrompt +=
-        "\n\n[Düşünme: MAX] En derin analizi yap. Problemi birden fazla açıdan incele, " +
+        "\n\n[EFOR: MAX] Mümkün olan en yüksek eforu harca. Problemi birden fazla açıdan incele, " +
         "tüm alternatif yaklaşımları değerlendir, olası hataları ve edge case'leri listele, " +
         "güvenlik ve performans etkilerini değerlendir, ardından en sağlam çözümü tam gerekçesiyle sun. Kısa kesme.";
     }
@@ -964,6 +964,7 @@ export function CoderView() {
           terminalAvailable: !!(store.config.terminalWsUrl?.trim()) || terminalSupported,
           temperature: activeProjectCfg?.temperature,
           maxTokens: activeProjectCfg?.maxTokens,
+          effort: thinkingMode,
           searchContext: webSearchContext || undefined,
           repoCtx: toolsEnabled && repo ? {
             owner: repo.owner,
