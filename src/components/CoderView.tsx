@@ -564,16 +564,18 @@ export function CoderView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.activeRepo, config.activeGithubId, config.activeGitlabId, config.cliMode]);
 
-  /* Terminal desteği varsa ARKAPLANDA otomatik boot et (gizli) → ajan
-     komutları hemen çalışır. autoTerminal açıksa görünür de aç. */
+  /* Bir REPO bağlanınca terminali ARKAPLANDA otomatik boot et (gizli) → ajan
+     komutları hazır olur; repo yokken boşa kaynak harcanmaz. autoTerminal
+     açıksa görünür de aç. Bir kez mount olunca kapanmaz. */
   useEffect(() => {
+    if (!repo) return;
     const useWs = !!config.terminalWsUrl?.trim();
     const mount = () => { setTerminalMounted(true); if (config.autoTerminal) setTerminalOpen(true); };
     if (useWs) { const id = setTimeout(mount, 0); return () => clearTimeout(id); }
     let alive = true;
     import("@/lib/webcontainer").then(({ isSupported }) => { if (alive && isSupported()) mount(); });
     return () => { alive = false; };
-  }, [config.autoTerminal, config.terminalWsUrl]);
+  }, [repo, config.autoTerminal, config.terminalWsUrl]);
 
   /* Terminal hazır olduğunda işaretle; kapanınca sıfırla → run_command'ı doğru anda gönder. */
   useEffect(() => {
@@ -1129,6 +1131,11 @@ export function CoderView() {
             /* ajan plan (update_plan) olayı */
             if (parsed.plan_event) {
               useStore.getState().setPlanOnLast(String(parsed.plan_event.plan ?? ""));
+              continue;
+            }
+            /* Ajan Ekibi (Swarm) ilerleme olayı → todo paneli canlı güncelle */
+            if (parsed.swarm_event) {
+              useStore.getState().setSwarmOnLast(parsed.swarm_event as import("@/lib/types").SwarmState);
               continue;
             }
             /* run_command: ajan terminalde komut çalıştırmak istiyor → terminali

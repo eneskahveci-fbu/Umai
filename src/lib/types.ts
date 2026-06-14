@@ -31,6 +31,8 @@ export interface ChatMessage {
   rating?: "up" | "down";
   /** Ajan görev planı (update_plan aracıyla canlı güncellenen checklist). */
   plan?: string;
+  /** Ajan Ekibi (Swarm) ilerleme durumu — todo panelinde çizilir. */
+  swarm?: SwarmState;
   /** Bu turda değiştirilen dosyaların geri-al noktaları (sohbetle kalıcı). */
   checkpoints?: FileCheckpoint[];
   /** Üreticinin bitiş nedeni: "length" ⇒ token sınırında kesildi (Devam et). */
@@ -40,6 +42,16 @@ export interface ChatMessage {
   branches?: ChatMessage[][];
   /** Aktif dalın indeksi. */
   branchIndex?: number;
+}
+
+export interface SwarmAgentState {
+  title: string;
+  role: string;
+  status: "running" | "done" | "error";
+}
+export interface SwarmState {
+  phase: "planning" | "working" | "synthesizing" | "done";
+  agents: SwarmAgentState[];
 }
 
 export interface McpServer {

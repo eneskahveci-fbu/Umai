@@ -11,9 +11,9 @@ import {
   BookMarked, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
   Circle, CircleDot, ListChecks,
   Code2, Copy, FileText, FolderOpen, GitBranch, GitCommit, Globe,
-  Loader2, Pencil, RefreshCw, Search, ThumbsDown, ThumbsUp, Wrench, X,
+  Loader2, Pencil, RefreshCw, Search, ThumbsDown, ThumbsUp, Users, Wrench, X,
 } from "lucide-react";
-import type { ChatMessage } from "@/lib/types";
+import type { ChatMessage, SwarmState } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { CodeBlock } from "./CodeBlock";
 import { ALL_AGENTS } from "@/lib/agents";
@@ -224,6 +224,72 @@ function PlanPanel({ plan }: { plan: string }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* ── Ajan Ekibi (Swarm) ilerleme paneli ────────────────────────────── */
+
+const SWARM_ROLE_ICON: Record<string, string> = {
+  mimar: "📐",
+  kodlayıcı: "⌨️",
+  test: "🧪",
+  inceleyici: "🔍",
+  araştırmacı: "🔬",
+  genel: "⚙️",
+};
+
+const SWARM_PHASE_LABEL: Record<SwarmState["phase"], string> = {
+  planning: "Görevler planlanıyor…",
+  working: "Ajanlar çalışıyor…",
+  synthesizing: "Sonuçlar birleştiriliyor…",
+  done: "Ajan ekibi tamamlandı",
+};
+
+function SwarmPanel({ swarm }: { swarm: SwarmState }) {
+  const { phase, agents } = swarm;
+  const done = agents.filter((a) => a.status === "done").length;
+  const active = phase !== "done";
+  return (
+    <div className="mb-3 border border-line/50 rounded-xl overflow-hidden bg-bgsoft/30">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-line/30 text-xs">
+        <Users size={12} className={active ? "text-brand animate-pulse" : "text-green"} />
+        <span className="font-semibold">Ajan Ekibi</span>
+        <span className="text-muted/60">· {SWARM_PHASE_LABEL[phase]}</span>
+        {agents.length > 0 && (
+          <span className="text-muted/50 font-mono ml-auto tabular-nums">{done}/{agents.length}</span>
+        )}
+      </div>
+      {phase === "planning" && agents.length === 0 ? (
+        <div className="px-3 py-2.5 flex items-center gap-2 text-xs text-muted/70">
+          <Loader2 size={12} className="animate-spin text-brand" />
+          <span>Görevler belirleniyor…</span>
+        </div>
+      ) : (
+        <div className="px-3 py-2.5 space-y-1.5">
+          {agents.map((a, i) => (
+            <div key={i} className="flex items-start gap-2 text-xs">
+              <span className="shrink-0 mt-0.5 w-4 text-center leading-none">
+                {SWARM_ROLE_ICON[a.role] ?? "⚙️"}
+              </span>
+              {a.status === "done" ? (
+                <Check size={12} className="text-green shrink-0 mt-0.5" />
+              ) : a.status === "error" ? (
+                <X size={12} className="text-red-400 shrink-0 mt-0.5" />
+              ) : (
+                <Loader2 size={12} className="text-brand shrink-0 mt-0.5 animate-spin" />
+              )}
+              <span className={
+                a.status === "done" ? "text-muted/60" :
+                a.status === "error" ? "text-red-400/80" :
+                "text-ink font-medium"
+              }>
+                {a.title}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -477,6 +543,9 @@ export function MessageBubble({
             </span>
           </div>
         )}
+
+        {/* Ajan Ekibi (Swarm) ilerleme */}
+        {message.swarm && <SwarmPanel swarm={message.swarm} />}
 
         {/* Plan */}
         {message.plan && <PlanPanel plan={message.plan} />}

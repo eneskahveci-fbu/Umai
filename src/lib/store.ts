@@ -327,6 +327,7 @@ interface StoreState {
   updateLastContent: (content: string) => void;
   updateLastThinking: (thinking: string) => void;
   setPlanOnLast: (plan: string) => void;
+  setSwarmOnLast: (swarm: import("./types").SwarmState) => void;
   setCheckpointsOnLast: (checkpoints: FileCheckpoint[]) => void;
   setFinishReasonOnLast: (finishReason: string | undefined) => void;
   updateLastTokens: (tokenIn: number, tokenOut: number) => void;
@@ -856,6 +857,17 @@ export const useStore = create<StoreState>()((set, get) => ({
         const messages = c.messages.slice();
         if (messages.length) {
           messages[messages.length - 1] = { ...messages[messages.length - 1], plan };
+        }
+        return { ...c, messages };
+      }),
+    })),
+  setSwarmOnLast: (swarm) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const messages = c.messages.slice();
+        if (messages.length) {
+          messages[messages.length - 1] = { ...messages[messages.length - 1], swarm };
         }
         return { ...c, messages };
       }),
