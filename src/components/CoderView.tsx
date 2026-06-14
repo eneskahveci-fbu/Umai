@@ -84,7 +84,7 @@ import {
 } from "@/lib/gitlab";
 import type { TreeFile, TreeNode } from "@/lib/types";
 import { ALL_AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agents";
-import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
+import { calculateCost, formatCost, getModelPrice } from "@/lib/pricing";
 import { buildContextSections } from "@/lib/prompt";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { addPendingAction, removePendingAction, isCommandAllowed, DEFAULT_COMMAND_ALLOWLIST, type PendingAction } from "@/lib/agentActions";
@@ -365,6 +365,10 @@ export function CoderView() {
 
   const [filesOpen, setFilesOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
+  /* Terminal bir kez boot olur ve ARKAPLANDA mount kalır (kapatınca unmount
+     olmaz) → ajan run_command'ları her zaman çalışır; buton sadece görünürlüğü
+     açıp kapatır. */
+  const [terminalMounted, setTerminalMounted] = useState(false);
   const [terminalSupported, setTerminalSupported] = useState(true);
   /* Terminal "hazır" mı? run_command komutunu erken gönderip kaybetmemek için izlenir. */
   const terminalReadyRef = useRef(false);
@@ -560,12 +564,16 @@ export function CoderView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.activeRepo, config.activeGithubId, config.activeGitlabId, config.cliMode]);
 
+  /* Terminal desteği varsa ARKAPLANDA otomatik boot et (gizli) → ajan
+     komutları hemen çalışır. autoTerminal açıksa görünür de aç. */
   useEffect(() => {
-    if (!config.autoTerminal) return;
-    import("@/lib/webcontainer").then(({ isSupported }) => {
-      if (isSupported()) setTerminalOpen(true);
-    });
-  }, [config.autoTerminal]);
+    const useWs = !!config.terminalWsUrl?.trim();
+    const mount = () => { setTerminalMounted(true); if (config.autoTerminal) setTerminalOpen(true); };
+    if (useWs) { const id = setTimeout(mount, 0); return () => clearTimeout(id); }
+    let alive = true;
+    import("@/lib/webcontainer").then(({ isSupported }) => { if (alive && isSupported()) mount(); });
+    return () => { alive = false; };
+  }, [config.autoTerminal, config.terminalWsUrl]);
 
   /* Terminal hazır olduğunda işaretle; kapanınca sıfırla → run_command'ı doğru anda gönder. */
   useEffect(() => {
@@ -573,7 +581,9 @@ export function CoderView() {
     window.addEventListener("craftai:terminal-ready", onReady);
     return () => window.removeEventListener("craftai:terminal-ready", onReady);
   }, []);
-  useEffect(() => { if (!terminalOpen) terminalReadyRef.current = false; }, [terminalOpen]);
+  /* Terminal arkaplanda mount kaldığı için kapatınca 'ready' sıfırlanmaz —
+     yalnızca tamamen unmount olursa (terminalMounted=false). */
+  useEffect(() => { if (!terminalMounted) terminalReadyRef.current = false; }, [terminalMounted]);
 
   /* Listen for terminal output events — auto-send to AI as follow-up context */
   useEffect(() => {
@@ -1126,7 +1136,9 @@ export function CoderView() {
             if (parsed.run_command_event) {
               const command = String(parsed.run_command_event.command ?? "").trim();
               if (command) {
-                setTerminalOpen(true);
+                /* Terminali ARKAPLANDA hazırla (görünür açma — kullanıcı isterse
+                   butonla açar); komut arkaplanda çalışır, çıktı AI'ya döner. */
+                setTerminalMounted(true);
                 const fire = () => window.dispatchEvent(new CustomEvent("craftai:terminal-run", { detail: { command } }));
                 if (terminalReadyRef.current) {
                   fire();
@@ -1251,9 +1263,11 @@ export function CoderView() {
         tokenIn = realUsage.prompt;
         tokenOut = realUsage.completion;
       } else {
+        /* Gerçek tokenizer (gpt-tokenizer, tembel yüklenir) ile doğru say. */
+        const { countTokens } = await import("@/lib/tokenizer");
         const inputText = apiMessages.map((m) => typeof m.content === "string" ? m.content : "").join("\n");
-        tokenIn = estimateTokens(inputText) + estimateTokens(coderSystemPrompt);
-        tokenOut = estimateTokens(full.slice(priorLen));
+        tokenIn = (await countTokens(inputText)) + (await countTokens(coderSystemPrompt));
+        tokenOut = await countTokens(full.slice(priorLen));
       }
       useStore.getState().updateLastTokens(tokenIn, tokenOut);
       /* geri-al noktalarını mesaja yaz → persistCurrent ile sohbetle kaydedilir,
@@ -1460,7 +1474,7 @@ export function CoderView() {
               icon={<Terminal size={14} />}
               label={terminalSupported ? (terminalOpen ? "Terminal'i kapat" : "Terminal") : "Terminal (masaüstü Chrome/Edge)"}
               active={terminalOpen}
-              onClick={() => setTerminalOpen((v) => !v)}
+              onClick={() => { setTerminalMounted(true); setTerminalOpen((v) => !v); }}
             />
             <MoreItem icon={<GitBranch size={14} />} label="Git & PR (dal, PR/MR, incele)" active={gitPanelOpen} onClick={() => setGitPanelOpen((v) => !v)} />
             <MoreItem icon={<FolderOpen size={14} />} label="Dosyalar (depo)" active={filesOpen} onClick={() => setFilesOpen((v) => !v)} />
@@ -1828,11 +1842,14 @@ export function CoderView() {
             )}
           </div>
 
-          {/* Terminal */}
-          {terminalOpen && (
-            <ErrorBoundary variant="inline" label="Terminal çöktü">
-              <RealTerminal onClose={() => setTerminalOpen(false)} />
-            </ErrorBoundary>
+          {/* Terminal — bir kez boot olur, ARKAPLANDA mount kalır; kapatınca
+              yalnızca gizlenir (unmount olmaz) → ajan komutları hep çalışır. */}
+          {terminalMounted && (
+            <div className={terminalOpen ? "" : "hidden"}>
+              <ErrorBoundary variant="inline" label="Terminal çöktü">
+                <RealTerminal onClose={() => setTerminalOpen(false)} />
+              </ErrorBoundary>
+            </div>
           )}
 
           {/* Composer */}
