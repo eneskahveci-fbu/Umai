@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, Copy, X } from "lucide-react";
 import { diffLines } from "diff";
 import { useStore } from "@/lib/store";
+import { highlightLines, type Token } from "@/lib/highlight";
 
 interface DiffLine {
   type: "ctx" | "add" | "del";
@@ -46,6 +47,23 @@ export function DiffModal() {
     () => (diff ? computeDiff(diff.original, diff.newCode) : []),
     [diff],
   );
+
+  /* Shiki ile satır-token'larını (renkli) async hesapla. Yüklenene kadar düz
+     metin gösterilir; gelince renklenir. */
+  const [oldTok, setOldTok] = useState<Token[][]>([]);
+  const [newTok, setNewTok] = useState<Token[][]>([]);
+  useEffect(() => {
+    if (!diff) return;
+    let cancelled = false;
+    const lang = diff.language || "text";
+    Promise.all([
+      highlightLines(diff.original, lang),
+      highlightLines(diff.newCode, lang),
+    ]).then(([o, n]) => {
+      if (!cancelled) { setOldTok(o); setNewTok(n); }
+    });
+    return () => { cancelled = true; };
+  }, [diff]);
 
   if (!diff) return null;
 
@@ -125,7 +143,20 @@ export function DiffModal() {
               <span className="w-4 shrink-0 select-none font-bold">
                 {l.type === "add" ? "+" : l.type === "del" ? "-" : " "}
               </span>
-              <span className="whitespace-pre flex-1 break-all">{l.text || " "}</span>
+              <span className="whitespace-pre flex-1 break-all">
+                {(() => {
+                  const toks =
+                    l.type === "del"
+                      ? oldTok[(l.oldNo ?? 1) - 1]
+                      : newTok[(l.newNo ?? 1) - 1];
+                  if (!toks || !toks.length) return l.text || " ";
+                  return toks.map((t, ti) => (
+                    <span key={ti} style={t.color ? { color: t.color } : undefined}>
+                      {t.content}
+                    </span>
+                  ));
+                })()}
+              </span>
             </div>
           ))}
         </div>
