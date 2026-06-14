@@ -1148,7 +1148,7 @@ export async function POST(req: Request) {
             body: JSON.stringify({
               model,
               /* Bağlam yönetimi: eski/büyük tool çıktılarını kırp (yapı korunur). */
-              messages: pruneMessages(convo, { keepRecent: 8, maxContentChars: 4000 }),
+              messages: pruneMessages(convo, { keepRecent: 16, maxContentChars: 12000 }),
               stream: true,
               tools: allTools,
               tool_choice: round === MAX_ROUNDS - 1 ? "none" : "auto",

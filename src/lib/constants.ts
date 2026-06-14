@@ -468,7 +468,7 @@ export const DEFAULT_CONFIG: Config = {
   fontScale: "base",
   soundEnabled: false,
   accentColor: "amber",
-  maxContext: 8192,
+  maxContext: 128000,
   webcontainerApiKey: "",
   terminalWsUrl: "",
   mcpServers: [],

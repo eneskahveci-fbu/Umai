@@ -839,8 +839,9 @@ export function CoderView() {
           "selamlama veya giriş cümlesi YAZMA, açık kalan markdown/kod bloğu yapısını koru.",
       });
     }
-    /* Context window management: keep last 24 messages to avoid token overflow */
-    const MAX_CTX = 24;
+    /* Bağlam penceresi: çok daha uzun geçmiş gönderilir (sunucu tarafı
+       pruneMessages büyük tool çıktılarını ayrıca kırpar). */
+    const MAX_CTX = 60;
     const apiMessages = rawMessages.length > MAX_CTX
       ? [
           { role: "system" as const, content: `[Bağlam notu: Bu sohbet ${rawMessages.length} mesaj içeriyor. Token sınırı nedeniyle yalnızca son ${MAX_CTX} mesaj gönderiliyor.]` },
@@ -1265,9 +1266,9 @@ export function CoderView() {
     }
     /* Otomatik devam (Claude Code gibi): yanıt token sınırında kesildiyse aynı
        baloncuk içinden kendiliğinden sürdür — kullanıcı tıklamasına gerek yok.
-       Sonsuz döngüye karşı en çok 2 ardışık otomatik devam. */
+       Sonsuz döngüye karşı en çok 8 ardışık otomatik devam. */
     const depth = opts?.depth ?? 0;
-    if (cutAtLength && useStore.getState().config.autoContinue !== false && depth < 5 && !abortCtl.signal.aborted) {
+    if (cutAtLength && useStore.getState().config.autoContinue !== false && depth < 8 && !abortCtl.signal.aborted) {
       useStore.getState().addToast("Yanıt sınırda kesildi — kaldığı yerden devam ediliyor…", "info");
       await callApi(overrideAgent, { continuation: true, depth: depth + 1 });
     }

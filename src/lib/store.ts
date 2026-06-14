@@ -118,6 +118,10 @@ function loadConfig(): Config {
       if ((merged.accentColor as string) === "purple" || (merged.accentColor as string) === "blue") {
         merged.accentColor = "amber";
       }
+      /* Eski küçük bağlam penceresini (8192) çok daha uzun varsayılana yükselt */
+      if (typeof merged.maxContext !== "number" || merged.maxContext <= 8192) {
+        merged.maxContext = 128000;
+      }
       /* Eğer hiç model yoksa, ücretsiz Pollinations modelini tohum olarak ekle */
       if (!Array.isArray(merged.models) || merged.models.length === 0) {
         merged.models = [POLLINATIONS_DEFAULT_MODEL];

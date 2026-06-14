@@ -564,11 +564,6 @@ export function MessageBubble({
                 <RefreshCw size={12} /><span>Yeniden</span>
               </button>
             )}
-            {showRegenerate && onContinue && (
-              <button onClick={onContinue} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink px-2 py-1.5 rounded-lg hover:bg-bgsoft transition-colors">
-                <ChevronRight size={12} /><span>Devam</span>
-              </button>
-            )}
 
             {chatId && (
               <>
