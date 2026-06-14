@@ -84,6 +84,36 @@ export async function mountDefaults(wc: WebContainer) {
   await wc.mount(DEFAULT_FILES);
 }
 
+/* Düz {path, content} listesini WebContainer'ın iç içe FileSystemTree biçimine
+   çevirir (gerçek repoyu mount etmek için). */
+type FsTree = Record<string, { file: { contents: string } } | { directory: FsTree }>;
+export function buildFileSystemTree(files: { path: string; content: string }[]): FsTree {
+  const root: FsTree = {};
+  for (const f of files) {
+    const parts = f.path.split("/").filter(Boolean);
+    if (parts.length === 0) continue;
+    let node = root;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const seg = parts[i];
+      let dir = node[seg];
+      if (!dir || !("directory" in dir)) {
+        dir = { directory: {} };
+        node[seg] = dir;
+      }
+      node = (dir as { directory: FsTree }).directory;
+    }
+    node[parts[parts.length - 1]] = { file: { contents: f.content } };
+  }
+  return root;
+}
+
+/* Bağlı reponun dosyalarını WebContainer'a mount eder → gerçek kod tabanı
+   üzerinde npm install / dev / test çalıştırılabilir. */
+export async function mountFiles(wc: WebContainer, files: { path: string; content: string }[]) {
+  if (!files.length) { await mountDefaults(wc); return; }
+  await wc.mount(buildFileSystemTree(files));
+}
+
 export async function writeFile(wc: WebContainer, path: string, content: string) {
   const parts = path.split("/").filter(Boolean);
   if (parts.length > 1) {

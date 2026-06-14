@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Cloud, ExternalLink, FolderOpen, Loader2, Power, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
-import { getUnsupportedReason, getWebContainer, isSupported, mountDefaults, needsApiKey } from "@/lib/webcontainer";
+import { getUnsupportedReason, getWebContainer, isSupported, mountDefaults, mountFiles, needsApiKey } from "@/lib/webcontainer";
+import { fetchAllFiles } from "@/lib/github";
+import { fetchAllGitLabFiles, isGitLabRepo } from "@/lib/gitlab";
+import type { TreeNode } from "@/lib/types";
 import {
   dirHandleToTree,
   getMountedHandle,
@@ -143,6 +146,14 @@ async function bootWsTerminal(
 }
 
 /* ── WebContainer mode (mevcut) ─────────────────────────────────── */
+/* Repo ağacını düz blob listesine çevirir (mount için). */
+function treeBlobs(node: TreeNode): { path: string; type: string }[] {
+  const items: { path: string; type: string }[] = [];
+  for (const f of node.files) items.push({ path: f.path, type: "blob" });
+  for (const child of Object.values(node.dirs)) items.push(...treeBlobs(child));
+  return items;
+}
+
 async function bootWcTerminal(
   containerEl: HTMLDivElement,
   apiKey: string,
@@ -150,6 +161,7 @@ async function bootWcTerminal(
   onReady: () => void,
   onError: (msg: string) => void,
   onNeedsKey: () => void,
+  loadRepoFiles?: () => Promise<{ path: string; content: string }[]>,
 ): Promise<() => void> {
   if (!isSupported()) { onError(getUnsupportedReason() ?? "Tarayıcı desteklemiyor."); return () => {}; }
   if (needsApiKey() && !apiKey.trim()) { onNeedsKey(); return () => {}; }
@@ -184,11 +196,26 @@ async function bootWcTerminal(
     await wc.mount(tree);
     term.writeln(`\x1b[1;32m✓ Mount: \x1b[36m${getMountedName()}\x1b[0m (${fileCount} dosya${truncated ? ", \x1b[33mkesildi\x1b[0m" : ""})`);
     if (skipped.length > 0) term.writeln(`\x1b[33m⚠ Atlandı (>5MB): ${skipped.slice(0, 3).join(", ")}${skipped.length > 3 ? ` ve ${skipped.length - 3} daha` : ""}\x1b[0m`);
+  } else if (loadRepoFiles) {
+    /* Yerel klasör yok ama bir repo bağlı → gerçek repoyu mount et. */
+    term.writeln("\x1b[2mBağlı repo yükleniyor…\x1b[0m");
+    try {
+      const files = await loadRepoFiles();
+      if (files.length) {
+        await mountFiles(wc, files);
+        term.writeln(`\x1b[1;32m✓ Repo mount edildi: \x1b[36m${files.length} dosya\x1b[0m — gerçek kod tabanı hazır`);
+      } else {
+        await mountDefaults(wc);
+      }
+    } catch {
+      await mountDefaults(wc);
+      term.writeln("\x1b[33m⚠ Repo yüklenemedi, boş sandbox açıldı.\x1b[0m");
+    }
   } else {
     await mountDefaults(wc);
   }
   term.writeln("\x1b[1;35m▲ Craft.Coder sandbox\x1b[0m — Node.js + busybox-shell hazır");
-  term.writeln("\x1b[2mDeneyin: \x1b[36mls\x1b[2m, \x1b[36mnode -v\x1b[2m, \x1b[36mnpm init -y\x1b[0m\n");
+  term.writeln("\x1b[2mDeneyin: \x1b[36mnpm install\x1b[2m, \x1b[36mnpm run dev\x1b[2m, \x1b[36mnpm test\x1b[2m, \x1b[36mls\x1b[0m\n");
 
   const proc = await wc.spawn("jsh", { terminal: { cols: term.cols, rows: term.rows } });
   const writer = proc.input.getWriter();
@@ -295,6 +322,18 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
             () => setStatus("ready"),
             (msg) => { setStatus("error"); setErrMsg(msg); },
             () => setStatus("needs-key"),
+            /* Bağlı repoyu WebContainer'a getir → gerçek kod tabanında çalış. */
+            async () => {
+              const store = useStore.getState();
+              const r = store.repo;
+              if (!r || !store.tree) return [];
+              const treeItems = treeBlobs(store.tree);
+              const activeRepo = store.config.activeRepo || "";
+              if (isGitLabRepo(activeRepo)) {
+                return await fetchAllGitLabFiles(r.owner, r.repo, r.branch, treeItems, store.activeGitlab()?.token);
+              }
+              return await fetchAllFiles(r.owner, r.repo, r.branch, treeItems, store.activeGithub()?.token);
+            },
           );
       cleanupRef.current = cleanup;
     } catch (e) {
