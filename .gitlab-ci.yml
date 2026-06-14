@@ -1,53 +1,22 @@
-# Hafif CI — GitLab compute kotasını korumak için optimize edildi.
-# Üretim build/deploy Vercel'de yapılır; bu pipeline yalnızca bozuk commit'leri
-# (lint/tip/test/build hatası) erken yakalamak içindir.
+# ─────────────────────────────────────────────────────────────────────────
+# GitLab CI DEVRE DIŞI — bilinçli karar (compute kotası tüketmemek için).
 #
-# Kota tasarrufu (önceki sürüm her push'ta 3 ayrı iş × 3 ayrı `npm ci` yapıyordu):
-#   1. workflow.rules → pipeline SADECE merge request'lerde ve main'e push'ta
-#      çalışır. Diğer (feature) branch push'ları HİÇ pipeline tetiklemez.
-#   2. Tek iş (verify) → lint+test+build tek `npm ci` ile sırayla (3× → 1× kurulum).
-#   3. interruptible → eski pipeline yeni push'ta otomatik iptal.
-#   4. changes → yalnızca kod/yapılandırma dosyaları değiştiyse çalışır
-#      (doküman-only commit'ler compute harcamaz).
+# Neden kapalı?
+#   • GitLab paylaşımlı runner'ları "compute minutes" harcar ve kota dolunca
+#     pipeline'lar ci_quota_exceeded ile başarısız olur (kırmızı pipeline/mail).
+#   • Kaliteyi kapatmıyoruz; iki katman zaten koruyor:
+#       1) Geliştirici/asistan her push ÖNCESİ yerelde çalıştırır:
+#            npm run lint && npm run test && npm run build
+#          → bozuk commit repoya hiç ulaşmaz.
+#       2) Vercel, üretim build'ini deploy'dan ÖNCE çalıştırır → build hatası
+#          canlıya çıkmaz.
+#   • Sonuç: compute=0, kota hatası=0, bakım=0.
+#
+# Tekrar açmak istersen: aşağıdaki "when: never"ı kaldır ve eski işleri ekle
+# (lint/test/build). Önerilen hafif sürüm tek iş + workflow.rules ile sadece
+# merge request + main'de çalışacak şekilde kurulur.
+# ─────────────────────────────────────────────────────────────────────────
 
 workflow:
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
     - when: never
-
-default:
-  image: node:20-slim
-  interruptible: true
-
-stages:
-  - quality
-
-verify:
-  stage: quality
-  cache:
-    key:
-      files:
-        - package-lock.json
-    paths:
-      - node_modules/
-  rules:
-    - changes:
-        - "**/*.ts"
-        - "**/*.tsx"
-        - "**/*.js"
-        - "**/*.jsx"
-        - "**/*.mjs"
-        - "**/*.cjs"
-        - "**/*.json"
-        - "**/*.css"
-        - package-lock.json
-        - .gitlab-ci.yml
-  variables:
-    NEXT_PUBLIC_SITE_URL: ""
-  before_script:
-    - npm ci --prefer-offline --no-audit --fund=false
-  script:
-    - npm run lint
-    - npm run test
-    - npm run build
