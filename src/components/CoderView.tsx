@@ -1435,7 +1435,7 @@ export function CoderView() {
           )}
           <ThinkingModeToggle />
           {/* Birleşik ⋯ menüsü: Editör · Terminal · Git · PR · Skills · Dışa aktar */}
-          <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen}>
+          <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen || toolsEnabled || !!config.safeMode || !!artifact}>
             <MoreItem
               icon={<Code2 size={14} />}
               label={editorOpen ? "Editörü kapat" : "Editör (IDE)"}
@@ -1449,6 +1449,53 @@ export function CoderView() {
               onClick={() => setTerminalOpen((v) => !v)}
             />
             <MoreItem icon={<GitBranch size={14} />} label="Git & PR (dal, PR/MR, incele)" active={gitPanelOpen} onClick={() => setGitPanelOpen((v) => !v)} />
+            <MoreItem icon={<FolderOpen size={14} />} label="Dosyalar (depo)" active={filesOpen} onClick={() => setFilesOpen((v) => !v)} />
+            <MoreItem
+              icon={<Wrench size={14} />}
+              label="Tools (araç kullanımı)"
+              active={toolsEnabled}
+              onClick={() => {
+                const store = useStore.getState();
+                if (!store.repo) { addToast("Tool-use için önce bir GitHub deposu bağla", "error"); return; }
+                store.setToolsEnabled(!store.toolsEnabled);
+              }}
+            />
+            <MoreItem
+              icon={<ShieldCheck size={14} />}
+              label="Güvenli Mod (salt-okunur)"
+              active={!!config.safeMode}
+              onClick={() => useStore.getState().saveConfig({ ...config, safeMode: !config.safeMode })}
+            />
+            <MoreItem
+              icon={<Palette size={14} />}
+              label="Canvas önizleme"
+              active={!!artifact}
+              onClick={() => {
+                const msgs = useStore.getState().current()?.messages ?? [];
+                for (let i = msgs.length - 1; i >= 0; i--) {
+                  const content = msgs[i].content;
+                  if (!content) continue;
+                  const directMatch = /```(?:html|svg|mermaid)(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
+                  if (directMatch) {
+                    const lang = /```(html|svg|mermaid)/.exec(content)?.[1] ?? "html";
+                    useStore.getState().setArtifact({ type: lang as "html" | "svg" | "mermaid", content: directMatch[1], title: `${lang.toUpperCase()} Önizleme` });
+                    return;
+                  }
+                  const cssMatch = /```css(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
+                  if (cssMatch) {
+                    useStore.getState().setArtifact({ type: "html", content: `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${cssMatch[1]}</style></head><body></body></html>`, title: "CSS Önizleme" });
+                    return;
+                  }
+                  const jsMatch = /```(?:javascript|js|jsx|ts|tsx)(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
+                  if (jsMatch) {
+                    useStore.getState().setArtifact({ type: "html", content: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><script>${jsMatch[1]}<\/script></body></html>`, title: "JS Önizleme" });
+                    return;
+                  }
+                }
+                addToast("Önizlenecek HTML, SVG, CSS veya Mermaid kodu bulunamadı", "info");
+              }}
+            />
+            <MoreItem icon={<BookOpen size={14} />} label="Kütüphane" onClick={() => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); }} />
             <MoreItem icon={<Zap size={14} />} label="Skills" onClick={() => useStore.getState().setSkillsOpen(true)} />
             {current && messages.length > 0 && (
               <>
@@ -1938,62 +1985,11 @@ export function CoderView() {
                     }}
                   />
                 )}
-                {/* Daha fazla — mikrofon ile gönder arasında; tüm composer eylemleri burada */}
-                <MoreMenu active={filesOpen || toolsEnabled || !!artifact || !!activeAgent || searchOn || !!config.safeMode}>
-                  <MoreItem icon={<FolderOpen size={14} />} label="Dosyalar (depo)" active={filesOpen} onClick={() => setFilesOpen((v) => !v)} />
+                {/* Daha fazla — mikrofon ile gönder arasında; mesaj-oluşturma eylemleri */}
+                <MoreMenu active={searchOn}>
                   <MoreItem icon={<Paperclip size={14} />} label="Dosya ekle" onClick={() => fileRef.current?.click()} />
-                  <MoreItem
-                    icon={<Wrench size={14} />}
-                    label="Tools (araç kullanımı)"
-                    active={toolsEnabled}
-                    onClick={() => {
-                      const store = useStore.getState();
-                      if (!store.repo) { addToast("Tool-use için önce bir GitHub deposu bağla", "error"); return; }
-                      store.setToolsEnabled(!store.toolsEnabled);
-                    }}
-                  />
-                  <MoreItem icon={<Globe size={14} />} label="Web arama" active={searchOn} onClick={() => setSearchOn(!searchOn)} />
-                  <MoreItem
-                    icon={<ShieldCheck size={14} />}
-                    label="Güvenli Mod (salt-okunur)"
-                    active={!!config.safeMode}
-                    onClick={() => useStore.getState().saveConfig({ ...config, safeMode: !config.safeMode })}
-                  />
                   <MoreItem icon={<ImageIcon size={14} />} label="Görsel ekle" onClick={() => imgRef.current?.click()} />
-                  <MoreItem
-                    icon={<Palette size={14} />}
-                    label="Canvas önizleme"
-                    active={!!artifact}
-                    onClick={() => {
-                      const msgs = useStore.getState().current()?.messages ?? [];
-                      for (let i = msgs.length - 1; i >= 0; i--) {
-                        const content = msgs[i].content;
-                        if (!content) continue;
-                        const directMatch = /```(?:html|svg|mermaid)(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
-                        if (directMatch) {
-                          const lang = /```(html|svg|mermaid)/.exec(content)?.[1] ?? "html";
-                          useStore.getState().setArtifact({ type: lang as "html" | "svg" | "mermaid", content: directMatch[1], title: `${lang.toUpperCase()} Önizleme` });
-                          return;
-                        }
-                        const cssMatch = /```css(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
-                        if (cssMatch) {
-                          useStore.getState().setArtifact({ type: "html", content: `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${cssMatch[1]}</style></head><body></body></html>`, title: "CSS Önizleme" });
-                          return;
-                        }
-                        const jsMatch = /```(?:javascript|js|jsx|ts|tsx)(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
-                        if (jsMatch) {
-                          useStore.getState().setArtifact({ type: "html", content: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><script>${jsMatch[1]}<\/script></body></html>`, title: "JS Önizleme" });
-                          return;
-                        }
-                      }
-                      addToast("Önizlenecek HTML, SVG, CSS veya Mermaid kodu bulunamadı", "info");
-                    }}
-                  />
-                  <MoreItem
-                    icon={<BookOpen size={14} />}
-                    label="Kütüphane"
-                    onClick={() => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); }}
-                  />
+                  <MoreItem icon={<Globe size={14} />} label="Web arama" active={searchOn} onClick={() => setSearchOn(!searchOn)} />
                 </MoreMenu>
                 {streaming ? (
                   <button onClick={stop} className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-red hover:bg-red/80 active:bg-red/70 text-white grid place-items-center transition-colors" title="Durdur">
@@ -2205,6 +2201,8 @@ interface UsageQuota {
 function UsageBadge({ chat }: { chat: { totalInTokens?: number; totalOutTokens?: number } }) {
   const config = useStore((s) => s.config);
   const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const tokenIn = chat.totalInTokens ?? 0;
   const tokenOut = chat.totalOutTokens ?? 0;
   const total = tokenIn + tokenOut;
@@ -2215,10 +2213,19 @@ function UsageBadge({ chat }: { chat: { totalInTokens?: number; totalOutTokens?:
   const warn = pct >= 80;
   const danger = pct >= 95;
 
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ left: r.right, top: r.bottom + 6 });
+    }
+    setOpen((o) => !o);
+  };
+
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        ref={btnRef}
+        onClick={toggle}
         className={`flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded-lg border mr-1 transition-colors hover:border-brand/40 ${
           danger ? "border-red/40 bg-red/5 text-red"
           : warn ? "border-amber-400/40 bg-amber-400/5 text-amber-400"
@@ -2238,12 +2245,12 @@ function UsageBadge({ chat }: { chat: { totalInTokens?: number; totalOutTokens?:
           </>
         )}
       </button>
-      {open && <UsageModal chat={chat} onClose={() => setOpen(false)} />}
+      {open && pos && <UsageModal chat={chat} pos={pos} onClose={() => setOpen(false)} />}
     </>
   );
 }
 
-function UsageModal({ chat, onClose }: { chat: { totalInTokens?: number; totalOutTokens?: number }; onClose: () => void }) {
+function UsageModal({ chat, pos, onClose }: { chat: { totalInTokens?: number; totalOutTokens?: number }; pos: { left: number; top: number }; onClose: () => void }) {
   const config = useStore((s) => s.config);
   const activeModel = config.models.find((m) => m.id === config.activeModelId);
   const [quota, setQuota] = useState<UsageQuota | null>(null);
@@ -2273,19 +2280,24 @@ function UsageModal({ chat, onClose }: { chat: { totalInTokens?: number; totalOu
     return () => { alive = false; };
   }, [activeModel]);
 
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 backdrop-blur-sm p-4 animate-modal-bg" onClick={onClose}>
-      <div className="w-full max-w-sm bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden animate-modal-content" onClick={(e) => e.stopPropagation()}>
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-[70]" onClick={onClose} />
+      <div
+        style={{ position: "fixed", left: pos.left, top: pos.top, transform: "translateX(-100%)" }}
+        className="z-[71] w-[300px] max-h-[72vh] overflow-y-auto bg-surface border border-line rounded-2xl shadow-2xl shadow-black/40 animate-modal-content"
+      >
         {/* Başlık */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-line/60">
+        <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-line/60 sticky top-0 bg-surface">
           <div className="flex items-center gap-2">
-            <DollarSign size={15} className="text-brand" />
-            <h3 className="font-bold text-sm">Kullanım & Kota</h3>
+            <DollarSign size={14} className="text-brand" />
+            <h3 className="font-bold text-xs">Kullanım & Kota</h3>
           </div>
-          <button onClick={onClose} className="text-muted hover:text-ink transition-colors"><X size={15} /></button>
+          <button onClick={onClose} className="text-muted hover:text-ink transition-colors"><X size={14} /></button>
         </div>
 
-        <div className="p-4 space-y-4 text-sm">
+        <div className="p-3 space-y-3 text-sm">
           {/* Aktif model */}
           <div className="flex items-center justify-between">
             <span className="text-muted text-xs">Aktif model</span>
@@ -2352,7 +2364,8 @@ function UsageModal({ chat, onClose }: { chat: { totalInTokens?: number; totalOu
           )}
         </div>
       </div>
-    </div>
+    </>,
+    document.body,
   );
 }
 
