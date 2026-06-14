@@ -1068,7 +1068,15 @@ export const useStore = create<StoreState>()((set, get) => ({
   repo: null,
   tree: null,
   currentFile: null,
-  setRepo: (r) => set({ repo: r }),
+  setRepo: (r) => {
+    set({ repo: r });
+    /* Claude Code tarzı: repo bağlanınca araçları (Tools) OTOMATİK aç —
+       kullanıcı bilerek kapatmadıysa (localStorage "0"). Böylece ajan dosyaları
+       kendi okuyup düzenler, kullanıcı ayrıca açmak zorunda kalmaz. */
+    if (r && typeof window !== "undefined" && localStorage.getItem("craftai_tools") !== "0") {
+      set({ toolsEnabled: true });
+    }
+  },
   setTree: (t) => set({ tree: t }),
   setCurrentFile: (f) => set({ currentFile: f }),
 
