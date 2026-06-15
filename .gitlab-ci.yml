@@ -1,0 +1,26 @@
+# craft.ai — kota dostu CI
+# Tek hafif doğrulama job'ı: lint + test + build. Sadece Merge Request'lerde
+# ve main dalında çalışır (gereksiz pipeline tetiklenmez → compute kotası korunur).
+
+stages:
+  - verify
+
+verify:
+  stage: verify
+  image: node:22-alpine
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - node_modules/
+    policy: pull-push
+  script:
+    - npm ci --no-audit --no-fund
+    - npm run lint
+    - npm test
+    - npm run build
+  interruptible: true
