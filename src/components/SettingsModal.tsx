@@ -323,10 +323,11 @@ export function SettingsModal() {
     together: "https://api.together.xyz/settings/api-keys",
     xai: "https://console.x.ai",
     hf: "https://huggingface.co/settings/tokens",
+    github: "https://github.com/settings/tokens",
   };
   /* Hızlı kurulumda sunulan sağlayıcılar (anahtar gerektirenler; pollinations
      anahtarsız çalışır, ollama yereldir, custom manuel → alttaki formdan eklenir). */
-  const QUICK_PROVIDERS: Provider[] = ["gemini", "groq", "deepseek", "openrouter", "anthropic", "mistral", "cerebras", "together", "xai", "hf"];
+  const QUICK_PROVIDERS: Provider[] = ["gemini", "groq", "github", "openrouter", "deepseek", "anthropic", "mistral", "cerebras", "together", "xai", "hf"];
   /* PRESET etiketinden kısa, temiz ad (emoji + parantez kırpılır). */
   const cleanLabel = (p: Provider) => PRESETS[p].label.replace(/\s*\([^)]*\)\s*$/, "").replace(/^[^\p{L}]*/u, "").trim();
 

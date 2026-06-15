@@ -108,6 +108,7 @@ export type Provider =
   | "ollama"
   | "anthropic"
   | "pollinations"
+  | "github"
   | "custom";
 
 export interface ModelProfile {

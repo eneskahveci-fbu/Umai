@@ -117,6 +117,12 @@ export const PRESETS: Record<Provider, Preset> = {
     model: "openai",
     keyHint: "opsiyonel: pollinations.ai ücretsiz token'ı (limiti yükseltir)",
   },
+  github: {
+    label: "🐙 GitHub Models (Ücretsiz)",
+    baseUrl: "https://models.github.ai/inference",
+    model: "gpt-4o-mini",
+    keyHint: "GitHub token (models:read izinli — github.com/settings/tokens)",
+  },
   ollama: {
     label: "💻 Ollama (Yerel / Ücretsiz)",
     baseUrl: "http://localhost:11434/v1",
@@ -201,6 +207,13 @@ export const PROVIDER_MODELS: Record<Provider, string[]> = {
     "qwen-coder",
     "mistral",
     "llama",
+  ],
+  github: [
+    "gpt-4o",
+    "gpt-4o-mini",
+    "DeepSeek-R1",
+    "Meta-Llama-3.1-70B-Instruct",
+    "Mistral-large-2407",
   ],
   ollama: [
     "qwen2.5-coder:7b",
