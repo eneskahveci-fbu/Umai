@@ -461,7 +461,7 @@ export const DEFAULT_CONFIG: Config = {
   inlineCompletion: true,
   requireWriteApproval: false,
   safeMode: false,
-  autoRunCommands: false,
+  autoRunCommands: true,
   commandAllowlist: [...DEFAULT_COMMAND_ALLOWLIST],
   planApprovalMode: false,
   blockNetworkTools: false,
