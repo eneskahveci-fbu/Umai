@@ -290,9 +290,10 @@ type AttachedFile = { path: string; content: string };
 
 /* ── FileTree ── */
 function FileTreeNode({
-  node, prefix = "", onSelect, attached,
+  node, prefix = "", onSelect, attached, onContextMenu,
 }: {
   node: TreeNode; prefix?: string; onSelect: (f: TreeFile) => void; attached: string[];
+  onContextMenu?: (f: TreeFile, e: React.MouseEvent) => void;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const toggle = (name: string) => setCollapsed((p) => ({ ...p, [name]: !p[name] }));
@@ -313,7 +314,7 @@ function FileTreeNode({
               {isOpen ? <FolderOpen size={11} className="shrink-0 text-yellow-500/70" /> : <Folder size={11} className="shrink-0 text-muted/50" />}
               <span className="truncate">{name}</span>
             </button>
-            {isOpen && <FileTreeNode node={child} prefix={key + "/"} onSelect={onSelect} attached={attached} />}
+            {isOpen && <FileTreeNode node={child} prefix={key + "/"} onSelect={onSelect} attached={attached} onContextMenu={onContextMenu} />}
           </div>
         );
       })}
@@ -323,6 +324,7 @@ function FileTreeNode({
           <button
             key={f.path}
             onClick={() => onSelect(f)}
+            onContextMenu={(e) => { if (onContextMenu) { e.preventDefault(); onContextMenu(f, e); } }}
             className={`w-full flex items-center gap-1.5 px-2 py-1 text-[11px] rounded transition-colors text-left ${
               isAttached
                 ? "bg-brand/10 text-brand"
@@ -422,6 +424,8 @@ export function CoderView() {
      kaydedilmemiş durumu (sekme geçişinde veri kaybını önlemek için). */
   const [openTabs, setOpenTabs] = useState<EditorFile[]>([]);
   const [activeDirty, setActiveDirty] = useState(false);
+  /* Dosya ağacı sağ-tık menüsü konumu + hedef dosya. */
+  const [treeMenu, setTreeMenu] = useState<{ x: number; y: number; file: TreeFile } | null>(null);
   const [gitPanelOpen, setGitPanelOpen] = useState(false);
 
   /* Dosyayı editörde aç: sekme yoksa ekle, varsa içeriğini güncelle, aktif yap. */
@@ -683,6 +687,29 @@ export function CoderView() {
         content = await fetchFileContent(repo.owner, repo.repo, repo.branch, file.path, token);
       }
       setAttachedFiles((prev) => [...prev, { path: file.path, content }]);
+      openInEditor({ path: file.path, content, language: detectLanguage(file.path) });
+    } catch (e) {
+      addToast(`Dosya okunamadı: ${(e as Error).message}`, "error");
+    } finally {
+      setFetchingFile(null);
+    }
+  };
+
+  /* Sağ-tık menüsü: dosyayı sohbete eklemeden yalnızca editörde aç. */
+  const openTreeFile = async (file: TreeFile) => {
+    const existing = attachedFiles.find((f) => f.path === file.path);
+    if (existing) {
+      openInEditor({ path: file.path, content: existing.content, language: detectLanguage(file.path) });
+      return;
+    }
+    if (!repo) return;
+    setFetchingFile(file.path);
+    try {
+      const store = useStore.getState();
+      const activeRepo = store.config.activeRepo || "";
+      const content = isGitLabRepo(activeRepo)
+        ? await fetchGitLabFileContent(repo.owner, repo.repo, repo.branch, file.path, store.activeGitlab()?.token)
+        : await fetchFileContent(repo.owner, repo.repo, repo.branch, file.path, store.activeGithub()?.token);
       openInEditor({ path: file.path, content, language: detectLanguage(file.path) });
     } catch (e) {
       addToast(`Dosya okunamadı: ${(e as Error).message}`, "error");
@@ -1846,7 +1873,12 @@ export function CoderView() {
                   })}
                 </div>
               ) : (
-                <FileTreeNode node={tree} onSelect={attachRepoFile} attached={attachedPaths} />
+                <FileTreeNode
+                  node={tree}
+                  onSelect={attachRepoFile}
+                  attached={attachedPaths}
+                  onContextMenu={(f, e) => setTreeMenu({ x: e.clientX, y: e.clientY, file: f })}
+                />
               )}
             </div>
 
@@ -2268,6 +2300,50 @@ export function CoderView() {
       </div>
 
       {/* PR / MR Review Modal */}
+      {/* Dosya ağacı sağ-tık menüsü */}
+      {treeMenu && (
+        <>
+          <div
+            className="fixed inset-0 z-50"
+            onClick={() => setTreeMenu(null)}
+            onContextMenu={(e) => { e.preventDefault(); setTreeMenu(null); }}
+          />
+          <div
+            className="fixed z-50 min-w-[180px] bg-surface border border-line rounded-xl shadow-2xl py-1 text-[12px] animate-in fade-in zoom-in-95 duration-100"
+            style={{
+              left: Math.min(treeMenu.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 200),
+              top: Math.min(treeMenu.y, (typeof window !== "undefined" ? window.innerHeight : 9999) - 150),
+            }}
+          >
+            <div className="px-3 py-1.5 text-[10px] text-muted/60 truncate border-b border-line/40 mb-1">{treeMenu.file.path}</div>
+            <button
+              onClick={() => { openTreeFile(treeMenu.file); setTreeMenu(null); }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-bgsoft/60 transition-colors"
+            >
+              <Code2 size={13} className="text-muted" /> Editörde aç
+            </button>
+            <button
+              onClick={() => { attachRepoFile(treeMenu.file); setTreeMenu(null); }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-bgsoft/60 transition-colors"
+            >
+              <Paperclip size={13} className="text-muted" />
+              {attachedPaths.includes(treeMenu.file.path) ? "Sohbetten çıkar" : "Sohbete ekle"}
+            </button>
+            <button
+              onClick={() => {
+                navigator.clipboard?.writeText(treeMenu.file.path)
+                  .then(() => addToast("Yol kopyalandı", "success"))
+                  .catch(() => { /* yok say */ });
+                setTreeMenu(null);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-bgsoft/60 transition-colors"
+            >
+              <Copy size={13} className="text-muted" /> Yolu kopyala
+            </button>
+          </div>
+        </>
+      )}
+
       {prModalOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setPrModalOpen(false)}>
           <div className="w-full max-w-sm bg-surface border border-line rounded-2xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
