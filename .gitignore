@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Tree-sitter WASM (build öncesi otomatik kopyalanır)
+/public/tree-sitter/
