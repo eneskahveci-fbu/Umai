@@ -710,8 +710,8 @@ export function SettingsModal() {
                 <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
                   <input type="checkbox" checked={config.autoTerminal} onChange={() => saveConfig({ ...config, autoTerminal: !config.autoTerminal })} className="accent-brand mt-0.5" />
                   <div>
-                    <div className="text-sm font-semibold">Terminal&apos;i otomatik aç</div>
-                    <div className="text-xs text-muted mt-0.5">Coder sekmesi açılınca terminal panelini otomatik gösterir.</div>
+                    <div className="text-sm font-semibold">Terminal panelini otomatik aç</div>
+                    <div className="text-xs text-muted mt-0.5">Kapalıyken terminal yalnızca arkaplanda çalışır; komutlar ve çıktıları sohbette &quot;Terminal&quot; todo kutusunda görünür. Açıksa görünür panel de otomatik açılır.</div>
                   </div>
                 </label>
                 <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
@@ -950,8 +950,8 @@ export function SettingsModal() {
             <div>
               <h4 className="text-sm font-bold mb-2">Bağlam Penceresi</h4>
               <select value={config.maxContext} onChange={(e) => saveConfig({ ...config, maxContext: Number(e.target.value) })} className="input-mono text-xs">
-                {[4096, 8192, 16384, 32768, 65536, 131072, 200000].map((n) => (
-                  <option key={n} value={n}>{(n / 1024).toFixed(0)}K token</option>
+                {[4096, 8192, 16384, 32768, 65536, 131072, 200000, 400000, 1000000, 2000000].map((n) => (
+                  <option key={n} value={n}>{n >= 1000000 ? `${(n / 1000000).toFixed(0)}M token` : `${(n / 1024).toFixed(0)}K token`}</option>
                 ))}
               </select>
             </div>

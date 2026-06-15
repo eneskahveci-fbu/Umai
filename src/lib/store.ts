@@ -328,6 +328,8 @@ interface StoreState {
   updateLastThinking: (thinking: string) => void;
   setPlanOnLast: (plan: string) => void;
   setSwarmOnLast: (swarm: import("./types").SwarmState) => void;
+  addCommandRun: (command: string) => void;
+  setCommandOutput: (command: string, output: string, status: "done" | "error") => void;
   setCheckpointsOnLast: (checkpoints: FileCheckpoint[]) => void;
   setFinishReasonOnLast: (finishReason: string | undefined) => void;
   updateLastTokens: (tokenIn: number, tokenOut: number) => void;
@@ -879,6 +881,48 @@ export const useStore = create<StoreState>()((set, get) => ({
         const messages = c.messages.slice();
         if (messages.length) {
           messages[messages.length - 1] = { ...messages[messages.length - 1], checkpoints };
+        }
+        return { ...c, messages };
+      }),
+    })),
+  /* Terminal komutu kutusu: son asistan mesajına "çalışıyor" satırı ekle. */
+  addCommandRun: (command) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const messages = c.messages.slice();
+        let idx = -1;
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i].role === "assistant") { idx = i; break; }
+        }
+        if (idx < 0) idx = messages.length - 1;
+        if (idx < 0) return c;
+        const existing = messages[idx].commands ?? [];
+        messages[idx] = { ...messages[idx], commands: [...existing, { command, status: "running" as const }] };
+        return { ...c, messages };
+      }),
+    })),
+  /* Komut çıktısı geldi: eşleşen "çalışıyor" komutunu (en yeni) güncelle. */
+  setCommandOutput: (command, output, status) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const messages = c.messages.slice();
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const cmds = messages[i].commands;
+          if (!cmds) continue;
+          const j = (() => {
+            for (let k = cmds.length - 1; k >= 0; k--) {
+              if (cmds[k].command === command && cmds[k].status === "running") return k;
+            }
+            return -1;
+          })();
+          if (j >= 0) {
+            const next = cmds.slice();
+            next[j] = { ...next[j], output, status };
+            messages[i] = { ...messages[i], commands: next };
+            break;
+          }
         }
         return { ...c, messages };
       }),

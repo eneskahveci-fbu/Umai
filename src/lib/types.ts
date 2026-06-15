@@ -33,6 +33,9 @@ export interface ChatMessage {
   plan?: string;
   /** Ajan Ekibi (Swarm) ilerleme durumu — todo panelinde çizilir. */
   swarm?: SwarmState;
+  /** Ajanın bu turda terminalde çalıştırdığı komutlar — "todo" kutusunda
+      canlı gösterilir (çıktı kutunun içinde, ayrı bir balon yok). */
+  commands?: CommandRun[];
   /** Bu turda değiştirilen dosyaların geri-al noktaları (sohbetle kalıcı). */
   checkpoints?: FileCheckpoint[];
   /** Üreticinin bitiş nedeni: "length" ⇒ token sınırında kesildi (Devam et). */
@@ -52,6 +55,14 @@ export interface SwarmAgentState {
 export interface SwarmState {
   phase: "planning" | "working" | "synthesizing" | "done";
   agents: SwarmAgentState[];
+}
+
+/** Ajanın terminalde çalıştırdığı bir komut — sohbette "todo" kutusunda canlı
+    çizilir (çalışıyor → bitti) ve çıktısı kutunun içinde gösterilir. */
+export interface CommandRun {
+  command: string;
+  output?: string;
+  status: "running" | "done" | "error";
 }
 
 export interface McpServer {

@@ -11,7 +11,7 @@ import {
   BookMarked, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
   Circle, CircleDot, ListChecks,
   Code2, Copy, FileText, FolderOpen, GitBranch, GitCommit, Globe,
-  Loader2, Pencil, RefreshCw, Search, ThumbsDown, ThumbsUp, Users, Wrench, X,
+  Loader2, Pencil, RefreshCw, Search, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, Users, Wrench, X,
 } from "lucide-react";
 import type { ChatMessage, SwarmState } from "@/lib/types";
 import { useStore } from "@/lib/store";
@@ -294,6 +294,56 @@ function SwarmPanel({ swarm }: { swarm: SwarmState }) {
   );
 }
 
+/* ── Terminal komut kutusu (todo) ──────────────────────────────────── */
+
+function CommandRow({ cmd }: { cmd: NonNullable<ChatMessage["commands"]>[number] }) {
+  const [open, setOpen] = useState(false);
+  const hasOutput = !!cmd.output?.trim();
+  return (
+    <div className="text-xs">
+      <button
+        onClick={() => hasOutput && setOpen((o) => !o)}
+        className={`w-full flex items-start gap-2 text-left ${hasOutput ? "cursor-pointer" : "cursor-default"}`}
+      >
+        {cmd.status === "running" ? (
+          <Loader2 size={12} className="text-brand shrink-0 mt-0.5 animate-spin" />
+        ) : cmd.status === "error" ? (
+          <X size={12} className="text-red-400 shrink-0 mt-0.5" />
+        ) : (
+          <Check size={12} className="text-green shrink-0 mt-0.5" />
+        )}
+        <code className={`flex-1 min-w-0 font-mono break-all ${cmd.status === "running" ? "text-ink" : "text-muted/80"}`}>
+          $ {cmd.command}
+        </code>
+        {hasOutput && (open ? <ChevronUp size={12} className="text-muted/40 shrink-0 mt-0.5" /> : <ChevronDown size={12} className="text-muted/40 shrink-0 mt-0.5" />)}
+      </button>
+      {hasOutput && open && (
+        <pre className="mt-1 ml-5 px-2.5 py-1.5 rounded-lg bg-[#0a0a0d] border border-line/40 text-[11px] font-mono whitespace-pre-wrap break-all max-h-60 overflow-auto text-muted/80">
+          {cmd.output}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+function CommandPanel({ commands }: { commands: NonNullable<ChatMessage["commands"]> }) {
+  if (!commands.length) return null;
+  const running = commands.some((c) => c.status === "running");
+  const done = commands.filter((c) => c.status !== "running").length;
+  return (
+    <div className="mb-3 border border-line/50 rounded-xl overflow-hidden bg-bgsoft/30">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-line/30 text-xs">
+        <TerminalIcon size={12} className={running ? "text-brand animate-pulse" : "text-green"} />
+        <span className="font-semibold">Terminal</span>
+        <span className="text-muted/50 font-mono ml-auto tabular-nums">{done}/{commands.length}</span>
+      </div>
+      <div className="px-3 py-2.5 space-y-1.5">
+        {commands.map((c, i) => <CommandRow key={i} cmd={c} />)}
+      </div>
+    </div>
+  );
+}
+
 /* ── Tool call group ───────────────────────────────────────────────── */
 
 function ToolCallGroup({ calls }: { calls: NonNullable<ChatMessage["toolCalls"]> }) {
@@ -437,6 +487,9 @@ export function MessageBubble({
 
   /* ── USER BUBBLE ─────────────────────────────────────────────────── */
   if (isUser) {
+    /* Terminal çıktısı kullanıcı mesajları sohbette gösterilmez — çıktı zaten
+       asistan mesajındaki "Terminal" todo kutusunda görünür (AI bağlamında kalır). */
+    if (message.content.startsWith("**Terminal çıktısı**")) return null;
     return (
       <div className="group/msg flex justify-end gap-2.5 py-2.5 animate-fade-in">
         <div className="flex flex-col items-end gap-1.5 max-w-[80%]">
@@ -546,6 +599,9 @@ export function MessageBubble({
 
         {/* Ajan Ekibi (Swarm) ilerleme */}
         {message.swarm && <SwarmPanel swarm={message.swarm} />}
+
+        {/* Terminal komutları (todo kutusu) */}
+        {message.commands && message.commands.length > 0 && <CommandPanel commands={message.commands} />}
 
         {/* Plan */}
         {message.plan && <PlanPanel plan={message.plan} />}

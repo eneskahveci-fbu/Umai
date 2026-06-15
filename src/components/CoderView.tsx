@@ -576,12 +576,15 @@ export function CoderView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.activeRepo, config.activeGithubId, config.activeGitlabId, config.cliMode]);
 
-  /* Bir REPO bağlanınca terminali ARKAPLANDA otomatik boot et (gizli) → ajan
-     komutları hazır olur; repo yokken boşa kaynak harcanmaz. autoTerminal
-     açıksa görünür de aç. Bir kez mount olunca kapanmaz. */
+  /* Bir REPO bağlanınca terminali HER ZAMAN ARKAPLANDA boot et (gizli) → ajan
+     komutları hazır olur; repo yokken boşa kaynak harcanmaz. Ön plana ASLA
+     kendiliğinden açılmaz; kullanıcı isterse butonla açar. Komut çıktıları
+     sohbette "Terminal" todo kutusunda görünür. Bir kez mount olunca kapanmaz. */
   useEffect(() => {
     if (!repo) return;
     const useWs = !!config.terminalWsUrl?.trim();
+    /* Varsayılan: yalnızca arkaplanda mount (ön plana açılmaz). Kullanıcı
+       ayarlardan "Terminal panelini otomatik aç"ı açıkça seçerse ön plana da gelir. */
     const mount = () => { setTerminalMounted(true); if (config.autoTerminal) setTerminalOpen(true); };
     if (useWs) { const id = setTimeout(mount, 0); return () => clearTimeout(id); }
     let alive = true;
@@ -604,6 +607,11 @@ export function CoderView() {
     const handler = (e: Event) => {
       const { command, output } = (e as CustomEvent<{ command: string; output: string }>).detail ?? {};
       if (!output) return;
+      /* Çıktıyı "Terminal" todo kutusuna yaz (ayrı balon yok). */
+      useStore.getState().setCommandOutput(command, output, "done");
+      /* AI'ya bağlam olarak besle — bu kullanıcı mesajı sohbette GİZLENİR
+         (MessageBubble "**Terminal çıktısı**" ile başlayanları render etmez);
+         çıktı zaten todo kutusunda görünür. */
       const msg = `**Terminal çıktısı** (\`${command}\`):\n\`\`\`\n${output}\n\`\`\``;
       useStore.getState().pushMessage({ role: "user", content: msg });
       /* callApi is a stable useCallback defined below; it's only invoked here
@@ -1221,9 +1229,11 @@ export function CoderView() {
             if (parsed.run_command_event) {
               const command = String(parsed.run_command_event.command ?? "").trim();
               if (command) {
-                /* Terminali ARKAPLANDA hazırla (görünür açma — kullanıcı isterse
-                   butonla açar); komut arkaplanda çalışır, çıktı AI'ya döner. */
+                /* Terminali ARKAPLANDA hazırla (görünür açma yok); komut
+                   arkaplanda çalışır, ilerleme sohbetteki "Terminal" todo
+                   kutusunda görünür, çıktı AI'ya döner. */
                 setTerminalMounted(true);
+                useStore.getState().addCommandRun(command);
                 const fire = () => window.dispatchEvent(new CustomEvent("craftai:terminal-run", { detail: { command } }));
                 if (terminalReadyRef.current) {
                   fire();
@@ -1239,7 +1249,6 @@ export function CoderView() {
                   window.addEventListener("craftai:terminal-ready", onReady);
                   setTimeout(onReady, 20000);
                 }
-                addToast(`▶ Terminal: ${command}`, "info");
               }
               continue;
             }
