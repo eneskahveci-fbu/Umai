@@ -16,13 +16,16 @@ import {
   Plus,
   Search,
   Settings,
+  Settings2,
   Share2,
+  Sparkles,
   Sun,
   Tag,
   Trash2,
   X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { PROJECT_TEMPLATES, projectColorHex } from "@/lib/constants";
 import type { Chat } from "@/lib/types";
 import { AuthButton } from "./AuthButton";
 import { AccordionSection } from "./Accordion";
@@ -74,9 +77,11 @@ export function Sidebar() {
   const sidebarOpen = useStore((s) => s.sidebarOpen);
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
   const addProject = useStore((s) => s.addProject);
+  const addProjectFromTemplate = useStore((s) => s.addProjectFromTemplate);
   const setActiveProject = useStore((s) => s.setActiveProject);
   const removeProject = useStore((s) => s.removeProject);
   const updateProject = useStore((s) => s.updateProject);
+  const setProjectModalId = useStore((s) => s.setProjectModalId);
 
   const [search, setSearch] = useState("");
   /* Proje: satır-içi ekleme/yeniden adlandırma (window.prompt yerine). */
@@ -386,8 +391,17 @@ export function Sidebar() {
                     active ? "bg-brand/10 text-brand" : "text-muted hover:text-ink hover:bg-bgsoft/60"
                   }`}
                   onClick={() => setActiveProject(p.id)}
+                  title={p.description || p.name}
                 >
-                  {active ? <FolderOpen size={13} className="shrink-0" /> : <Folder size={13} className="shrink-0" />}
+                  {p.icon ? (
+                    <span className="text-[13px] leading-none shrink-0 w-3.5 text-center">{p.icon}</span>
+                  ) : p.color ? (
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0 ml-0.5" style={{ background: projectColorHex(p.color) }} />
+                  ) : active ? (
+                    <FolderOpen size={13} className="shrink-0" />
+                  ) : (
+                    <Folder size={13} className="shrink-0" />
+                  )}
                   <span className="flex-1 text-[12px] font-medium truncate">{p.name}</span>
                   {/* Sohbet sayısı rozeti — hover'da eylemlere yer açmak için gizlenir */}
                   {count > 0 && (
@@ -397,8 +411,15 @@ export function Sidebar() {
                       {count}
                     </span>
                   )}
-                  {/* Hover eylemleri: yeniden adlandır / sil */}
+                  {/* Hover eylemleri: detay paneli / yeniden adlandır / sil */}
                   <div className="hidden group-hover/proj:flex items-center gap-0.5 shrink-0">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setProjectModalId(p.id); }}
+                      title="Proje ayarları"
+                      className="p-0.5 rounded text-muted/60 hover:text-brand transition-colors"
+                    >
+                      <Settings2 size={12} />
+                    </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); setEditingProjectId(p.id); setEditProjectName(p.name); }}
                       title="Yeniden adlandır"
@@ -418,22 +439,44 @@ export function Sidebar() {
               );
             })}
 
-            {/* Satır-içi yeni proje girişi */}
+            {/* Satır-içi yeni proje girişi + şablonlar */}
             {addingProject && (
-              <div className="flex items-center gap-1 px-1.5 py-1">
-                <FolderPlus size={13} className="shrink-0 text-brand/70" />
-                <input
-                  id="new-project-input"
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") submitNewProject();
-                    if (e.key === "Escape") { setAddingProject(false); setNewProjectName(""); }
-                  }}
-                  onBlur={submitNewProject}
-                  placeholder="Proje adı…"
-                  className="flex-1 min-w-0 bg-bgsoft border border-brand/40 rounded-md px-2 py-1 text-[12px] outline-none placeholder:text-muted/35"
-                />
+              <div className="px-1.5 py-1 space-y-1.5">
+                <div className="flex items-center gap-1">
+                  <FolderPlus size={13} className="shrink-0 text-brand/70" />
+                  <input
+                    id="new-project-input"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") submitNewProject();
+                      if (e.key === "Escape") { setAddingProject(false); setNewProjectName(""); }
+                    }}
+                    onBlur={submitNewProject}
+                    placeholder="Proje adı…"
+                    className="flex-1 min-w-0 bg-bgsoft border border-brand/40 rounded-md px-2 py-1 text-[12px] outline-none placeholder:text-muted/35"
+                  />
+                </div>
+                {/* Şablondan oluştur — mousedown ile (input blur'undan önce) çalışır */}
+                <div className="flex flex-wrap gap-1 pl-5">
+                  <span className="flex items-center gap-1 text-[10px] text-muted/50 pr-0.5"><Sparkles size={9} /> Şablon:</span>
+                  {PROJECT_TEMPLATES.filter((t) => t.id !== "tpl-blank").map((t) => (
+                    <button
+                      key={t.id}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        const id = addProjectFromTemplate(t);
+                        setAddingProject(false);
+                        setNewProjectName("");
+                        setProjectModalId(id);
+                      }}
+                      title={t.description}
+                      className="text-[10px] px-1.5 py-0.5 rounded-md border border-line/60 text-muted hover:text-ink hover:border-brand/40 transition-colors"
+                    >
+                      {t.icon} {t.name}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

@@ -279,10 +279,16 @@ interface StoreState {
   toggleTheme: () => void;
 
   // projects
-  addProject: (name: string) => void;
+  addProject: (name: string) => string;
+  addProjectFromTemplate: (tpl: { name: string; icon?: string; color?: string; description?: string; systemPrompt?: string }) => string;
   removeProject: (id: string) => void;
   updateProject: (id: string, patch: Partial<Project>) => void;
   setActiveProject: (id: string | null) => void;
+  addProjectFile: (projectId: string, file: { name: string; content: string }) => void;
+  removeProjectFile: (projectId: string, fileId: string) => void;
+  /** Düzenlenen projenin id'si (ProjectModal). null = kapalı. */
+  projectModalId: string | null;
+  setProjectModalId: (id: string | null) => void;
 
   // memory (legacy — kept for back-compat)
   addMemory: (content: string) => void;
@@ -586,6 +592,44 @@ export const useStore = create<StoreState>()((set, get) => ({
       projects: [...config.projects, project],
       activeProjectId: project.id,
     });
+    return project.id;
+  },
+  addProjectFromTemplate: (tpl) => {
+    const project: Project = {
+      id: uid(),
+      name: tpl.name,
+      systemPrompt: tpl.systemPrompt ?? "",
+      created_at: Date.now(),
+      icon: tpl.icon,
+      color: tpl.color,
+      description: tpl.description,
+    };
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      projects: [...config.projects, project],
+      activeProjectId: project.id,
+    });
+    return project.id;
+  },
+  addProjectFile: (projectId, file) => {
+    const config = get().config;
+    const entry = { id: uid(), name: file.name, content: file.content, createdAt: Date.now() };
+    get().saveConfig({
+      ...config,
+      projects: config.projects.map((p) =>
+        p.id === projectId ? { ...p, files: [...(p.files ?? []), entry] } : p,
+      ),
+    });
+  },
+  removeProjectFile: (projectId, fileId) => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      projects: config.projects.map((p) =>
+        p.id === projectId ? { ...p, files: (p.files ?? []).filter((f) => f.id !== fileId) } : p,
+      ),
+    });
   },
   removeProject: (id) => {
     const config = get().config;
@@ -606,6 +650,8 @@ export const useStore = create<StoreState>()((set, get) => ({
     });
   },
   setActiveProject: (id) => get().saveConfig({ ...get().config, activeProjectId: id }),
+  projectModalId: null,
+  setProjectModalId: (id) => set({ projectModalId: id }),
 
   /* ─── Bellek ─── */
   addMemory: (content) => {

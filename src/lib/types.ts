@@ -133,6 +133,13 @@ export interface GitLabAccount {
 
 export type ResponseStyle = "normal" | "concise" | "detailed" | "code" | "formal";
 
+export interface ProjectFile {
+  id: string;
+  name: string;
+  content: string;
+  createdAt: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -144,6 +151,18 @@ export interface Project {
   temperature?: number;
   /** Bu projeye özel maksimum yanıt token'ı. Tanımsız = sağlayıcı varsayılanı. */
   maxTokens?: number;
+  /** Kısa açıklama (sidebar/araç ipucu). */
+  description?: string;
+  /** Görsel kimlik: renk anahtarı (PROJECT_COLORS) ve emoji/ikon. */
+  color?: string;
+  icon?: string;
+  /** Proje açılınca otomatik yüklenecek varsayılan repo ("owner/repo") + branch. */
+  repo?: string;
+  branch?: string;
+  /** Bilgi tabanı: projedeki her sohbete bağlam olarak verilen referans dosyalar. */
+  files?: ProjectFile[];
+  /** Projeye özel aktif Skills (tanımlıysa global yerine bu set kullanılır). */
+  skillIds?: string[];
 }
 
 export interface MemoryItem {

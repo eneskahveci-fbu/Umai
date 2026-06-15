@@ -619,6 +619,20 @@ export function CoderView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.activeRepo, config.activeGithubId, config.activeGitlabId, config.cliMode]);
 
+  /* Proje değişince, projeye bağlı varsayılan repo varsa onu aktif et
+     (yukarıdaki efekt repo bağlantısını otomatik kurar). */
+  const prevProjRepoRef = useRef(config.activeProjectId);
+  useEffect(() => {
+    if (prevProjRepoRef.current === config.activeProjectId) return;
+    prevProjRepoRef.current = config.activeProjectId;
+    const proj = config.projects.find((p) => p.id === config.activeProjectId);
+    if (proj?.repo && proj.repo !== config.activeRepo) {
+      const st = useStore.getState();
+      st.saveConfig({ ...st.config, activeRepo: proj.repo });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.activeProjectId]);
+
   /* Bir REPO bağlanınca terminali HER ZAMAN ARKAPLANDA boot et (gizli) → ajan
      komutları hazır olur; repo yokken boşa kaynak harcanmaz. Ön plana ASLA
      kendiliğinden açılmaz; kullanıcı isterse butonla açar. Komut çıktıları
@@ -1035,6 +1049,12 @@ export function CoderView() {
             : "")
         : "Sen uzman bir yazılım geliştiricisisin. Claude Code tarzında çalış: kullanıcının kod tabanını anla, dosya içeriklerini incele, sorunlara adım adım yaklaş. Kod yazarken best practice'leri uygula, okunabilir ve sürdürülebilir çözümler sun. KARMAŞIK (çok adımlı) görevlerde ÖNCE update_plan ile KISA bir plan (yapılacaklar listesi) sun, sonra adım adım uygula ve her adım bitince planı güncelle.",
       activeProject?.systemPrompt?.trim() ? `## Proje: ${activeProject.name}\n${activeProject.systemPrompt.trim()}` : "",
+      /* Proje bilgi tabanı: yüklenen referans dosyalar (dosya başına kırpılır). */
+      activeProject?.files?.length
+        ? `## Proje Bilgi Tabanı (referans dosyalar — örnek/bağlam olarak kullan)\n${activeProject.files
+            .map((f) => `### ${f.name}\n${f.content.slice(0, 6000)}${f.content.length > 6000 ? "\n…(kırpıldı)" : ""}`)
+            .join("\n\n")}`
+        : "",
       config.rulesFile?.trim() ? `## Proje Kuralları (.rules)\n${config.rulesFile.trim()}` : "",
     ].filter(Boolean).join("\n\n");
 
@@ -1090,7 +1110,12 @@ export function CoderView() {
     let realUsage: { prompt: number; completion: number } | null = null; // sağlayıcı gerçek token
     let thinkingFull = ""; // reasoning delta'ları birikir
     try {
-      const allEnabledSkills = (store.config.skills ?? []).filter((s) => s.enabled);
+      /* Projeye özel Skills: aktif projede skillIds tanımlıysa global "enabled"
+         yerine yalnızca o set kullanılır; aksi halde global aktif skills. */
+      const projectSkillIds = activeProject?.skillIds;
+      const allEnabledSkills = projectSkillIds && projectSkillIds.length > 0
+        ? (store.config.skills ?? []).filter((s) => projectSkillIds.includes(s.id))
+        : (store.config.skills ?? []).filter((s) => s.enabled);
       /* Relevance scoring: compare skill text against the last user message.
          If ≤5 skills, include all; otherwise pick top-5 by keyword overlap. */
       const activeSkills = (() => {
