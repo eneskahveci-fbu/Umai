@@ -13,6 +13,45 @@ import { ErrorBoundary } from "./ErrorBoundary";
 
 type Tool = "editor" | "git" | "artifact";
 
+/* Editör üstündeki dosya sekmesi şeridi — birden fazla dosya açıkken görünür. */
+function FileTabsBar({
+  tabs, activePath, onSelect, onClose,
+}: {
+  tabs: EditorFile[];
+  activePath: string | null;
+  onSelect: (p: string) => void;
+  onClose: (p: string) => void;
+}) {
+  if (tabs.length < 2) return null;
+  return (
+    <div className="h-8 shrink-0 flex items-stretch overflow-x-auto border-b border-line/60 bg-surface/30">
+      {tabs.map((t) => {
+        const name = t.path.split("/").pop() || t.path;
+        const active = t.path === activePath;
+        return (
+          <div
+            key={t.path}
+            onClick={() => onSelect(t.path)}
+            title={t.path}
+            className={`group/tab flex items-center gap-1.5 pl-3 pr-1.5 max-w-[180px] cursor-pointer border-r border-line/40 text-[11px] transition-colors ${
+              active ? "bg-bg text-ink" : "text-muted/70 hover:text-ink hover:bg-bgsoft/50"
+            }`}
+          >
+            <span className="truncate">{name}</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); onClose(t.path); }}
+              className="w-4 h-4 grid place-items-center rounded text-muted/40 hover:text-ink hover:bg-line/60 shrink-0"
+              aria-label="Sekmeyi kapat"
+            >
+              <X size={11} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 interface RightPanelProps {
   editorFile: EditorFile | null;
   editorOpen: boolean;
@@ -23,6 +62,11 @@ interface RightPanelProps {
   /** Git panelinden "PR/MR İncele" modalını açar (birleşik Git & PR butonu). */
   onReviewPr?: () => void;
   artifact: Artifact | null;
+  /** Çoklu dosya sekmeleri: açık dosyalar + seç/kapat ve kirli durum bildirimi. */
+  openTabs?: EditorFile[];
+  onSelectTab?: (path: string) => void;
+  onCloseTab?: (path: string) => void;
+  onEditorDirtyChange?: (dirty: boolean) => void;
 }
 
 export function RightPanel(props: RightPanelProps) {
@@ -158,14 +202,23 @@ export function RightPanel(props: RightPanelProps) {
       {splitView ? (
         /* Split: editor top (flex-1) + preview bottom (45%) */
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-hidden border-b border-line/60">
-            <ErrorBoundary variant="inline" label="Editör çöktü">
-              <EditorPanel
-                file={props.editorFile!}
-                onClose={props.onCloseEditor}
-                onAskAI={props.onAskAI}
-              />
-            </ErrorBoundary>
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden border-b border-line/60">
+            <FileTabsBar
+              tabs={props.openTabs ?? []}
+              activePath={props.editorFile?.path ?? null}
+              onSelect={(p) => props.onSelectTab?.(p)}
+              onClose={(p) => props.onCloseTab?.(p)}
+            />
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <ErrorBoundary variant="inline" label="Editör çöktü">
+                <EditorPanel
+                  file={props.editorFile!}
+                  onClose={props.onCloseEditor}
+                  onAskAI={props.onAskAI}
+                  onDirtyChange={props.onEditorDirtyChange}
+                />
+              </ErrorBoundary>
+            </div>
           </div>
           <div className="h-[45%] shrink-0 overflow-hidden">
             <ErrorBoundary variant="inline" label="Önizleme çöktü">
@@ -177,13 +230,24 @@ export function RightPanel(props: RightPanelProps) {
         /* Single tool view */
         <div className="flex-1 min-h-0 overflow-hidden">
           {effectiveActive === "editor" && props.editorFile && (
-            <ErrorBoundary variant="inline" label="Editör çöktü">
-              <EditorPanel
-                file={props.editorFile}
-                onClose={props.onCloseEditor}
-                onAskAI={props.onAskAI}
+            <div className="h-full flex flex-col min-h-0">
+              <FileTabsBar
+                tabs={props.openTabs ?? []}
+                activePath={props.editorFile.path}
+                onSelect={(p) => props.onSelectTab?.(p)}
+                onClose={(p) => props.onCloseTab?.(p)}
               />
-            </ErrorBoundary>
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <ErrorBoundary variant="inline" label="Editör çöktü">
+                  <EditorPanel
+                    file={props.editorFile}
+                    onClose={props.onCloseEditor}
+                    onAskAI={props.onAskAI}
+                    onDirtyChange={props.onEditorDirtyChange}
+                  />
+                </ErrorBoundary>
+              </div>
+            </div>
           )}
           {effectiveActive === "git" && (
             <ErrorBoundary variant="inline" label="Git paneli çöktü">

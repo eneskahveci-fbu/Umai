@@ -418,7 +418,46 @@ export function CoderView() {
   const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
   const [resolvingAction, setResolvingAction] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  /* Çoklu dosya sekmeleri: editörde açık tutulan dosyalar + aktif olanın
+     kaydedilmemiş durumu (sekme geçişinde veri kaybını önlemek için). */
+  const [openTabs, setOpenTabs] = useState<EditorFile[]>([]);
+  const [activeDirty, setActiveDirty] = useState(false);
   const [gitPanelOpen, setGitPanelOpen] = useState(false);
+
+  /* Dosyayı editörde aç: sekme yoksa ekle, varsa içeriğini güncelle, aktif yap. */
+  const openInEditor = (f: EditorFile) => {
+    setEditorFile(f);
+    setEditorOpen(true);
+    setActiveDirty(false);
+    setOpenTabs((tabs) => {
+      const i = tabs.findIndex((t) => t.path === f.path);
+      if (i === -1) return [...tabs, f];
+      const next = [...tabs];
+      next[i] = f;
+      return next;
+    });
+  };
+  /* Sekmeye geç — aktif sekmede kaydedilmemiş değişiklik varsa onay iste. */
+  const selectTab = (path: string) => {
+    if (path === editorFile?.path) return;
+    if (activeDirty && !confirm("Kaydedilmemiş değişiklikler kaybolacak. Devam edilsin mi?")) return;
+    const t = openTabs.find((x) => x.path === path);
+    if (t) { setEditorFile(t); setEditorOpen(true); setActiveDirty(false); }
+  };
+  /* Sekmeyi kapat — aktif ve kirliyse onay iste, komşu sekmeye geç. */
+  const closeTab = (path: string) => {
+    const isActive = path === editorFile?.path;
+    if (isActive && activeDirty && !confirm("Kaydedilmemiş değişiklikler kaybolacak. Sekme kapatılsın mı?")) return;
+    setOpenTabs((tabs) => {
+      const idx = tabs.findIndex((t) => t.path === path);
+      const next = tabs.filter((t) => t.path !== path);
+      if (isActive) {
+        if (next.length === 0) { setEditorFile(null); setEditorOpen(false); }
+        else { setEditorFile(next[Math.max(0, idx - 1)]); setActiveDirty(false); }
+      }
+      return next;
+    });
+  };
   const [loadingAll, setLoadingAll] = useState(false);
   const [prModalOpen, setPrModalOpen] = useState(false);
   const [prNumber, setPrNumber] = useState("");
@@ -644,8 +683,7 @@ export function CoderView() {
         content = await fetchFileContent(repo.owner, repo.repo, repo.branch, file.path, token);
       }
       setAttachedFiles((prev) => [...prev, { path: file.path, content }]);
-      setEditorFile({ path: file.path, content, language: detectLanguage(file.path) });
-      setEditorOpen(true);
+      openInEditor({ path: file.path, content, language: detectLanguage(file.path) });
     } catch (e) {
       addToast(`Dosya okunamadı: ${(e as Error).message}`, "error");
     } finally {
@@ -668,8 +706,7 @@ export function CoderView() {
       } else {
         content = await fetchFileContent(r.owner, r.repo, r.branch, path, store.activeGithub()?.token);
       }
-      setEditorFile({ path, content, language: detectLanguage(path) });
-      setEditorOpen(true);
+      openInEditor({ path, content, language: detectLanguage(path) });
     } catch { /* dosya henüz okunamadıysa sessiz geç */ }
   }, []);
 
@@ -746,8 +783,7 @@ export function CoderView() {
       if (!path) return;
       const existing = attachedFiles.find((f) => f.path === path);
       if (existing) {
-        setEditorFile({ path: existing.path, content: existing.content, language: detectLanguage(path) });
-        setEditorOpen(true);
+        openInEditor({ path: existing.path, content: existing.content, language: detectLanguage(path) });
         return;
       }
       const file = tree ? getAllFiles(tree).find((f) => f.path === path) : undefined;
@@ -1328,8 +1364,10 @@ export function CoderView() {
       /* AI'nın yazdığı dosyayı otomatik IDE'de aç + multi-commit bar */
       const autoFiles = extractAllFileFences(full);
       if (autoFiles.length > 0) {
-        setEditorFile(autoFiles[0]);
-        setEditorOpen(true);
+        /* Tümünü sekme olarak aç (ilki aktif), birden fazla dosya yazıldıysa da
+           hepsi sekme şeridinde görünsün. */
+        for (const af of autoFiles) openInEditor(af);
+        openInEditor(autoFiles[0]);
       }
       setPendingCommit(autoFiles.length >= 2 ? autoFiles : null);
 
@@ -1883,7 +1921,7 @@ export function CoderView() {
                           <MultiCommitBar
                             files={pendingCommit}
                             onClose={() => setPendingCommit(null)}
-                            onOpenInEditor={(f) => { setEditorFile(f); setEditorOpen(true); }}
+                            onOpenInEditor={(f) => openInEditor(f)}
                           />
                         </div>
                       )}
@@ -2209,7 +2247,16 @@ export function CoderView() {
         <RightPanel
           editorFile={editorFile}
           editorOpen={editorOpen}
-          onCloseEditor={() => setEditorOpen(false)}
+          openTabs={openTabs}
+          onSelectTab={selectTab}
+          onCloseTab={closeTab}
+          onEditorDirtyChange={setActiveDirty}
+          onCloseEditor={() => {
+            if (activeDirty && !confirm("Kaydedilmemiş değişiklikler kaybolacak. Editör kapatılsın mı?")) return;
+            setEditorOpen(false);
+            setOpenTabs([]);
+            setActiveDirty(false);
+          }}
           onAskAI={(_text, context) => {
             useStore.getState().setPendingInput(context);
           }}
