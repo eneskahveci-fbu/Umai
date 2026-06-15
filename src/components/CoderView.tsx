@@ -960,6 +960,22 @@ export function CoderView() {
       reader.readAsDataURL(f);
       return;
     }
+    /* PDF: istemcide metni çıkar, metin olarak ekle (görsel akışıyla aynı mantık). */
+    if (f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")) {
+      if (f.size > 20_000_000) { addToast("PDF 20MB'den büyük.", "error"); return; }
+      addToast(`${f.name} okunuyor…`, "info");
+      void (async () => {
+        try {
+          const { extractPdfText } = await import("@/lib/pdf");
+          const text = await extractPdfText(f);
+          setAttachedFiles((prev) => [...prev, { path: f.name, content: text }]);
+          addToast(`${f.name} eklendi (metin çıkarıldı).`, "success");
+        } catch (e) {
+          addToast(`PDF okunamadı: ${(e as Error).message}`, "error");
+        }
+      })();
+      return;
+    }
     if (f.size > 512_000) { addToast("Dosya 512KB'den büyük.", "error"); return; }
     const reader = new FileReader();
     reader.onload = () => {
@@ -2282,7 +2298,7 @@ export function CoderView() {
                 </div>
               )}
 
-              <input ref={fileRef} type="file" multiple accept=".txt,.md,.js,.ts,.tsx,.jsx,.py,.json,.yaml,.yml,.toml,.html,.css,.sql,.sh,.go,.rs,.java,.c,.cpp,.h,.rb,.php" className="hidden"
+              <input ref={fileRef} type="file" multiple accept=".txt,.md,.js,.ts,.tsx,.jsx,.py,.json,.yaml,.yml,.toml,.html,.css,.sql,.sh,.go,.rs,.java,.c,.cpp,.h,.rb,.php,.pdf,.ipynb" className="hidden"
                 onChange={(e) => { for (const f of Array.from(e.target.files ?? [])) readFileIntoInput(f); e.target.value = ""; }} />
               <input ref={imgRef} type="file" accept="image/*" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) readFileIntoInput(f); e.target.value = ""; }} />
