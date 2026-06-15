@@ -32,6 +32,7 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
+  Sparkles,
   Trash2,
   Square,
   Terminal,
@@ -341,6 +342,10 @@ function FileTreeNode({
 
 /* ─── main ─── */
 
+/* Anlamsal indekse alınacak metin/kod uzantıları ve üst sınır. */
+const RAG_TEXT_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|php|c|h|cpp|cs|css|scss|html|json|md|mdx|txt|yml|yaml|sh|sql)$/i;
+const RAG_MAX_FILES = 150;
+
 export function CoderView() {
   const config = useStore((s) => s.config);
   const repo = useStore((s) => s.repo);
@@ -398,6 +403,12 @@ export function CoderView() {
   const [connecting, setConnecting] = useState(false);
   const connectingRef = useRef(false);
   const [fetchingFile, setFetchingFile] = useState<string | null>(null);
+  /* Anlamsal (RAG) arama — transformers.js gömme indeksi (repo+branch ile önbellek). */
+  const [semanticMode, setSemanticMode] = useState(false);
+  const [ragHits, setRagHits] = useState<import("@/lib/rag").RagHit[]>([]);
+  const [ragBusy, setRagBusy] = useState(false);
+  const [ragProgress, setRagProgress] = useState<{ done: number; total: number } | null>(null);
+  const ragIndexRef = useRef<{ key: string; index: import("@/lib/rag").SemanticIndex } | null>(null);
   const [editorFile, setEditorFile] = useState<EditorFile | null>(null);
   const [pendingCommit, setPendingCommit] = useState<EditorFile[] | null>(null);
   /* Ajanın bu turda yazdığı dosyaların ESKİ içeriği — "Geri al" için. */
@@ -653,6 +664,72 @@ export function CoderView() {
       setEditorOpen(true);
     } catch { /* dosya henüz okunamadıysa sessiz geç */ }
   }, []);
+
+  /* ── Anlamsal (RAG) arama ──────────────────────────────────────────
+     İlk kullanımda depo metin dosyalarını (sınırlı sayıda) çekip gömme
+     indeksine ekler; indeks repo+branch ile önbelleklenir. Sonra sorguyu
+     anlamca en yakın parçalara eşler. */
+  const ensureRagIndex = useCallback(async (): Promise<import("@/lib/rag").SemanticIndex | null> => {
+    const store = useStore.getState();
+    const r = store.repo;
+    if (!r || !tree) return null;
+    const key = `${r.owner}/${r.repo}@${r.branch}`;
+    if (ragIndexRef.current?.key === key && ragIndexRef.current.index.size > 0) {
+      return ragIndexRef.current.index;
+    }
+    const { SemanticIndex, chunkText } = await import("@/lib/rag");
+    const index = new SemanticIndex();
+    const activeRepo = store.config.activeRepo || "";
+    const gitlab = isGitLabRepo(activeRepo);
+    const token = gitlab ? store.activeGitlab()?.token : store.activeGithub()?.token;
+
+    const files = getAllFiles(tree)
+      .filter((f) => RAG_TEXT_EXT.test(f.path))
+      .slice(0, RAG_MAX_FILES);
+    setRagProgress({ done: 0, total: files.length });
+
+    /* Eş zamanlılık sınırlı (5) çekme + parçalama. */
+    let i = 0;
+    let done = 0;
+    const worker = async () => {
+      while (i < files.length) {
+        const f = files[i++];
+        try {
+          const content = gitlab
+            ? await fetchGitLabFileContent(r.owner, r.repo, r.branch, f.path, token)
+            : await fetchFileContent(r.owner, r.repo, r.branch, f.path, token);
+          if (content && content.length < 100_000) {
+            await index.add(chunkText(f.path, content));
+          }
+        } catch { /* dosya atla */ }
+        done++;
+        setRagProgress({ done, total: files.length });
+      }
+    };
+    await Promise.all(Array.from({ length: 5 }, worker));
+    ragIndexRef.current = { key, index };
+    setRagProgress(null);
+    return index;
+  }, [tree]);
+
+  const runSemanticSearch = useCallback(async (query: string) => {
+    const q = query.trim();
+    if (!q) { setRagHits([]); return; }
+    setRagBusy(true);
+    try {
+      const index = await ensureRagIndex();
+      if (!index || index.size === 0) {
+        addToast("Anlamsal indeks kurulamadı (model yüklenemedi)", "error");
+        setRagHits([]);
+        return;
+      }
+      const hits = await index.search(q, 8);
+      setRagHits(hits);
+      if (hits.length === 0) addToast("Eşleşme bulunamadı", "info");
+    } finally {
+      setRagBusy(false);
+    }
+  }, [ensureRagIndex, addToast]);
 
   /* Komut paletinden (Cmd+P) dosya açma isteği → editörde aç. */
   useEffect(() => {
@@ -1601,15 +1678,36 @@ export function CoderView() {
 
             {tree && (
               <div className="px-2 py-1.5 border-b border-line/40 shrink-0">
-                <div className="relative">
-                  <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted/40" />
-                  <input
-                    value={repoSearch}
-                    onChange={(e) => setRepoSearch(e.target.value)}
-                    placeholder="Ara…"
-                    className="w-full bg-bgsoft/60 rounded-lg pl-6 pr-2 py-1.5 text-[11px] outline-none focus:ring-1 ring-brand/30 placeholder:text-muted/30"
-                  />
+                <div className="relative flex items-center gap-1">
+                  <div className="relative flex-1">
+                    <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted/40" />
+                    <input
+                      value={repoSearch}
+                      onChange={(e) => setRepoSearch(e.target.value)}
+                      onKeyDown={(e) => { if (semanticMode && e.key === "Enter") runSemanticSearch(repoSearch); }}
+                      placeholder={semanticMode ? "Anlamca ara, Enter…" : "Ara…"}
+                      className="w-full bg-bgsoft/60 rounded-lg pl-6 pr-2 py-1.5 text-[11px] outline-none focus:ring-1 ring-brand/30 placeholder:text-muted/30"
+                    />
+                  </div>
+                  <button
+                    onClick={() => { setSemanticMode((v) => !v); setRagHits([]); }}
+                    title={semanticMode ? "Anlamsal arama açık (kelime aramasına dön)" : "Anlamsal arama (AI gömme)"}
+                    className={`shrink-0 p-1.5 rounded-lg transition-colors ${semanticMode ? "bg-brand/15 text-brand" : "text-muted/50 hover:text-ink hover:bg-bgsoft/60"}`}
+                  >
+                    <Sparkles size={12} />
+                  </button>
                 </div>
+                {semanticMode && ragProgress && (
+                  <div className="mt-1.5 px-0.5">
+                    <div className="flex items-center justify-between text-[9px] text-muted/50 mb-0.5">
+                      <span>İndeksleniyor…</span>
+                      <span className="tabular-nums">{ragProgress.done}/{ragProgress.total}</span>
+                    </div>
+                    <div className="h-1 rounded-full bg-bgsoft overflow-hidden">
+                      <div className="h-full bg-brand transition-all" style={{ width: `${ragProgress.total ? (ragProgress.done / ragProgress.total) * 100 : 0}%` }} />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1647,6 +1745,39 @@ export function CoderView() {
                       <Paperclip size={10} /> Yerel dosya yükle
                     </button>
                   </div>
+                </div>
+              ) : semanticMode ? (
+                <div className="py-1">
+                  {ragBusy && !ragProgress ? (
+                    <div className="px-3 py-4 text-center text-[10px] text-muted/50 flex items-center justify-center gap-1.5">
+                      <RefreshCw size={11} className="animate-spin text-brand" /> Anlamca aranıyor…
+                    </div>
+                  ) : ragHits.length === 0 ? (
+                    <div className="px-3 py-6 text-center text-[10px] text-muted/40 leading-relaxed">
+                      <Sparkles size={18} className="mx-auto mb-2 text-muted/20" />
+                      Anlamsal arama: ne aradığını <em>doğal dille</em> yaz, Enter&apos;a bas.
+                      <br />İlk aramada depo indekslenir (model indirilir).
+                    </div>
+                  ) : (
+                    ragHits.map((h, i) => {
+                      const isAttached = attachedPaths.includes(h.path);
+                      return (
+                        <button
+                          key={`${h.path}-${h.line}-${i}`}
+                          onClick={() => { const f = getAllFiles(tree).find((x) => x.path === h.path); if (f) attachRepoFile(f); }}
+                          className={`w-full flex flex-col gap-0.5 px-3 py-1.5 text-left rounded transition-colors ${isAttached ? "bg-brand/10" : "hover:bg-bgsoft/50"}`}
+                        >
+                          <div className="flex items-center gap-1.5 text-[11px]">
+                            {fetchingFile === h.path ? <RefreshCw size={10} className="animate-spin shrink-0 text-brand" /> : <FileIcon name={h.path.split("/").pop() || h.path} size={10} />}
+                            <span className="truncate flex-1 text-muted/90">{h.path}</span>
+                            <span className="text-[8px] text-muted/40">:{h.line}</span>
+                            <span className="text-[8px] font-mono text-brand/60 tabular-nums shrink-0">{(h.score * 100).toFixed(0)}%</span>
+                          </div>
+                          <div className="text-[9px] text-muted/40 font-mono truncate pl-4">{h.text.trim().slice(0, 80)}</div>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
               ) : repoSearch ? (
                 <div className="py-1">
