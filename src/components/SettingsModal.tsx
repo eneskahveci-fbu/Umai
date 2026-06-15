@@ -1069,6 +1069,58 @@ export function SettingsModal() {
               />
             </div>
 
+            {/* Otomasyonlar (olaya bağlı komutlar — Claude Code hooks benzeri) */}
+            <div>
+              <h4 className="text-sm font-bold mb-1 flex items-center gap-1.5"><Zap size={14} className="text-brand" /> Otomasyonlar</h4>
+              <p className="text-xs text-muted/70 mb-2 leading-relaxed">
+                Belirli bir olayda terminalde otomatik komut çalıştır.{" "}
+                <strong className="text-muted">Dosya yazınca</strong> = ajan kod yazdığında,{" "}
+                <strong className="text-muted">Yanıttan sonra</strong> = her yanıtın ardından. Terminal bağlı olmalı.
+              </p>
+              <div className="space-y-2">
+                {(config.automations ?? []).map((a) => (
+                  <div key={a.id} className="flex items-center gap-2 bg-bgsoft border border-line/60 rounded-lg px-2 py-2">
+                    <input
+                      type="checkbox"
+                      checked={a.enabled}
+                      onChange={(e) => saveConfig({ ...config, automations: (config.automations ?? []).map((x) => x.id === a.id ? { ...x, enabled: e.target.checked } : x) })}
+                      className="accent-brand shrink-0"
+                      title="Etkin"
+                    />
+                    <select
+                      value={a.event}
+                      onChange={(e) => saveConfig({ ...config, automations: (config.automations ?? []).map((x) => x.id === a.id ? { ...x, event: e.target.value as "afterWrite" | "afterResponse" } : x) })}
+                      className="bg-bg border border-line rounded-md px-1.5 py-1 text-xs outline-none shrink-0"
+                    >
+                      <option value="afterWrite">Dosya yazınca</option>
+                      <option value="afterResponse">Yanıttan sonra</option>
+                    </select>
+                    <input
+                      value={a.command}
+                      onChange={(e) => saveConfig({ ...config, automations: (config.automations ?? []).map((x) => x.id === a.id ? { ...x, command: e.target.value } : x) })}
+                      placeholder="npm test"
+                      className="input-mono flex-1 min-w-0 text-xs py-1"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    <button
+                      onClick={() => saveConfig({ ...config, automations: (config.automations ?? []).filter((x) => x.id !== a.id) })}
+                      className="text-muted hover:text-red p-1 shrink-0"
+                      title="Sil"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => saveConfig({ ...config, automations: [...(config.automations ?? []), { id: crypto.randomUUID(), name: "Otomasyon", event: "afterWrite", command: "", enabled: true }] })}
+                className="mt-2 flex items-center justify-center gap-1.5 py-2 w-full rounded-xl border border-line hover:border-brand text-sm font-semibold transition-colors"
+              >
+                <Plus size={15} /> Otomasyon Ekle
+              </button>
+            </div>
+
             {/* Yazı tipi boyutu */}
             <div>
               <h4 className="text-sm font-bold mb-2">Kod Yazı Tipi Boyutu</h4>

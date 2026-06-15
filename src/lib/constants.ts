@@ -473,6 +473,7 @@ export const DEFAULT_CONFIG: Config = {
   webcontainerApiKey: "",
   terminalWsUrl: "",
   terminalSetupCommand: "",
+  automations: [],
   mcpServers: [],
 };
 

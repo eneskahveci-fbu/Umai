@@ -652,6 +652,25 @@ export function CoderView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.activeProjectId]);
 
+  /* Terminalde komut çalıştır (arkaplanda hazırlar, hazır olunca gönderir).
+     Hem ajan run_command'ı hem de otomasyonlar bunu kullanır. */
+  const runInTerminal = (command: string) => {
+    const cmd = command.trim();
+    if (!cmd) return;
+    setTerminalMounted(true);
+    useStore.getState().addCommandRun(cmd);
+    const fire = () => window.dispatchEvent(new CustomEvent("craftai:terminal-run", { detail: { command: cmd } }));
+    if (terminalReadyRef.current) { fire(); return; }
+    let done = false;
+    const onReady = () => {
+      if (done) return; done = true;
+      window.removeEventListener("craftai:terminal-ready", onReady);
+      fire();
+    };
+    window.addEventListener("craftai:terminal-ready", onReady);
+    setTimeout(onReady, 20000);
+  };
+
   /* Bir REPO bağlanınca terminali HER ZAMAN ARKAPLANDA boot et (gizli) → ajan
      komutları hazır olur; repo yokken boşa kaynak harcanmaz. Ön plana ASLA
      kendiliğinden açılmaz; kullanıcı isterse butonla açar. Komut çıktıları
@@ -1334,29 +1353,9 @@ export function CoderView() {
             /* run_command: ajan terminalde komut çalıştırmak istiyor → terminali
                aç ve komutu gönder. Çıktı craftai:terminal-output ile geri döner. */
             if (parsed.run_command_event) {
-              const command = String(parsed.run_command_event.command ?? "").trim();
-              if (command) {
-                /* Terminali ARKAPLANDA hazırla (görünür açma yok); komut
-                   arkaplanda çalışır, ilerleme sohbetteki "Terminal" todo
-                   kutusunda görünür, çıktı AI'ya döner. */
-                setTerminalMounted(true);
-                useStore.getState().addCommandRun(command);
-                const fire = () => window.dispatchEvent(new CustomEvent("craftai:terminal-run", { detail: { command } }));
-                if (terminalReadyRef.current) {
-                  fire();
-                } else {
-                  /* Terminal hazır olunca gönder (WebContainer açılışı 5-10 sn
-                     sürebilir → sabit gecikme komutu kaybediyordu). 20 sn emniyet. */
-                  let done = false;
-                  const onReady = () => {
-                    if (done) return; done = true;
-                    window.removeEventListener("craftai:terminal-ready", onReady);
-                    fire();
-                  };
-                  window.addEventListener("craftai:terminal-ready", onReady);
-                  setTimeout(onReady, 20000);
-                }
-              }
+              /* Terminali ARKAPLANDA hazırla; komut arkaplanda çalışır, ilerleme
+                 sohbetteki "Terminal" todo kutusunda görünür, çıktı AI'ya döner. */
+              runInTerminal(String(parsed.run_command_event.command ?? ""));
               continue;
             }
             /* bitiş nedeni: "length" ⇒ token sınırında kesildi → şerit + oto-devam */
@@ -1441,6 +1440,18 @@ export function CoderView() {
         openInEditor(autoFiles[0]);
       }
       setPendingCommit(autoFiles.length >= 2 ? autoFiles : null);
+
+      /* Otomasyonlar (Claude Code hooks benzeri): afterResponse her yanıttan
+         sonra, afterWrite yalnızca ajan dosya yazınca çalışır. Eşleşen komutlar
+         sıralı (&&) tek seferde terminale gönderilir. */
+      {
+        const wroteFiles = autoFiles.length > 0 || turnCheckpoints.length > 0;
+        const due = (store.config.automations ?? [])
+          .filter((a) => a.enabled && a.command.trim())
+          .filter((a) => a.event === "afterResponse" || (a.event === "afterWrite" && wroteFiles))
+          .map((a) => a.command.trim());
+        if (due.length > 0) runInTerminal(due.join(" && "));
+      }
 
       /* Güvenli oto-çalıştır: yalnızca allowlist'teki komut otomatik terminale
          gönderilir (çıktı AI'ya beslenir → güvenli oto-düzelt). Diğerleri elle. */

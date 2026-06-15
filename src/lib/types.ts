@@ -133,6 +133,16 @@ export interface GitLabAccount {
 
 export type ResponseStyle = "normal" | "concise" | "detailed" | "code" | "formal";
 
+/** Olay-tabanlı otomasyon: belirli bir olayda terminalde komut çalıştırır.
+ *  afterWrite = ajan dosya yazınca, afterResponse = her yanıttan sonra. */
+export interface Automation {
+  id: string;
+  name: string;
+  event: "afterWrite" | "afterResponse";
+  command: string;
+  enabled: boolean;
+}
+
 export interface ProjectFile {
   id: string;
   name: string;
@@ -261,6 +271,8 @@ export interface Config {
   /** Gerçek terminal bağlanınca otomatik çalıştırılacak kurulum komutu
    *  (ör. "npm install && npm run dev"). Boşsa hiçbir şey çalıştırılmaz. */
   terminalSetupCommand?: string;
+  /** Olaya bağlı otomasyonlar (Claude Code hooks benzeri). */
+  automations?: Automation[];
   mcpServers?: McpServer[];
 }
 
