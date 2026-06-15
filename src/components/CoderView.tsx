@@ -86,7 +86,7 @@ import {
 } from "@/lib/gitlab";
 import type { TreeFile, TreeNode } from "@/lib/types";
 import { ALL_AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agents";
-import { calculateCost, formatCost, getModelPrice } from "@/lib/pricing";
+import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
 import { buildContextSections } from "@/lib/prompt";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { addPendingAction, removePendingAction, isCommandAllowed, DEFAULT_COMMAND_ALLOWLIST, type PendingAction } from "@/lib/agentActions";
@@ -281,6 +281,25 @@ function FileIcon({ name, size = 13 }: { name: string; size?: number }) {
 
 function getAllFiles(node: TreeNode): TreeFile[] {
   return [...node.files, ...Object.values(node.dirs).flatMap(getAllFiles)];
+}
+
+/* Ham hata mesajını kullanıcının anlayacağı, çözüm önerili Türkçe metne çevirir.
+   Tanınmayan hatalarda orijinal mesaj korunur. */
+function friendlyError(raw: string): string {
+  const m = (raw || "").toLowerCase();
+  if (/(401|403|unauthorized|invalid api key|invalid_api_key|authentication)/.test(m))
+    return "Geçersiz veya eksik API anahtarı. Ayarlar → Modeller'den anahtarını kontrol et.";
+  if (/(429|rate limit|too many requests|quota|insufficient_quota)/.test(m))
+    return "İstek sınırına (rate limit) takıldın veya kotan bitti. Biraz bekle ya da başka bir model/sağlayıcı dene.";
+  if (/(timeout|timed out|etimedout|deadline)/.test(m))
+    return "İstek zaman aşımına uğradı. Bağlantını kontrol et ve tekrar dene; istek çok uzunsa kısaltmayı dene.";
+  if (/(failed to fetch|network|networkerror|err_network|connection|econnrefused|fetch failed)/.test(m))
+    return "Ağ/bağlantı sorunu. İnternetini kontrol et; sağlayıcı erişilemiyor olabilir.";
+  if (/(404|not found|model.*(not found|does not exist)|unknown model)/.test(m))
+    return "Model bulunamadı. Ayarlar'dan model adının doğru yazıldığından emin ol.";
+  if (/(500|502|503|529|overloaded|service unavailable|server error)/.test(m))
+    return "Sağlayıcı şu an yoğun veya geçici olarak yanıt vermiyor. Birkaç saniye sonra tekrar dene.";
+  return raw;
 }
 
 
@@ -1462,7 +1481,7 @@ export function CoderView() {
         /* Kullanıcı durdurdu: hiç içerik gelmediyse boş asistan baloncuğunu kaldır. */
         if (!full) useStore.getState().popLastMessage();
       } else {
-        useStore.getState().updateLastContent(`**Hata:** ${(err as Error).message}\n\n_Anahtar/model doğru mu? Ayarlardan kontrol et._`);
+        useStore.getState().updateLastContent(`**Hata:** ${friendlyError((err as Error).message)}`);
       }
     } finally {
       coderAbort = null;
@@ -1622,10 +1641,16 @@ export function CoderView() {
 
         <div className="flex-1 min-w-0" />
 
-        {/* Token + cost */}
-        {current && (current.totalInTokens || current.totalOutTokens) ? (
-          <UsageBadge chat={current} />
-        ) : null}
+        {/* Token + maliyet — her zaman görünür; göndermeden önce yazılan metnin
+           ve eklenen dosyaların yaklaşık token tahminini canlı gösterir. */}
+        {config.models.length > 0 && (
+          <UsageBadge
+            chat={current ?? {}}
+            pendingTokens={
+              estimateTokens(input) + attachedFiles.reduce((a, f) => a + estimateTokens(f.content), 0)
+            }
+          />
+        )}
 
         <div className="flex items-center gap-1 shrink-0">
           {config.models.length > 0 ? (
@@ -2531,7 +2556,7 @@ interface UsageQuota {
 }
 
 /* Token + maliyet rozeti — tıklanınca canlı kota pop-up'ı açar. */
-function UsageBadge({ chat }: { chat: { totalInTokens?: number; totalOutTokens?: number } }) {
+function UsageBadge({ chat, pendingTokens = 0 }: { chat: { totalInTokens?: number; totalOutTokens?: number }; pendingTokens?: number }) {
   const config = useStore((s) => s.config);
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -2564,13 +2589,18 @@ function UsageBadge({ chat }: { chat: { totalInTokens?: number; totalOutTokens?:
           : warn ? "border-amber-400/40 bg-amber-400/5 text-amber-400"
           : "border-line/40 text-muted/70"
         }`}
-        title="Token & kota detayı için tıkla"
+        title={pendingTokens > 0
+          ? `Bu sohbet: ${total.toLocaleString()} token · Göndereceğin: ~${pendingTokens.toLocaleString()} token. Detay için tıkla.`
+          : "Token & kota detayı için tıkla"}
       >
         <span className="relative w-3 h-3" aria-hidden>
           <span className="absolute inset-0 rounded-full bg-current opacity-15" />
           <span className="absolute inset-0 rounded-full bg-current" style={{ clipPath: `inset(${100 - pct}% 0 0 0)` }} />
         </span>
         <span>{total.toLocaleString()} tok</span>
+        {pendingTokens > 0 && (
+          <span className="text-brand/80" title="Göndermeden önce tahmini ek token">+~{pendingTokens.toLocaleString()}</span>
+        )}
         {cost !== null && hasPrice && (
           <>
             <span className="opacity-40">·</span>
