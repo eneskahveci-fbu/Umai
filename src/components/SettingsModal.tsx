@@ -415,7 +415,7 @@ export function SettingsModal() {
         </div>
 
         <div className="flex gap-1 mb-5 border-b border-line">
-          {([["model", "Model"], ["github", "Git"], ["general", "Genel"], ["advanced", "Gelişmiş"], ["mcp", "MCP"]] as const).map(([key, lbl]) => {
+          {([["model", "Model"], ["github", "Git"], ["general", "Temel"], ["advanced", "Gelişmiş"], ["mcp", "MCP"]] as const).map(([key, lbl]) => {
             const hit = matchingTabs.has(key);
             return (
               <button
@@ -926,26 +926,6 @@ export function SettingsModal() {
               <button onClick={() => { saveConfig({ ...config, systemPrompt: DEFAULT_SYSTEM_PROMPT }); setSystemPromptDraft(DEFAULT_SYSTEM_PROMPT); }} className="text-xs text-muted hover:text-brand mt-1">Varsayılana sıfırla</button>
             </div>
 
-            {/* Togglelar */}
-            <div className="flex flex-col gap-2">
-              <label className="flex items-center gap-3 text-sm cursor-pointer">
-                <input type="checkbox" checked={config.followUps} onChange={() => saveConfig({ ...config, followUps: !config.followUps })} className="accent-brand" />
-                Takip soruları öner
-              </label>
-              <label className="flex items-center gap-3 text-sm cursor-pointer">
-                <input type="checkbox" checked={config.webSearch} onChange={() => saveConfig({ ...config, webSearch: !config.webSearch })} className="accent-brand" />
-                Web arama (varsayılan açık)
-              </label>
-              <label className="flex items-center gap-3 text-sm cursor-pointer">
-                <input type="checkbox" checked={config.autoMemory !== false} onChange={() => saveConfig({ ...config, autoMemory: config.autoMemory === false })} className="accent-brand" />
-                Otomatik bellek — kalıcı tercihleri 🧠 skill&apos;ine damıt
-              </label>
-              <label className="flex items-center gap-3 text-sm cursor-pointer">
-                <input type="checkbox" checked={config.autoContinue !== false} onChange={() => saveConfig({ ...config, autoContinue: config.autoContinue === false })} className="accent-brand" />
-                Otomatik devam — yanıt token sınırında kesilirse kendiliğinden sürdür
-              </label>
-            </div>
-
             {/* Bağlam limiti */}
             <div>
               <h4 className="text-sm font-bold mb-2">Bağlam Penceresi</h4>
@@ -974,6 +954,29 @@ export function SettingsModal() {
         {/* GELİŞMİŞ */}
         {tab === "advanced" && (
           <section className="flex flex-col gap-5">
+            {/* Ajan davranışı (Temel'den taşındı) */}
+            <div>
+              <h4 className="text-sm font-bold mb-2">Ajan Davranışı</h4>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-3 text-sm cursor-pointer">
+                  <input type="checkbox" checked={config.followUps} onChange={() => saveConfig({ ...config, followUps: !config.followUps })} className="accent-brand" />
+                  Takip soruları öner
+                </label>
+                <label className="flex items-center gap-3 text-sm cursor-pointer">
+                  <input type="checkbox" checked={config.webSearch} onChange={() => saveConfig({ ...config, webSearch: !config.webSearch })} className="accent-brand" />
+                  Web arama (varsayılan açık)
+                </label>
+                <label className="flex items-center gap-3 text-sm cursor-pointer">
+                  <input type="checkbox" checked={config.autoMemory !== false} onChange={() => saveConfig({ ...config, autoMemory: config.autoMemory === false })} className="accent-brand" />
+                  Otomatik bellek — kalıcı tercihleri 🧠 skill&apos;ine damıt
+                </label>
+                <label className="flex items-center gap-3 text-sm cursor-pointer">
+                  <input type="checkbox" checked={config.autoContinue !== false} onChange={() => saveConfig({ ...config, autoContinue: config.autoContinue === false })} className="accent-brand" />
+                  Otomatik devam — yanıt token sınırında kesilirse kendiliğinden sürdür
+                </label>
+              </div>
+            </div>
+
             {/* Guest mode */}
             <div>
               <label className="flex items-start gap-2 cursor-pointer">
