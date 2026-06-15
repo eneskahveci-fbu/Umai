@@ -105,6 +105,16 @@ body {
   font-variant-emoji: text;
 }
 
+/* Sohbet sanallaştırması: ekran dışı mesajların layout/paint'ini tarayıcı
+   atlar (content-visibility), böylece çok uzun sohbetlerde kaydırma akıcı
+   kalır. `auto` anahtar sözcüğü her mesajın gerçek yüksekliğini bir kez
+   render edildikten sonra hatırlar → tekrar kaydırmada zıplama olmaz; 220px
+   ilk render öncesi yer tutucu tahmindir. Akış yapan son mesaja uygulanmaz. */
+.cv-msg {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 220px;
+}
+
 /* ─── iOS / dynamic viewport helpers ─────────────────────────────────────
    iOS Safari's URL bar steals viewport height with `100vh`. `100dvh` is
    the dynamic viewport that resizes as the bar shows/hides. We override

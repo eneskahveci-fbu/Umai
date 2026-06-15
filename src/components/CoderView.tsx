@@ -1931,8 +1931,11 @@ export function CoderView() {
               <div className="max-w-3xl mx-auto px-5 py-6">
                 {messages.map((m, i) => {
                   const isLastAssistant = m.role === "assistant" && i === messages.length - 1;
+                  const isLast = i === messages.length - 1;
                   return (
-                    <div key={i}>
+                    /* cv-msg: ekran dışı eski mesajları sanallaştırır (akıcı
+                       kaydırma). Son mesaj akış/paneller için hariç tutulur. */
+                    <div key={i} className={isLast ? undefined : "cv-msg"}>
                       <MessageBubble
                         index={i}
                         message={m}
