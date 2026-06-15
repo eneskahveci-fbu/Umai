@@ -472,6 +472,7 @@ export const DEFAULT_CONFIG: Config = {
   maxContext: 128000,
   webcontainerApiKey: "",
   terminalWsUrl: "",
+  terminalSetupCommand: "",
   mcpServers: [],
 };
 

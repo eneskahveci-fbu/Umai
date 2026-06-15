@@ -258,6 +258,9 @@ export interface Config {
   /** Uzak WebSocket PTY sunucusu URL'i (ör. wss://terminal.example.com?token=xxx).
       Boşsa WebContainer sandbox kullanılır. */
   terminalWsUrl?: string;
+  /** Gerçek terminal bağlanınca otomatik çalıştırılacak kurulum komutu
+   *  (ör. "npm install && npm run dev"). Boşsa hiçbir şey çalıştırılmaz. */
+  terminalSetupCommand?: string;
   mcpServers?: McpServer[];
 }
 
