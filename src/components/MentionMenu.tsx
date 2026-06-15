@@ -60,8 +60,9 @@ export function MentionMenu({ query, items, onSelect, onClose }: Props) {
 
   return (
     <div className="absolute bottom-full mb-2 left-3 right-3 max-h-60 overflow-y-auto bg-surface border border-line rounded-2xl shadow-2xl shadow-black/40 z-40 animate-fade-in">
-      <div className="px-3 py-2 border-b border-line/40 text-[10px] uppercase tracking-widest text-muted/60 font-bold">
-        Dosya ekle (@)
+      <div className="px-3 py-2 border-b border-line/40 text-[10px] uppercase tracking-widest text-muted/60 font-bold flex items-center justify-between">
+        <span>Dosya ekle (@)</span>
+        <span className="text-[8px] text-muted/40 tracking-normal normal-case font-normal">bulanık</span>
       </div>
       {filtered.map((item, i) => (
         <button

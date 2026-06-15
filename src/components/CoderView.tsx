@@ -1685,7 +1685,7 @@ export function CoderView() {
                       value={repoSearch}
                       onChange={(e) => setRepoSearch(e.target.value)}
                       onKeyDown={(e) => { if (semanticMode && e.key === "Enter") runSemanticSearch(repoSearch); }}
-                      placeholder={semanticMode ? "Anlamca ara, Enter…" : "Ara…"}
+                      placeholder={semanticMode ? "Anlamca ara, Enter…" : "Bulanık ara…"}
                       className="w-full bg-bgsoft/60 rounded-lg pl-6 pr-2 py-1.5 text-[11px] outline-none focus:ring-1 ring-brand/30 placeholder:text-muted/30"
                     />
                   </div>
