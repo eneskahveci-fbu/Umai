@@ -385,6 +385,9 @@ interface StoreState {
   // command palette
   commandPaletteOpen: boolean;
   setCommandPaletteOpen: (b: boolean) => void;
+  /** Denetim günlüğü (etkinlik) modali açık mı. */
+  activityOpen: boolean;
+  setActivityOpen: (b: boolean) => void;
 
   // keyboard shortcuts overlay
   shortcutsOpen: boolean;
@@ -1192,6 +1195,8 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   commandPaletteOpen: false,
   setCommandPaletteOpen: (b) => set({ commandPaletteOpen: b }),
+  activityOpen: false,
+  setActivityOpen: (b) => set({ activityOpen: b }),
 
   shortcutsOpen: false,
   setShortcutsOpen: (b) => set({ shortcutsOpen: b }),
