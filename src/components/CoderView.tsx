@@ -1289,7 +1289,37 @@ export function CoderView() {
           res = await callViaServer();
         }
       } else {
-        res = await callViaServer();
+        /* Kararlılık: akış başlamadan önce geçici hatalarda (ağ kopması veya
+           5xx) otomatik yeniden dene (en çok 2 kez, üstel bekleme). İptal'e
+           saygılı; 4xx/429 yeniden denenmez (kalıcı/akış altında ele alınır). */
+        const backoff = (n: number) => new Promise<void>((r) => {
+          const t = setTimeout(r, 1000 * 2 ** (n - 1));
+          abortCtl.signal.addEventListener("abort", () => clearTimeout(t), { once: true });
+        });
+        let attempt = 0;
+        for (;;) {
+          try {
+            res = await callViaServer();
+            if (!res.ok && res.status >= 500 && attempt < 2 && !abortCtl.signal.aborted) {
+              attempt++;
+              addToast(`Sağlayıcı hatası (${res.status}) — yeniden deneniyor (${attempt}/2)…`, "info");
+              await backoff(attempt);
+              if (abortCtl.signal.aborted) break;
+              continue;
+            }
+            break;
+          } catch (err) {
+            if ((err as Error)?.name === "AbortError") throw err;
+            if (attempt < 2 && !abortCtl.signal.aborted) {
+              attempt++;
+              addToast(`Bağlantı hatası — yeniden deneniyor (${attempt}/2)…`, "info");
+              await backoff(attempt);
+              if (abortCtl.signal.aborted) throw err;
+              continue;
+            }
+            throw err;
+          }
+        }
       }
 
       if (!res.ok || !res.body) {
