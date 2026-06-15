@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BookmarkPlus, Check, ChevronDown, ChevronUp, Copy, Eye, GitCompareArrows, Play } from "lucide-react";
+import { BookmarkPlus, Check, ChevronDown, ChevronUp, Copy, Eye, GitCompareArrows, Loader2, Play, Terminal } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { buildSingleBlockPreview } from "@/lib/preview";
+import { runPython } from "@/lib/python";
 
 const COLLAPSE_LINE_THRESHOLD = 30;
 const COLLAPSED_PX = 240;
@@ -17,6 +18,8 @@ export function CodeBlock({
   const [saved, setSaved] = useState(false);
   const [lineCount, setLineCount] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
+  const [pyOut, setPyOut] = useState<{ output: string; error?: string } | null>(null);
+  const [pyRunning, setPyRunning] = useState(false);
 
   useEffect(() => {
     const text = preRef.current?.textContent ?? "";
@@ -35,6 +38,7 @@ export function CodeBlock({
 
   const isPreviewable = ["html", "svg", "htm", "mermaid", "css", "js", "javascript", "mjs", "jsx", "tsx", "react"].includes(lang);
   const isRunnable = ["bash", "sh", "shell", "zsh"].includes(lang);
+  const isPython = ["python", "py"].includes(lang);
 
   const getText = () => preRef.current?.textContent || "";
 
@@ -69,6 +73,18 @@ export function CodeBlock({
     useStore.getState().addToast("Terminal'e gönderildi", "success");
   };
 
+  const runPy = async () => {
+    const code = getText();
+    if (!code.trim()) return;
+    setPyRunning(true);
+    setPyOut(null);
+    const res = await runPython(code, () =>
+      useStore.getState().addToast("Python (Pyodide) yükleniyor…", "info"),
+    );
+    setPyOut(res);
+    setPyRunning(false);
+  };
+
   const showDiff = () => {
     /* Editörde açık olan dosyayla karşılaştır — eski window.prompt yerine. */
     const open = useStore.getState().currentFile;
@@ -97,6 +113,11 @@ export function CodeBlock({
           {isRunnable && (
             <button onClick={runInTerminal} className="flex items-center gap-1 hover:text-green transition-colors" title="Terminal'de çalıştır">
               <Play size={12} /> Çalıştır
+            </button>
+          )}
+          {isPython && (
+            <button onClick={runPy} disabled={pyRunning} className="flex items-center gap-1 hover:text-green transition-colors disabled:opacity-50" title="Python'u tarayıcıda çalıştır (Pyodide)">
+              {pyRunning ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />} Çalıştır
             </button>
           )}
           <button onClick={showDiff} className="flex items-center gap-1 hover:text-brand transition-colors" title="Editörde açık dosya ile karşılaştır">
@@ -137,6 +158,25 @@ export function CodeBlock({
           </button>
         )}
       </div>
+      {/* Python (Pyodide) çıktısı */}
+      {(pyOut || pyRunning) && (
+        <div className="border border-t-0 border-line rounded-b-[10px] bg-[#0a0a0d] -mt-px">
+          <div className="flex items-center gap-1.5 px-4 py-1.5 border-b border-line/40 text-[10px] uppercase tracking-wider text-muted/60 font-bold">
+            <Terminal size={11} /> Çıktı
+            {pyOut?.error && <span className="text-red/80 normal-case tracking-normal font-normal ml-1">· hata</span>}
+            <button onClick={() => setPyOut(null)} className="ml-auto text-muted/40 hover:text-ink normal-case font-normal">temizle</button>
+          </div>
+          <pre className="px-4 py-2.5 text-[12px] font-mono whitespace-pre-wrap break-all max-h-72 overflow-auto m-0 !bg-transparent">
+            {pyRunning && !pyOut ? <span className="text-muted/50">çalışıyor…</span> : (
+              <>
+                {pyOut?.output && <span className="text-ink/90">{pyOut.output}</span>}
+                {pyOut?.error && <span className="text-red/80">{pyOut.output ? "\n" : ""}{pyOut.error}</span>}
+                {pyOut && !pyOut.output && !pyOut.error && <span className="text-muted/50">(çıktı yok)</span>}
+              </>
+            )}
+          </pre>
+        </div>
+      )}
     </div>
   );
 }
