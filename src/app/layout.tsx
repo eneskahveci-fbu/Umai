@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, Noto_Emoji } from "next/font/google";
 import "./globals.css";
 import "highlight.js/styles/atom-one-dark.css";
 
@@ -11,6 +11,15 @@ const inter = Inter({
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
+});
+
+/* Monokrom emoji fontu — tüm emojileri tek renk glif olarak çizer ve metnin
+   rengini (currentColor) izler → aydınlık temada koyu, karanlıkta açık. Emoji
+   yazı tipi yığınının başına konur (globals.css). */
+const notoEmoji = Noto_Emoji({
+  variable: "--font-emoji",
+  subsets: ["emoji"],
+  weight: "400",
 });
 
 export const metadata: Metadata = {
@@ -95,7 +104,7 @@ export default function RootLayout({
   return (
     <html
       lang="tr"
-      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${jetbrainsMono.variable} ${notoEmoji.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>

@@ -18,8 +18,11 @@
   --color-green: #3ddc84;
   --color-purple: #c8a87e;
 
-  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  /* Emoji yazı tipi yığınının başına monokrom Noto Emoji konur: metin glifleri
+     birincil fonttan, emoji glifleri tek renk Noto Emoji'den gelir ve tema
+     rengini (currentColor) izler. */
+  --font-sans: var(--font-inter), var(--font-emoji), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), var(--font-emoji), ui-monospace, monospace;
 }
 
 :root {
@@ -93,6 +96,13 @@ body {
   /* Pleasant text rendering on macOS / iOS */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tüm emojileri tek renk (monokrom) sun → renkli sistem emoji fontu yerine
+   metin sunumu, tema rengini (currentColor) izler. Destekleyen tarayıcılarda
+   ✓/⚠/▶ gibi sembolleri ve (Noto Emoji ile) piktografları temaya uydurur. */
+* {
+  font-variant-emoji: text;
 }
 
 /* ─── iOS / dynamic viewport helpers ─────────────────────────────────────
