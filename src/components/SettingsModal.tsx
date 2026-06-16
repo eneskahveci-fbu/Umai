@@ -975,6 +975,10 @@ export function SettingsModal() {
                   <input type="checkbox" checked={config.autoContinue !== false} onChange={() => saveConfig({ ...config, autoContinue: config.autoContinue === false })} className="accent-brand" />
                   Otomatik devam — yanıt token sınırında kesilirse kendiliğinden sürdür
                 </label>
+                <label className="flex items-center gap-3 text-sm cursor-pointer">
+                  <input type="checkbox" checked={!!config.qualityMode} onChange={() => saveConfig({ ...config, qualityMode: !config.qualityMode })} className="accent-brand" />
+                  Kalite modu — taslak → öz-eleştiri → düzeltme (daha doğru, biraz daha yavaş)
+                </label>
               </div>
             </div>
 

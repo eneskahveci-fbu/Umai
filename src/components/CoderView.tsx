@@ -1193,6 +1193,16 @@ export function CoderView() {
         "tüm alternatif yaklaşımları değerlendir, olası hataları ve edge case'leri listele, " +
         "güvenlik ve performans etkilerini değerlendir, ardından en sağlam çözümü tam gerekçesiyle sun. Kısa kesme.";
     }
+    /* Çok-geçişli kalite modu: taslak → öz-eleştiri → düzeltme döngüsünü tek
+       yanıt içinde uygulat (yalnızca nihai sürümü göster). */
+    if (store.config.qualityMode) {
+      finalSystemPrompt +=
+        "\n\n[KALİTE MODU] Yanıtını üç aşamada üret ama YALNIZCA son sürümü göster: " +
+        "(1) TASLAK: hızlı bir ilk çözüm düşün. " +
+        "(2) ÖZ-ELEŞTİRİ: taslağındaki hataları, eksikleri, edge-case'leri ve daha iyi yaklaşımları içten değerlendir. " +
+        "(3) DÜZELTME: eleştirini uygulayıp en doğru, eksiksiz ve sağlam yanıtı ver. " +
+        "Taslak ve eleştiri sürecini YAZMA; sadece nihai, düzeltilmiş yanıtı sun.";
+    }
 
     const repo = store.repo;
     const activeGithub = store.activeGithub();

@@ -235,6 +235,8 @@ export interface Config {
   autoMemory?: boolean;
   /** Yanıt token sınırında kesilirse otomatik sürdür (en çok 2 kez). */
   autoContinue?: boolean;
+  /** Çok-geçişli kalite modu: taslak → öz-eleştiri → düzeltme (tek yanıtta). */
+  qualityMode?: boolean;
   webSearch: boolean;
   cliMode: boolean;
   autoTerminal: boolean;

@@ -468,6 +468,7 @@ export const DEFAULT_CONFIG: Config = {
   autoTheme: false,
   autoMemory: true,
   autoContinue: true,
+  qualityMode: false,
   webSearch: false,
   cliMode: false,
   autoTerminal: false,
