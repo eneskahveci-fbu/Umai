@@ -718,6 +718,9 @@ export function CoderView() {
       if (!output) return;
       /* Çıktıyı "Terminal" todo kutusuna yaz (ayrı balon yok). */
       useStore.getState().setCommandOutput(command, output, "done");
+      /* Arka plan görevi bitti → kullanıcıya bildir (uzun komutlar non-blocking
+         çalışır; ajan placeholder ile devam etmiş, çıktı şimdi geldi). */
+      addToast(`Komut tamamlandı: ${command.length > 40 ? command.slice(0, 40) + "…" : command}`, "info");
       /* AI'ya bağlam olarak besle — bu kullanıcı mesajı sohbette GİZLENİR
          (MessageBubble "**Terminal çıktısı**" ile başlayanları render etmez);
          çıktı zaten todo kutusunda görünür. */
