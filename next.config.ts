@@ -58,6 +58,17 @@ const nextConfig: NextConfig = {
         source: "/app",
         headers: COOP_COEP_HEADERS,
       },
+      /* Statik (içerik-hash'li) varlıklar: 1 yıl, immutable → Cloudflare/CDN uzun
+         süre önbelleğe alır, kaynak isabeti azalır. */
+      {
+        source: "/_next/static/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+      /* API uçları DİNAMİK (BYOK/anahtar bağlamlı) → asla önbelleğe alınmaz. */
+      {
+        source: "/api/:path*",
+        headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }],
+      },
     ];
   },
   images: {
