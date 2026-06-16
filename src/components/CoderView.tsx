@@ -728,7 +728,6 @@ export function CoderView() {
       useStore.getState().pushMessage({ role: "user", content: msg });
       /* callApi is a stable useCallback defined below; it's only invoked here
          from an event handler that fires after mount, so the forward ref is safe. */
-      // eslint-disable-next-line react-hooks/immutability
       void callApi();
     };
     window.addEventListener("craftai:terminal-output", handler);
