@@ -1914,7 +1914,7 @@ export function CoderView() {
           )}
           <ThinkingModeToggle />
           {/* Birleşik ⋯ menüsü: Editör · Terminal · Git · PR · Skills · Dışa aktar */}
-          <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen || toolsEnabled || !!config.safeMode || !!artifact}>
+          <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen || toolsEnabled || !!config.safeMode || !!artifact || swarmMode}>
             <MoreItem
               icon={<Code2 size={14} />}
               label={editorOpen ? "Editörü kapat" : "Editör (IDE)"}
@@ -1977,12 +1977,11 @@ export function CoderView() {
             <MoreItem icon={<BookOpen size={14} />} label="Kütüphane" onClick={() => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); }} />
             <MoreItem icon={<Zap size={14} />} label="Skills" onClick={() => useStore.getState().setSkillsOpen(true)} />
             <MoreItem icon={<Activity size={14} />} label="Etkinlik günlüğü" onClick={() => useStore.getState().setActivityOpen(true)} />
+            <MoreItem icon={<Users size={14} />} label="Ajan Ekibi (Swarm)" active={swarmMode} onClick={() => setSwarmMode((v) => !v)} />
             {current && messages.length > 0 && (
               <>
                 <div className="h-px bg-line/60 my-1 mx-1" />
                 <MoreItem icon={<Download size={14} />} label="Markdown indir" onClick={() => useStore.getState().exportChat(current.id)} />
-                <MoreItem icon={<Download size={14} />} label="HTML indir" onClick={() => useStore.getState().exportChatHtml(current.id)} />
-                <MoreItem icon={<Download size={14} />} label="JSON indir" onClick={() => useStore.getState().exportChatJson(current.id)} />
                 <MoreItem icon={<Copy size={14} />} label="Markdown kopyala" onClick={() => useStore.getState().copyChatMarkdown(current.id)} />
               </>
             )}
@@ -2531,11 +2530,10 @@ export function CoderView() {
                   />
                 )}
                 {/* Daha fazla — mikrofon ile gönder arasında; mesaj-oluşturma eylemleri */}
-                <MoreMenu active={searchOn || swarmMode}>
+                <MoreMenu active={searchOn}>
                   <MoreItem icon={<Paperclip size={14} />} label="Dosya ekle" onClick={() => fileRef.current?.click()} />
                   <MoreItem icon={<ImageIcon size={14} />} label="Görsel ekle" onClick={() => imgRef.current?.click()} />
                   <MoreItem icon={<Globe size={14} />} label="Web arama" active={searchOn} onClick={() => setSearchOn(!searchOn)} />
-                  <MoreItem icon={<Users size={14} />} label="Ajan Ekibi (Swarm)" active={swarmMode} onClick={() => setSwarmMode((v) => !v)} />
                 </MoreMenu>
                 {streaming ? (
                   <button onClick={stop} className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-red hover:bg-red/80 active:bg-red/70 text-white grid place-items-center transition-colors" title="Durdur">
