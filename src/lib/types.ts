@@ -139,7 +139,9 @@ export type ResponseStyle = "normal" | "concise" | "detailed" | "code" | "formal
 export interface Automation {
   id: string;
   name: string;
-  event: "afterWrite" | "afterResponse";
+  /** afterWrite/afterResponse = pratik kısayollar; preToolUse/postToolUse/onStop
+   *  = Claude Code tarzı hook olayları (araç öncesi/sonrası, tur bitişi). */
+  event: "afterWrite" | "afterResponse" | "preToolUse" | "postToolUse" | "onStop";
   command: string;
   enabled: boolean;
 }

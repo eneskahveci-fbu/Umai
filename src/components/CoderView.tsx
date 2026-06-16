@@ -675,6 +675,16 @@ export function CoderView() {
     setTimeout(onReady, 20000);
   };
 
+  /* Hook olayını tetikle (preToolUse/postToolUse/onStop): o olaya bağlı etkin
+     otomasyon komutlarını sıralı (&&) terminale gönderir. Opt-in olduğu için
+     yalnızca kullanıcı tanımlarsa çalışır. */
+  const fireHooks = (event: "preToolUse" | "postToolUse" | "onStop") => {
+    const due = (useStore.getState().config.automations ?? [])
+      .filter((a) => a.enabled && a.command.trim() && a.event === event)
+      .map((a) => a.command.trim());
+    if (due.length > 0) runInTerminal(due.join(" && "));
+  };
+
   /* Bir REPO bağlanınca terminali HER ZAMAN ARKAPLANDA boot et (gizli) → ajan
      komutları hazır olur; repo yokken boşa kaynak harcanmaz. Ön plana ASLA
      kendiliğinden açılmaz; kullanıcı isterse butonla açar. Komut çıktıları
@@ -1424,11 +1434,13 @@ export function CoderView() {
                   id: ev.id, name: ev.name, arguments: ev.arguments || "{}", status: "pending",
                   startedAt: Date.now(),
                 });
+                fireHooks("preToolUse");
               } else if (ev.phase === "end") {
                 useStore.getState().updateToolCallOnLast(ev.id, {
                   result: ev.result, status: "done",
                   endedAt: Date.now(),
                 });
+                fireHooks("postToolUse");
               }
               continue;
             }
@@ -1597,6 +1609,7 @@ export function CoderView() {
       }
       fetchFollowUps();
       void extractMemory();
+      fireHooks("onStop");
     }
     /* Otomatik devam (Claude Code gibi): yanıt token sınırında kesildiyse aynı
        baloncuk içinden kendiliğinden sürdür — kullanıcı tıklamasına gerek yok.

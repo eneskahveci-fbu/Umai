@@ -1093,11 +1093,14 @@ export function SettingsModal() {
                     />
                     <select
                       value={a.event}
-                      onChange={(e) => saveConfig({ ...config, automations: (config.automations ?? []).map((x) => x.id === a.id ? { ...x, event: e.target.value as "afterWrite" | "afterResponse" } : x) })}
+                      onChange={(e) => saveConfig({ ...config, automations: (config.automations ?? []).map((x) => x.id === a.id ? { ...x, event: e.target.value as import("@/lib/types").Automation["event"] } : x) })}
                       className="bg-bg border border-line rounded-md px-1.5 py-1 text-xs outline-none shrink-0"
                     >
                       <option value="afterWrite">Dosya yazınca</option>
                       <option value="afterResponse">Yanıttan sonra</option>
+                      <option value="preToolUse">Araç öncesi (preToolUse)</option>
+                      <option value="postToolUse">Araç sonrası (postToolUse)</option>
+                      <option value="onStop">Tur bitince (onStop)</option>
                     </select>
                     <input
                       value={a.command}
