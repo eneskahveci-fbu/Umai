@@ -15,6 +15,7 @@ import { ActivityLog } from "@/components/ActivityLog";
 import { DiffModal } from "@/components/DiffModal";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OnboardingTour } from "@/components/OnboardingTour";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 import { registerServiceWorker, watchConnection } from "@/lib/sw-register";
@@ -124,6 +125,7 @@ export default function AppPage() {
         <ToastContainer />
         <OfflineBanner />
         <OnboardingTour />
+        <InstallPrompt />
       </div>
     </ErrorBoundary>
   );
