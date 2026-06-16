@@ -17,6 +17,9 @@ const eslintConfig = defineConfig([
     "terminal-server/**",
     // Bağımsız Node (CommonJS) Yerel Köprü — gerçek FS/shell/MCP, app kaynağı değil.
     "local-bridge/**",
+    // Bağımsız Node (ESM) Başsız SDK + CLI — app kaynağı değil, kendi çalışma
+    // zamanı (Node fetch/stdin, JSDoc tipleri) var.
+    "sdk/**",
   ]),
 ]);
 

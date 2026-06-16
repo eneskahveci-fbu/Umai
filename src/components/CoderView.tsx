@@ -391,6 +391,9 @@ export function CoderView() {
   useEffect(() => { swarmModeRef.current = swarmMode; }, [swarmMode]);
   /* Plan onayı: bir sonraki istekte plan-modu kapısını geçici aşar. */
   const planApprovedRef = useRef(false);
+  /* afterEdit kancası geri-besleme döngü sayacı (her kullanıcı mesajında sıfırlanır,
+     turda en çok 3 tur lint→düzelt → sonsuz döngü engellenir). */
+  const hookRunsRef = useRef(0);
   const [repoSearch, setRepoSearch] = useState("");
   const [connecting, setConnecting] = useState(false);
   const connectingRef = useRef(false);
@@ -808,6 +811,70 @@ export function CoderView() {
       }
     } catch { /* yoksay */ }
   }, []);
+
+  /* Tek bir kanca komutunu çalıştırıp çıktısını döndür (yalnız Yerel Mod köprüsü
+     çıktıyı doğrudan yakalayabilir). Köprü yoksa null. */
+  const runHookCommand = useCallback(async (command: string): Promise<string | null> => {
+    const cfg = useStore.getState().config;
+    if (cfg.localMode && cfg.localBridgeUrl?.trim()) {
+      try {
+        const r = await fetch(`${cfg.localBridgeUrl.replace(/\/$/, "")}/exec`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.localBridgeToken || ""}` },
+          body: JSON.stringify({ command }),
+        });
+        const d = await r.json();
+        return typeof d.error === "string" ? `Hata: ${d.error}` : String(d.output ?? "").slice(0, 8000);
+      } catch (e) {
+        return `Yerel köprüye ulaşılamadı: ${(e as Error).message}`;
+      }
+    }
+    return null;
+  }, []);
+
+  /* Olay kancalarını çalıştır. `edited` = bu tur dosya düzenlendi mi.
+     - afterEdit: düzenleme olduysa komutu çalıştır, çıktıyı ajana GERİ BESLE
+       (kendi kendine lint/test düzeltsin). En çok 3 tur (hookRunsRef) → döngü yok.
+     - onFinish: ajan tamamen durunca yalnız bildir (geri besleme yok). */
+  const runHooks = useCallback(async (edited: boolean) => {
+    const hooks = (useStore.getState().config.hooks ?? []).filter((h) => h.enabled);
+    if (!hooks.length) return;
+    /* afterEdit — geri-beslemeli oto-düzelt */
+    if (edited && hookRunsRef.current < 3) {
+      const editHooks = hooks.filter((h) => h.event === "afterEdit");
+      if (editHooks.length) {
+        hookRunsRef.current += 1;
+        let fedBack = false;
+        for (const h of editHooks) {
+          addToast(`🪝 ${h.label || h.command}`, "info");
+          const out = await runHookCommand(h.command);
+          if (out !== null) {
+            /* Yerel Mod: çıktıyı doğrudan ajana besle (terminal-output dinleyicisi
+               yeni bir callApi başlatır → ajan sonucu görür, hatayı düzeltir). */
+            window.dispatchEvent(new CustomEvent("craftai:terminal-output", { detail: { command: h.command, output: out || "(çıktı yok)" } }));
+          } else {
+            /* Köprü yok: komutu terminalde çalıştır; terminal çıktıyı geri besler. */
+            setTerminalOpen(true);
+            window.dispatchEvent(new CustomEvent("craftai:terminal-run", { detail: { command: h.command } }));
+          }
+          fedBack = true;
+        }
+        if (fedBack) return; // geri-besleme yeni turu tetikler → onFinish'i bu turda atla
+      }
+    }
+    /* onFinish — yalnız bildir (geri besleme yok; sadece köprü ile çalışır) */
+    const finishHooks = hooks.filter((h) => h.event === "onFinish");
+    if (finishHooks.length) {
+      const cfg = useStore.getState().config;
+      if (cfg.localMode && cfg.localBridgeUrl?.trim()) {
+        for (const h of finishHooks) {
+          addToast(`🪝 ${h.label || h.command}`, "info");
+          const out = await runHookCommand(h.command);
+          if (out !== null) addToast(`🪝 ${h.label || h.command} ✓`, "success");
+        }
+      }
+    }
+  }, [addToast, runHookCommand]);
 
   const callApi = useCallback(async (
     overrideAgent?: Agent | null,
@@ -1321,12 +1388,15 @@ export function CoderView() {
     if (cutAtLength && useStore.getState().config.autoContinue !== false && depth < 8 && !abortCtl.signal.aborted) {
       useStore.getState().addToast("Yanıt sınırda kesildi — kaldığı yerden devam ediliyor…", "info");
       await callApi(overrideAgent, { continuation: true, depth: depth + 1 });
+    } else if (!abortCtl.signal.aborted) {
+      /* Tur tamamlandı (sınırda kesilmedi) → olay kancalarını çalıştır. */
+      await runHooks(turnCheckpoints.length > 0);
     }
   /* callApi reads the rest of its inputs live via useStore.getState() during
      streaming, so it deliberately keeps a minimal dep set — recreating it on
      every config change would break in-flight requests. */
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.systemPrompt, fetchFollowUps, extractMemory]);
+  }, [config.systemPrompt, fetchFollowUps, extractMemory, runHooks]);
 
   const send = async () => {
     const text = input.trim();
@@ -1335,6 +1405,7 @@ export function CoderView() {
     if (!store.activeModel()) { store.setSettingsOpen(true); return; }
     if (!store.currentId) store.newChat(incognito);
     setPendingCommit(null);
+    hookRunsRef.current = 0; // yeni kullanıcı mesajı → afterEdit döngü sayacını sıfırla
     if (store.config.soundEnabled) import("@/lib/sounds").then((m) => m.playSend());
 
     /* slash command algıla */

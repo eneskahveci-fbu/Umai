@@ -1,0 +1,22 @@
+{
+  "name": "craftcoder-sdk",
+  "version": "1.0.0",
+  "description": "Craft.Coder için başsız (headless) SDK + CLI — UI olmadan ajanı programatik sürün.",
+  "type": "module",
+  "main": "craftcoder.mjs",
+  "bin": {
+    "craftcoder": "cli.mjs"
+  },
+  "exports": {
+    ".": "./craftcoder.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "craftcoder.mjs",
+    "cli.mjs",
+    "README.md"
+  ],
+  "license": "MIT"
+}
