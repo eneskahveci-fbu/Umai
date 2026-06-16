@@ -28,6 +28,7 @@ import { useStore } from "@/lib/store";
 import { PROJECT_TEMPLATES, projectColorHex } from "@/lib/constants";
 import type { Chat } from "@/lib/types";
 import { AuthButton } from "./AuthButton";
+import { ProUpgrade } from "./ProUpgrade";
 import { AccordionSection } from "./Accordion";
 
 /* Sohbetleri tarih kovalarına böler (Claude Code tarzı): Bugün, Dün, Son 7 gün… */
@@ -546,6 +547,7 @@ export function Sidebar() {
             <ThemeToggle />
           </div>
           <AuthButton />
+          <ProUpgrade />
         </div>
         <DevCredit />
       </div>

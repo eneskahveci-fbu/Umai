@@ -285,6 +285,10 @@ interface StoreState {
   userId: string | null;
   userEmail: string | null;
   setUser: (id: string | null, email: string | null) => void;
+  /** Abonelik planı (Stripe). Giriş yoksa/yapılandırılmamışsa "free". BYOK her
+      zaman ücretsiz çalışır; "pro" yalnızca ek özellikleri açar. */
+  plan: "free" | "pro";
+  loadPlan: (userId: string | null) => Promise<void>;
 
   config: Config;
   saveConfig: (c: Config) => void;
@@ -465,8 +469,25 @@ interface StoreState {
 
 export const useStore = create<StoreState>()((set, get) => ({
   userId: null,
+  plan: "free",
   userEmail: null,
   setUser: (id, email) => set({ userId: id, userEmail: email }),
+  loadPlan: async (userId) => {
+    if (!userId) { set({ plan: "free" }); return; }
+    const sb = createClient();
+    if (!sb) { set({ plan: "free" }); return; }
+    try {
+      const { data } = await sb
+        .from("subscriptions")
+        .select("plan, status")
+        .eq("user_id", userId)
+        .maybeSingle();
+      const pro = data?.plan === "pro" && (data?.status === "active" || data?.status === "trialing");
+      set({ plan: pro ? "pro" : "free" });
+    } catch {
+      set({ plan: "free" }); // hata → güvenli varsayılan, BYOK çalışır
+    }
+  },
 
   config: loadConfig(),
   saveConfig: (c) => {

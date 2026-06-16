@@ -96,6 +96,30 @@ create trigger user_config_set_updated_at
   before update on public.user_config
   for each row execute function public.set_updated_at();
 
+-- ── Abonelikler (Stripe — Pro plan durumu) ──────────────────────────────────
+create table if not exists public.subscriptions (
+  user_id                uuid primary key references auth.users on delete cascade,
+  stripe_customer_id     text,
+  stripe_subscription_id text,
+  status                 text not null default 'free',  -- free | active | trialing | past_due | canceled
+  plan                   text not null default 'free',  -- free | pro
+  current_period_end     timestamptz,
+  updated_at             timestamptz not null default now()
+);
+
+alter table public.subscriptions enable row level security;
+
+-- Kullanıcı yalnızca KENDİ abonelik durumunu OKUYABİLİR. Yazma yalnızca
+-- service-role (Stripe webhook) tarafından yapılır → RLS yazmayı engeller.
+drop policy if exists "kendi abonelik - select" on public.subscriptions;
+create policy "kendi abonelik - select"
+  on public.subscriptions for select using (auth.uid() = user_id);
+
+drop trigger if exists subscriptions_set_updated_at on public.subscriptions;
+create trigger subscriptions_set_updated_at
+  before update on public.subscriptions
+  for each row execute function public.set_updated_at();
+
 -- ─────────────────────────────────────────────────────────────────────────
 -- DASHBOARD AYARLARI (SQL değil — Supabase panelinden bir kez yapılır):
 --   1) Authentication → Providers → E-posta'yı aç; ayrıca Google / GitHub / GitLab
