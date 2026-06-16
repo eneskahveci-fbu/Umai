@@ -43,3 +43,7 @@ next-env.d.ts
 
 # Tree-sitter WASM (build öncesi otomatik kopyalanır)
 /public/tree-sitter/
+
+# Capacitor native projeleri (kendi makinende üretilir)
+/ios/
+/android/
