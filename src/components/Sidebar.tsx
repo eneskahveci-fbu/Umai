@@ -299,6 +299,7 @@ export function Sidebar() {
     <aside
       className="fixed top-0 left-0 z-40 h-full w-[min(80vw,16rem)] md:w-64 flex flex-col bg-surface border-r border-line/60"
       style={{
+        paddingTop: "env(safe-area-inset-top)",
         paddingLeft: "env(safe-area-inset-left)",
         paddingBottom: "env(safe-area-inset-bottom)",
       }}

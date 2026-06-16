@@ -1855,8 +1855,8 @@ export function CoderView() {
       )}
       {/* Header */}
       <div
-        className="h-12 shrink-0 flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 border-b border-line/60 bg-surface/60 backdrop-blur-sm overflow-x-auto scrollbar-none"
-        style={{ paddingTop: "env(safe-area-inset-top)" }}
+        className="shrink-0 flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 border-b border-line/60 bg-surface/60 backdrop-blur-sm overflow-x-auto scrollbar-none"
+        style={{ height: "calc(3rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}
       >
         <button
           onClick={() => setSidebarOpen(true)}
