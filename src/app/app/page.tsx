@@ -29,6 +29,9 @@ export default function AppPage() {
   useEffect(() => {
     if (window.innerWidth >= 768) setSidebarOpen(false);
     registerServiceWorker();
+    /* Depodaki şifreli API anahtarlarını çöz + eski düz metni migrate et
+       (mümkün olan en erken; kullanıcı bir istek başlatmadan önce tamamlanır). */
+    void useStore.getState().rehydrateSecrets();
     return watchConnection();
   }, [setSidebarOpen]);
 

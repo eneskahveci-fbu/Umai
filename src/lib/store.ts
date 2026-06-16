@@ -21,9 +21,13 @@ import type {
   TreeNode,
 } from "./types";
 import { DEFAULT_CONFIG, DEFAULT_REPO, DEFAULT_SKILLS, POLLINATIONS_DEFAULT_MODEL } from "./constants";
+import { encryptConfigSecrets, decryptConfigSecrets, isCryptoAvailable, hasPlaintextSecret } from "./secureKeys";
 import { applyEditBranch, applySwitchBranch } from "./branching";
 import { createClient } from "./supabase/client";
 
+/* Config yazımları için monotonik sıra: async şifreli yazımların sırasını korur
+   (eski yazım yeniyi ezmesin). */
+let saveSeq = 0;
 const CONFIG_KEY = "craftai_config";
 const CHATS_KEY = "craftai_chats";
 const SNIPPETS_KEY = "craftai_snippets";
@@ -261,6 +265,9 @@ interface StoreState {
 
   config: Config;
   saveConfig: (c: Config) => void;
+  /** Açılışta: depodaki şifreli gizli alanları çözüp belleğe alır ve eski düz
+      metin anahtarları şifreli forma migrate eder. Eski veri asla bozulmaz. */
+  rehydrateSecrets: () => Promise<void>;
   syncConfig: (userId: string) => Promise<void>;
   addModel: (m: Omit<ModelProfile, "id">) => void;
   updateModel: (id: string, patch: Partial<ModelProfile>) => void;
@@ -442,19 +449,25 @@ export const useStore = create<StoreState>()((set, get) => ({
   saveConfig: (c) => {
     const store = getStore();
     if (store) {
-      try {
-        store.setItem(CONFIG_KEY, JSON.stringify(c));
-      } catch (e) {
-        if ((e as Error)?.name === "QuotaExceededError") {
-          get().addToast("Tarayıcı depolaması dolu — eski sohbetleri/skill'leri sil.", "error");
-        }
-      }
       applyTheme(c.theme);
-      /* Mirror to sessionStorage so the same incognito session survives page
-         reloads; loadConfig falls back to this key when localStorage is empty. */
-      if (!isGuestMode()) {
-        try { window.sessionStorage.setItem(CONFIG_KEY + "_backup", JSON.stringify(c)); } catch { /* ignore */ }
-      }
+      /* Gizli alanları (API anahtarları/token'lar) AES-GCM ile şifreleyip öyle
+         yaz → düz metin bırakma. Şifreleme async; kripto yoksa Config aynen döner
+         (eski davranış). Sıra numarasıyla eski yazımların yenisini ezmesi önlenir.
+         Bellekteki state DÜZ METİN kalır (uygulama anahtarları doğrudan kullanır). */
+      const seq = ++saveSeq;
+      void encryptConfigSecrets(c).then((enc) => {
+        if (seq !== saveSeq || !store) return;
+        try {
+          store.setItem(CONFIG_KEY, JSON.stringify(enc));
+        } catch (e) {
+          if ((e as Error)?.name === "QuotaExceededError") {
+            get().addToast("Tarayıcı depolaması dolu — eski sohbetleri/skill'leri sil.", "error");
+          }
+        }
+        if (!isGuestMode()) {
+          try { window.sessionStorage.setItem(CONFIG_KEY + "_backup", JSON.stringify(enc)); } catch { /* ignore */ }
+        }
+      });
     }
     set({ config: c });
     /* Supabase'e senkron (giriş yapıldıysa). Hata yutulmaz: kalıcı başarısızlıkta
@@ -462,6 +475,30 @@ export const useStore = create<StoreState>()((set, get) => ({
        hissinin sessiz kalmaması için). */
     const { userId } = get();
     if (userId && !isGuestMode()) pushCloudConfig(get, userId, c);
+  },
+  rehydrateSecrets: async () => {
+    if (!isCryptoAvailable()) return; // kripto yok → düz metin zaten kullanılıyor
+    const cur = get().config;
+    /* Depodan gelen şifreli gizli alanları çöz (düz metinse passthrough). */
+    const dec = await decryptConfigSecrets(cur);
+    if (JSON.stringify(dec) !== JSON.stringify(cur)) {
+      set({ config: dec });
+    }
+    /* Migrasyon: hâlâ düz metin anahtar varsa (eski veri), şifreli forma yaz.
+       saveConfig zaten şifreli kalıcılaştırır; burada yalnızca depoyu günceller. */
+    if (hasPlaintextSecret(dec)) {
+      const store = getStore();
+      if (store) {
+        const seq = ++saveSeq;
+        const enc = await encryptConfigSecrets(dec);
+        if (seq === saveSeq) {
+          try { store.setItem(CONFIG_KEY, JSON.stringify(enc)); } catch { /* yok say */ }
+          if (!isGuestMode()) {
+            try { window.sessionStorage.setItem(CONFIG_KEY + "_backup", JSON.stringify(enc)); } catch { /* yok say */ }
+          }
+        }
+      }
+    }
   },
   syncConfig: async (userId) => {
     if (isGuestMode()) return;
