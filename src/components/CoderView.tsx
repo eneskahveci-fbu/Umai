@@ -976,6 +976,17 @@ export function CoderView() {
       })();
       return;
     }
+    /* .ipynb → hücre-bazlı okunur biçim (markdown + kod + çıktı). */
+    if (f.name.toLowerCase().endsWith(".ipynb")) {
+      if (f.size > 2_000_000) { addToast("Notebook 2MB'den büyük.", "error"); return; }
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const { ipynbToReadable } = await import("@/lib/notebook");
+        setAttachedFiles((prev) => [...prev, { path: f.name, content: ipynbToReadable(reader.result as string) }]);
+      };
+      reader.readAsText(f);
+      return;
+    }
     if (f.size > 512_000) { addToast("Dosya 512KB'den büyük.", "error"); return; }
     const reader = new FileReader();
     reader.onload = () => {

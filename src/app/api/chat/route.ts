@@ -3,6 +3,7 @@ import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { buildContextSections } from "@/lib/prompt";
 import { runReadOnlyAgent } from "@/lib/subagent";
 import { filterByGlob } from "@/lib/glob";
+import { ipynbToReadable, isNotebook } from "@/lib/notebook";
 import { pruneMessages } from "@/lib/contextWindow";
 import { detectFrameworks, extractDeps, parseGitignore } from "@/lib/projectContext";
 import { CODER_TOOLS } from "@/lib/tools";
@@ -240,6 +241,13 @@ async function execReadFile(ctx: RepoCtx, args: { path: string }, cache?: Map<st
   if (!args.path) return "Hata: path boş";
   const r = await getFileRaw(ctx, args.path, cache);
   if (!r.ok) return r.error;
+  /* .ipynb → hücre-bazlı okunur biçim (markdown + kod + çıktı). */
+  if (isNotebook(args.path)) {
+    const readable = ipynbToReadable(r.content);
+    return readable.length > 20_000
+      ? readable.slice(0, 20_000) + "\n\n[... kısaltıldı]"
+      : readable;
+  }
   const lines = r.content.split("\n");
   const numbered = lines.map((l, i) => `${i + 1}\t${l}`).join("\n");
   if (numbered.length > 20_000) {
