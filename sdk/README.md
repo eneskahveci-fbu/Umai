@@ -1,9 +1,46 @@
-# Craft.Coder Headless SDK + CLI
+# Craft.Coder CLI (+ başsız SDK)
 
-UI olmadan Craft.Coder ajanını **programatik** sürmek için bağımlılıksız (Node 18+)
-bir SDK ve `claude -p` benzeri bir CLI. Çalışan bir Craft.Coder sunucusunun
-`/api/chat` ucuna bağlanır; isteğe bağlı bir **Local Bridge** ile ajan gerçek
-dosya sistemi + kabuk üzerinde çok-adımlı görev yürütür.
+Mac/Linux terminalinde **tek komutla** kurulan, **etkileşimli** (Claude Code
+tarzı, **craft teması**) bir AI kod asistanı — ve UI olmadan ajanı programatik
+sürmek için bağımlılıksız (Node 18+) bir SDK.
+
+## Kurulum (tek komut)
+
+```bash
+# Mac & Linux:
+curl -fsSL https://raw.githubusercontent.com/eneskahveci-sdo/craft-coder/main/sdk/install.sh | sh
+# veya doğrudan:
+npm install -g craft-coder
+```
+
+## Başlat
+
+```bash
+craft-coder           # etkileşimli sohbet (sıfır yapılandırma: ücretsiz model)
+```
+
+İlk çalıştırmada ayar gerekmez — ücretsiz **Pollinations** modeli + herkese açık
+Craft.Coder sunucusu kullanılır. Kendi modelin için:
+
+```bash
+craft-coder --base-url https://api.groq.com/openai/v1 --model llama-3.3-70b-versatile --api-key gsk_...
+# veya env: CRAFTCODER_BASE_URL / CRAFTCODER_MODEL / CRAFTCODER_API_KEY
+```
+
+Dosya/komut araçları için yerel köprü:
+
+```bash
+craft-coder --bridge-url http://localhost:4319 --bridge-token GIZLI
+```
+
+Etkileşimli komutlar: `/yeni` sıfırla · `/help` yardım · `/çık` çıkış.
+
+---
+
+Aynı paket, UI olmadan ajanı **programatik** sürmek için bir SDK ve `claude -p`
+benzeri başsız CLI de sunar. Çalışan bir Craft.Coder sunucusunun `/api/chat`
+ucuna bağlanır; isteğe bağlı **Local Bridge** ile ajan gerçek dosya sistemi +
+kabuk üzerinde çok-adımlı görev yürütür.
 
 ## Nasıl çalışır?
 
