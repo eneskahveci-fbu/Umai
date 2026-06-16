@@ -431,6 +431,9 @@ export function CoderView() {
   const [ragBusy, setRagBusy] = useState(false);
   const [ragProgress, setRagProgress] = useState<{ done: number; total: number } | null>(null);
   const ragIndexRef = useRef<{ key: string; index: import("@/lib/rag").SemanticIndex } | null>(null);
+  /* Otomatik bağlam sıkıştırma önbelleği: aynı eşik için tekrar tekrar
+     özetlemeyi önler (key = chatId:eskiMesajSayısı). */
+  const compactCacheRef = useRef<{ key: string; summary: string } | null>(null);
   const [editorFile, setEditorFile] = useState<EditorFile | null>(null);
   const [pendingCommit, setPendingCommit] = useState<EditorFile[] | null>(null);
   /* Ajanın bu turda yazdığı dosyaların ESKİ içeriği — "Geri al" için. */
@@ -1096,15 +1099,46 @@ export function CoderView() {
           "selamlama veya giriş cümlesi YAZMA, açık kalan markdown/kod bloğu yapısını koru.",
       });
     }
-    /* Bağlam penceresi: çok daha uzun geçmiş gönderilir (sunucu tarafı
-       pruneMessages büyük tool çıktılarını ayrıca kırpar). */
+    /* Bağlam penceresi + OTOMATİK SIKIŞTIRMA: eşik aşılınca eski mesajlar LLM ile
+       tek özete damıtılır (Claude Code /compact gibi), son KEEP mesaj aynen
+       gönderilir. Stored sohbet DEĞİŞMEZ (yalnızca gönderilen kopya sıkışır);
+       özet çağrısı başarısızsa ham kırpmaya düşülür → akış asla bozulmaz. */
     const MAX_CTX = 60;
-    const apiMessages = rawMessages.length > MAX_CTX
-      ? [
-          { role: "system" as const, content: `[Bağlam notu: Bu sohbet ${rawMessages.length} mesaj içeriyor. Token sınırı nedeniyle yalnızca son ${MAX_CTX} mesaj gönderiliyor.]` },
-          ...rawMessages.slice(-MAX_CTX),
-        ]
-      : rawMessages;
+    const KEEP = 40;
+    let apiMessages: { role: string; content: string | unknown[] }[];
+    if (rawMessages.length > MAX_CTX && active) {
+      const older = rawMessages.slice(0, rawMessages.length - KEEP);
+      const recent = rawMessages.slice(-KEEP);
+      const cacheKey = `${chat?.id ?? "_"}:${older.length}`;
+      let summary = compactCacheRef.current?.key === cacheKey ? compactCacheRef.current.summary : "";
+      if (!summary) {
+        const transcript = older
+          .map((m) => `${m.role}: ${typeof m.content === "string" ? m.content : "[görsel]"}`)
+          .join("\n\n");
+        try {
+          const cr = await fetch("/api/compact", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              transcript,
+              baseUrl: active.baseUrl,
+              model: active.model,
+              apiKey: active.apiKey || store.config.providerKeys?.[active.provider] || "",
+            }),
+          });
+          summary = (await cr.json())?.summary || "";
+          if (summary) {
+            compactCacheRef.current = { key: cacheKey, summary };
+            addToast("Bağlam otomatik özetlendi (uzun sohbet).", "info");
+          }
+        } catch { /* özetleme başarısız → ham kırpmaya düş */ }
+      }
+      apiMessages = summary
+        ? [{ role: "system" as const, content: `[Önceki konuşmanın özeti — bağlamı koru]\n${summary}` }, ...recent]
+        : [{ role: "system" as const, content: `[Bağlam notu: ${rawMessages.length} mesajdan son ${KEEP}'i gönderiliyor.]` }, ...recent];
+    } else {
+      apiMessages = rawMessages;
+    }
 
     const activeProject = config.projects.find((p) => p.id === config.activeProjectId);
     const coderSystemPrompt = [
