@@ -53,12 +53,13 @@ export interface McpServer {
 /** Olay kancası (Claude Code "hooks" benzeri): ajan bir turu bitirince otomatik
     bir kabuk komutu çalıştırır. `afterEdit` = ajan dosya düzenledikten sonra
     (çıktı ajana geri beslenir → lint/test/typecheck kendiliğinden düzeltilir);
-    `onFinish` = ajan tamamen durduğunda (yalnız bildirim, geri besleme yok). */
+    `onFinish` = ajan tamamen durduğunda (yalnız bildirim, geri besleme yok);
+    `onError` = ajan/komut hata verdiğinde (yalnız bildirim, geri besleme yok). */
 export interface Hook {
   id: string;
   /** İnsan-okur etiket (ör. "Lint düzelt"). Boşsa komut gösterilir. */
   label?: string;
-  event: "afterEdit" | "onFinish";
+  event: "afterEdit" | "onFinish" | "onError";
   command: string;
   enabled: boolean;
 }
@@ -97,6 +98,7 @@ export type Provider =
   | "xai"
   | "ollama"
   | "anthropic"
+  | "openai"
   | "pollinations"
   | "custom";
 
@@ -237,6 +239,10 @@ export interface Config {
   localMode?: boolean;
   /** Olay kancaları: ajan turu bitince otomatik komut çalıştırır (bkz. Hook). */
   hooks?: Hook[];
+  /** Tehlikeli komut kalkanı (varsayılan açık): açıkken ajanın run_command'i
+      katastrofik kalıplara (rm -rf /, fork bomb, mkfs, curl|sh…) karşı engellenir
+      ve sonuç ajana geri bildirilir. false ⇒ kapalı. */
+  commandGuard?: boolean;
 }
 
 export interface RepoState {

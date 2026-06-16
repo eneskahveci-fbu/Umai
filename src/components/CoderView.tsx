@@ -87,7 +87,7 @@ import { ALL_AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
 import { buildContextSections } from "@/lib/prompt";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
-import { addPendingAction, removePendingAction, isCommandAllowed, DEFAULT_COMMAND_ALLOWLIST, type PendingAction } from "@/lib/agentActions";
+import { addPendingAction, removePendingAction, isCommandAllowed, matchDangerousCommand, DEFAULT_COMMAND_ALLOWLIST, type PendingAction } from "@/lib/agentActions";
 
 declare global {
   interface SpeechRecognition {
@@ -836,9 +836,21 @@ export function CoderView() {
      - afterEdit: düzenleme olduysa komutu çalıştır, çıktıyı ajana GERİ BESLE
        (kendi kendine lint/test düzeltsin). En çok 3 tur (hookRunsRef) → döngü yok.
      - onFinish: ajan tamamen durunca yalnız bildir (geri besleme yok). */
-  const runHooks = useCallback(async (edited: boolean) => {
+  const runHooks = useCallback(async (edited: boolean, phase: "finish" | "error" = "finish") => {
     const hooks = (useStore.getState().config.hooks ?? []).filter((h) => h.enabled);
     if (!hooks.length) return;
+    /* onError — ajan/komut hata verince yalnız bildir (geri besleme yok; köprü ile). */
+    if (phase === "error") {
+      const errHooks = hooks.filter((h) => h.event === "onError");
+      const cfg = useStore.getState().config;
+      if (errHooks.length && cfg.localMode && cfg.localBridgeUrl?.trim()) {
+        for (const h of errHooks) {
+          addToast(`🪝 ${h.label || h.command}`, "info");
+          await runHookCommand(h.command);
+        }
+      }
+      return;
+    }
     /* afterEdit — geri-beslemeli oto-düzelt */
     if (edited && hookRunsRef.current < 3) {
       const editHooks = hooks.filter((h) => h.event === "afterEdit");
@@ -1210,6 +1222,15 @@ export function CoderView() {
               const command = String(parsed.run_command_event.command ?? "").trim();
               if (command) {
                 const lcfg = useStore.getState().config;
+                /* Tehlikeli komut kalkanı: katastrofik kalıpları (rm -rf /, fork
+                   bomb, mkfs, curl|sh…) çalıştırmadan engelle ve sonucu ajana geri
+                   besle → loop sürer, ajan daha güvenli komutla devam eder. */
+                const danger = lcfg.commandGuard !== false ? matchDangerousCommand(command) : null;
+                if (danger) {
+                  addToast(`⛔ Güvenlik: komut engellendi (${danger})`, "error");
+                  window.dispatchEvent(new CustomEvent("craftai:terminal-output", { detail: { command, output: `⛔ Güvenlik politikası bu komutu engelledi: ${danger}. Komut ÇALIŞTIRILMADI. Gerçekten gerekliyse kullanıcıdan açık onay iste; aksi halde daha güvenli bir komutla devam et.` } }));
+                  continue;
+                }
                 if (lcfg.localMode && lcfg.localBridgeUrl?.trim()) {
                   /* Yerel Mod: komutu köprünün GERÇEK kabuğunda çalıştır; çıktıyı
                      craftai:terminal-output ile ajana geri besle (loop sürer). */
@@ -1368,6 +1389,7 @@ export function CoderView() {
         if (!full) useStore.getState().popLastMessage();
       } else {
         useStore.getState().updateLastContent(`**Hata:** ${(err as Error).message}\n\n_Anahtar/model doğru mu? Ayarlardan kontrol et._`);
+        void runHooks(false, "error");
       }
     } finally {
       coderAbort = null;

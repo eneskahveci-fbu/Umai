@@ -67,7 +67,7 @@ export function SettingsModal() {
 
   const [hookLabel, setHookLabel] = useState("");
   const [hookCommand, setHookCommand] = useState("");
-  const [hookEvent, setHookEvent] = useState<"afterEdit" | "onFinish">("afterEdit");
+  const [hookEvent, setHookEvent] = useState<"afterEdit" | "onFinish" | "onError">("afterEdit");
 
   const [tab, setTab] = useState<"model" | "github" | "general" | "advanced" | "mcp" | "hooks">("model");
   const [search, setSearch] = useState("");
@@ -747,6 +747,13 @@ export function SettingsModal() {
                     />
                   </div>
                 )}
+                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-amber-400/50 transition-colors">
+                  <input type="checkbox" checked={config.commandGuard !== false} onChange={() => saveConfig({ ...config, commandGuard: config.commandGuard === false })} className="accent-amber-400 mt-0.5" />
+                  <div>
+                    <div className="text-sm font-semibold">Tehlikeli komut kalkanı</div>
+                    <div className="text-xs text-muted mt-0.5">Açıkken (varsayılan) ajanın çalıştırmak istediği <b>katastrofik</b> komutlar (<code>rm -rf /</code>, fork bomb, <code>mkfs</code>, <code>curl | sh</code>, sistem kapatma…) çalıştırılmadan engellenir ve ajana geri bildirilir. Normal komutlar (<code>npm test</code>, <code>rm -rf node_modules</code>…) etkilenmez.</div>
+                  </div>
+                </label>
                 <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
                   <input type="checkbox" checked={!!config.planApprovalMode} onChange={() => saveConfig({ ...config, planApprovalMode: !config.planApprovalMode })} className="accent-brand mt-0.5" />
                   <div>
@@ -1293,7 +1300,7 @@ export function SettingsModal() {
           <section className="space-y-5">
             <div>
               <h4 className="text-sm font-bold mb-1">Olay Kancaları</h4>
-              <p className="text-xs text-muted mb-3">Ajan bir turu bitirince otomatik kabuk komutu çalıştır. <b>Düzenleme sonrası</b> kancalarının çıktısı ajana geri beslenir → lint/test/tip hatalarını kendi kendine düzeltir (Claude Code &quot;hooks&quot; mantığı).</p>
+              <p className="text-xs text-muted mb-3">Ajan bir turu bitirince otomatik kabuk komutu çalıştır. <b>Düzenleme sonrası</b> kancalarının çıktısı ajana geri beslenir → lint/test/tip hatalarını kendi kendine düzeltir (Claude Code &quot;hooks&quot; mantığı). <b>Bitişte</b> ve <b>Hata olunca</b> kancaları yalnız bildirir (geri besleme yok; Yerel Mod köprüsü gerekir).</p>
 
               {(config.hooks ?? []).length > 0 && (
                 <div className="flex flex-col gap-2 mb-4">
@@ -1301,8 +1308,8 @@ export function SettingsModal() {
                     <div key={h.id} className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-line bg-bgsoft">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${h.event === "afterEdit" ? "bg-brand/15 text-brand" : "bg-amber/15 text-amber"}`}>
-                            {h.event === "afterEdit" ? "Düzenleme sonrası" : "Bitişte"}
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${h.event === "afterEdit" ? "bg-brand/15 text-brand" : h.event === "onError" ? "bg-red/15 text-red" : "bg-amber/15 text-amber"}`}>
+                            {h.event === "afterEdit" ? "Düzenleme sonrası" : h.event === "onError" ? "Hata olunca" : "Bitişte"}
                           </span>
                           {h.label && <span className="text-sm font-semibold truncate">{h.label}</span>}
                         </div>
@@ -1326,9 +1333,10 @@ export function SettingsModal() {
               <div className="space-y-2 border border-line/60 rounded-xl p-3 bg-bgsoft/40">
                 <div className="text-xs font-semibold text-muted mb-2">Yeni Kanca Ekle</div>
                 <div className="flex gap-2">
-                  <select value={hookEvent} onChange={(e) => setHookEvent(e.target.value as "afterEdit" | "onFinish")} className="input-mono">
+                  <select value={hookEvent} onChange={(e) => setHookEvent(e.target.value as "afterEdit" | "onFinish" | "onError")} className="input-mono">
                     <option value="afterEdit">Düzenleme sonrası</option>
                     <option value="onFinish">Bitişte</option>
+                    <option value="onError">Hata olunca</option>
                   </select>
                   <input value={hookLabel} onChange={(e) => setHookLabel(e.target.value)} placeholder="Etiket (opsiyonel)" className="input-mono flex-1" />
                 </div>
