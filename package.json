@@ -44,6 +44,7 @@
     "shiki": "^4.2.0",
     "stripe": "^22.2.1",
     "web-tree-sitter": "^0.26.9",
+    "zod": "^4.4.3",
     "zustand": "^5.0.13"
   },
   "devDependencies": {
