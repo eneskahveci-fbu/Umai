@@ -361,7 +361,9 @@ export function CoderView() {
   const setFollowUpSuggestions = useStore((s) => s.setFollowUpSuggestions);
   const addToast = useStore((s) => s.addToast);
 
-  const toolsEnabled = toolsEnabledStore && !!repo;
+  /* Yerel Mod aktifse github/gitlab repo olmadan da araçlar açılır (gerçek FS+shell). */
+  const localActive = !!(config.localMode && config.localBridgeUrl?.trim());
+  const toolsEnabled = toolsEnabledStore && (!!repo || localActive);
 
   const [filesOpen, setFilesOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
@@ -869,7 +871,7 @@ export function CoderView() {
     const coderSystemPrompt = [
       config.systemPrompt,
       agent
-        ? agent.systemPrompt + ((store.toolsEnabled && !!store.repo)
+        ? agent.systemPrompt + ((store.toolsEnabled && (!!store.repo || (store.config.localMode && store.config.localBridgeUrl?.trim())))
             ? "\n\n[Araçlar açık] Tahmin etme — gerektiğinde read_file/read_files/grep/glob ile ilgili dosyaları incele, git_diff/git_log/git_blame ile değişiklikleri ve geçmişi gör, discover_rules ile proje kurallarını (CLAUDE.md/.rules) oku. ÖNCE keşfet, SONRA yanıtla; iddialarını dosya kanıtına dayandır."
             : "")
         : "Sen uzman bir yazılım geliştiricisisin. Claude Code tarzında çalış: kullanıcının kod tabanını anla, dosya içeriklerini incele, sorunlara adım adım yaklaş. Kod yazarken best practice'leri uygula, okunabilir ve sürdürülebilir çözümler sun.",
@@ -906,7 +908,10 @@ export function CoderView() {
     const repo = store.repo;
     const activeGithub = store.activeGithub();
     const activeGitlab = store.activeGitlab();
-    const toolsEnabled = store.toolsEnabled && !!repo;
+    /* Yerel Mod: köprü tanımlı ve açıksa, github/gitlab repo'ya gerek kalmadan
+       araçlar gerçek dosya sistemine + kabuğa erişir. */
+    const localActive = !!(store.config.localMode && store.config.localBridgeUrl?.trim());
+    const toolsEnabled = store.toolsEnabled && (!!repo || localActive);
     const activeRepo = store.config.activeRepo || "";
     const repoIsGitLab = isGitLabRepo(activeRepo);
 
@@ -972,18 +977,29 @@ export function CoderView() {
           planApproved: planApprovedRef.current,
           blockNetworkTools: store.config.blockNetworkTools,
           /* Terminal varsa ajana run_command aracı sunulur (uzak WS veya WebContainer). */
-          terminalAvailable: !!(store.config.terminalWsUrl?.trim()) || terminalSupported,
+          terminalAvailable: localActive || !!(store.config.terminalWsUrl?.trim()) || terminalSupported,
           temperature: activeProjectCfg?.temperature,
           maxTokens: activeProjectCfg?.maxTokens,
           effort: thinkingMode,
           searchContext: webSearchContext || undefined,
-          repoCtx: toolsEnabled && repo ? {
-            owner: repo.owner,
-            repo: repo.repo,
-            branch: repo.branch,
-            token: repoIsGitLab ? activeGitlab?.token : activeGithub?.token,
-            provider: repoIsGitLab ? "gitlab" : "github",
-          } : undefined,
+          repoCtx: toolsEnabled
+            ? (localActive
+                ? {
+                    owner: "local", repo: "local", branch: "main",
+                    provider: "local",
+                    bridgeUrl: store.config.localBridgeUrl,
+                    bridgeToken: store.config.localBridgeToken,
+                  }
+                : repo
+                  ? {
+                      owner: repo.owner,
+                      repo: repo.repo,
+                      branch: repo.branch,
+                      token: repoIsGitLab ? activeGitlab?.token : activeGithub?.token,
+                      provider: repoIsGitLab ? "gitlab" : "github",
+                    }
+                  : undefined)
+            : undefined,
           mcpServers: (store.config.mcpServers ?? []).filter((s) => s.enabled).map((s) => ({
             url: s.url,
             headers: s.headers,
@@ -1126,23 +1142,43 @@ export function CoderView() {
             if (parsed.run_command_event) {
               const command = String(parsed.run_command_event.command ?? "").trim();
               if (command) {
-                setTerminalOpen(true);
-                const fire = () => window.dispatchEvent(new CustomEvent("craftai:terminal-run", { detail: { command } }));
-                if (terminalReadyRef.current) {
-                  fire();
+                const lcfg = useStore.getState().config;
+                if (lcfg.localMode && lcfg.localBridgeUrl?.trim()) {
+                  /* Yerel Mod: komutu köprünün GERÇEK kabuğunda çalıştır; çıktıyı
+                     craftai:terminal-output ile ajana geri besle (loop sürer). */
+                  addToast(`▶ Yerel kabuk: ${command}`, "info");
+                  fetch(`${lcfg.localBridgeUrl.replace(/\/$/, "")}/exec`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${lcfg.localBridgeToken || ""}` },
+                    body: JSON.stringify({ command }),
+                  })
+                    .then((r) => r.json())
+                    .then((d) => {
+                      const output = typeof d.error === "string" ? `Hata: ${d.error}` : String(d.output ?? "").slice(0, 8000);
+                      window.dispatchEvent(new CustomEvent("craftai:terminal-output", { detail: { command, output } }));
+                    })
+                    .catch((err) => {
+                      window.dispatchEvent(new CustomEvent("craftai:terminal-output", { detail: { command, output: `Yerel köprüye ulaşılamadı: ${(err as Error).message}` } }));
+                    });
                 } else {
-                  /* Terminal hazır olunca gönder (WebContainer açılışı 5-10 sn
-                     sürebilir → sabit gecikme komutu kaybediyordu). 20 sn emniyet. */
-                  let done = false;
-                  const onReady = () => {
-                    if (done) return; done = true;
-                    window.removeEventListener("craftai:terminal-ready", onReady);
+                  setTerminalOpen(true);
+                  const fire = () => window.dispatchEvent(new CustomEvent("craftai:terminal-run", { detail: { command } }));
+                  if (terminalReadyRef.current) {
                     fire();
-                  };
-                  window.addEventListener("craftai:terminal-ready", onReady);
-                  setTimeout(onReady, 20000);
+                  } else {
+                    /* Terminal hazır olunca gönder (WebContainer açılışı 5-10 sn
+                       sürebilir → sabit gecikme komutu kaybediyordu). 20 sn emniyet. */
+                    let done = false;
+                    const onReady = () => {
+                      if (done) return; done = true;
+                      window.removeEventListener("craftai:terminal-ready", onReady);
+                      fire();
+                    };
+                    window.addEventListener("craftai:terminal-ready", onReady);
+                    setTimeout(onReady, 20000);
+                  }
+                  addToast(`▶ Terminal: ${command}`, "info");
                 }
-                addToast(`▶ Terminal: ${command}`, "info");
               }
               continue;
             }

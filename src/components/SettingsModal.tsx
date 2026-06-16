@@ -1035,6 +1035,47 @@ export function SettingsModal() {
               />
             </div>
 
+            {/* Yerel Mod (Local Bridge) */}
+            <div>
+              <h4 className="text-sm font-bold mb-1">🖥️ Yerel Mod (Local Bridge)</h4>
+              <p className="text-xs text-muted/70 mb-2 leading-relaxed">
+                Açıkken ajan GitHub/GitLab API yerine{" "}
+                <strong className="text-muted">kendi bilgisayarındaki gerçek dosya sistemine ve kabuğa</strong>{" "}
+                erişir (Claude Code gibi). Tamamen ücretsiz; sunucu/bulut yok.
+                <br />
+                Köprüyü çalıştır:{" "}
+                <code className="text-brand/80 bg-bgsoft px-1 rounded text-[11px]">cd local-bridge &amp;&amp; BRIDGE_TOKEN=gizli WORK_DIR=/proje node server.js</code>
+                <br />
+                <span className="text-muted/50 text-[11px]">Yalnızca localhost dinler; token zorunlu. Uygulamayı yerelde (npm run dev) çalıştırırken kullan.</span>
+              </p>
+              <label className="flex items-center gap-2 cursor-pointer mb-2">
+                <input
+                  type="checkbox"
+                  checked={!!config.localMode}
+                  onChange={(e) => saveConfig({ ...config, localMode: e.target.checked })}
+                  className="accent-brand"
+                />
+                <span className="text-sm">Yerel Mod&apos;u etkinleştir (repo işlemleri köprüye gider)</span>
+              </label>
+              <input
+                type="text"
+                value={config.localBridgeUrl ?? ""}
+                onChange={(e) => saveConfig({ ...config, localBridgeUrl: e.target.value.trim() })}
+                placeholder="http://localhost:4319"
+                className="input-mono w-full mb-2"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <input
+                type="password"
+                value={config.localBridgeToken ?? ""}
+                onChange={(e) => saveConfig({ ...config, localBridgeToken: e.target.value })}
+                placeholder="Köprü token'ı (BRIDGE_TOKEN)"
+                className="input-mono w-full"
+                autoComplete="off"
+              />
+            </div>
+
             {/* Yazı tipi boyutu */}
             <div>
               <h4 className="text-sm font-bold mb-2">Kod Yazı Tipi Boyutu</h4>
