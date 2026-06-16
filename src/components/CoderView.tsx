@@ -377,7 +377,6 @@ export function CoderView() {
   const incognito = useStore((s) => s.incognito);
   const streaming = useStore((s) => s.streaming);
   const pendingInput = useStore((s) => s.pendingInput);
-  const followUpSuggestions = useStore((s) => s.followUpSuggestions);
 
   const toolsEnabledStore = useStore((s) => s.toolsEnabled);
   const artifact = useStore((s) => s.artifact);
@@ -386,7 +385,6 @@ export function CoderView() {
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const setPendingInput = useStore((s) => s.setPendingInput);
-  const setFollowUpSuggestions = useStore((s) => s.setFollowUpSuggestions);
   const addToast = useStore((s) => s.addToast);
 
   /* Yerel Mod aktifse github/gitlab repo olmadan da araçlar açılır (gerçek FS+shell). */
@@ -1015,28 +1013,6 @@ export function CoderView() {
     reader.readAsText(f);
   };
 
-  /* API */
-  const fetchFollowUps = useCallback(async () => {
-    const store = useStore.getState();
-    if (!store.config.followUps) return;
-    const active = store.activeModel();
-    if (!active) return;
-    const chat = store.current();
-    if (!chat || chat.messages.length < 2) return;
-    try {
-      const res = await fetch("/api/suggest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: chat.messages.map((m) => ({ role: m.role, content: m.content })),
-          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey || useStore.getState().config.providerKeys?.[active.provider] || "",
-        }),
-      });
-      const { suggestions } = await res.json();
-      store.setFollowUpSuggestions(suggestions || []);
-    } catch { /* yoksay */ }
-  }, []);
-
   /* Otomatik bellek: yanıt bittikten sonra arka planda son alışverişten kalıcı
      tercihleri damıt ve "🧠 Otomatik Bellek" skill'ine ekle. Gizli sohbetlerde
      ve ayar kapalıyken çalışmaz; hata ana akışı asla etkilemez. */
@@ -1258,7 +1234,6 @@ export function CoderView() {
     const turnCheckpoints: { path: string; previous: string | null }[] =
       isContinuation ? [...(lastMsg?.checkpoints ?? [])] : []; // devamda önceki yazmalar korunur
     setPendingActions([]); // bekleyen yıkıcı işlem önerileri
-    store.setFollowUpSuggestions([]);
     coderAbort = new AbortController();
     const abortCtl = coderAbort;
 
@@ -1728,7 +1703,6 @@ export function CoderView() {
         playReady();
         notifyReady("Craft.Coder", "Yanıt hazır.");
       }
-      fetchFollowUps();
       void extractMemory();
       fireHooks("onStop");
     }
@@ -1747,7 +1721,7 @@ export function CoderView() {
      streaming, so it deliberately keeps a minimal dep set — recreating it on
      every config change would break in-flight requests. */
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.systemPrompt, fetchFollowUps, extractMemory, runHooks]);
+  }, [config.systemPrompt, extractMemory, runHooks]);
 
   const send = async () => {
     const text = input.trim();
@@ -2337,19 +2311,6 @@ export function CoderView() {
                     </div>
                   );
                 })}
-                {!streaming && followUpSuggestions.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3 mb-4">
-                    {followUpSuggestions.map((s, i) => (
-                      <button
-                        key={i}
-                        onClick={() => { setInput(s); setFollowUpSuggestions([]); }}
-                        className="text-xs px-3 py-1.5 rounded-full border border-line bg-surface hover:border-brand/50 transition-colors text-muted hover:text-ink"
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                )}
                 <div ref={endRef} />
               </div>
             )}
