@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 import {
   asBranch,
@@ -26,6 +27,8 @@ function encodeProject(namespace: string, repo: string) {
 
 /* Bir dosyayı siler + commit eder. Yalnızca KULLANICI ONAYINDAN sonra çağrılır. */
 export async function POST(req: NextRequest) {
+  const __rl = rateLimit(req, "gl-delete", 20, 60_000);
+  if (__rl) return __rl;
   let namespace: string, repo: string, branch: string, path: string;
   let message: string | undefined, token: string;
   try {

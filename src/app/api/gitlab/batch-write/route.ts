@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 import {
   asBranch,
@@ -30,6 +31,8 @@ function encodeProject(namespace: string, repo: string) {
    N ayrı commit üretiyordu. Burada her dosyanın var/yok durumu PARALEL kontrol
    edilir (create/update kararı), sonra tek commit atılır. */
 export async function POST(req: NextRequest) {
+  const __rl = rateLimit(req, "gl-batch", 20, 60_000);
+  if (__rl) return __rl;
   let namespace: string, repo: string, branch: string, message: string | undefined, token: string;
   let files: { path: string; content: string }[];
   try {

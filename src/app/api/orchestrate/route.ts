@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/rate-limit";
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/constants";
 import { buildContextSections, type SkillLike } from "@/lib/prompt";
 import type { RepoReadCtx } from "@/lib/repoRead";
@@ -178,6 +179,8 @@ function parseTasks(raw: string): { title: string; role: string; instruction: st
 }
 
 export async function POST(req: Request) {
+  const __rl = rateLimit(req, "orchestrate", 20, 60_000);
+  if (__rl) return __rl;
   if (!checkOrigin(req)) return new Response("Geçersiz origin", { status: 403 });
 
   let body: OrchestrateRequest;

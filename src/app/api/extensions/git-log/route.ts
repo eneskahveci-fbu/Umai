@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/rate-limit";
 // ---------------------------------------------------------------------------
 // POST /api/extensions/git-log
 // GitHub Commits API üzerinden commit geçmişini döndürür.
@@ -24,6 +25,8 @@ function ghHeaders(token?: string): Record<string, string> {
 }
 
 export async function POST(req: Request) {
+  const __rl = rateLimit(req, "git-log", 40, 60_000);
+  if (__rl) return __rl;
   try {
     const body = (await req.json().catch(() => ({}))) as LogRequest;
     const { owner, repo, token, branch, path, limit } = body;

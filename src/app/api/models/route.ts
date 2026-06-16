@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/rate-limit";
 import type { Provider } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -22,6 +23,8 @@ function checkOrigin(req: Request): boolean {
    etmek yerine anahtara göre listeleriz. Anahtar sunucuda saklanmaz; yalnızca
    bu istekte sağlayıcıya iletilir. */
 export async function POST(req: Request) {
+  const __rl = rateLimit(req, "models", 20, 60_000);
+  if (__rl) return __rl;
   if (!checkOrigin(req)) return Response.json({ error: "Geçersiz origin." }, { status: 403 });
 
   let body: ModelsRequest;

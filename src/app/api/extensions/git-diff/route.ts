@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/rate-limit";
 // ---------------------------------------------------------------------------
 // POST /api/extensions/git-diff
 // GitHub Compare API üzerinden iki commit/dal arasındaki farkı döndürür.
@@ -25,6 +26,8 @@ function ghHeaders(token?: string): Record<string, string> {
 }
 
 export async function POST(req: Request) {
+  const __rl = rateLimit(req, "git-diff", 40, 60_000);
+  if (__rl) return __rl;
   try {
     const body = (await req.json().catch(() => ({}))) as DiffRequest;
     const { base, head, owner, repo, token } = body;

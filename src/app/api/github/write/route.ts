@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 import {
   asBranch,
@@ -24,6 +25,8 @@ interface WriteBody {
 }
 
 export async function POST(req: NextRequest) {
+  const __rl = rateLimit(req, "gh-write", 30, 60_000);
+  if (__rl) return __rl;
   let owner: string, repo: string, branch: string, path: string;
   let content: string, message: string | undefined, token: string;
   try {

@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/rate-limit";
 // ---------------------------------------------------------------------------
 // POST /api/extensions/discover-rules
 // Bağlı repodaki CLAUDE.md, AGENTS.md, .rules, .cursorrules vb. dosyaları
@@ -64,6 +65,8 @@ async function fetchAllPathsGitHub(
 }
 
 export async function POST(req: Request) {
+  const __rl = rateLimit(req, "discover-rules", 30, 60_000);
+  if (__rl) return __rl;
   try {
     const body = (await req.json().catch(() => ({}))) as DiscoverRequest;
     const { owner, repo, branch, token, provider, allPaths } = body;

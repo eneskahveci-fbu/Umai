@@ -2,12 +2,11 @@
    as a first line of defence against a single-client burst. Use a real
    store (Upstash/Redis) for production multi-instance fairness. */
 
-import type { NextRequest } from "next/server";
-
 interface Bucket { tokens: number; resetAt: number }
 const buckets = new Map<string, Bucket>();
 
-function clientKey(req: NextRequest, scope: string): string {
+/* Yalnızca header okuduğu için hem Request hem NextRequest kabul eder. */
+function clientKey(req: Request, scope: string): string {
   const fwd = req.headers.get("x-forwarded-for") || "";
   const ip = fwd.split(",")[0].trim() || req.headers.get("x-real-ip") || "anon";
   return `${scope}:${ip}`;
@@ -16,7 +15,7 @@ function clientKey(req: NextRequest, scope: string): string {
 /* Cap: `max` requests per `windowMs` per IP per scope.
    Returns null when allowed; otherwise a NextResponse-ready { status, body }. */
 export function checkLimit(
-  req: NextRequest,
+  req: Request,
   scope: string,
   max: number,
   windowMs: number,
@@ -38,6 +37,22 @@ export function checkLimit(
     body: { error: `Çok fazla istek. ${retryAfter}s sonra tekrar dene.` },
     retryAfter,
   };
+}
+
+/* Kısayol: limit aşıldıysa hazır 429 Response döndürür, aksi halde null.
+   `const r = rateLimit(req, "scope", 30, 60_000); if (r) return r;` */
+export function rateLimit(
+  req: Request,
+  scope: string,
+  max: number,
+  windowMs: number,
+): Response | null {
+  const limited = checkLimit(req, scope, max, windowMs);
+  if (!limited) return null;
+  return Response.json(limited.body, {
+    status: limited.status,
+    headers: { "Retry-After": String(limited.retryAfter) },
+  });
 }
 
 /* Trim old entries on a soft interval to bound memory. */

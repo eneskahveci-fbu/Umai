@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/rate-limit";
 // ---------------------------------------------------------------------------
 // POST /api/extensions/trigger-ci
 // GitHub Actions workflow_dispatch ile CI tetikleme.
@@ -24,6 +25,8 @@ function ghHeaders(token?: string): Record<string, string> {
 }
 
 export async function POST(req: Request) {
+  const __rl = rateLimit(req, "trigger-ci", 15, 60_000);
+  if (__rl) return __rl;
   try {
     const body = (await req.json().catch(() => ({}))) as TriggerRequest;
     const { workflow, owner, repo, token, ref, inputs } = body;

@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -24,6 +25,8 @@ interface UsageResult {
 }
 
 export async function POST(req: NextRequest) {
+  const __rl = rateLimit(req, "usage", 30, 60_000);
+  if (__rl) return __rl;
   let provider: string, baseUrl: string, apiKey: string;
   try {
     const body = await req.json();

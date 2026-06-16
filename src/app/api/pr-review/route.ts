@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/rate-limit";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,8 @@ async function fetchGitlabMrDiff(owner: string, repo: string, mrNumber: number, 
 }
 
 export async function POST(req: Request) {
+  const __rl = rateLimit(req, "pr-review", 10, 60_000);
+  if (__rl) return __rl;
   try {
     const body = await req.json() as PrReviewRequest;
     let diff = "";

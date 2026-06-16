@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 import {
   asBranch,
@@ -27,6 +28,8 @@ interface GitBody {
 const ACTIONS = new Set(["branches", "create_pr", "create_branch"]);
 
 export async function POST(req: NextRequest) {
+  const __rl = rateLimit(req, "gh-git", 60, 60_000);
+  if (__rl) return __rl;
   let body: GitBody;
   let owner: string, repo: string, token: string, action: string;
   try {

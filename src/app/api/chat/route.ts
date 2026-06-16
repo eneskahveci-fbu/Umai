@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/rate-limit";
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/constants";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { buildContextSections } from "@/lib/prompt";
@@ -980,6 +981,8 @@ function friendlyApiError(status: number, rawDetail: string, ctx?: { model?: str
 }
 
 export async function POST(req: Request) {
+  const __rl = rateLimit(req, "chat", 60, 60_000);
+  if (__rl) return __rl;
   if (!checkOrigin(req)) return new Response("Geçersiz origin.", { status: 403 });
 
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
