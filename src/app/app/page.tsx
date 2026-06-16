@@ -10,6 +10,8 @@ import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { SkillsPanel } from "@/components/SkillsPanel";
+import { ProjectModal } from "@/components/ProjectModal";
+import { ActivityLog } from "@/components/ActivityLog";
 import { DiffModal } from "@/components/DiffModal";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OnboardingTour } from "@/components/OnboardingTour";
@@ -111,6 +113,8 @@ export default function AppPage() {
         <CommandPalette />
         <KeyboardShortcuts />
         <SkillsPanel />
+        <ProjectModal />
+        <ActivityLog />
         <DiffModal />
         <ToastContainer />
         <OfflineBanner />

@@ -3,6 +3,7 @@ import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { buildContextSections } from "@/lib/prompt";
 import { runReadOnlyAgent } from "@/lib/subagent";
 import { filterByGlob } from "@/lib/glob";
+import { ipynbToReadable, isNotebook } from "@/lib/notebook";
 import { pruneMessages } from "@/lib/contextWindow";
 import { detectFrameworks, extractDeps, parseGitignore } from "@/lib/projectContext";
 import { CODER_TOOLS } from "@/lib/tools";
@@ -178,21 +179,29 @@ async function execGrep(ctx: RepoCtx, args: { pattern: string; glob?: string; ig
   let paths: string[];
   try { paths = await getAllPaths(ctx); } catch (e) { return `Hata: ${(e as Error).message}`; }
   if (args.glob) paths = filterByGlob(paths, args.glob);
-  const MAX_FILES = 60;
+  const MAX_FILES = 300;
   const capped = paths.slice(0, MAX_FILES);
   const out: string[] = [];
   let matches = 0;
-  for (const p of capped) {
-    const r = await getFileRaw(ctx, p, cache);
-    if (!r.ok) continue;
-    const lines = r.content.split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      if (re.test(lines[i])) {
-        out.push(`${p}:${i + 1}: ${lines[i].trim().slice(0, 200)}`);
-        if (++matches >= 100) break;
+  /* Dosyaları 10'lu gruplarla EŞZAMANLI çek (Promise.all) → büyük repoda hız ve
+     isabet artar. 100 eşleşmeye ulaşınca dur. */
+  const BATCH = 10;
+  for (let b = 0; b < capped.length && matches < 100; b += BATCH) {
+    const batch = capped.slice(b, b + BATCH);
+    const results = await Promise.all(
+      batch.map((p) => getFileRaw(ctx, p, cache).then((r) => ({ p, r }))),
+    );
+    for (const { p, r } of results) {
+      if (!r.ok) continue;
+      const lines = r.content.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        if (re.test(lines[i])) {
+          out.push(`${p}:${i + 1}: ${lines[i].trim().slice(0, 200)}`);
+          if (++matches >= 100) break;
+        }
       }
+      if (matches >= 100) break;
     }
-    if (matches >= 100) break;
   }
   let res = out.join("\n") || "(eşleşme yok)";
   if (paths.length > MAX_FILES) res += `\n\n[Not: ${paths.length} dosyadan ilk ${MAX_FILES}'i tarandı — 'glob' ile daralt]`;
@@ -263,6 +272,13 @@ async function execReadFile(ctx: RepoCtx, args: { path: string }, cache?: Map<st
   if (!args.path) return "Hata: path boş";
   const r = await getFileRaw(ctx, args.path, cache);
   if (!r.ok) return r.error;
+  /* .ipynb → hücre-bazlı okunur biçim (markdown + kod + çıktı). */
+  if (isNotebook(args.path)) {
+    const readable = ipynbToReadable(r.content);
+    return readable.length > 20_000
+      ? readable.slice(0, 20_000) + "\n\n[... kısaltıldı]"
+      : readable;
+  }
   const lines = r.content.split("\n");
   const numbered = lines.map((l, i) => `${i + 1}\t${l}`).join("\n");
   if (numbered.length > 20_000) {

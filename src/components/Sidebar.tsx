@@ -2,10 +2,13 @@
 
 import { useRef, useState } from "react";
 import {
+  Check,
   Code2,
   Download,
+  Folder,
   FolderOpen,
   FolderPlus,
+  Layers,
   MessageSquare,
   Moon,
   Pencil,
@@ -13,13 +16,16 @@ import {
   Plus,
   Search,
   Settings,
+  Settings2,
   Share2,
+  Sparkles,
   Sun,
   Tag,
   Trash2,
   X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { PROJECT_TEMPLATES, projectColorHex } from "@/lib/constants";
 import type { Chat } from "@/lib/types";
 import { AuthButton } from "./AuthButton";
 import { AccordionSection } from "./Accordion";
@@ -71,10 +77,18 @@ export function Sidebar() {
   const sidebarOpen = useStore((s) => s.sidebarOpen);
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
   const addProject = useStore((s) => s.addProject);
+  const addProjectFromTemplate = useStore((s) => s.addProjectFromTemplate);
   const setActiveProject = useStore((s) => s.setActiveProject);
   const removeProject = useStore((s) => s.removeProject);
+  const updateProject = useStore((s) => s.updateProject);
+  const setProjectModalId = useStore((s) => s.setProjectModalId);
 
   const [search, setSearch] = useState("");
+  /* Proje: satır-içi ekleme/yeniden adlandırma (window.prompt yerine). */
+  const [addingProject, setAddingProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [editProjectName, setEditProjectName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [sharingId, setSharingId] = useState<string | null>(null);
@@ -104,6 +118,26 @@ export function Sidebar() {
   };
 
   const activeProject = config.activeProjectId;
+
+  /* Proje başına sohbet sayısı (gizli hariç) — profesyonel rozet için. */
+  const projectCounts = new Map<string, number>();
+  for (const c of chats) {
+    if (c.incognito || !c.projectId) continue;
+    projectCounts.set(c.projectId, (projectCounts.get(c.projectId) ?? 0) + 1);
+  }
+
+  const submitNewProject = () => {
+    const name = newProjectName.trim();
+    if (name) addProject(name);
+    setNewProjectName("");
+    setAddingProject(false);
+  };
+  const submitRenameProject = () => {
+    const name = editProjectName.trim();
+    if (editingProjectId && name) updateProject(editingProjectId, { name });
+    setEditingProjectId(null);
+    setEditProjectName("");
+  };
 
   const history = chats
     .filter((c) => !c.incognito)
@@ -305,8 +339,8 @@ export function Sidebar() {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                const name = window.prompt("Proje adı:");
-                if (name?.trim()) addProject(name.trim());
+                setAddingProject(true);
+                setTimeout(() => document.getElementById("new-project-input")?.focus(), 30);
               }}
               title="Yeni proje"
               className="text-muted/50 hover:text-brand p-0.5 transition-colors"
@@ -315,39 +349,145 @@ export function Sidebar() {
             </button>
           }
         >
-          <div className="flex flex-wrap gap-1">
+          <div className="space-y-0.5">
+            {/* Tümü (proje filtresi yok) */}
             <button
               onClick={() => setActiveProject(null)}
-              className={`text-[11px] px-2.5 py-1 rounded-lg border transition-colors ${
-                !activeProject
-                  ? "border-brand/40 bg-brand/10 text-brand"
-                  : "border-line/60 text-muted hover:text-ink hover:border-line"
+              className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors ${
+                !activeProject ? "bg-brand/10 text-brand" : "text-muted hover:text-ink hover:bg-bgsoft/60"
               }`}
             >
-              Tümü
+              <Layers size={13} className="shrink-0" />
+              <span className="flex-1 text-[12px] font-medium truncate">Tüm sohbetler</span>
+              {!activeProject && <Check size={12} className="shrink-0" />}
             </button>
-            {config.projects.map((p) => (
-              <div key={p.id} className="group/proj relative">
-                <button
-                  onClick={() => setActiveProject(p.id)}
-                  className={`text-[11px] px-2.5 py-1 rounded-lg border flex items-center gap-1 transition-colors ${
-                    activeProject === p.id
-                      ? "border-brand/40 bg-brand/10 text-brand"
-                      : "border-line/60 text-muted hover:text-ink hover:border-line"
+
+            {/* Proje listesi */}
+            {config.projects.map((p) => {
+              const active = activeProject === p.id;
+              const count = projectCounts.get(p.id) ?? 0;
+              if (editingProjectId === p.id) {
+                return (
+                  <div key={p.id} className="flex items-center gap-1 px-1.5 py-1">
+                    <Folder size={13} className="shrink-0 text-muted/60" />
+                    <input
+                      autoFocus
+                      value={editProjectName}
+                      onChange={(e) => setEditProjectName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") submitRenameProject();
+                        if (e.key === "Escape") { setEditingProjectId(null); setEditProjectName(""); }
+                      }}
+                      onBlur={submitRenameProject}
+                      className="flex-1 min-w-0 bg-bgsoft border border-brand/40 rounded-md px-2 py-1 text-[12px] outline-none"
+                    />
+                  </div>
+                );
+              }
+              return (
+                <div
+                  key={p.id}
+                  className={`group/proj flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${
+                    active ? "bg-brand/10 text-brand" : "text-muted hover:text-ink hover:bg-bgsoft/60"
                   }`}
+                  onClick={() => setActiveProject(p.id)}
+                  title={p.description || p.name}
                 >
-                  <FolderOpen size={10} /> {p.name}
-                </button>
-                <button
-                  onClick={() => { if (confirm(`"${p.name}" projesini sil?`)) removeProject(p.id); }}
-                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red text-white grid place-items-center text-[9px] opacity-0 group-hover/proj:opacity-100 transition-opacity"
-                >
-                  ×
-                </button>
+                  {p.icon ? (
+                    <span className="text-[13px] leading-none shrink-0 w-3.5 text-center">{p.icon}</span>
+                  ) : p.color ? (
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0 ml-0.5" style={{ background: projectColorHex(p.color) }} />
+                  ) : active ? (
+                    <FolderOpen size={13} className="shrink-0" />
+                  ) : (
+                    <Folder size={13} className="shrink-0" />
+                  )}
+                  <span className="flex-1 text-[12px] font-medium truncate">{p.name}</span>
+                  {/* Sohbet sayısı rozeti — hover'da eylemlere yer açmak için gizlenir */}
+                  {count > 0 && (
+                    <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded-md shrink-0 group-hover/proj:hidden ${
+                      active ? "bg-brand/15 text-brand/80" : "bg-bgsoft text-muted/60"
+                    }`}>
+                      {count}
+                    </span>
+                  )}
+                  {/* Hover eylemleri: detay paneli / yeniden adlandır / sil */}
+                  <div className="hidden group-hover/proj:flex items-center gap-0.5 shrink-0">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setProjectModalId(p.id); }}
+                      title="Proje ayarları"
+                      className="p-0.5 rounded text-muted/60 hover:text-brand transition-colors"
+                    >
+                      <Settings2 size={12} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingProjectId(p.id); setEditProjectName(p.name); }}
+                      title="Yeniden adlandır"
+                      className="p-0.5 rounded text-muted/60 hover:text-brand transition-colors"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); if (confirm(`"${p.name}" projesi silinsin mi? (Sohbetler silinmez, projesiz kalır.)`)) removeProject(p.id); }}
+                      title="Sil"
+                      className="p-0.5 rounded text-muted/60 hover:text-red transition-colors"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Satır-içi yeni proje girişi + şablonlar */}
+            {addingProject && (
+              <div className="px-1.5 py-1 space-y-1.5">
+                <div className="flex items-center gap-1">
+                  <FolderPlus size={13} className="shrink-0 text-brand/70" />
+                  <input
+                    id="new-project-input"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") submitNewProject();
+                      if (e.key === "Escape") { setAddingProject(false); setNewProjectName(""); }
+                    }}
+                    onBlur={submitNewProject}
+                    placeholder="Proje adı…"
+                    className="flex-1 min-w-0 bg-bgsoft border border-brand/40 rounded-md px-2 py-1 text-[12px] outline-none placeholder:text-muted/35"
+                  />
+                </div>
+                {/* Şablondan oluştur — mousedown ile (input blur'undan önce) çalışır */}
+                <div className="flex flex-wrap gap-1 pl-5">
+                  <span className="flex items-center gap-1 text-[10px] text-muted/50 pr-0.5"><Sparkles size={9} /> Şablon:</span>
+                  {PROJECT_TEMPLATES.filter((t) => t.id !== "tpl-blank").map((t) => (
+                    <button
+                      key={t.id}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        const id = addProjectFromTemplate(t);
+                        setAddingProject(false);
+                        setNewProjectName("");
+                        setProjectModalId(id);
+                      }}
+                      title={t.description}
+                      className="text-[10px] px-1.5 py-0.5 rounded-md border border-line/60 text-muted hover:text-ink hover:border-brand/40 transition-colors"
+                    >
+                      {t.icon} {t.name}
+                    </button>
+                  ))}
+                </div>
               </div>
-            ))}
-            {config.projects.length === 0 && (
-              <span className="text-[11px] text-muted/40 italic py-1">Henüz proje yok</span>
+            )}
+
+            {/* Boş durum + hızlı oluştur */}
+            {config.projects.length === 0 && !addingProject && (
+              <button
+                onClick={() => { setAddingProject(true); setTimeout(() => document.getElementById("new-project-input")?.focus(), 30); }}
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg border border-dashed border-line/60 text-muted/50 hover:text-brand hover:border-brand/40 transition-colors text-[11px]"
+              >
+                <FolderPlus size={13} /> İlk projeni oluştur
+              </button>
             )}
           </div>
         </AccordionSection>

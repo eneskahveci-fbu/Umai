@@ -1,0 +1,17 @@
+{
+  "name": "craftcoder-terminal-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "craft.coder için yerel gerçek terminal (shell) köprüsü — ücretsiz, kendi makinende çalışır.",
+  "bin": {
+    "craftcoder-bridge": "bridge.mjs"
+  },
+  "scripts": {
+    "start": "node bridge.mjs"
+  },
+  "dependencies": {
+    "node-pty": "^1.0.0",
+    "ws": "^8.18.0"
+  }
+}

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ALL_AGENTS, type Agent } from "@/lib/agents";
+import { getUserAgents } from "@/lib/extensions/customAgents";
 
 interface Props {
   query: string;
@@ -13,8 +14,21 @@ export function SlashMenu({ query, onSelect, onClose }: Props) {
   const [active, setActive] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
 
+  /* Kullanıcının kendi tanımladığı slash komutları da menüde görünsün
+     (aynı komutta kullanıcınınki yerleşiği ezer). */
+  const merged = (() => {
+    const seen = new Set<string>();
+    const out: Agent[] = [];
+    for (const a of [...getUserAgents(), ...ALL_AGENTS]) {
+      if (seen.has(a.command)) continue;
+      seen.add(a.command);
+      out.push(a);
+    }
+    return out;
+  })();
+
   const q = query.toLowerCase();
-  const filtered = ALL_AGENTS.filter(
+  const filtered = merged.filter(
     (a) => a.command.toLowerCase().includes(q) || a.label.toLowerCase().includes(q),
   );
 

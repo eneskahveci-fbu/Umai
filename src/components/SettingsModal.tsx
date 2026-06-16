@@ -211,6 +211,9 @@ export function SettingsModal() {
     setProvider(p);
     setFetchedModels([]);
     if (p !== "custom") { setBaseUrl(PRESETS[p].baseUrl); setModel(PRESETS[p].model); }
+    /* Sağlayıcı için daha önce kaydedilmiş anahtar varsa otomatik doldur →
+       aynı sağlayıcıya tekrar anahtar girmeye gerek kalmaz. */
+    setApiKey(config.providerKeys?.[p] ?? "");
   };
 
   /* Girilen anahtar + Base URL ile sağlayıcının desteklediği gerçek modelleri
@@ -254,9 +257,15 @@ export function SettingsModal() {
 
   const submitModel = () => {
     if (!baseUrl.trim() || !model.trim()) { addToast("Base URL ve model gerekli.", "error"); return; }
-    addModel({ label: label.trim() || model.trim(), provider, baseUrl: baseUrl.trim(), model: model.trim(), apiKey: apiKey.trim() });
+    /* Anahtar boşsa sağlayıcı için kayıtlı anahtarı kullan; doluysa onu hem
+       modele yaz hem de sağlayıcı hafızasına kaydet (ömür boyu hatırlanır). */
+    const key = apiKey.trim() || config.providerKeys?.[provider] || "";
+    if (apiKey.trim()) {
+      saveConfig({ ...config, providerKeys: { ...config.providerKeys, [provider]: apiKey.trim() } });
+    }
+    addModel({ label: label.trim() || model.trim(), provider, baseUrl: baseUrl.trim(), model: model.trim(), apiKey: key });
     addToast("Model eklendi.", "success");
-    setLabel(""); setApiKey("");
+    setLabel("");
   };
 
   const submitGithub = async () => {
@@ -322,10 +331,11 @@ export function SettingsModal() {
     together: "https://api.together.xyz/settings/api-keys",
     xai: "https://console.x.ai",
     hf: "https://huggingface.co/settings/tokens",
+    github: "https://github.com/settings/tokens",
   };
   /* Hızlı kurulumda sunulan sağlayıcılar (anahtar gerektirenler; pollinations
      anahtarsız çalışır, ollama yereldir, custom manuel → alttaki formdan eklenir). */
-  const QUICK_PROVIDERS: Provider[] = ["gemini", "groq", "deepseek", "openrouter", "anthropic", "mistral", "cerebras", "together", "xai", "hf"];
+  const QUICK_PROVIDERS: Provider[] = ["gemini", "groq", "github", "openrouter", "deepseek", "anthropic", "mistral", "cerebras", "together", "xai", "hf"];
   /* PRESET etiketinden kısa, temiz ad (emoji + parantez kırpılır). */
   const cleanLabel = (p: Provider) => PRESETS[p].label.replace(/\s*\([^)]*\)\s*$/, "").replace(/^[^\p{L}]*/u, "").trim();
 
@@ -343,8 +353,14 @@ export function SettingsModal() {
       model: preset.model,
       apiKey: key,
     };
-    /* addModel mevcut aktif modeli korur; burada yeni modeli aktif yapıyoruz. */
-    saveConfig({ ...config, models: [...config.models, newModel], activeModelId: id });
+    /* addModel mevcut aktif modeli korur; burada yeni modeli aktif yapıyoruz.
+       Anahtar sağlayıcı hafızasına da kaydedilir → ömür boyu hatırlanır. */
+    saveConfig({
+      ...config,
+      models: [...config.models, newModel],
+      activeModelId: id,
+      providerKeys: { ...config.providerKeys, [quickProvider]: key },
+    });
     setQuickBusy(true);
     setQuickResult(null);
     try {
@@ -408,7 +424,7 @@ export function SettingsModal() {
         </div>
 
         <div className="flex gap-1 mb-5 border-b border-line">
-          {([["model", "Model"], ["github", "Git"], ["general", "Genel"], ["advanced", "Gelişmiş"], ["mcp", "MCP"], ["hooks", "Kancalar"]] as const).map(([key, lbl]) => {
+          {([["model", "Model"], ["github", "Git"], ["general", "Temel"], ["advanced", "Gelişmiş"], ["mcp", "MCP"], ["hooks", "Kancalar"]] as const).map(([key, lbl]) => {
             const hit = matchingTabs.has(key);
             return (
               <button
@@ -443,7 +459,7 @@ export function SettingsModal() {
               </p>
               <select
                 value={quickProvider}
-                onChange={(e) => { setQuickProvider(e.target.value as Provider); setQuickResult(null); }}
+                onChange={(e) => { const p = e.target.value as Provider; setQuickProvider(p); setQuickResult(null); setQuickKey(config.providerKeys?.[p] ?? ""); }}
                 className="input-mono w-full mb-2.5"
               >
                 {QUICK_PROVIDERS.map((p) => (
@@ -703,8 +719,8 @@ export function SettingsModal() {
                 <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
                   <input type="checkbox" checked={config.autoTerminal} onChange={() => saveConfig({ ...config, autoTerminal: !config.autoTerminal })} className="accent-brand mt-0.5" />
                   <div>
-                    <div className="text-sm font-semibold">Terminal&apos;i otomatik aç</div>
-                    <div className="text-xs text-muted mt-0.5">Coder sekmesi açılınca terminal panelini otomatik gösterir.</div>
+                    <div className="text-sm font-semibold">Terminal panelini otomatik aç</div>
+                    <div className="text-xs text-muted mt-0.5">Kapalıyken terminal yalnızca arkaplanda çalışır; komutlar ve çıktıları sohbette &quot;Terminal&quot; todo kutusunda görünür. Açıksa görünür panel de otomatik açılır.</div>
                   </div>
                 </label>
                 <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
@@ -926,32 +942,12 @@ export function SettingsModal() {
               <button onClick={() => { saveConfig({ ...config, systemPrompt: DEFAULT_SYSTEM_PROMPT }); setSystemPromptDraft(DEFAULT_SYSTEM_PROMPT); }} className="text-xs text-muted hover:text-brand mt-1">Varsayılana sıfırla</button>
             </div>
 
-            {/* Togglelar */}
-            <div className="flex flex-col gap-2">
-              <label className="flex items-center gap-3 text-sm cursor-pointer">
-                <input type="checkbox" checked={config.followUps} onChange={() => saveConfig({ ...config, followUps: !config.followUps })} className="accent-brand" />
-                Takip soruları öner
-              </label>
-              <label className="flex items-center gap-3 text-sm cursor-pointer">
-                <input type="checkbox" checked={config.webSearch} onChange={() => saveConfig({ ...config, webSearch: !config.webSearch })} className="accent-brand" />
-                Web arama (varsayılan açık)
-              </label>
-              <label className="flex items-center gap-3 text-sm cursor-pointer">
-                <input type="checkbox" checked={config.autoMemory !== false} onChange={() => saveConfig({ ...config, autoMemory: config.autoMemory === false })} className="accent-brand" />
-                Otomatik bellek — kalıcı tercihleri 🧠 skill&apos;ine damıt
-              </label>
-              <label className="flex items-center gap-3 text-sm cursor-pointer">
-                <input type="checkbox" checked={config.autoContinue !== false} onChange={() => saveConfig({ ...config, autoContinue: config.autoContinue === false })} className="accent-brand" />
-                Otomatik devam — yanıt token sınırında kesilirse kendiliğinden sürdür
-              </label>
-            </div>
-
             {/* Bağlam limiti */}
             <div>
               <h4 className="text-sm font-bold mb-2">Bağlam Penceresi</h4>
               <select value={config.maxContext} onChange={(e) => saveConfig({ ...config, maxContext: Number(e.target.value) })} className="input-mono text-xs">
-                {[4096, 8192, 16384, 32768, 65536, 131072, 200000].map((n) => (
-                  <option key={n} value={n}>{(n / 1024).toFixed(0)}K token</option>
+                {[4096, 8192, 16384, 32768, 65536, 131072, 200000, 400000, 1000000, 2000000].map((n) => (
+                  <option key={n} value={n}>{n >= 1000000 ? `${(n / 1000000).toFixed(0)}M token` : `${(n / 1024).toFixed(0)}K token`}</option>
                 ))}
               </select>
             </div>
@@ -974,6 +970,33 @@ export function SettingsModal() {
         {/* GELİŞMİŞ */}
         {tab === "advanced" && (
           <section className="flex flex-col gap-5">
+            {/* Ajan davranışı (Temel'den taşındı) */}
+            <div>
+              <h4 className="text-sm font-bold mb-2">Ajan Davranışı</h4>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-3 text-sm cursor-pointer">
+                  <input type="checkbox" checked={config.followUps} onChange={() => saveConfig({ ...config, followUps: !config.followUps })} className="accent-brand" />
+                  Takip soruları öner
+                </label>
+                <label className="flex items-center gap-3 text-sm cursor-pointer">
+                  <input type="checkbox" checked={config.webSearch} onChange={() => saveConfig({ ...config, webSearch: !config.webSearch })} className="accent-brand" />
+                  Web arama (varsayılan açık)
+                </label>
+                <label className="flex items-center gap-3 text-sm cursor-pointer">
+                  <input type="checkbox" checked={config.autoMemory !== false} onChange={() => saveConfig({ ...config, autoMemory: config.autoMemory === false })} className="accent-brand" />
+                  Otomatik bellek — kalıcı tercihleri 🧠 skill&apos;ine damıt
+                </label>
+                <label className="flex items-center gap-3 text-sm cursor-pointer">
+                  <input type="checkbox" checked={config.autoContinue !== false} onChange={() => saveConfig({ ...config, autoContinue: config.autoContinue === false })} className="accent-brand" />
+                  Otomatik devam — yanıt token sınırında kesilirse kendiliğinden sürdür
+                </label>
+                <label className="flex items-center gap-3 text-sm cursor-pointer">
+                  <input type="checkbox" checked={!!config.qualityMode} onChange={() => saveConfig({ ...config, qualityMode: !config.qualityMode })} className="accent-brand" />
+                  Kalite modu — taslak → öz-eleştiri → düzeltme (daha doğru, biraz daha yavaş)
+                </label>
+              </div>
+            </div>
+
             {/* Guest mode */}
             <div>
               <label className="flex items-start gap-2 cursor-pointer">
@@ -1036,18 +1059,92 @@ export function SettingsModal() {
                 <code className="text-brand/80 bg-bgsoft px-1 rounded text-[11px]">wss://sunucu-ip:7071?token=SIFRE</code>
                 <br />
                 <span className="text-muted/50 text-[11px]">
-                  Sunucu kurulum scripti: projedeki <code className="bg-bgsoft px-1 rounded">terminal-server/server.js</code>
+                  Kendi bilgisayarın için hazır ücretsiz köprü:{" "}
+                  <code className="bg-bgsoft px-1 rounded">scripts/terminal-bridge/</code> (README&apos;ye bak) →{" "}
+                  <code className="bg-bgsoft px-1 rounded text-[11px]">ws://localhost:7777/?token=...</code>
                 </span>
               </p>
               <input
                 type="text"
                 value={config.terminalWsUrl ?? ""}
                 onChange={(e) => saveConfig({ ...config, terminalWsUrl: e.target.value.trim() })}
-                placeholder="wss://your-server:7071?token=..."
+                placeholder="ws://localhost:7777/?token=..."
                 className="input-mono w-full"
                 autoComplete="off"
                 spellCheck={false}
               />
+
+              {/* Otomasyon: bağlanınca çalışacak kurulum komutu (SessionStart) */}
+              <h4 className="text-sm font-bold mt-4 mb-1">Bağlanınca kurulum komutu</h4>
+              <p className="text-xs text-muted/70 mb-2 leading-relaxed">
+                Terminal her bağlandığında otomatik çalışır (Claude Code&apos;un SessionStart&apos;ı gibi).
+                Örn. <code className="text-brand/80 bg-bgsoft px-1 rounded text-[11px]">npm install &amp;&amp; npm run dev</code>.
+                Boş bırakırsan hiçbir şey çalışmaz.
+              </p>
+              <input
+                type="text"
+                value={config.terminalSetupCommand ?? ""}
+                onChange={(e) => saveConfig({ ...config, terminalSetupCommand: e.target.value })}
+                placeholder="npm install && npm run dev"
+                className="input-mono w-full"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+
+            {/* Otomasyonlar (olaya bağlı komutlar — Claude Code hooks benzeri) */}
+            <div>
+              <h4 className="text-sm font-bold mb-1 flex items-center gap-1.5"><Zap size={14} className="text-brand" /> Otomasyonlar</h4>
+              <p className="text-xs text-muted/70 mb-2 leading-relaxed">
+                Belirli bir olayda terminalde otomatik komut çalıştır.{" "}
+                <strong className="text-muted">Dosya yazınca</strong> = ajan kod yazdığında,{" "}
+                <strong className="text-muted">Yanıttan sonra</strong> = her yanıtın ardından. Terminal bağlı olmalı.
+              </p>
+              <div className="space-y-2">
+                {(config.automations ?? []).map((a) => (
+                  <div key={a.id} className="flex items-center gap-2 bg-bgsoft border border-line/60 rounded-lg px-2 py-2">
+                    <input
+                      type="checkbox"
+                      checked={a.enabled}
+                      onChange={(e) => saveConfig({ ...config, automations: (config.automations ?? []).map((x) => x.id === a.id ? { ...x, enabled: e.target.checked } : x) })}
+                      className="accent-brand shrink-0"
+                      title="Etkin"
+                    />
+                    <select
+                      value={a.event}
+                      onChange={(e) => saveConfig({ ...config, automations: (config.automations ?? []).map((x) => x.id === a.id ? { ...x, event: e.target.value as import("@/lib/types").Automation["event"] } : x) })}
+                      className="bg-bg border border-line rounded-md px-1.5 py-1 text-xs outline-none shrink-0"
+                    >
+                      <option value="afterWrite">Dosya yazınca</option>
+                      <option value="afterResponse">Yanıttan sonra</option>
+                      <option value="preToolUse">Araç öncesi (preToolUse)</option>
+                      <option value="postToolUse">Araç sonrası (postToolUse)</option>
+                      <option value="onStop">Tur bitince (onStop)</option>
+                    </select>
+                    <input
+                      value={a.command}
+                      onChange={(e) => saveConfig({ ...config, automations: (config.automations ?? []).map((x) => x.id === a.id ? { ...x, command: e.target.value } : x) })}
+                      placeholder="npm test"
+                      className="input-mono flex-1 min-w-0 text-xs py-1"
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    <button
+                      onClick={() => saveConfig({ ...config, automations: (config.automations ?? []).filter((x) => x.id !== a.id) })}
+                      className="text-muted hover:text-red p-1 shrink-0"
+                      title="Sil"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => saveConfig({ ...config, automations: [...(config.automations ?? []), { id: crypto.randomUUID(), name: "Otomasyon", event: "afterWrite", command: "", enabled: true }] })}
+                className="mt-2 flex items-center justify-center gap-1.5 py-2 w-full rounded-xl border border-line hover:border-brand text-sm font-semibold transition-colors"
+              >
+                <Plus size={15} /> Otomasyon Ekle
+              </button>
             </div>
 
             {/* Yerel Mod (Local Bridge) */}

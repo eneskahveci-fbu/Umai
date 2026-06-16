@@ -31,6 +31,11 @@ export interface ChatMessage {
   rating?: "up" | "down";
   /** Ajan görev planı (update_plan aracıyla canlı güncellenen checklist). */
   plan?: string;
+  /** Ajan Ekibi (Swarm) ilerleme durumu — todo panelinde çizilir. */
+  swarm?: SwarmState;
+  /** Ajanın bu turda terminalde çalıştırdığı komutlar — "todo" kutusunda
+      canlı gösterilir (çıktı kutunun içinde, ayrı bir balon yok). */
+  commands?: CommandRun[];
   /** Bu turda değiştirilen dosyaların geri-al noktaları (sohbetle kalıcı). */
   checkpoints?: FileCheckpoint[];
   /** Üreticinin bitiş nedeni: "length" ⇒ token sınırında kesildi (Devam et). */
@@ -40,6 +45,24 @@ export interface ChatMessage {
   branches?: ChatMessage[][];
   /** Aktif dalın indeksi. */
   branchIndex?: number;
+}
+
+export interface SwarmAgentState {
+  title: string;
+  role: string;
+  status: "running" | "done" | "error";
+}
+export interface SwarmState {
+  phase: "planning" | "working" | "synthesizing" | "done";
+  agents: SwarmAgentState[];
+}
+
+/** Ajanın terminalde çalıştırdığı bir komut — sohbette "todo" kutusunda canlı
+    çizilir (çalışıyor → bitti) ve çıktısı kutunun içinde gösterilir. */
+export interface CommandRun {
+  command: string;
+  output?: string;
+  status: "running" | "done" | "error";
 }
 
 export interface McpServer {
@@ -100,6 +123,7 @@ export type Provider =
   | "anthropic"
   | "openai"
   | "pollinations"
+  | "github"
   | "custom";
 
 export interface ModelProfile {
@@ -125,6 +149,25 @@ export interface GitLabAccount {
 
 export type ResponseStyle = "normal" | "concise" | "detailed" | "code" | "formal";
 
+/** Olay-tabanlı otomasyon: belirli bir olayda terminalde komut çalıştırır.
+ *  afterWrite = ajan dosya yazınca, afterResponse = her yanıttan sonra. */
+export interface Automation {
+  id: string;
+  name: string;
+  /** afterWrite/afterResponse = pratik kısayollar; preToolUse/postToolUse/onStop
+   *  = Claude Code tarzı hook olayları (araç öncesi/sonrası, tur bitişi). */
+  event: "afterWrite" | "afterResponse" | "preToolUse" | "postToolUse" | "onStop";
+  command: string;
+  enabled: boolean;
+}
+
+export interface ProjectFile {
+  id: string;
+  name: string;
+  content: string;
+  createdAt: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -136,6 +179,18 @@ export interface Project {
   temperature?: number;
   /** Bu projeye özel maksimum yanıt token'ı. Tanımsız = sağlayıcı varsayılanı. */
   maxTokens?: number;
+  /** Kısa açıklama (sidebar/araç ipucu). */
+  description?: string;
+  /** Görsel kimlik: renk anahtarı (PROJECT_COLORS) ve emoji/ikon. */
+  color?: string;
+  icon?: string;
+  /** Proje açılınca otomatik yüklenecek varsayılan repo ("owner/repo") + branch. */
+  repo?: string;
+  branch?: string;
+  /** Bilgi tabanı: projedeki her sohbete bağlam olarak verilen referans dosyalar. */
+  files?: ProjectFile[];
+  /** Projeye özel aktif Skills (tanımlıysa global yerine bu set kullanılır). */
+  skillIds?: string[];
 }
 
 export interface MemoryItem {
@@ -171,6 +226,9 @@ export interface PromptTemplate {
 export interface Config {
   models: ModelProfile[];
   activeModelId: string | null;
+  /** Sağlayıcı başına hatırlanan API anahtarı. Bir kez girilince o sağlayıcı
+      için tekrar girmeye gerek kalmaz (model değiştirsen bile dolu gelir). */
+  providerKeys?: Partial<Record<Provider, string>>;
   githubAccounts: GitHubAccount[];
   activeGithubId: string | null;
   gitlabAccounts: GitLabAccount[];
@@ -192,6 +250,8 @@ export interface Config {
   autoMemory?: boolean;
   /** Yanıt token sınırında kesilirse otomatik sürdür (en çok 2 kez). */
   autoContinue?: boolean;
+  /** Çok-geçişli kalite modu: taslak → öz-eleştiri → düzeltme (tek yanıtta). */
+  qualityMode?: boolean;
   webSearch: boolean;
   cliMode: boolean;
   autoTerminal: boolean;
@@ -228,6 +288,11 @@ export interface Config {
   /** Uzak WebSocket PTY sunucusu URL'i (ör. wss://terminal.example.com?token=xxx).
       Boşsa WebContainer sandbox kullanılır. */
   terminalWsUrl?: string;
+  /** Gerçek terminal bağlanınca otomatik çalıştırılacak kurulum komutu
+   *  (ör. "npm install && npm run dev"). Boşsa hiçbir şey çalıştırılmaz. */
+  terminalSetupCommand?: string;
+  /** Olaya bağlı otomasyonlar (Claude Code hooks benzeri). */
+  automations?: Automation[];
   mcpServers?: McpServer[];
   /** Yerel Mod: kullanıcının makinesindeki Local Bridge adresi (ör. http://localhost:4319).
       Doluysa ve localMode açıksa ajan GitHub/GitLab API yerine gerçek dosya

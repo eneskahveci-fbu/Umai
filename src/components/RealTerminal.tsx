@@ -63,6 +63,13 @@ async function bootWsTerminal(
   ws.onopen = () => {
     ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
     onReady();
+    /* Otomasyon: bağlanınca kurulum komutunu bir kez çalıştır (SessionStart). */
+    const setup = useStore.getState().config.terminalSetupCommand?.trim();
+    if (setup) {
+      setTimeout(() => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "input", data: setup + "\n" }));
+      }, 300);
+    }
   };
   ws.onerror = () => onError("Sunucuya bağlanılamadı. URL'i ve token'ı kontrol et.");
   ws.onclose = (ev) => {

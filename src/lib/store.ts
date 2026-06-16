@@ -281,10 +281,16 @@ interface StoreState {
   toggleTheme: () => void;
 
   // projects
-  addProject: (name: string) => void;
+  addProject: (name: string) => string;
+  addProjectFromTemplate: (tpl: { name: string; icon?: string; color?: string; description?: string; systemPrompt?: string }) => string;
   removeProject: (id: string) => void;
   updateProject: (id: string, patch: Partial<Project>) => void;
   setActiveProject: (id: string | null) => void;
+  addProjectFile: (projectId: string, file: { name: string; content: string }) => void;
+  removeProjectFile: (projectId: string, fileId: string) => void;
+  /** Düzenlenen projenin id'si (ProjectModal). null = kapalı. */
+  projectModalId: string | null;
+  setProjectModalId: (id: string | null) => void;
 
   // memory (legacy — kept for back-compat)
   addMemory: (content: string) => void;
@@ -329,6 +335,9 @@ interface StoreState {
   updateLastContent: (content: string) => void;
   updateLastThinking: (thinking: string) => void;
   setPlanOnLast: (plan: string) => void;
+  setSwarmOnLast: (swarm: import("./types").SwarmState) => void;
+  addCommandRun: (command: string) => void;
+  setCommandOutput: (command: string, output: string, status: "done" | "error") => void;
   setCheckpointsOnLast: (checkpoints: FileCheckpoint[]) => void;
   setFinishReasonOnLast: (finishReason: string | undefined) => void;
   updateLastTokens: (tokenIn: number, tokenOut: number) => void;
@@ -378,6 +387,9 @@ interface StoreState {
   // command palette
   commandPaletteOpen: boolean;
   setCommandPaletteOpen: (b: boolean) => void;
+  /** Denetim günlüğü (etkinlik) modali açık mı. */
+  activityOpen: boolean;
+  setActivityOpen: (b: boolean) => void;
 
   // keyboard shortcuts overlay
   shortcutsOpen: boolean;
@@ -588,6 +600,44 @@ export const useStore = create<StoreState>()((set, get) => ({
       projects: [...config.projects, project],
       activeProjectId: project.id,
     });
+    return project.id;
+  },
+  addProjectFromTemplate: (tpl) => {
+    const project: Project = {
+      id: uid(),
+      name: tpl.name,
+      systemPrompt: tpl.systemPrompt ?? "",
+      created_at: Date.now(),
+      icon: tpl.icon,
+      color: tpl.color,
+      description: tpl.description,
+    };
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      projects: [...config.projects, project],
+      activeProjectId: project.id,
+    });
+    return project.id;
+  },
+  addProjectFile: (projectId, file) => {
+    const config = get().config;
+    const entry = { id: uid(), name: file.name, content: file.content, createdAt: Date.now() };
+    get().saveConfig({
+      ...config,
+      projects: config.projects.map((p) =>
+        p.id === projectId ? { ...p, files: [...(p.files ?? []), entry] } : p,
+      ),
+    });
+  },
+  removeProjectFile: (projectId, fileId) => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      projects: config.projects.map((p) =>
+        p.id === projectId ? { ...p, files: (p.files ?? []).filter((f) => f.id !== fileId) } : p,
+      ),
+    });
   },
   removeProject: (id) => {
     const config = get().config;
@@ -608,6 +658,8 @@ export const useStore = create<StoreState>()((set, get) => ({
     });
   },
   setActiveProject: (id) => get().saveConfig({ ...get().config, activeProjectId: id }),
+  projectModalId: null,
+  setProjectModalId: (id) => set({ projectModalId: id }),
 
   /* ─── Bellek ─── */
   addMemory: (content) => {
@@ -865,6 +917,17 @@ export const useStore = create<StoreState>()((set, get) => ({
         return { ...c, messages };
       }),
     })),
+  setSwarmOnLast: (swarm) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const messages = c.messages.slice();
+        if (messages.length) {
+          messages[messages.length - 1] = { ...messages[messages.length - 1], swarm };
+        }
+        return { ...c, messages };
+      }),
+    })),
   setCheckpointsOnLast: (checkpoints) =>
     set((s) => ({
       chats: s.chats.map((c) => {
@@ -872,6 +935,48 @@ export const useStore = create<StoreState>()((set, get) => ({
         const messages = c.messages.slice();
         if (messages.length) {
           messages[messages.length - 1] = { ...messages[messages.length - 1], checkpoints };
+        }
+        return { ...c, messages };
+      }),
+    })),
+  /* Terminal komutu kutusu: son asistan mesajına "çalışıyor" satırı ekle. */
+  addCommandRun: (command) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const messages = c.messages.slice();
+        let idx = -1;
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i].role === "assistant") { idx = i; break; }
+        }
+        if (idx < 0) idx = messages.length - 1;
+        if (idx < 0) return c;
+        const existing = messages[idx].commands ?? [];
+        messages[idx] = { ...messages[idx], commands: [...existing, { command, status: "running" as const }] };
+        return { ...c, messages };
+      }),
+    })),
+  /* Komut çıktısı geldi: eşleşen "çalışıyor" komutunu (en yeni) güncelle. */
+  setCommandOutput: (command, output, status) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const messages = c.messages.slice();
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const cmds = messages[i].commands;
+          if (!cmds) continue;
+          const j = (() => {
+            for (let k = cmds.length - 1; k >= 0; k--) {
+              if (cmds[k].command === command && cmds[k].status === "running") return k;
+            }
+            return -1;
+          })();
+          if (j >= 0) {
+            const next = cmds.slice();
+            next[j] = { ...next[j], output, status };
+            messages[i] = { ...messages[i], commands: next };
+            break;
+          }
         }
         return { ...c, messages };
       }),
@@ -1073,7 +1178,15 @@ export const useStore = create<StoreState>()((set, get) => ({
   repo: null,
   tree: null,
   currentFile: null,
-  setRepo: (r) => set({ repo: r }),
+  setRepo: (r) => {
+    set({ repo: r });
+    /* Claude Code tarzı: repo bağlanınca araçları (Tools) OTOMATİK aç —
+       kullanıcı bilerek kapatmadıysa (localStorage "0"). Böylece ajan dosyaları
+       kendi okuyup düzenler, kullanıcı ayrıca açmak zorunda kalmaz. */
+    if (r && typeof window !== "undefined" && localStorage.getItem("craftai_tools") !== "0") {
+      set({ toolsEnabled: true });
+    }
+  },
   setTree: (t) => set({ tree: t }),
   setCurrentFile: (f) => set({ currentFile: f }),
 
@@ -1087,6 +1200,8 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   commandPaletteOpen: false,
   setCommandPaletteOpen: (b) => set({ commandPaletteOpen: b }),
+  activityOpen: false,
+  setActivityOpen: (b) => set({ activityOpen: b }),
 
   shortcutsOpen: false,
   setShortcutsOpen: (b) => set({ shortcutsOpen: b }),

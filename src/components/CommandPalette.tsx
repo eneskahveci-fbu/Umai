@@ -10,6 +10,7 @@ import {
   BookOpen,
   Search,
   FileText,
+  Activity,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { TreeNode } from "@/lib/types";
@@ -92,6 +93,16 @@ export function CommandPalette() {
         setOpen(false);
       },
       keywords: ["tema", "theme", "dark", "light", "koyu", "acik", "degistir"],
+    },
+    {
+      id: "activity-log",
+      label: "Etkinlik günlüğü",
+      icon: <Activity size={16} />,
+      action: () => {
+        useStore.getState().setActivityOpen(true);
+        setOpen(false);
+      },
+      keywords: ["etkinlik", "gunluk", "activity", "log", "denetim", "audit", "gecmis"],
     },
     {
       id: "prompt-library",

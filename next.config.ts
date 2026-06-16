@@ -40,6 +40,14 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
   },
   compress: true,
+  turbopack: {
+    /* web-tree-sitter, tarayıcıda kullanılmayan Node.js yollarına başvuruyor
+       (fs/promises, module). Bunları tarayıcı derlemesinde boş modüle yönlendir. */
+    resolveAlias: {
+      "fs/promises": { browser: "./empty.ts" },
+      module: { browser: "./empty.ts" },
+    },
+  },
 };
 
 export default nextConfig;

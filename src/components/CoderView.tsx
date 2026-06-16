@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  Activity,
   ArrowDown,
   ArrowUp,
   BookOpen,
@@ -32,6 +33,7 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
+  Sparkles,
   Trash2,
   Square,
   Terminal,
@@ -46,6 +48,7 @@ import {
 import dynamic from "next/dynamic";
 import { detectLanguage, type EditorFile } from "@/lib/editor";
 import { extractAllFileFences } from "@/lib/parsers";
+import { fuzzyFiles } from "@/lib/fuzzy";
 import { buildPreview } from "@/lib/preview";
 
 import { RightPanel } from "./RightPanel";
@@ -281,6 +284,25 @@ function getAllFiles(node: TreeNode): TreeFile[] {
   return [...node.files, ...Object.values(node.dirs).flatMap(getAllFiles)];
 }
 
+/* Ham hata mesajını kullanıcının anlayacağı, çözüm önerili Türkçe metne çevirir.
+   Tanınmayan hatalarda orijinal mesaj korunur. */
+function friendlyError(raw: string): string {
+  const m = (raw || "").toLowerCase();
+  if (/(401|403|unauthorized|invalid api key|invalid_api_key|authentication)/.test(m))
+    return "Geçersiz veya eksik API anahtarı. Ayarlar → Modeller'den anahtarını kontrol et.";
+  if (/(429|rate limit|too many requests|quota|insufficient_quota)/.test(m))
+    return "İstek sınırına (rate limit) takıldın veya kotan bitti. Biraz bekle ya da başka bir model/sağlayıcı dene.";
+  if (/(timeout|timed out|etimedout|deadline)/.test(m))
+    return "İstek zaman aşımına uğradı. Bağlantını kontrol et ve tekrar dene; istek çok uzunsa kısaltmayı dene.";
+  if (/(failed to fetch|network|networkerror|err_network|connection|econnrefused|fetch failed)/.test(m))
+    return "Ağ/bağlantı sorunu. İnternetini kontrol et; sağlayıcı erişilemiyor olabilir.";
+  if (/(404|not found|model.*(not found|does not exist)|unknown model)/.test(m))
+    return "Model bulunamadı. Ayarlar'dan model adının doğru yazıldığından emin ol.";
+  if (/(500|502|503|529|overloaded|service unavailable|server error)/.test(m))
+    return "Sağlayıcı şu an yoğun veya geçici olarak yanıt vermiyor. Birkaç saniye sonra tekrar dene.";
+  return raw;
+}
+
 
 let coderAbort: AbortController | null = null;
 
@@ -288,9 +310,10 @@ type AttachedFile = { path: string; content: string };
 
 /* ── FileTree ── */
 function FileTreeNode({
-  node, prefix = "", onSelect, attached,
+  node, prefix = "", onSelect, attached, onContextMenu,
 }: {
   node: TreeNode; prefix?: string; onSelect: (f: TreeFile) => void; attached: string[];
+  onContextMenu?: (f: TreeFile, e: React.MouseEvent) => void;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const toggle = (name: string) => setCollapsed((p) => ({ ...p, [name]: !p[name] }));
@@ -311,7 +334,7 @@ function FileTreeNode({
               {isOpen ? <FolderOpen size={11} className="shrink-0 text-yellow-500/70" /> : <Folder size={11} className="shrink-0 text-muted/50" />}
               <span className="truncate">{name}</span>
             </button>
-            {isOpen && <FileTreeNode node={child} prefix={key + "/"} onSelect={onSelect} attached={attached} />}
+            {isOpen && <FileTreeNode node={child} prefix={key + "/"} onSelect={onSelect} attached={attached} onContextMenu={onContextMenu} />}
           </div>
         );
       })}
@@ -321,6 +344,7 @@ function FileTreeNode({
           <button
             key={f.path}
             onClick={() => onSelect(f)}
+            onContextMenu={(e) => { if (onContextMenu) { e.preventDefault(); onContextMenu(f, e); } }}
             className={`w-full flex items-center gap-1.5 px-2 py-1 text-[11px] rounded transition-colors text-left ${
               isAttached
                 ? "bg-brand/10 text-brand"
@@ -339,6 +363,10 @@ function FileTreeNode({
 }
 
 /* ─── main ─── */
+
+/* Anlamsal indekse alınacak metin/kod uzantıları ve üst sınır. */
+const RAG_TEXT_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|php|c|h|cpp|cs|css|scss|html|json|md|mdx|txt|yml|yaml|sh|sql)$/i;
+const RAG_MAX_FILES = 150;
 
 export function CoderView() {
   const config = useStore((s) => s.config);
@@ -367,6 +395,10 @@ export function CoderView() {
 
   const [filesOpen, setFilesOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
+  /* Terminal bir kez boot olur ve ARKAPLANDA mount kalır (kapatınca unmount
+     olmaz) → ajan run_command'ları her zaman çalışır; buton sadece görünürlüğü
+     açıp kapatır. */
+  const [terminalMounted, setTerminalMounted] = useState(false);
   const [terminalSupported, setTerminalSupported] = useState(true);
   /* Terminal "hazır" mı? run_command komutunu erken gönderip kaybetmemek için izlenir. */
   const terminalReadyRef = useRef(false);
@@ -398,6 +430,15 @@ export function CoderView() {
   const [connecting, setConnecting] = useState(false);
   const connectingRef = useRef(false);
   const [fetchingFile, setFetchingFile] = useState<string | null>(null);
+  /* Anlamsal (RAG) arama — transformers.js gömme indeksi (repo+branch ile önbellek). */
+  const [semanticMode, setSemanticMode] = useState(false);
+  const [ragHits, setRagHits] = useState<import("@/lib/rag").RagHit[]>([]);
+  const [ragBusy, setRagBusy] = useState(false);
+  const [ragProgress, setRagProgress] = useState<{ done: number; total: number } | null>(null);
+  const ragIndexRef = useRef<{ key: string; index: import("@/lib/rag").SemanticIndex } | null>(null);
+  /* Otomatik bağlam sıkıştırma önbelleği: aynı eşik için tekrar tekrar
+     özetlemeyi önler (key = chatId:eskiMesajSayısı). */
+  const compactCacheRef = useRef<{ key: string; summary: string } | null>(null);
   const [editorFile, setEditorFile] = useState<EditorFile | null>(null);
   const [pendingCommit, setPendingCommit] = useState<EditorFile[] | null>(null);
   /* Ajanın bu turda yazdığı dosyaların ESKİ içeriği — "Geri al" için. */
@@ -407,7 +448,48 @@ export function CoderView() {
   const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
   const [resolvingAction, setResolvingAction] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  /* Çoklu dosya sekmeleri: editörde açık tutulan dosyalar + aktif olanın
+     kaydedilmemiş durumu (sekme geçişinde veri kaybını önlemek için). */
+  const [openTabs, setOpenTabs] = useState<EditorFile[]>([]);
+  const [activeDirty, setActiveDirty] = useState(false);
+  /* Dosya ağacı sağ-tık menüsü konumu + hedef dosya. */
+  const [treeMenu, setTreeMenu] = useState<{ x: number; y: number; file: TreeFile } | null>(null);
   const [gitPanelOpen, setGitPanelOpen] = useState(false);
+
+  /* Dosyayı editörde aç: sekme yoksa ekle, varsa içeriğini güncelle, aktif yap. */
+  const openInEditor = (f: EditorFile) => {
+    setEditorFile(f);
+    setEditorOpen(true);
+    setActiveDirty(false);
+    setOpenTabs((tabs) => {
+      const i = tabs.findIndex((t) => t.path === f.path);
+      if (i === -1) return [...tabs, f];
+      const next = [...tabs];
+      next[i] = f;
+      return next;
+    });
+  };
+  /* Sekmeye geç — aktif sekmede kaydedilmemiş değişiklik varsa onay iste. */
+  const selectTab = (path: string) => {
+    if (path === editorFile?.path) return;
+    if (activeDirty && !confirm("Kaydedilmemiş değişiklikler kaybolacak. Devam edilsin mi?")) return;
+    const t = openTabs.find((x) => x.path === path);
+    if (t) { setEditorFile(t); setEditorOpen(true); setActiveDirty(false); }
+  };
+  /* Sekmeyi kapat — aktif ve kirliyse onay iste, komşu sekmeye geç. */
+  const closeTab = (path: string) => {
+    const isActive = path === editorFile?.path;
+    if (isActive && activeDirty && !confirm("Kaydedilmemiş değişiklikler kaybolacak. Sekme kapatılsın mı?")) return;
+    setOpenTabs((tabs) => {
+      const idx = tabs.findIndex((t) => t.path === path);
+      const next = tabs.filter((t) => t.path !== path);
+      if (isActive) {
+        if (next.length === 0) { setEditorFile(null); setEditorOpen(false); }
+        else { setEditorFile(next[Math.max(0, idx - 1)]); setActiveDirty(false); }
+      }
+      return next;
+    });
+  };
   const [loadingAll, setLoadingAll] = useState(false);
   const [prModalOpen, setPrModalOpen] = useState(false);
   const [prNumber, setPrNumber] = useState("");
@@ -565,12 +647,64 @@ export function CoderView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.activeRepo, config.activeGithubId, config.activeGitlabId, config.cliMode]);
 
+  /* Proje değişince, projeye bağlı varsayılan repo varsa onu aktif et
+     (yukarıdaki efekt repo bağlantısını otomatik kurar). */
+  const prevProjRepoRef = useRef(config.activeProjectId);
   useEffect(() => {
-    if (!config.autoTerminal) return;
-    import("@/lib/webcontainer").then(({ isSupported }) => {
-      if (isSupported()) setTerminalOpen(true);
-    });
-  }, [config.autoTerminal]);
+    if (prevProjRepoRef.current === config.activeProjectId) return;
+    prevProjRepoRef.current = config.activeProjectId;
+    const proj = config.projects.find((p) => p.id === config.activeProjectId);
+    if (proj?.repo && proj.repo !== config.activeRepo) {
+      const st = useStore.getState();
+      st.saveConfig({ ...st.config, activeRepo: proj.repo });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.activeProjectId]);
+
+  /* Terminalde komut çalıştır (arkaplanda hazırlar, hazır olunca gönderir).
+     Hem ajan run_command'ı hem de otomasyonlar bunu kullanır. */
+  const runInTerminal = (command: string) => {
+    const cmd = command.trim();
+    if (!cmd) return;
+    setTerminalMounted(true);
+    useStore.getState().addCommandRun(cmd);
+    const fire = () => window.dispatchEvent(new CustomEvent("craftai:terminal-run", { detail: { command: cmd } }));
+    if (terminalReadyRef.current) { fire(); return; }
+    let done = false;
+    const onReady = () => {
+      if (done) return; done = true;
+      window.removeEventListener("craftai:terminal-ready", onReady);
+      fire();
+    };
+    window.addEventListener("craftai:terminal-ready", onReady);
+    setTimeout(onReady, 20000);
+  };
+
+  /* Hook olayını tetikle (preToolUse/postToolUse/onStop): o olaya bağlı etkin
+     otomasyon komutlarını sıralı (&&) terminale gönderir. Opt-in olduğu için
+     yalnızca kullanıcı tanımlarsa çalışır. */
+  const fireHooks = (event: "preToolUse" | "postToolUse" | "onStop") => {
+    const due = (useStore.getState().config.automations ?? [])
+      .filter((a) => a.enabled && a.command.trim() && a.event === event)
+      .map((a) => a.command.trim());
+    if (due.length > 0) runInTerminal(due.join(" && "));
+  };
+
+  /* Bir REPO bağlanınca terminali HER ZAMAN ARKAPLANDA boot et (gizli) → ajan
+     komutları hazır olur; repo yokken boşa kaynak harcanmaz. Ön plana ASLA
+     kendiliğinden açılmaz; kullanıcı isterse butonla açar. Komut çıktıları
+     sohbette "Terminal" todo kutusunda görünür. Bir kez mount olunca kapanmaz. */
+  useEffect(() => {
+    if (!repo) return;
+    const useWs = !!config.terminalWsUrl?.trim();
+    /* Varsayılan: yalnızca arkaplanda mount (ön plana açılmaz). Kullanıcı
+       ayarlardan "Terminal panelini otomatik aç"ı açıkça seçerse ön plana da gelir. */
+    const mount = () => { setTerminalMounted(true); if (config.autoTerminal) setTerminalOpen(true); };
+    if (useWs) { const id = setTimeout(mount, 0); return () => clearTimeout(id); }
+    let alive = true;
+    import("@/lib/webcontainer").then(({ isSupported }) => { if (alive && isSupported()) mount(); });
+    return () => { alive = false; };
+  }, [repo, config.autoTerminal, config.terminalWsUrl]);
 
   /* Terminal hazır olduğunda işaretle; kapanınca sıfırla → run_command'ı doğru anda gönder. */
   useEffect(() => {
@@ -578,18 +712,27 @@ export function CoderView() {
     window.addEventListener("craftai:terminal-ready", onReady);
     return () => window.removeEventListener("craftai:terminal-ready", onReady);
   }, []);
-  useEffect(() => { if (!terminalOpen) terminalReadyRef.current = false; }, [terminalOpen]);
+  /* Terminal arkaplanda mount kaldığı için kapatınca 'ready' sıfırlanmaz —
+     yalnızca tamamen unmount olursa (terminalMounted=false). */
+  useEffect(() => { if (!terminalMounted) terminalReadyRef.current = false; }, [terminalMounted]);
 
   /* Listen for terminal output events — auto-send to AI as follow-up context */
   useEffect(() => {
     const handler = (e: Event) => {
       const { command, output } = (e as CustomEvent<{ command: string; output: string }>).detail ?? {};
       if (!output) return;
+      /* Çıktıyı "Terminal" todo kutusuna yaz (ayrı balon yok). */
+      useStore.getState().setCommandOutput(command, output, "done");
+      /* Arka plan görevi bitti → kullanıcıya bildir (uzun komutlar non-blocking
+         çalışır; ajan placeholder ile devam etmiş, çıktı şimdi geldi). */
+      addToast(`Komut tamamlandı: ${command.length > 40 ? command.slice(0, 40) + "…" : command}`, "info");
+      /* AI'ya bağlam olarak besle — bu kullanıcı mesajı sohbette GİZLENİR
+         (MessageBubble "**Terminal çıktısı**" ile başlayanları render etmez);
+         çıktı zaten todo kutusunda görünür. */
       const msg = `**Terminal çıktısı** (\`${command}\`):\n\`\`\`\n${output}\n\`\`\``;
       useStore.getState().pushMessage({ role: "user", content: msg });
       /* callApi is a stable useCallback defined below; it's only invoked here
          from an event handler that fires after mount, so the forward ref is safe. */
-      // eslint-disable-next-line react-hooks/immutability
       void callApi();
     };
     window.addEventListener("craftai:terminal-output", handler);
@@ -617,8 +760,30 @@ export function CoderView() {
         content = await fetchFileContent(repo.owner, repo.repo, repo.branch, file.path, token);
       }
       setAttachedFiles((prev) => [...prev, { path: file.path, content }]);
-      setEditorFile({ path: file.path, content, language: detectLanguage(file.path) });
-      setEditorOpen(true);
+      openInEditor({ path: file.path, content, language: detectLanguage(file.path) });
+    } catch (e) {
+      addToast(`Dosya okunamadı: ${(e as Error).message}`, "error");
+    } finally {
+      setFetchingFile(null);
+    }
+  };
+
+  /* Sağ-tık menüsü: dosyayı sohbete eklemeden yalnızca editörde aç. */
+  const openTreeFile = async (file: TreeFile) => {
+    const existing = attachedFiles.find((f) => f.path === file.path);
+    if (existing) {
+      openInEditor({ path: file.path, content: existing.content, language: detectLanguage(file.path) });
+      return;
+    }
+    if (!repo) return;
+    setFetchingFile(file.path);
+    try {
+      const store = useStore.getState();
+      const activeRepo = store.config.activeRepo || "";
+      const content = isGitLabRepo(activeRepo)
+        ? await fetchGitLabFileContent(repo.owner, repo.repo, repo.branch, file.path, store.activeGitlab()?.token)
+        : await fetchFileContent(repo.owner, repo.repo, repo.branch, file.path, store.activeGithub()?.token);
+      openInEditor({ path: file.path, content, language: detectLanguage(file.path) });
     } catch (e) {
       addToast(`Dosya okunamadı: ${(e as Error).message}`, "error");
     } finally {
@@ -641,10 +806,75 @@ export function CoderView() {
       } else {
         content = await fetchFileContent(r.owner, r.repo, r.branch, path, store.activeGithub()?.token);
       }
-      setEditorFile({ path, content, language: detectLanguage(path) });
-      setEditorOpen(true);
+      openInEditor({ path, content, language: detectLanguage(path) });
     } catch { /* dosya henüz okunamadıysa sessiz geç */ }
   }, []);
+
+  /* ── Anlamsal (RAG) arama ──────────────────────────────────────────
+     İlk kullanımda depo metin dosyalarını (sınırlı sayıda) çekip gömme
+     indeksine ekler; indeks repo+branch ile önbelleklenir. Sonra sorguyu
+     anlamca en yakın parçalara eşler. */
+  const ensureRagIndex = useCallback(async (): Promise<import("@/lib/rag").SemanticIndex | null> => {
+    const store = useStore.getState();
+    const r = store.repo;
+    if (!r || !tree) return null;
+    const key = `${r.owner}/${r.repo}@${r.branch}`;
+    if (ragIndexRef.current?.key === key && ragIndexRef.current.index.size > 0) {
+      return ragIndexRef.current.index;
+    }
+    const { SemanticIndex, chunkText } = await import("@/lib/rag");
+    const index = new SemanticIndex();
+    const activeRepo = store.config.activeRepo || "";
+    const gitlab = isGitLabRepo(activeRepo);
+    const token = gitlab ? store.activeGitlab()?.token : store.activeGithub()?.token;
+
+    const files = getAllFiles(tree)
+      .filter((f) => RAG_TEXT_EXT.test(f.path))
+      .slice(0, RAG_MAX_FILES);
+    setRagProgress({ done: 0, total: files.length });
+
+    /* Eş zamanlılık sınırlı (5) çekme + parçalama. */
+    let i = 0;
+    let done = 0;
+    const worker = async () => {
+      while (i < files.length) {
+        const f = files[i++];
+        try {
+          const content = gitlab
+            ? await fetchGitLabFileContent(r.owner, r.repo, r.branch, f.path, token)
+            : await fetchFileContent(r.owner, r.repo, r.branch, f.path, token);
+          if (content && content.length < 100_000) {
+            await index.add(chunkText(f.path, content));
+          }
+        } catch { /* dosya atla */ }
+        done++;
+        setRagProgress({ done, total: files.length });
+      }
+    };
+    await Promise.all(Array.from({ length: 5 }, worker));
+    ragIndexRef.current = { key, index };
+    setRagProgress(null);
+    return index;
+  }, [tree]);
+
+  const runSemanticSearch = useCallback(async (query: string) => {
+    const q = query.trim();
+    if (!q) { setRagHits([]); return; }
+    setRagBusy(true);
+    try {
+      const index = await ensureRagIndex();
+      if (!index || index.size === 0) {
+        addToast("Anlamsal indeks kurulamadı (model yüklenemedi)", "error");
+        setRagHits([]);
+        return;
+      }
+      const hits = await index.search(q, 8);
+      setRagHits(hits);
+      if (hits.length === 0) addToast("Eşleşme bulunamadı", "info");
+    } finally {
+      setRagBusy(false);
+    }
+  }, [ensureRagIndex, addToast]);
 
   /* Komut paletinden (Cmd+P) dosya açma isteği → editörde aç. */
   useEffect(() => {
@@ -653,8 +883,7 @@ export function CoderView() {
       if (!path) return;
       const existing = attachedFiles.find((f) => f.path === path);
       if (existing) {
-        setEditorFile({ path: existing.path, content: existing.content, language: detectLanguage(path) });
-        setEditorOpen(true);
+        openInEditor({ path: existing.path, content: existing.content, language: detectLanguage(path) });
         return;
       }
       const file = tree ? getAllFiles(tree).find((f) => f.path === path) : undefined;
@@ -751,6 +980,33 @@ export function CoderView() {
       reader.readAsDataURL(f);
       return;
     }
+    /* PDF: istemcide metni çıkar, metin olarak ekle (görsel akışıyla aynı mantık). */
+    if (f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")) {
+      if (f.size > 20_000_000) { addToast("PDF 20MB'den büyük.", "error"); return; }
+      addToast(`${f.name} okunuyor…`, "info");
+      void (async () => {
+        try {
+          const { extractPdfText } = await import("@/lib/pdf");
+          const text = await extractPdfText(f);
+          setAttachedFiles((prev) => [...prev, { path: f.name, content: text }]);
+          addToast(`${f.name} eklendi (metin çıkarıldı).`, "success");
+        } catch (e) {
+          addToast(`PDF okunamadı: ${(e as Error).message}`, "error");
+        }
+      })();
+      return;
+    }
+    /* .ipynb → hücre-bazlı okunur biçim (markdown + kod + çıktı). */
+    if (f.name.toLowerCase().endsWith(".ipynb")) {
+      if (f.size > 2_000_000) { addToast("Notebook 2MB'den büyük.", "error"); return; }
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const { ipynbToReadable } = await import("@/lib/notebook");
+        setAttachedFiles((prev) => [...prev, { path: f.name, content: ipynbToReadable(reader.result as string) }]);
+      };
+      reader.readAsText(f);
+      return;
+    }
     if (f.size > 512_000) { addToast("Dosya 512KB'den büyük.", "error"); return; }
     const reader = new FileReader();
     reader.onload = () => {
@@ -773,7 +1029,7 @@ export function CoderView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: chat.messages.map((m) => ({ role: m.role, content: m.content })),
-          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey,
+          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey || useStore.getState().config.providerKeys?.[active.provider] || "",
         }),
       });
       const { suggestions } = await res.json();
@@ -802,7 +1058,7 @@ export function CoderView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userText: lastUser, assistantText: lastAssistant, existing,
-          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey,
+          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey || useStore.getState().config.providerKeys?.[active.provider] || "",
         }),
       });
       const { facts } = await res.json();
@@ -936,15 +1192,46 @@ export function CoderView() {
           "selamlama veya giriş cümlesi YAZMA, açık kalan markdown/kod bloğu yapısını koru.",
       });
     }
-    /* Bağlam penceresi: çok daha uzun geçmiş gönderilir (sunucu tarafı
-       pruneMessages büyük tool çıktılarını ayrıca kırpar). */
+    /* Bağlam penceresi + OTOMATİK SIKIŞTIRMA: eşik aşılınca eski mesajlar LLM ile
+       tek özete damıtılır (Claude Code /compact gibi), son KEEP mesaj aynen
+       gönderilir. Stored sohbet DEĞİŞMEZ (yalnızca gönderilen kopya sıkışır);
+       özet çağrısı başarısızsa ham kırpmaya düşülür → akış asla bozulmaz. */
     const MAX_CTX = 60;
-    const apiMessages = rawMessages.length > MAX_CTX
-      ? [
-          { role: "system" as const, content: `[Bağlam notu: Bu sohbet ${rawMessages.length} mesaj içeriyor. Token sınırı nedeniyle yalnızca son ${MAX_CTX} mesaj gönderiliyor.]` },
-          ...rawMessages.slice(-MAX_CTX),
-        ]
-      : rawMessages;
+    const KEEP = 40;
+    let apiMessages: { role: string; content: string | unknown[] }[];
+    if (rawMessages.length > MAX_CTX && active) {
+      const older = rawMessages.slice(0, rawMessages.length - KEEP);
+      const recent = rawMessages.slice(-KEEP);
+      const cacheKey = `${chat?.id ?? "_"}:${older.length}`;
+      let summary = compactCacheRef.current?.key === cacheKey ? compactCacheRef.current.summary : "";
+      if (!summary) {
+        const transcript = older
+          .map((m) => `${m.role}: ${typeof m.content === "string" ? m.content : "[görsel]"}`)
+          .join("\n\n");
+        try {
+          const cr = await fetch("/api/compact", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              transcript,
+              baseUrl: active.baseUrl,
+              model: active.model,
+              apiKey: active.apiKey || store.config.providerKeys?.[active.provider] || "",
+            }),
+          });
+          summary = (await cr.json())?.summary || "";
+          if (summary) {
+            compactCacheRef.current = { key: cacheKey, summary };
+            addToast("Bağlam otomatik özetlendi (uzun sohbet).", "info");
+          }
+        } catch { /* özetleme başarısız → ham kırpmaya düş */ }
+      }
+      apiMessages = summary
+        ? [{ role: "system" as const, content: `[Önceki konuşmanın özeti — bağlamı koru]\n${summary}` }, ...recent]
+        : [{ role: "system" as const, content: `[Bağlam notu: ${rawMessages.length} mesajdan son ${KEEP}'i gönderiliyor.]` }, ...recent];
+    } else {
+      apiMessages = rawMessages;
+    }
 
     const activeProject = config.projects.find((p) => p.id === config.activeProjectId);
     const coderSystemPrompt = [
@@ -953,8 +1240,14 @@ export function CoderView() {
         ? agent.systemPrompt + ((store.toolsEnabled && (!!store.repo || (store.config.localMode && store.config.localBridgeUrl?.trim())))
             ? "\n\n[Araçlar açık] Tahmin etme — gerektiğinde read_file/read_files/grep/glob ile ilgili dosyaları incele, git_diff/git_log/git_blame ile değişiklikleri ve geçmişi gör, discover_rules ile proje kurallarını (CLAUDE.md/.rules) oku. ÖNCE keşfet, SONRA yanıtla; iddialarını dosya kanıtına dayandır."
             : "")
-        : "Sen uzman bir yazılım geliştiricisisin. Claude Code tarzında çalış: kullanıcının kod tabanını anla, dosya içeriklerini incele, sorunlara adım adım yaklaş. Kod yazarken best practice'leri uygula, okunabilir ve sürdürülebilir çözümler sun.",
+        : "Sen uzman bir yazılım geliştiricisisin. Claude Code tarzında çalış: kullanıcının kod tabanını anla, dosya içeriklerini incele, sorunlara adım adım yaklaş. Kod yazarken best practice'leri uygula, okunabilir ve sürdürülebilir çözümler sun. KARMAŞIK (çok adımlı) görevlerde ÖNCE update_plan ile KISA bir plan (yapılacaklar listesi) sun, sonra adım adım uygula ve her adım bitince planı güncelle.",
       activeProject?.systemPrompt?.trim() ? `## Proje: ${activeProject.name}\n${activeProject.systemPrompt.trim()}` : "",
+      /* Proje bilgi tabanı: yüklenen referans dosyalar (dosya başına kırpılır). */
+      activeProject?.files?.length
+        ? `## Proje Bilgi Tabanı (referans dosyalar — örnek/bağlam olarak kullan)\n${activeProject.files
+            .map((f) => `### ${f.name}\n${f.content.slice(0, 6000)}${f.content.length > 6000 ? "\n…(kırpıldı)" : ""}`)
+            .join("\n\n")}`
+        : "",
       config.rulesFile?.trim() ? `## Proje Kuralları (.rules)\n${config.rulesFile.trim()}` : "",
     ].filter(Boolean).join("\n\n");
 
@@ -982,6 +1275,16 @@ export function CoderView() {
         "\n\n[EFOR: MAX] Mümkün olan en yüksek eforu harca. Problemi birden fazla açıdan incele, " +
         "tüm alternatif yaklaşımları değerlendir, olası hataları ve edge case'leri listele, " +
         "güvenlik ve performans etkilerini değerlendir, ardından en sağlam çözümü tam gerekçesiyle sun. Kısa kesme.";
+    }
+    /* Çok-geçişli kalite modu: taslak → öz-eleştiri → düzeltme döngüsünü tek
+       yanıt içinde uygulat (yalnızca nihai sürümü göster). */
+    if (store.config.qualityMode) {
+      finalSystemPrompt +=
+        "\n\n[KALİTE MODU] Yanıtını üç aşamada üret ama YALNIZCA son sürümü göster: " +
+        "(1) TASLAK: hızlı bir ilk çözüm düşün. " +
+        "(2) ÖZ-ELEŞTİRİ: taslağındaki hataları, eksikleri, edge-case'leri ve daha iyi yaklaşımları içten değerlendir. " +
+        "(3) DÜZELTME: eleştirini uygulayıp en doğru, eksiksiz ve sağlam yanıtı ver. " +
+        "Taslak ve eleştiri sürecini YAZMA; sadece nihai, düzeltilmiş yanıtı sun.";
     }
 
     const repo = store.repo;
@@ -1013,7 +1316,12 @@ export function CoderView() {
     let realUsage: { prompt: number; completion: number } | null = null; // sağlayıcı gerçek token
     let thinkingFull = ""; // reasoning delta'ları birikir
     try {
-      const allEnabledSkills = (store.config.skills ?? []).filter((s) => s.enabled);
+      /* Projeye özel Skills: aktif projede skillIds tanımlıysa global "enabled"
+         yerine yalnızca o set kullanılır; aksi halde global aktif skills. */
+      const projectSkillIds = activeProject?.skillIds;
+      const allEnabledSkills = projectSkillIds && projectSkillIds.length > 0
+        ? (store.config.skills ?? []).filter((s) => projectSkillIds.includes(s.id))
+        : (store.config.skills ?? []).filter((s) => s.enabled);
       /* Relevance scoring: compare skill text against the last user message.
          If ≤5 skills, include all; otherwise pick top-5 by keyword overlap. */
       const activeSkills = (() => {
@@ -1040,7 +1348,7 @@ export function CoderView() {
         signal: abortCtl.signal,
         body: JSON.stringify({
           messages: apiMessages,
-          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey,
+          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey || useStore.getState().config.providerKeys?.[active.provider] || "",
           provider: active.provider, systemPrompt: finalSystemPrompt,
           style: store.config.style,
           memories: store.config.memories,
@@ -1160,7 +1468,37 @@ export function CoderView() {
           res = await callViaServer();
         }
       } else {
-        res = await callViaServer();
+        /* Kararlılık: akış başlamadan önce geçici hatalarda (ağ kopması veya
+           5xx) otomatik yeniden dene (en çok 2 kez, üstel bekleme). İptal'e
+           saygılı; 4xx/429 yeniden denenmez (kalıcı/akış altında ele alınır). */
+        const backoff = (n: number) => new Promise<void>((r) => {
+          const t = setTimeout(r, 1000 * 2 ** (n - 1));
+          abortCtl.signal.addEventListener("abort", () => clearTimeout(t), { once: true });
+        });
+        let attempt = 0;
+        for (;;) {
+          try {
+            res = await callViaServer();
+            if (!res.ok && res.status >= 500 && attempt < 2 && !abortCtl.signal.aborted) {
+              attempt++;
+              addToast(`Sağlayıcı hatası (${res.status}) — yeniden deneniyor (${attempt}/2)…`, "info");
+              await backoff(attempt);
+              if (abortCtl.signal.aborted) break;
+              continue;
+            }
+            break;
+          } catch (err) {
+            if ((err as Error)?.name === "AbortError") throw err;
+            if (attempt < 2 && !abortCtl.signal.aborted) {
+              attempt++;
+              addToast(`Bağlantı hatası — yeniden deneniyor (${attempt}/2)…`, "info");
+              await backoff(attempt);
+              if (abortCtl.signal.aborted) throw err;
+              continue;
+            }
+            throw err;
+          }
+        }
       }
 
       if (!res.ok || !res.body) {
@@ -1203,11 +1541,13 @@ export function CoderView() {
                   id: ev.id, name: ev.name, arguments: ev.arguments || "{}", status: "pending",
                   startedAt: Date.now(),
                 });
+                fireHooks("preToolUse");
               } else if (ev.phase === "end") {
                 useStore.getState().updateToolCallOnLast(ev.id, {
                   result: ev.result, status: "done",
                   endedAt: Date.now(),
                 });
+                fireHooks("postToolUse");
               }
               continue;
             }
@@ -1216,57 +1556,29 @@ export function CoderView() {
               useStore.getState().setPlanOnLast(String(parsed.plan_event.plan ?? ""));
               continue;
             }
+            /* Ajan Ekibi (Swarm) ilerleme olayı → todo paneli canlı güncelle */
+            if (parsed.swarm_event) {
+              useStore.getState().setSwarmOnLast(parsed.swarm_event as import("@/lib/types").SwarmState);
+              continue;
+            }
             /* run_command: ajan terminalde komut çalıştırmak istiyor → terminali
                aç ve komutu gönder. Çıktı craftai:terminal-output ile geri döner. */
             if (parsed.run_command_event) {
               const command = String(parsed.run_command_event.command ?? "").trim();
-              if (command) {
-                const lcfg = useStore.getState().config;
-                /* Tehlikeli komut kalkanı: katastrofik kalıpları (rm -rf /, fork
-                   bomb, mkfs, curl|sh…) çalıştırmadan engelle ve sonucu ajana geri
-                   besle → loop sürer, ajan daha güvenli komutla devam eder. */
-                const danger = lcfg.commandGuard !== false ? matchDangerousCommand(command) : null;
-                if (danger) {
-                  addToast(`⛔ Güvenlik: komut engellendi (${danger})`, "error");
-                  window.dispatchEvent(new CustomEvent("craftai:terminal-output", { detail: { command, output: `⛔ Güvenlik politikası bu komutu engelledi: ${danger}. Komut ÇALIŞTIRILMADI. Gerçekten gerekliyse kullanıcıdan açık onay iste; aksi halde daha güvenli bir komutla devam et.` } }));
-                  continue;
-                }
-                if (lcfg.localMode && lcfg.localBridgeUrl?.trim()) {
-                  /* Yerel Mod: komutu köprünün GERÇEK kabuğunda çalıştır; çıktıyı
-                     craftai:terminal-output ile ajana geri besle (loop sürer). */
-                  addToast(`▶ Yerel kabuk: ${command}`, "info");
-                  fetch(`${lcfg.localBridgeUrl.replace(/\/$/, "")}/exec`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${lcfg.localBridgeToken || ""}` },
-                    body: JSON.stringify({ command }),
-                  })
-                    .then((r) => r.json())
-                    .then((d) => {
-                      const output = typeof d.error === "string" ? `Hata: ${d.error}` : String(d.output ?? "").slice(0, 8000);
-                      window.dispatchEvent(new CustomEvent("craftai:terminal-output", { detail: { command, output } }));
-                    })
-                    .catch((err) => {
-                      window.dispatchEvent(new CustomEvent("craftai:terminal-output", { detail: { command, output: `Yerel köprüye ulaşılamadı: ${(err as Error).message}` } }));
-                    });
-                } else {
-                  setTerminalOpen(true);
-                  const fire = () => window.dispatchEvent(new CustomEvent("craftai:terminal-run", { detail: { command } }));
-                  if (terminalReadyRef.current) {
-                    fire();
-                  } else {
-                    /* Terminal hazır olunca gönder (WebContainer açılışı 5-10 sn
-                       sürebilir → sabit gecikme komutu kaybediyordu). 20 sn emniyet. */
-                    let done = false;
-                    const onReady = () => {
-                      if (done) return; done = true;
-                      window.removeEventListener("craftai:terminal-ready", onReady);
-                      fire();
-                    };
-                    window.addEventListener("craftai:terminal-ready", onReady);
-                    setTimeout(onReady, 20000);
-                  }
-                  addToast(`▶ Terminal: ${command}`, "info");
-                }
+              const lcfg = useStore.getState().config;
+              /* Tehlikeli komut kalkanı: katastrofik kalıpları (rm -rf /, fork bomb,
+                 mkfs, curl|sh…) çalıştırmadan engelle; engellenen komutu "Terminal"
+                 kutusunda göster ve sonucu ajana geri besle (loop sürer, ajan daha
+                 güvenli komutla devam eder). */
+              const danger = command && lcfg.commandGuard !== false ? matchDangerousCommand(command) : null;
+              if (danger) {
+                addToast(`⛔ Güvenlik: komut engellendi (${danger})`, "error");
+                useStore.getState().addCommandRun(command);
+                window.dispatchEvent(new CustomEvent("craftai:terminal-output", { detail: { command, output: `⛔ Güvenlik politikası bu komutu engelledi: ${danger}. Komut ÇALIŞTIRILMADI. Gerçekten gerekliyse kullanıcıdan açık onay iste; aksi halde daha güvenli bir komutla devam et.` } }));
+              } else {
+                /* Terminali ARKAPLANDA hazırla; komut arkaplanda çalışır, ilerleme
+                   sohbetteki "Terminal" todo kutusunda görünür, çıktı AI'ya döner. */
+                runInTerminal(String(parsed.run_command_event.command ?? ""));
               }
               continue;
             }
@@ -1346,10 +1658,24 @@ export function CoderView() {
       /* AI'nın yazdığı dosyayı otomatik IDE'de aç + multi-commit bar */
       const autoFiles = extractAllFileFences(full);
       if (autoFiles.length > 0) {
-        setEditorFile(autoFiles[0]);
-        setEditorOpen(true);
+        /* Tümünü sekme olarak aç (ilki aktif), birden fazla dosya yazıldıysa da
+           hepsi sekme şeridinde görünsün. */
+        for (const af of autoFiles) openInEditor(af);
+        openInEditor(autoFiles[0]);
       }
       setPendingCommit(autoFiles.length >= 2 ? autoFiles : null);
+
+      /* Otomasyonlar (Claude Code hooks benzeri): afterResponse her yanıttan
+         sonra, afterWrite yalnızca ajan dosya yazınca çalışır. Eşleşen komutlar
+         sıralı (&&) tek seferde terminale gönderilir. */
+      {
+        const wroteFiles = autoFiles.length > 0 || turnCheckpoints.length > 0;
+        const due = (store.config.automations ?? [])
+          .filter((a) => a.enabled && a.command.trim())
+          .filter((a) => a.event === "afterResponse" || (a.event === "afterWrite" && wroteFiles))
+          .map((a) => a.command.trim());
+        if (due.length > 0) runInTerminal(due.join(" && "));
+      }
 
       /* Güvenli oto-çalıştır: yalnızca allowlist'teki komut otomatik terminale
          gönderilir (çıktı AI'ya beslenir → güvenli oto-düzelt). Diğerleri elle. */
@@ -1375,9 +1701,11 @@ export function CoderView() {
         tokenIn = realUsage.prompt;
         tokenOut = realUsage.completion;
       } else {
+        /* Gerçek tokenizer (gpt-tokenizer, tembel yüklenir) ile doğru say. */
+        const { countTokens } = await import("@/lib/tokenizer");
         const inputText = apiMessages.map((m) => typeof m.content === "string" ? m.content : "").join("\n");
-        tokenIn = estimateTokens(inputText) + estimateTokens(coderSystemPrompt);
-        tokenOut = estimateTokens(full.slice(priorLen));
+        tokenIn = (await countTokens(inputText)) + (await countTokens(coderSystemPrompt));
+        tokenOut = await countTokens(full.slice(priorLen));
       }
       useStore.getState().updateLastTokens(tokenIn, tokenOut);
       /* geri-al noktalarını mesaja yaz → persistCurrent ile sohbetle kaydedilir,
@@ -1388,7 +1716,7 @@ export function CoderView() {
         /* Kullanıcı durdurdu: hiç içerik gelmediyse boş asistan baloncuğunu kaldır. */
         if (!full) useStore.getState().popLastMessage();
       } else {
-        useStore.getState().updateLastContent(`**Hata:** ${(err as Error).message}\n\n_Anahtar/model doğru mu? Ayarlardan kontrol et._`);
+        useStore.getState().updateLastContent(`**Hata:** ${friendlyError((err as Error).message)}`);
         void runHooks(false, "error");
       }
     } finally {
@@ -1402,6 +1730,7 @@ export function CoderView() {
       }
       fetchFollowUps();
       void extractMemory();
+      fireHooks("onStop");
     }
     /* Otomatik devam (Claude Code gibi): yanıt token sınırında kesildiyse aynı
        baloncuk içinden kendiliğinden sürdür — kullanıcı tıklamasına gerek yok.
@@ -1487,10 +1816,11 @@ export function CoderView() {
     await callApi();
   };
 
-  const allFiles = tree ? getAllFiles(tree) : [];
-  const filteredFiles = repoSearch
-    ? allFiles.filter((f) => f.name.toLowerCase().includes(repoSearch.toLowerCase()) || f.path.toLowerCase().includes(repoSearch.toLowerCase()))
-    : allFiles;
+  const allFiles = useMemo(() => (tree ? getAllFiles(tree) : []), [tree]);
+  const filteredFiles = useMemo(
+    () => fuzzyFiles(allFiles, repoSearch),
+    [allFiles, repoSearch],
+  );
   const attachedPaths = attachedFiles.map((f) => f.path);
 
   return (
@@ -1552,10 +1882,16 @@ export function CoderView() {
 
         <div className="flex-1 min-w-0" />
 
-        {/* Token + cost */}
-        {current && (current.totalInTokens || current.totalOutTokens) ? (
-          <UsageBadge chat={current} />
-        ) : null}
+        {/* Token + maliyet — her zaman görünür; göndermeden önce yazılan metnin
+           ve eklenen dosyaların yaklaşık token tahminini canlı gösterir. */}
+        {config.models.length > 0 && (
+          <UsageBadge
+            chat={current ?? {}}
+            pendingTokens={
+              estimateTokens(input) + attachedFiles.reduce((a, f) => a + estimateTokens(f.content), 0)
+            }
+          />
+        )}
 
         <div className="flex items-center gap-1 shrink-0">
           {config.models.length > 0 ? (
@@ -1589,7 +1925,7 @@ export function CoderView() {
               icon={<Terminal size={14} />}
               label={terminalSupported ? (terminalOpen ? "Terminal'i kapat" : "Terminal") : "Terminal (masaüstü Chrome/Edge)"}
               active={terminalOpen}
-              onClick={() => setTerminalOpen((v) => !v)}
+              onClick={() => { setTerminalMounted(true); setTerminalOpen((v) => !v); }}
             />
             <MoreItem icon={<GitBranch size={14} />} label="Git & PR (dal, PR/MR, incele)" active={gitPanelOpen} onClick={() => setGitPanelOpen((v) => !v)} />
             <MoreItem icon={<FolderOpen size={14} />} label="Dosyalar (depo)" active={filesOpen} onClick={() => setFilesOpen((v) => !v)} />
@@ -1640,6 +1976,7 @@ export function CoderView() {
             />
             <MoreItem icon={<BookOpen size={14} />} label="Kütüphane" onClick={() => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); }} />
             <MoreItem icon={<Zap size={14} />} label="Skills" onClick={() => useStore.getState().setSkillsOpen(true)} />
+            <MoreItem icon={<Activity size={14} />} label="Etkinlik günlüğü" onClick={() => useStore.getState().setActivityOpen(true)} />
             {current && messages.length > 0 && (
               <>
                 <div className="h-px bg-line/60 my-1 mx-1" />
@@ -1707,15 +2044,36 @@ export function CoderView() {
 
             {tree && (
               <div className="px-2 py-1.5 border-b border-line/40 shrink-0">
-                <div className="relative">
-                  <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted/40" />
-                  <input
-                    value={repoSearch}
-                    onChange={(e) => setRepoSearch(e.target.value)}
-                    placeholder="Ara…"
-                    className="w-full bg-bgsoft/60 rounded-lg pl-6 pr-2 py-1.5 text-[11px] outline-none focus:ring-1 ring-brand/30 placeholder:text-muted/30"
-                  />
+                <div className="relative flex items-center gap-1">
+                  <div className="relative flex-1">
+                    <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted/40" />
+                    <input
+                      value={repoSearch}
+                      onChange={(e) => setRepoSearch(e.target.value)}
+                      onKeyDown={(e) => { if (semanticMode && e.key === "Enter") runSemanticSearch(repoSearch); }}
+                      placeholder={semanticMode ? "Anlamca ara, Enter…" : "Bulanık ara…"}
+                      className="w-full bg-bgsoft/60 rounded-lg pl-6 pr-2 py-1.5 text-[11px] outline-none focus:ring-1 ring-brand/30 placeholder:text-muted/30"
+                    />
+                  </div>
+                  <button
+                    onClick={() => { setSemanticMode((v) => !v); setRagHits([]); }}
+                    title={semanticMode ? "Anlamsal arama açık (kelime aramasına dön)" : "Anlamsal arama (AI gömme)"}
+                    className={`shrink-0 p-1.5 rounded-lg transition-colors ${semanticMode ? "bg-brand/15 text-brand" : "text-muted/50 hover:text-ink hover:bg-bgsoft/60"}`}
+                  >
+                    <Sparkles size={12} />
+                  </button>
                 </div>
+                {semanticMode && ragProgress && (
+                  <div className="mt-1.5 px-0.5">
+                    <div className="flex items-center justify-between text-[9px] text-muted/50 mb-0.5">
+                      <span>İndeksleniyor…</span>
+                      <span className="tabular-nums">{ragProgress.done}/{ragProgress.total}</span>
+                    </div>
+                    <div className="h-1 rounded-full bg-bgsoft overflow-hidden">
+                      <div className="h-full bg-brand transition-all" style={{ width: `${ragProgress.total ? (ragProgress.done / ragProgress.total) * 100 : 0}%` }} />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1754,6 +2112,39 @@ export function CoderView() {
                     </button>
                   </div>
                 </div>
+              ) : semanticMode ? (
+                <div className="py-1">
+                  {ragBusy && !ragProgress ? (
+                    <div className="px-3 py-4 text-center text-[10px] text-muted/50 flex items-center justify-center gap-1.5">
+                      <RefreshCw size={11} className="animate-spin text-brand" /> Anlamca aranıyor…
+                    </div>
+                  ) : ragHits.length === 0 ? (
+                    <div className="px-3 py-6 text-center text-[10px] text-muted/40 leading-relaxed">
+                      <Sparkles size={18} className="mx-auto mb-2 text-muted/20" />
+                      Anlamsal arama: ne aradığını <em>doğal dille</em> yaz, Enter&apos;a bas.
+                      <br />İlk aramada depo indekslenir (model indirilir).
+                    </div>
+                  ) : (
+                    ragHits.map((h, i) => {
+                      const isAttached = attachedPaths.includes(h.path);
+                      return (
+                        <button
+                          key={`${h.path}-${h.line}-${i}`}
+                          onClick={() => { const f = getAllFiles(tree).find((x) => x.path === h.path); if (f) attachRepoFile(f); }}
+                          className={`w-full flex flex-col gap-0.5 px-3 py-1.5 text-left rounded transition-colors ${isAttached ? "bg-brand/10" : "hover:bg-bgsoft/50"}`}
+                        >
+                          <div className="flex items-center gap-1.5 text-[11px]">
+                            {fetchingFile === h.path ? <RefreshCw size={10} className="animate-spin shrink-0 text-brand" /> : <FileIcon name={h.path.split("/").pop() || h.path} size={10} />}
+                            <span className="truncate flex-1 text-muted/90">{h.path}</span>
+                            <span className="text-[8px] text-muted/40">:{h.line}</span>
+                            <span className="text-[8px] font-mono text-brand/60 tabular-nums shrink-0">{(h.score * 100).toFixed(0)}%</span>
+                          </div>
+                          <div className="text-[9px] text-muted/40 font-mono truncate pl-4">{h.text.trim().slice(0, 80)}</div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               ) : repoSearch ? (
                 <div className="py-1">
                   {filteredFiles.slice(0, 50).map((f) => {
@@ -1774,7 +2165,12 @@ export function CoderView() {
                   })}
                 </div>
               ) : (
-                <FileTreeNode node={tree} onSelect={attachRepoFile} attached={attachedPaths} />
+                <FileTreeNode
+                  node={tree}
+                  onSelect={attachRepoFile}
+                  attached={attachedPaths}
+                  onContextMenu={(f, e) => setTreeMenu({ x: e.clientX, y: e.clientY, file: f })}
+                />
               )}
             </div>
 
@@ -1827,8 +2223,11 @@ export function CoderView() {
               <div className="max-w-3xl mx-auto px-5 py-6">
                 {messages.map((m, i) => {
                   const isLastAssistant = m.role === "assistant" && i === messages.length - 1;
+                  const isLast = i === messages.length - 1;
                   return (
-                    <div key={i}>
+                    /* cv-msg: ekran dışı eski mesajları sanallaştırır (akıcı
+                       kaydırma). Son mesaj akış/paneller için hariç tutulur. */
+                    <div key={i} className={isLast ? undefined : "cv-msg"}>
                       <MessageBubble
                         index={i}
                         message={m}
@@ -1849,7 +2248,7 @@ export function CoderView() {
                           <MultiCommitBar
                             files={pendingCommit}
                             onClose={() => setPendingCommit(null)}
-                            onOpenInEditor={(f) => { setEditorFile(f); setEditorOpen(true); }}
+                            onOpenInEditor={(f) => openInEditor(f)}
                           />
                         </div>
                       )}
@@ -1957,11 +2356,14 @@ export function CoderView() {
             )}
           </div>
 
-          {/* Terminal */}
-          {terminalOpen && (
-            <ErrorBoundary variant="inline" label="Terminal çöktü">
-              <RealTerminal onClose={() => setTerminalOpen(false)} />
-            </ErrorBoundary>
+          {/* Terminal — bir kez boot olur, ARKAPLANDA mount kalır; kapatınca
+              yalnızca gizlenir (unmount olmaz) → ajan komutları hep çalışır. */}
+          {terminalMounted && (
+            <div className={terminalOpen ? "" : "hidden"}>
+              <ErrorBoundary variant="inline" label="Terminal çöktü">
+                <RealTerminal onClose={() => setTerminalOpen(false)} />
+              </ErrorBoundary>
+            </div>
           )}
 
           {/* Composer */}
@@ -2079,7 +2481,7 @@ export function CoderView() {
                 </div>
               )}
 
-              <input ref={fileRef} type="file" multiple accept=".txt,.md,.js,.ts,.tsx,.jsx,.py,.json,.yaml,.yml,.toml,.html,.css,.sql,.sh,.go,.rs,.java,.c,.cpp,.h,.rb,.php" className="hidden"
+              <input ref={fileRef} type="file" multiple accept=".txt,.md,.js,.ts,.tsx,.jsx,.py,.json,.yaml,.yml,.toml,.html,.css,.sql,.sh,.go,.rs,.java,.c,.cpp,.h,.rb,.php,.pdf,.ipynb" className="hidden"
                 onChange={(e) => { for (const f of Array.from(e.target.files ?? [])) readFileIntoInput(f); e.target.value = ""; }} />
               <input ref={imgRef} type="file" accept="image/*" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) readFileIntoInput(f); e.target.value = ""; }} />
@@ -2172,7 +2574,16 @@ export function CoderView() {
         <RightPanel
           editorFile={editorFile}
           editorOpen={editorOpen}
-          onCloseEditor={() => setEditorOpen(false)}
+          openTabs={openTabs}
+          onSelectTab={selectTab}
+          onCloseTab={closeTab}
+          onEditorDirtyChange={setActiveDirty}
+          onCloseEditor={() => {
+            if (activeDirty && !confirm("Kaydedilmemiş değişiklikler kaybolacak. Editör kapatılsın mı?")) return;
+            setEditorOpen(false);
+            setOpenTabs([]);
+            setActiveDirty(false);
+          }}
           onAskAI={(_text, context) => {
             useStore.getState().setPendingInput(context);
           }}
@@ -2184,6 +2595,50 @@ export function CoderView() {
       </div>
 
       {/* PR / MR Review Modal */}
+      {/* Dosya ağacı sağ-tık menüsü */}
+      {treeMenu && (
+        <>
+          <div
+            className="fixed inset-0 z-50"
+            onClick={() => setTreeMenu(null)}
+            onContextMenu={(e) => { e.preventDefault(); setTreeMenu(null); }}
+          />
+          <div
+            className="fixed z-50 min-w-[180px] bg-surface border border-line rounded-xl shadow-2xl py-1 text-[12px] animate-in fade-in zoom-in-95 duration-100"
+            style={{
+              left: Math.min(treeMenu.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 200),
+              top: Math.min(treeMenu.y, (typeof window !== "undefined" ? window.innerHeight : 9999) - 150),
+            }}
+          >
+            <div className="px-3 py-1.5 text-[10px] text-muted/60 truncate border-b border-line/40 mb-1">{treeMenu.file.path}</div>
+            <button
+              onClick={() => { openTreeFile(treeMenu.file); setTreeMenu(null); }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-bgsoft/60 transition-colors"
+            >
+              <Code2 size={13} className="text-muted" /> Editörde aç
+            </button>
+            <button
+              onClick={() => { attachRepoFile(treeMenu.file); setTreeMenu(null); }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-bgsoft/60 transition-colors"
+            >
+              <Paperclip size={13} className="text-muted" />
+              {attachedPaths.includes(treeMenu.file.path) ? "Sohbetten çıkar" : "Sohbete ekle"}
+            </button>
+            <button
+              onClick={() => {
+                navigator.clipboard?.writeText(treeMenu.file.path)
+                  .then(() => addToast("Yol kopyalandı", "success"))
+                  .catch(() => { /* yok say */ });
+                setTreeMenu(null);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-bgsoft/60 transition-colors"
+            >
+              <Copy size={13} className="text-muted" /> Yolu kopyala
+            </button>
+          </div>
+        </>
+      )}
+
       {prModalOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setPrModalOpen(false)}>
           <div className="w-full max-w-sm bg-surface border border-line rounded-2xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -2343,7 +2798,7 @@ interface UsageQuota {
 }
 
 /* Token + maliyet rozeti — tıklanınca canlı kota pop-up'ı açar. */
-function UsageBadge({ chat }: { chat: { totalInTokens?: number; totalOutTokens?: number } }) {
+function UsageBadge({ chat, pendingTokens = 0 }: { chat: { totalInTokens?: number; totalOutTokens?: number }; pendingTokens?: number }) {
   const config = useStore((s) => s.config);
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -2376,13 +2831,18 @@ function UsageBadge({ chat }: { chat: { totalInTokens?: number; totalOutTokens?:
           : warn ? "border-amber-400/40 bg-amber-400/5 text-amber-400"
           : "border-line/40 text-muted/70"
         }`}
-        title="Token & kota detayı için tıkla"
+        title={pendingTokens > 0
+          ? `Bu sohbet: ${total.toLocaleString()} token · Göndereceğin: ~${pendingTokens.toLocaleString()} token. Detay için tıkla.`
+          : "Token & kota detayı için tıkla"}
       >
         <span className="relative w-3 h-3" aria-hidden>
           <span className="absolute inset-0 rounded-full bg-current opacity-15" />
           <span className="absolute inset-0 rounded-full bg-current" style={{ clipPath: `inset(${100 - pct}% 0 0 0)` }} />
         </span>
         <span>{total.toLocaleString()} tok</span>
+        {pendingTokens > 0 && (
+          <span className="text-brand/80" title="Göndermeden önce tahmini ek token">+~{pendingTokens.toLocaleString()}</span>
+        )}
         {cost !== null && hasPrice && (
           <>
             <span className="opacity-40">·</span>

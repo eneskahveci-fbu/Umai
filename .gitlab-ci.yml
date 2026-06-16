@@ -2,7 +2,7 @@
 # GitLab paylaşımlı runner CI/CD dakika kotası tükendi → pipeline'lar
 # "ci_quota_exceeded" ile düşüyordu (kod sorunu değil). Vercel deploy'u
 # GitLab CI'dan bağımsızdır, bundan etkilenmez.
-# Kod kontrolleri yerelde yapılıyor: npx tsc --noEmit && npm run lint && npm test
+# Kod kontrolleri yerelde: npx tsc --noEmit && npm run lint && npm test && npm run build
 # YENİDEN AÇMAK için aşağıdaki `workflow:` bloğunu sil (kota ayın 1'inde
 # sıfırlanır; ya da kendi GitLab Runner'ını kaydet → ücretsiz, sınırsız).
 workflow:
@@ -17,17 +17,19 @@ verify:
   stage: verify
   image: node:22-alpine
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main"
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
   cache:
     key:
       files:
         - package-lock.json
     paths:
-      - .npm/
+      - node_modules/
+    policy: pull-push
   script:
-    - npm ci --cache .npm --prefer-offline --no-audit --no-fund
+    - npm ci --no-audit --no-fund
     - npx tsc --noEmit
     - npm run lint
     - npm test
+    - npm run build
   interruptible: true

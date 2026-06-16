@@ -43,8 +43,8 @@ const FEATURES = [
   },
   {
     icon: <Code2 size={20} />,
-    title: "Coder Sekmesi",
-    desc: "GitHub veya GitLab deposuna bağlan, dosyaları gez, içeriği sohbete gönderip kod sor. Diff görünümü ile değişiklikleri karşılaştır.",
+    title: "Kod & Depo",
+    desc: "GitHub veya GitLab deposuna bağlan, dosyaları gez, içeriği sohbete gönderip kod sor. Diff görünümü ile değişiklikleri karşılaştır. Sohbet, kod ve terminal tek ekranda.",
   },
   {
     icon: <GitBranch size={20} />,
@@ -99,14 +99,14 @@ const HOW_IT_WORKS = [
   },
   {
     step: "2",
-    title: "Sohbet Et veya Kod Yaz",
-    desc: "Chat sekmesinde soru sor, Coder sekmesinde deposunu aç — dosyaları okuyup kod üret.",
+    title: "Sohbet Et ve Kod Yaz",
+    desc: "Tek ekranda soru sor; deponu bağla, ajan dosyaları kendi okuyup kod üretsin — sohbet, kod ve terminal bir arada.",
     icon: <MessageSquare size={22} />,
   },
   {
     step: "3",
-    title: "Deploy Et",
-    desc: "Oluşturulan kodu diff'le karşılaştır, tek tıkla commit at ve canlıya al.",
+    title: "Commit & Push",
+    desc: "Oluşturulan kodu diff'le karşılaştır, tek tıkla commit & push et — değişikliklerin doğrudan depona gider.",
     icon: <Zap size={22} />,
   },
 ];
@@ -114,7 +114,7 @@ const HOW_IT_WORKS = [
 const FAQS = [
   {
     q: "Craft.Coder ücretsiz mi?",
-    a: "Evet, tamamen ücretsiz ve açık kaynak. Kendi API anahtarını getir (BYOK) modeliyle çalışır; Craft.Coder herhangi bir model ücreti almaz.",
+    a: "Evet, tamamen ücretsiz. Kendi API anahtarını getir (BYOK) modeliyle çalışır; Craft.Coder herhangi bir model ücreti almaz.",
   },
   {
     q: "Hangi modeller destekleniyor?",
@@ -126,7 +126,7 @@ const FAQS = [
   },
   {
     q: "GitHub ve GitLab entegrasyonu nasıl çalışıyor?",
-    a: "Coder sekmesinde GitHub veya GitLab personal access token'ınla giriş yaparsın. Repo'ları gezebilir, dosya içeriklerini sohbete gönderebilir, kod değişikliklerini commit edebilirsin. Her iki platform da aynı anda desteklenir.",
+    a: "Ayarlardan GitHub veya GitLab personal access token'ınla bağlanırsın. Repo'ları gezebilir, dosya içeriklerini sohbete gönderebilir, kod değişikliklerini commit edebilirsin. Her iki platform da aynı anda desteklenir.",
   },
   {
     q: "Mobilde çalışıyor mu?",
@@ -142,7 +142,7 @@ const JSON_LD_APP = {
   "@type": "SoftwareApplication",
   name: "Craft.Coder",
   description:
-    "OpenAI-uyumlu herhangi bir modelle çalışan AI kod asistanı. Sohbet, gizli sohbet, geçmiş senkron ve GitHub deposuna bağlı Coder sekmesi.",
+    "OpenAI-uyumlu herhangi bir modelle çalışan AI kod asistanı. Sohbet, gizli sohbet ve GitHub/GitLab deposuna bağlı kod üretimi — sohbet, kod ve terminal tek ekranda.",
   url: SITE_URL,
   applicationCategory: "DeveloperApplication",
   operatingSystem: "Web",
@@ -209,7 +209,7 @@ export default function Home() {
 
         <span className="inline-flex items-center gap-2 text-sm text-muted border border-line bg-surface/70 backdrop-blur-sm px-4 py-1.5 rounded-full mb-8">
           <span className="w-2 h-2 rounded-full bg-green animate-pulse" />
-          model bağımsız · açık kaynak · ücretsiz
+          model bağımsız · gizlilik önce · ücretsiz
         </span>
 
         <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-tight">
@@ -236,7 +236,7 @@ export default function Home() {
         <div className="flex flex-wrap justify-center gap-10 mt-14">
           {[
             { val: "9+", label: "Desteklenen sağlayıcı" },
-            { val: "100%", label: "Ücretsiz & açık kaynak" },
+            { val: "100%", label: "Ücretsiz & kendi anahtarınla" },
             { val: "0", label: "Sunucuya gönderilen anahtar" },
           ].map((s) => (
             <div key={s.label} className="text-center">
@@ -320,7 +320,7 @@ export default function Home() {
             Hemen dene — kurulum yok
           </h2>
           <p className="text-muted mb-7 max-w-lg mx-auto relative">
-            Tarayıcını aç, API anahtarını ekle ve kodlamaya başla. Ücretsiz, açık kaynak, gizliliğe saygılı.
+            Tarayıcını aç, API anahtarını ekle ve kodlamaya başla. Ücretsiz, gizliliğe saygılı, kendi anahtarınla.
           </p>
           <Link
             href="/app"
@@ -365,7 +365,7 @@ export default function Home() {
             <span className="text-ink">craft</span><span className="brand-text">.coder</span>
           </div>
           <p className="text-sm text-muted">
-            Terminal &amp; web tabanlı AI kod asistanı · MIT Lisansı
+            Terminal &amp; web tabanlı AI kod asistanı · Kendi anahtarınla (BYOK)
           </p>
 
           <div className="mt-8 inline-block rounded-2xl border border-line bg-surface px-8 py-5">

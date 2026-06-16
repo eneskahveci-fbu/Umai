@@ -123,6 +123,12 @@ export const PRESETS: Record<Provider, Preset> = {
     model: "openai",
     keyHint: "opsiyonel: pollinations.ai ücretsiz token'ı (limiti yükseltir)",
   },
+  github: {
+    label: "🐙 GitHub Models (Ücretsiz)",
+    baseUrl: "https://models.github.ai/inference",
+    model: "gpt-4o-mini",
+    keyHint: "GitHub token (models:read izinli — github.com/settings/tokens)",
+  },
   ollama: {
     label: "💻 Ollama (Yerel / Ücretsiz)",
     baseUrl: "http://localhost:11434/v1",
@@ -215,6 +221,13 @@ export const PROVIDER_MODELS: Record<Provider, string[]> = {
     "qwen-coder",
     "mistral",
     "llama",
+  ],
+  github: [
+    "gpt-4o",
+    "gpt-4o-mini",
+    "DeepSeek-R1",
+    "Meta-Llama-3.1-70B-Instruct",
+    "Mistral-large-2407",
   ],
   ollama: [
     "qwen2.5-coder:7b",
@@ -451,6 +464,7 @@ export const POLLINATIONS_DEFAULT_MODEL: ModelProfile = {
 export const DEFAULT_CONFIG: Config = {
   models: [],
   activeModelId: null,
+  providerKeys: {},
   githubAccounts: [],
   activeGithubId: null,
   gitlabAccounts: [],
@@ -468,13 +482,14 @@ export const DEFAULT_CONFIG: Config = {
   autoTheme: false,
   autoMemory: true,
   autoContinue: true,
+  qualityMode: false,
   webSearch: false,
   cliMode: false,
   autoTerminal: false,
   inlineCompletion: true,
   requireWriteApproval: false,
   safeMode: false,
-  autoRunCommands: false,
+  autoRunCommands: true,
   commandAllowlist: [...DEFAULT_COMMAND_ALLOWLIST],
   planApprovalMode: false,
   blockNetworkTools: false,
@@ -485,6 +500,8 @@ export const DEFAULT_CONFIG: Config = {
   maxContext: 128000,
   webcontainerApiKey: "",
   terminalWsUrl: "",
+  terminalSetupCommand: "",
+  automations: [],
   mcpServers: [],
 };
 
@@ -526,4 +543,93 @@ export const PROMPT_TEMPLATES: PromptTemplate[] = [
   { id: "ts1", category: "Test", title: "Birim test yaz", prompt: "Bu fonksiyon için kapsamlı birim testleri yaz. Edge case'leri, hata senaryolarını ve normal akışı test et:\n\n```\n[Kodu buraya yapıştır]\n```" },
   { id: "ts2", category: "Test", title: "Entegrasyon testi", prompt: "Bu API endpoint için entegrasyon testleri yaz. Başarılı ve başarısız senaryoları, validasyon hatalarını test et." },
   { id: "ts3", category: "Test", title: "Test stratejisi", prompt: "Bu proje için bir test stratejisi öner. Hangi testler yazılmalı, test kapsamı ne olmalı, hangi araçlar kullanılmalı?" },
+];
+
+/* ─── Projeler ─── */
+
+/* Proje renk kimliği — sidebar noktası ve panel vurgusu için sabit palet. */
+export const PROJECT_COLORS: { key: string; hex: string; label: string }[] = [
+  { key: "amber",   hex: "#c8a87e", label: "Amber" },
+  { key: "green",   hex: "#3ddc84", label: "Yeşil" },
+  { key: "blue",    hex: "#3b82f6", label: "Mavi" },
+  { key: "purple",  hex: "#a855f7", label: "Mor" },
+  { key: "pink",    hex: "#ec4899", label: "Pembe" },
+  { key: "orange",  hex: "#f97316", label: "Turuncu" },
+  { key: "red",     hex: "#ef4444", label: "Kırmızı" },
+  { key: "cyan",    hex: "#06b6d4", label: "Camgöbeği" },
+];
+
+export function projectColorHex(key?: string): string {
+  return PROJECT_COLORS.find((c) => c.key === key)?.hex ?? PROJECT_COLORS[0].hex;
+}
+
+/* Hazır proje şablonları — tek tıkla kurulu proje (ikon, renk, talimatlar). */
+export interface ProjectTemplate {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  description: string;
+  systemPrompt: string;
+}
+
+export const PROJECT_TEMPLATES: ProjectTemplate[] = [
+  {
+    id: "tpl-web",
+    name: "Web Uygulaması",
+    icon: "🌐",
+    color: "blue",
+    description: "Modern web uygulaması geliştirme (React/Next.js).",
+    systemPrompt:
+      "Bu bir modern web uygulaması projesi. React/Next.js, TypeScript ve Tailwind CSS kullan. " +
+      "Erişilebilirlik (a11y), performans ve responsive tasarıma dikkat et. Bileşenleri küçük ve yeniden kullanılabilir tut.",
+  },
+  {
+    id: "tpl-api",
+    name: "Backend / API",
+    icon: "🔌",
+    color: "green",
+    description: "REST/GraphQL API ve sunucu tarafı mantık.",
+    systemPrompt:
+      "Bu bir backend/API projesi. Temiz mimari, doğrulama, hata yönetimi ve güvenlik (auth, rate limit, input sanitization) " +
+      "önceliklidir. Uç noktaları belgelendir ve test edilebilir yaz.",
+  },
+  {
+    id: "tpl-data",
+    name: "Veri & Analiz",
+    icon: "📊",
+    color: "purple",
+    description: "Veri işleme, analiz ve görselleştirme.",
+    systemPrompt:
+      "Bu bir veri analizi projesi. Python (pandas/numpy) ve net görselleştirmeler kullan. " +
+      "Adımları açıkla, varsayımları belirt, sonuçları yorumla.",
+  },
+  {
+    id: "tpl-mobile",
+    name: "Mobil Uygulama",
+    icon: "📱",
+    color: "pink",
+    description: "iOS/Android mobil uygulama geliştirme.",
+    systemPrompt:
+      "Bu bir mobil uygulama projesi (React Native/Flutter). Platform yönergelerine, dokunmatik ergonomiye ve " +
+      "performansa dikkat et. Offline ve hata durumlarını düşün.",
+  },
+  {
+    id: "tpl-script",
+    name: "Otomasyon / Script",
+    icon: "⚙️",
+    color: "orange",
+    description: "CLI araçları, otomasyon ve script'ler.",
+    systemPrompt:
+      "Bu bir otomasyon/script projesi. Küçük, birleştirilebilir ve idempotent araçlar yaz. " +
+      "Net loglama, hata kodları ve --help çıktısı ekle.",
+  },
+  {
+    id: "tpl-blank",
+    name: "Boş Proje",
+    icon: "📁",
+    color: "amber",
+    description: "Sıfırdan, talimatsız boş proje.",
+    systemPrompt: "",
+  },
 ];

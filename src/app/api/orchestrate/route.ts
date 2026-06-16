@@ -216,11 +216,14 @@ export async function POST(req: Request) {
       req.signal.addEventListener("abort", () => ac.abort(), { once: true });
       const send = (content: string) =>
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`));
+      /* Yapısal ilerleme olayı (istemci 'Ajan Ekibi' todo panelini bununla çizer). */
+      const sendEvent = (obj: unknown) =>
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
       const done = () => { controller.enqueue(encoder.encode(`data: [DONE]\n\n`)); controller.close(); };
 
       try {
         /* ── 1) PLANLAMA ── */
-        send("🧠 **Ajan ekibi görevi planlıyor…**\n\n");
+        sendEvent({ swarm_event: { phase: "planning", agents: [] } });
         const planSys =
           `Sen bir baş planlayıcı ajansın. Kullanıcının isteğini, PARALEL ve BAĞIMSIZ ` +
           `çalışabilecek (birbirine bağımlı olmayan) en fazla ${MAX_AGENTS} alt göreve böl. ` +
@@ -239,22 +242,19 @@ export async function POST(req: Request) {
 
         /* ── Tek görev / plan başarısız → doğrudan tek ajanla cevapla ── */
         if (tasks.length <= 1) {
-          send("Tek ajan yeterli, doğrudan cevaplıyorum.\n\n---\n\n");
           await streamModel(cfg, [{ role: "system", content: baseSys }, ...shared], send, signal);
           done();
           return;
         }
 
-        send(
-          `**Plan — ${tasks.length} uzman ajan:**\n` +
-          tasks.map((t, i) => `${i + 1}. ${ROLE_ICON[t.role] ?? "⚙️"} _${t.role}_ — ${t.title}`).join("\n") +
-          `\n\n⚙️ Ajanlar paralel çalışıyor…\n\n`,
-        );
+        /* Yapısal ekip durumu — her ajan bir satır (todo paneli). */
+        const agents = tasks.map((t) => ({ title: t.title, role: t.role, status: "running" as "running" | "done" | "error" }));
+        sendEvent({ swarm_event: { phase: "working", agents } });
 
         /* ── 2) PARALEL UZMAN İŞÇİ AJANLAR ── */
         const repoCtx = body.repoCtx;
         const results = await Promise.all(
-          tasks.map(async (t) => {
+          tasks.map(async (t, i) => {
             /* Rol-özel sistem prompt'u → her ajan kendi uzmanlığıyla çalışır. */
             const workerSys =
               `${ROLE_GUIDE[t.role] ?? ROLE_GUIDE.genel} ` +
@@ -272,17 +272,19 @@ export async function POST(req: Request) {
               const r = repoCtx
                 ? await runReadOnlyAgent(cfg, wmsgs, repoCtx, signal)
                 : await callModel(cfg, wmsgs, signal);
-              send(`✅ ${ROLE_ICON[t.role] ?? "⚙️"} ${t.role} ajanı tamam — ${t.title}\n`);
+              agents[i].status = "done";
+              sendEvent({ swarm_event: { phase: "working", agents } });
               return r;
             } catch (e) {
-              send(`⚠️ ${t.role} ajanı hata verdi — ${t.title}\n`);
+              agents[i].status = "error";
+              sendEvent({ swarm_event: { phase: "working", agents } });
               return `(Bu alt görev tamamlanamadı: ${(e as Error).message})`;
             }
           }),
         );
 
         /* ── 3) BİRLEŞTİRME (akışlı) ── */
-        send(`\n🧩 **Sonuçlar birleştiriliyor…**\n\n---\n\n`);
+        sendEvent({ swarm_event: { phase: "synthesizing", agents } });
         const synthSys =
           `Sen baş ajansın. Alt ajanların sonuçlarını TEK, tutarlı ve eksiksiz bir cevapta ` +
           `birleştir: tekrarları temizle, çelişkileri çöz, mantıklı sıraya koy. Kullanıcının ` +
@@ -297,6 +299,7 @@ export async function POST(req: Request) {
           { role: "user", content: `Alt ajanların sonuçları aşağıda. Bunları birleştirip orijinal isteğe nihai cevabı ver:\n\n${combined}` },
         ], send, signal);
 
+        sendEvent({ swarm_event: { phase: "done", agents } });
         done();
       } catch (e) {
         if ((e as Error)?.name !== "AbortError") {
