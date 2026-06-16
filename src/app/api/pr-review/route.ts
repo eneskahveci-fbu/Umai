@@ -1,4 +1,5 @@
 import { rateLimit } from "@/lib/rate-limit";
+import { parseBody, prReviewSchema } from "@/lib/apiSchemas";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -31,8 +32,10 @@ async function fetchGitlabMrDiff(owner: string, repo: string, mrNumber: number, 
 export async function POST(req: Request) {
   const __rl = rateLimit(req, "pr-review", 10, 60_000);
   if (__rl) return __rl;
+  const __v = await parseBody(req, prReviewSchema);
+  if (!__v.ok) return __v.res;
+  const body = __v.data as PrReviewRequest;
   try {
-    const body = await req.json() as PrReviewRequest;
     let diff = "";
     if (body.provider === "github") {
       diff = await fetchGithubPrDiff(body.owner, body.repo, body.prNumber, body.token);

@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { checkLimit } from "@/lib/rate-limit";
+import { parseBody, llmProxySchema } from "@/lib/apiSchemas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,11 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const { userText, assistantText, existing, baseUrl, model, apiKey } = await req.json();
+  const __v = await parseBody(req, llmProxySchema);
+  if (!__v.ok) return __v.res;
+  const { userText, assistantText, existing, baseUrl, model, apiKey } = __v.data as {
+    userText?: string; assistantText?: string; existing?: string; baseUrl?: string; model?: string; apiKey?: string;
+  };
   if (!baseUrl || !model || !apiKey || !userText) {
     return Response.json({ facts: [] });
   }

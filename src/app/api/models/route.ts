@@ -1,4 +1,5 @@
 import { rateLimit } from "@/lib/rate-limit";
+import { parseBody, llmProxySchema } from "@/lib/apiSchemas";
 import type { Provider } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -27,8 +28,9 @@ export async function POST(req: Request) {
   if (__rl) return __rl;
   if (!checkOrigin(req)) return Response.json({ error: "Geçersiz origin." }, { status: 403 });
 
-  let body: ModelsRequest;
-  try { body = await req.json(); } catch { return Response.json({ error: "Geçersiz istek." }, { status: 400 }); }
+  const __v = await parseBody(req, llmProxySchema);
+  if (!__v.ok) return __v.res;
+  const body = __v.data as ModelsRequest;
 
   const baseUrl = (body.baseUrl || "").trim().replace(/\/$/, "");
   const apiKey = (body.apiKey || "").trim();
