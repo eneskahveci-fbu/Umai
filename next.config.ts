@@ -10,6 +10,30 @@ const SECURITY_HEADERS = [
     value: "camera=(), microphone=(self), geolocation=(), browsing-topics=()",
   },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  /* HSTS — tarayıcıya bu siteyi yalnızca HTTPS ile aç dedirtir. Üretimde
+     güvenli; localhost'u etkilemez. */
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  /* CSP — ÖNCE Report-Only: hiçbir şeyi ENGELLEMEZ, yalnızca ihlalleri raporlar.
+     Böylece canlı site/BYOK doğrudan çağrıları bozulmadan politika olgunlaştırılır.
+     (connect-src https:/wss: geniş — kullanıcı kendi sağlayıcısına çağrı yapar;
+     WebContainer için eval/blob izinli.) */
+  {
+    key: "Content-Security-Policy-Report-Only",
+    value: [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data:",
+      "connect-src 'self' https: wss: blob:",
+      "worker-src 'self' blob:",
+      "frame-src 'self' blob:",
+      "media-src 'self' blob: data:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join("; "),
+  },
 ];
 
 /* WebContainer needs cross-origin isolation (SharedArrayBuffer).
