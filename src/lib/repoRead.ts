@@ -7,7 +7,23 @@ export interface RepoReadCtx {
   repo: string;
   branch: string;
   token?: string;
-  provider?: "github" | "gitlab";
+  provider?: "github" | "gitlab" | "local";
+  /** Yerel Mod köprüsü (gerçek dosya sistemi). */
+  bridgeUrl?: string;
+  bridgeToken?: string;
+}
+
+/* Yerel Mod köprüsüne çağrı (alt-ajanların salt-okunur erişimi için). */
+async function bridgeCall(ctx: RepoReadCtx, endpoint: string, payload?: unknown): Promise<Record<string, unknown>> {
+  const base = (ctx.bridgeUrl || "").replace(/\/$/, "");
+  const res = await fetch(`${base}${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${ctx.bridgeToken || ""}` },
+    body: JSON.stringify(payload ?? {}),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) throw new Error(`Yerel köprü hatası ${res.status}`);
+  return await res.json() as Record<string, unknown>;
 }
 
 export interface ReadToolDef {
@@ -58,6 +74,13 @@ function ghHeaders(token?: string): Record<string, string> {
 
 async function listFiles(ctx: RepoReadCtx, filter?: string): Promise<string> {
   let paths: string[] = [];
+  if (ctx.provider === "local") {
+    const data = await bridgeCall(ctx, "/fs/list", {});
+    paths = Array.isArray(data.paths) ? data.paths as string[] : [];
+    if (filter) paths = paths.filter((p) => p.toLowerCase().includes(filter.toLowerCase()));
+    if (paths.length > 300) return paths.slice(0, 300).join("\n") + `\n[... ${paths.length - 300} dosya daha — filtre kullan]`;
+    return paths.join("\n") || "(dosya yok)";
+  }
   if (ctx.provider === "gitlab") {
     const proj = encodeURIComponent(`${ctx.owner}/${ctx.repo}`);
     const res = await fetch(
@@ -82,6 +105,11 @@ async function listFiles(ctx: RepoReadCtx, filter?: string): Promise<string> {
 }
 
 async function readFile(ctx: RepoReadCtx, path: string): Promise<string> {
+  if (ctx.provider === "local") {
+    const data = await bridgeCall(ctx, "/fs/read", { path });
+    if (typeof data.error === "string") return `Hata: ${data.error} (${path})`;
+    return withLineNumbers(typeof data.content === "string" ? data.content : "").slice(0, 16_000);
+  }
   if (ctx.provider === "gitlab") {
     const proj = encodeURIComponent(`${ctx.owner}/${ctx.repo}`);
     const res = await fetch(

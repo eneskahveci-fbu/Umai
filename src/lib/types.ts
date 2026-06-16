@@ -214,6 +214,14 @@ export interface Config {
       Boşsa WebContainer sandbox kullanılır. */
   terminalWsUrl?: string;
   mcpServers?: McpServer[];
+  /** Yerel Mod: kullanıcının makinesindeki Local Bridge adresi (ör. http://localhost:4319).
+      Doluysa ve localMode açıksa ajan GitHub/GitLab API yerine gerçek dosya
+      sistemine + kabuğa erişir (bkz. local-bridge/). */
+  localBridgeUrl?: string;
+  /** Yerel Mod köprü erişim token'ı (Local Bridge başlatılırken belirlenen). */
+  localBridgeToken?: string;
+  /** Açıksa repo işlemleri Yerel Mod köprüsüne yönlendirilir. */
+  localMode?: boolean;
 }
 
 export interface RepoState {
