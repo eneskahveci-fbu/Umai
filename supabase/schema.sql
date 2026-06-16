@@ -98,8 +98,10 @@ create trigger user_config_set_updated_at
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- DASHBOARD AYARLARI (SQL değil — Supabase panelinden bir kez yapılır):
---   1) Authentication → Providers → GitLab'i (ve istiyorsan GitHub'ı) etkinleştir;
---      OAuth App'in Client ID/Secret'ını gir.
+--   1) Authentication → Providers → E-posta'yı aç; ayrıca Google / GitHub / GitLab
+--      sağlayıcılarını etkinleştir ve her birinin OAuth Client ID/Secret'ını gir.
+--      (Google: console.cloud.google.com → OAuth consent ekranı + Credentials;
+--       Authorized redirect URI: https://<proje>.supabase.co/auth/v1/callback)
 --   2) Authentication → URL Configuration:
 --        • Site URL = https://craft-coder.vercel.app  (kendi alan adın)
 --        • Redirect URLs'e ekle: https://craft-coder.vercel.app/auth/callback

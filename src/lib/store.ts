@@ -238,6 +238,29 @@ export function mergeConfigs(local: Config, remote: Partial<Config>): Config {
   return migrateRepos(base);
 }
 
+/* MUTLAK KURAL: giriş yapınca yerel sohbetler EZİLMEZ; buluttakilerle BİRLEŞTİRİLİR.
+   id'ye göre birleşim; çakışmada DAHA ZENGİN (daha çok mesajlı) sürüm tutulur.
+   `toUpload`: yerelde olup bulutta olmayan veya yerelin kazandığı sohbetler → buluta
+   yüklenir ki hiçbir veri kaybolmasın. Saf fonksiyon (test edilebilir). */
+export function mergeChats(local: Chat[], cloud: Chat[]): { merged: Chat[]; toUpload: Chat[] } {
+  const byId = new Map<string, Chat>();
+  for (const c of cloud) byId.set(c.id, c);
+  const toUpload: Chat[] = [];
+  for (const c of local) {
+    if (c.incognito) continue; // gizli sohbetler buluta gitmez
+    const ex = byId.get(c.id);
+    if (!ex) {
+      byId.set(c.id, c);
+      toUpload.push(c);
+    } else if (c.messages.length > ex.messages.length) {
+      byId.set(c.id, c);
+      toUpload.push(c);
+    }
+  }
+  const merged = [...byId.values()].sort((a, b) => b.created_at - a.created_at);
+  return { merged, toUpload };
+}
+
 /* Config'i Supabase'e yazar. Hata olursa (tablo yok / RLS / ağ) bir kez
    kullanıcıya bildirir; böylece "ayarlarım kayboluyor" sorunu sessiz kalmaz. */
 let cloudPushFailed = false;
@@ -827,15 +850,30 @@ export const useStore = create<StoreState>()((set, get) => ({
           .eq("user_id", userId)
           .order("updated_at", { ascending: false });
         if (data) {
-          set({
-            chats: data.map((r) => ({
-              id: r.id,
-              title: r.title,
-              messages: r.messages,
-              created_at: new Date(r.created_at).getTime(),
-              projectId: r.project_id,
-            })),
-          });
+          const cloud: Chat[] = data.map((r) => ({
+            id: r.id,
+            title: r.title,
+            messages: r.messages,
+            created_at: new Date(r.created_at).getTime(),
+            projectId: r.project_id ?? undefined,
+          }));
+          /* MUTLAK KURAL: yerel sohbetleri EZME — buluttakilerle BİRLEŞTİR. */
+          const { merged, toUpload } = mergeChats(loadLocalChats(), cloud);
+          set({ chats: merged });
+          /* Yerelde olup bulutta olmayan / yerelin kazandığı sohbetleri buluta
+             yükle ki hiçbir veri kaybolmasın. */
+          if (toUpload.length) {
+            void sb.from("chats").upsert(
+              toUpload.map((c) => ({
+                id: c.id,
+                user_id: userId,
+                title: c.title,
+                messages: c.messages,
+                created_at: new Date(c.created_at).toISOString(),
+                updated_at: new Date().toISOString(),
+              })),
+            );
+          }
           return;
         }
       }

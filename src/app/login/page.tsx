@@ -111,6 +111,19 @@ export default function LoginPage() {
     if (err) { setError(err.message); setGhLoading(false); }
   };
 
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const signInWithGoogle = async () => {
+    setGoogleLoading(true);
+    setError("");
+    const sb = createClient();
+    if (!sb) { setError("Kimlik doğrulama yapılandırılmamış."); setGoogleLoading(false); return; }
+    const { error: err } = await sb.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
+    if (err) { setError(err.message); setGoogleLoading(false); }
+  };
+
   return (
     <div className="min-h-screen bg-bg flex flex-col items-center justify-center px-4 relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 -z-10">
@@ -212,6 +225,25 @@ export default function LoginPage() {
               <span className="text-xs text-muted/50">veya</span>
               <div className="flex-1 h-px bg-line/60" />
             </div>
+
+            {/* Google OAuth */}
+            <button
+              onClick={signInWithGoogle}
+              disabled={googleLoading}
+              className="w-full flex items-center justify-center gap-2.5 border border-line bg-bgsoft hover:border-brand/60 hover:bg-brand/5 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold py-3 rounded-xl transition-colors"
+            >
+              {googleLoading ? <Loader2 size={15} className="animate-spin" /> : (
+                <>
+                  <svg viewBox="0 0 24 24" width="16" height="16">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.65l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0012 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.11a6.6 6.6 0 010-4.22V7.05H2.18a11 11 0 000 9.9l3.66-2.84z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 002.18 7.05l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z" />
+                  </svg>
+                  Google ile Giriş Yap
+                </>
+              )}
+            </button>
 
             {/* GitHub OAuth */}
             <button
