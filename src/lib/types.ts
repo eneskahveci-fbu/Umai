@@ -73,6 +73,20 @@ export interface McpServer {
   enabled: boolean;
 }
 
+/** Olay kancası (Claude Code "hooks" benzeri): ajan bir turu bitirince otomatik
+    bir kabuk komutu çalıştırır. `afterEdit` = ajan dosya düzenledikten sonra
+    (çıktı ajana geri beslenir → lint/test/typecheck kendiliğinden düzeltilir);
+    `onFinish` = ajan tamamen durduğunda (yalnız bildirim, geri besleme yok);
+    `onError` = ajan/komut hata verdiğinde (yalnız bildirim, geri besleme yok). */
+export interface Hook {
+  id: string;
+  /** İnsan-okur etiket (ör. "Lint düzelt"). Boşsa komut gösterilir. */
+  label?: string;
+  event: "afterEdit" | "onFinish" | "onError";
+  command: string;
+  enabled: boolean;
+}
+
 export interface Snippet {
   id: string;
   title: string;
@@ -107,6 +121,7 @@ export type Provider =
   | "xai"
   | "ollama"
   | "anthropic"
+  | "openai"
   | "pollinations"
   | "github"
   | "custom";
@@ -279,6 +294,20 @@ export interface Config {
   /** Olaya bağlı otomasyonlar (Claude Code hooks benzeri). */
   automations?: Automation[];
   mcpServers?: McpServer[];
+  /** Yerel Mod: kullanıcının makinesindeki Local Bridge adresi (ör. http://localhost:4319).
+      Doluysa ve localMode açıksa ajan GitHub/GitLab API yerine gerçek dosya
+      sistemine + kabuğa erişir (bkz. local-bridge/). */
+  localBridgeUrl?: string;
+  /** Yerel Mod köprü erişim token'ı (Local Bridge başlatılırken belirlenen). */
+  localBridgeToken?: string;
+  /** Açıksa repo işlemleri Yerel Mod köprüsüne yönlendirilir. */
+  localMode?: boolean;
+  /** Olay kancaları: ajan turu bitince otomatik komut çalıştırır (bkz. Hook). */
+  hooks?: Hook[];
+  /** Tehlikeli komut kalkanı (varsayılan açık): açıkken ajanın run_command'i
+      katastrofik kalıplara (rm -rf /, fork bomb, mkfs, curl|sh…) karşı engellenir
+      ve sonuç ajana geri bildirilir. false ⇒ kapalı. */
+  commandGuard?: boolean;
 }
 
 export interface RepoState {

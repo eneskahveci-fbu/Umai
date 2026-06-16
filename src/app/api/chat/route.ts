@@ -20,7 +20,25 @@ interface RepoCtx {
   repo: string;
   branch: string;
   token?: string;
-  provider?: "github" | "gitlab";
+  provider?: "github" | "gitlab" | "local";
+  /** Yerel Mod: kullanıcının makinesindeki Local Bridge adresi/token'ı.
+      provider === "local" iken dosya işlemleri GitHub/GitLab API yerine
+      bu köprüye (gerçek dosya sistemi + shell) gider. */
+  bridgeUrl?: string;
+  bridgeToken?: string;
+}
+
+/* Yerel Mod köprüsüne JSON çağrısı (gerçek FS/shell, kullanıcının makinesinde). */
+async function bridgeCall(ctx: RepoCtx, endpoint: string, payload?: unknown): Promise<Record<string, unknown>> {
+  const base = (ctx.bridgeUrl || "").replace(/\/$/, "");
+  const res = await fetch(`${base}${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${ctx.bridgeToken || ""}` },
+    body: JSON.stringify(payload ?? {}),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) throw new Error(`Yerel köprü hatası ${res.status} — köprü çalışıyor mu? (node local-bridge/server.js)`);
+  return await res.json() as Record<string, unknown>;
 }
 
 interface SkillPayload {
@@ -107,6 +125,10 @@ function encodeGlProject(owner: string, repo: string) {
 
 /* Repo'daki tüm dosya yollarını döndürür (glob/grep/list_files ortak kullanır). */
 async function getAllPaths(ctx: RepoCtx): Promise<string[]> {
+  if (ctx.provider === "local") {
+    const data = await bridgeCall(ctx, "/fs/list", {});
+    return Array.isArray(data.paths) ? data.paths as string[] : [];
+  }
   if (ctx.provider === "gitlab") {
     const proj = encodeGlProject(ctx.owner, ctx.repo);
     const res = await fetch(
@@ -211,6 +233,15 @@ async function getFileRaw(
   cache?: Map<string, string>,
 ): Promise<{ ok: true; content: string } | { ok: false; error: string }> {
   if (cache?.has(path)) return { ok: true, content: cache.get(path)! };
+  if (ctx.provider === "local") {
+    try {
+      const data = await bridgeCall(ctx, "/fs/read", { path });
+      if (typeof data.error === "string") return { ok: false, error: `Hata: ${data.error} (${path})` };
+      const text = typeof data.content === "string" ? data.content : "";
+      cache?.set(path, text);
+      return { ok: true, content: text };
+    } catch (e) { return { ok: false, error: `Hata: ${(e as Error).message}` }; }
+  }
   if (ctx.provider === "gitlab") {
     const proj = encodeGlProject(ctx.owner, ctx.repo);
     const encoded = encodeURIComponent(path);
@@ -330,6 +361,13 @@ async function execCreatePR(ctx: RepoCtx, args: { title: string; head: string; b
 
 async function execSearchFiles(ctx: RepoCtx, args: { query: string }): Promise<string> {
   if (!args.query) return "Hata: query boş";
+  if (ctx.provider === "local") {
+    let items: string[];
+    try { items = await getAllPaths(ctx); } catch (e) { return `Hata: ${(e as Error).message}`; }
+    const q = args.query.toLowerCase();
+    const matches = items.filter((p) => p.toLowerCase().includes(q)).slice(0, 50);
+    return matches.length ? matches.join("\n") : "(eşleşme yok)";
+  }
   if (ctx.provider === "gitlab") {
     const proj = encodeGlProject(ctx.owner, ctx.repo);
     const res = await fetch(
@@ -361,6 +399,15 @@ async function execSearchFiles(ctx: RepoCtx, args: { query: string }): Promise<s
 
 async function execSearchCode(ctx: RepoCtx, args: { query: string; extension?: string }): Promise<string> {
   if (!args.query) return "Hata: query boş";
+  if (ctx.provider === "local") {
+    try {
+      const glob = args.extension ? `**/*.${args.extension}` : undefined;
+      const data = await bridgeCall(ctx, "/fs/grep", { pattern: args.query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), glob });
+      if (typeof data.error === "string") return `Hata: ${data.error}`;
+      const matches = Array.isArray(data.matches) ? data.matches as string[] : [];
+      return matches.length ? matches.slice(0, 30).join("\n") : "(eşleşme yok)";
+    } catch (e) { return `Hata: ${(e as Error).message}`; }
+  }
   if (ctx.provider === "gitlab") {
     const proj = encodeGlProject(ctx.owner, ctx.repo);
     const q = encodeURIComponent(args.query);
@@ -398,6 +445,20 @@ async function flushAtomicCommit(
   commitMessage: string,
 ): Promise<string> {
   if (writes.size === 0) return "Değişiklik yok";
+
+  if (ctx.provider === "local") {
+    /* Yerel diskte "commit" yok — her dosya doğrudan yazılır. */
+    let okCount = 0;
+    for (const [path, { content }] of writes.entries()) {
+      try {
+        const data = await bridgeCall(ctx, "/fs/write", { path, content });
+        if (typeof data.error !== "string") okCount++;
+      } catch { /* tek dosya hatası diğerlerini durdurmasın */ }
+    }
+    return okCount === writes.size
+      ? `✅ ${okCount} dosya yerel diske yazıldı`
+      : `⚠️ ${okCount}/${writes.size} dosya yazıldı (bazıları başarısız)`;
+  }
 
   if (ctx.provider === "gitlab") {
     const proj = encodeGlProject(ctx.owner, ctx.repo);
@@ -494,6 +555,12 @@ async function execWriteFile(
     cache?.set(args.path, args.content);
     writeBuffer.set(args.path, { content: args.content, isNew });
     return `✅ ${args.path} ${isNew ? "oluşturuldu" : "güncellendi"} (toplu commit bekleniyor)`;
+  }
+
+  if (ctx.provider === "local") {
+    const data = await bridgeCall(ctx, "/fs/write", { path: args.path, content: args.content });
+    if (typeof data.error === "string") return `Hata: ${data.error}`;
+    return `✅ ${args.path} başarıyla ${data.created ? "oluşturuldu" : "güncellendi"} (yerel disk)`;
   }
 
   if (ctx.provider === "gitlab") {
@@ -611,6 +678,11 @@ async function fetchSoulFile(ctx: RepoCtx): Promise<string | null> {
   const candidates = ["SOUL.md", ".craft.md", ".craftai.md", "AGENTS.md"];
   for (const candidate of candidates) {
     try {
+      if (ctx.provider === "local") {
+        const r = await getFileRaw(ctx, candidate);
+        if (r.ok && r.content.trim()) return r.content;
+        continue;
+      }
       if (ctx.provider === "gitlab") {
         const proj = encodeGlProject(ctx.owner, ctx.repo);
         const encoded = encodeURIComponent(candidate);
@@ -679,6 +751,9 @@ async function executeTool(
   try {
     if (!ctx && ["list_files","read_file","read_files","glob","grep","search_files","search_code","write_file","str_replace","list_branches","create_branch","create_pr","get_commit_history","git_diff","git_log","git_blame","discover_rules","trigger_ci"].includes(name))
       return "Hata: repo bağlı değil. Kullanıcıya bir repo bağlamasını söyle.";
+    /* Yerel Mod: git-tabanlı araçlar API yerine gerçek git ister → run_command'a yönlendir. */
+    if (ctx?.provider === "local" && ["list_branches","create_branch","create_pr","get_commit_history","git_diff","git_log","git_blame","trigger_ci"].includes(name))
+      return "Yerel modda bu git işlemi doğrudan desteklenmiyor. Gerçek git için run_command kullan (ör. run_command('git log --oneline -10'), run_command('git checkout -b yeni-dal'), run_command('git diff')).";
     if (name === "list_files") return await execListFiles(ctx!, args as { filter?: string });
     if (name === "glob") return await execGlob(ctx!, args as { pattern: string });
     if (name === "grep") return await execGrep(ctx!, args as { pattern: string; glob?: string; ignore_case?: boolean | string }, cache);

@@ -55,6 +55,9 @@ export function SettingsModal() {
   const addMcpServer = useStore((s) => s.addMcpServer);
   const removeMcpServer = useStore((s) => s.removeMcpServer);
   const updateMcpServer = useStore((s) => s.updateMcpServer);
+  const addHook = useStore((s) => s.addHook);
+  const removeHook = useStore((s) => s.removeHook);
+  const updateHook = useStore((s) => s.updateHook);
 
   const [mcpName, setMcpName] = useState("");
   const [mcpUrl, setMcpUrl] = useState("");
@@ -62,7 +65,11 @@ export function SettingsModal() {
   const [mcpHeaderVal, setMcpHeaderVal] = useState("");
   const [mcpTesting, setMcpTesting] = useState<string | null>(null);
 
-  const [tab, setTab] = useState<"model" | "github" | "general" | "advanced" | "mcp">("model");
+  const [hookLabel, setHookLabel] = useState("");
+  const [hookCommand, setHookCommand] = useState("");
+  const [hookEvent, setHookEvent] = useState<"afterEdit" | "onFinish" | "onError">("afterEdit");
+
+  const [tab, setTab] = useState<"model" | "github" | "general" | "advanced" | "mcp" | "hooks">("model");
   const [search, setSearch] = useState("");
   const modalRef = useRef<HTMLDivElement>(null);
   useModalA11y(modalRef, open, () => setOpen(false));
@@ -72,12 +79,13 @@ export function SettingsModal() {
 
   /* Keyword index — typing in the search box jumps to whichever tab
      contains the matching keyword (first hit wins). */
-  const SEARCH_INDEX: Record<"model" | "github" | "general" | "advanced" | "mcp", string[]> = {
+  const SEARCH_INDEX: Record<"model" | "github" | "general" | "advanced" | "mcp" | "hooks", string[]> = {
     model:    ["model", "api", "anahtar", "key", "openai", "anthropic", "huggingface", "hf", "provider", "test"],
     github:   ["github", "gitlab", "token", "depo", "repo", "branch", "dal", "kullanıcı", "username"],
     general:  ["sistem", "prompt", "stil", "style", "tema", "theme", "renk", "color", "accent", "font", "yazı", "ses", "sound", "skill", "memori", "ayar"],
     advanced: ["webcontainer", "key", "context", "max", "guest", "misafir", "kural", "rules", "rulesfile", "gelişmiş"],
     mcp:      ["mcp", "model context", "protocol", "sunucu", "server", "araç", "tool", "entegrasyon"],
+    hooks:    ["hook", "kanca", "olay", "event", "lint", "test", "otomatik", "afteredit", "onfinish", "komut", "command"],
   };
   const matchingTabs = (() => {
     const q = search.trim().toLowerCase();
@@ -94,7 +102,7 @@ export function SettingsModal() {
   if (search !== prevSearch) {
     setPrevSearch(search);
     if (search.trim() && matchingTabs.size > 0) {
-      const first = (["model", "github", "general", "advanced", "mcp"] as const).find((k) => matchingTabs.has(k));
+      const first = (["model", "github", "general", "advanced", "mcp", "hooks"] as const).find((k) => matchingTabs.has(k));
       if (first && first !== tab) setTab(first);
     }
   }
@@ -416,7 +424,7 @@ export function SettingsModal() {
         </div>
 
         <div className="flex gap-1 mb-5 border-b border-line">
-          {([["model", "Model"], ["github", "Git"], ["general", "Temel"], ["advanced", "Gelişmiş"], ["mcp", "MCP"]] as const).map(([key, lbl]) => {
+          {([["model", "Model"], ["github", "Git"], ["general", "Temel"], ["advanced", "Gelişmiş"], ["mcp", "MCP"], ["hooks", "Kancalar"]] as const).map(([key, lbl]) => {
             const hit = matchingTabs.has(key);
             return (
               <button
@@ -755,6 +763,13 @@ export function SettingsModal() {
                     />
                   </div>
                 )}
+                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-amber-400/50 transition-colors">
+                  <input type="checkbox" checked={config.commandGuard !== false} onChange={() => saveConfig({ ...config, commandGuard: config.commandGuard === false })} className="accent-amber-400 mt-0.5" />
+                  <div>
+                    <div className="text-sm font-semibold">Tehlikeli komut kalkanı</div>
+                    <div className="text-xs text-muted mt-0.5">Açıkken (varsayılan) ajanın çalıştırmak istediği <b>katastrofik</b> komutlar (<code>rm -rf /</code>, fork bomb, <code>mkfs</code>, <code>curl | sh</code>, sistem kapatma…) çalıştırılmadan engellenir ve ajana geri bildirilir. Normal komutlar (<code>npm test</code>, <code>rm -rf node_modules</code>…) etkilenmez.</div>
+                  </div>
+                </label>
                 <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
                   <input type="checkbox" checked={!!config.planApprovalMode} onChange={() => saveConfig({ ...config, planApprovalMode: !config.planApprovalMode })} className="accent-brand mt-0.5" />
                   <div>
@@ -1132,6 +1147,47 @@ export function SettingsModal() {
               </button>
             </div>
 
+            {/* Yerel Mod (Local Bridge) */}
+            <div>
+              <h4 className="text-sm font-bold mb-1">🖥️ Yerel Mod (Local Bridge)</h4>
+              <p className="text-xs text-muted/70 mb-2 leading-relaxed">
+                Açıkken ajan GitHub/GitLab API yerine{" "}
+                <strong className="text-muted">kendi bilgisayarındaki gerçek dosya sistemine ve kabuğa</strong>{" "}
+                erişir (Claude Code gibi). Tamamen ücretsiz; sunucu/bulut yok.
+                <br />
+                Köprüyü çalıştır:{" "}
+                <code className="text-brand/80 bg-bgsoft px-1 rounded text-[11px]">cd local-bridge &amp;&amp; BRIDGE_TOKEN=gizli WORK_DIR=/proje node server.js</code>
+                <br />
+                <span className="text-muted/50 text-[11px]">Yalnızca localhost dinler; token zorunlu. Uygulamayı yerelde (npm run dev) çalıştırırken kullan.</span>
+              </p>
+              <label className="flex items-center gap-2 cursor-pointer mb-2">
+                <input
+                  type="checkbox"
+                  checked={!!config.localMode}
+                  onChange={(e) => saveConfig({ ...config, localMode: e.target.checked })}
+                  className="accent-brand"
+                />
+                <span className="text-sm">Yerel Mod&apos;u etkinleştir (repo işlemleri köprüye gider)</span>
+              </label>
+              <input
+                type="text"
+                value={config.localBridgeUrl ?? ""}
+                onChange={(e) => saveConfig({ ...config, localBridgeUrl: e.target.value.trim() })}
+                placeholder="http://localhost:4319"
+                className="input-mono w-full mb-2"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <input
+                type="password"
+                value={config.localBridgeToken ?? ""}
+                onChange={(e) => saveConfig({ ...config, localBridgeToken: e.target.value })}
+                placeholder="Köprü token'ı (BRIDGE_TOKEN)"
+                className="input-mono w-full"
+                autoComplete="off"
+              />
+            </div>
+
             {/* Yazı tipi boyutu */}
             <div>
               <h4 className="text-sm font-bold mb-2">Kod Yazı Tipi Boyutu</h4>
@@ -1332,6 +1388,75 @@ export function SettingsModal() {
               <div className="font-semibold text-brand">MCP nedir?</div>
               <p>Model Context Protocol, Anthropic tarafından geliştirilen bir standarttır. Kendi araçlarını (veritabanı sorgu, dosya okuma, API çağrısı vb.) Craft.Coder&apos;a bağlayarak AI&apos;ın bunları otomatik kullanmasını sağlar.</p>
               <p>Aktif sunucuların araçları, araç kullanımı açıkken her sohbette AI&apos;a sunulur.</p>
+            </div>
+          </section>
+        )}
+
+        {/* Hooks — olay kancaları */}
+        {tab === "hooks" && (
+          <section className="space-y-5">
+            <div>
+              <h4 className="text-sm font-bold mb-1">Olay Kancaları</h4>
+              <p className="text-xs text-muted mb-3">Ajan bir turu bitirince otomatik kabuk komutu çalıştır. <b>Düzenleme sonrası</b> kancalarının çıktısı ajana geri beslenir → lint/test/tip hatalarını kendi kendine düzeltir (Claude Code &quot;hooks&quot; mantığı). <b>Bitişte</b> ve <b>Hata olunca</b> kancaları yalnız bildirir (geri besleme yok; Yerel Mod köprüsü gerekir).</p>
+
+              {(config.hooks ?? []).length > 0 && (
+                <div className="flex flex-col gap-2 mb-4">
+                  {(config.hooks ?? []).map((h) => (
+                    <div key={h.id} className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-line bg-bgsoft">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${h.event === "afterEdit" ? "bg-brand/15 text-brand" : h.event === "onError" ? "bg-red/15 text-red" : "bg-amber/15 text-amber"}`}>
+                            {h.event === "afterEdit" ? "Düzenleme sonrası" : h.event === "onError" ? "Hata olunca" : "Bitişte"}
+                          </span>
+                          {h.label && <span className="text-sm font-semibold truncate">{h.label}</span>}
+                        </div>
+                        <div className="text-xs text-muted font-mono truncate mt-0.5">{h.command}</div>
+                      </div>
+                      <label className="flex items-center gap-1.5 text-xs text-muted cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={h.enabled}
+                          onChange={() => updateHook(h.id, { enabled: !h.enabled })}
+                          className="accent-brand"
+                        />
+                        Aktif
+                      </label>
+                      <button onClick={() => removeHook(h.id)} className="text-muted hover:text-red/80 transition-colors"><Trash2 size={14} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="space-y-2 border border-line/60 rounded-xl p-3 bg-bgsoft/40">
+                <div className="text-xs font-semibold text-muted mb-2">Yeni Kanca Ekle</div>
+                <div className="flex gap-2">
+                  <select value={hookEvent} onChange={(e) => setHookEvent(e.target.value as "afterEdit" | "onFinish" | "onError")} className="input-mono">
+                    <option value="afterEdit">Düzenleme sonrası</option>
+                    <option value="onFinish">Bitişte</option>
+                    <option value="onError">Hata olunca</option>
+                  </select>
+                  <input value={hookLabel} onChange={(e) => setHookLabel(e.target.value)} placeholder="Etiket (opsiyonel)" className="input-mono flex-1" />
+                </div>
+                <input value={hookCommand} onChange={(e) => setHookCommand(e.target.value)} placeholder="Komut (örn. npm run lint, npm test)" className="input-mono w-full" />
+                <button
+                  onClick={() => {
+                    if (!hookCommand.trim()) { addToast("Komut zorunlu.", "error"); return; }
+                    addHook({ label: hookLabel.trim() || undefined, event: hookEvent, command: hookCommand.trim(), enabled: true });
+                    setHookLabel(""); setHookCommand("");
+                    addToast("Kanca eklendi.", "success");
+                  }}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-branddim transition-colors"
+                >
+                  <Plus size={14} /> Ekle
+                </button>
+              </div>
+            </div>
+
+            <div className="p-3 bg-brand/5 border border-brand/20 rounded-xl text-xs text-muted space-y-1.5">
+              <div className="font-semibold text-brand">Nasıl çalışır?</div>
+              <p><b>Düzenleme sonrası</b>: ajan dosya yazdığı her turdan sonra komut çalışır, çıktı ajana geri beslenir (en çok 3 tur). Örn. <span className="font-mono">npm run lint</span> → hatalar ajana gider, düzeltir.</p>
+              <p><b>Bitişte</b>: ajan tamamen durunca komut çalışır (yalnız bildirim). Örn. <span className="font-mono">npm test</span>.</p>
+              <p className="text-amber">Komutlar Yerel Mod köprüsünde çalışır. Köprü kapalıyken &quot;Düzenleme sonrası&quot; kancaları yerleşik terminale düşer; &quot;Bitişte&quot; kancaları yalnız Yerel Mod&apos;da çalışır.</p>
             </div>
           </section>
         )}

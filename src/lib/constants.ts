@@ -57,6 +57,12 @@ export const PRESETS: Record<Provider, Preset> = {
     model: "claude-opus-4-8",
     keyHint: "sk-ant-... (Anthropic API anahtarı)",
   },
+  openai: {
+    label: "🟢 OpenAI (GPT)",
+    baseUrl: "https://api.openai.com/v1",
+    model: "gpt-4.1",
+    keyHint: "sk-... (OpenAI API anahtarı)",
+  },
   hf: {
     label: "🤗 Hugging Face (router)",
     baseUrl: "https://router.huggingface.co/v1",
@@ -154,6 +160,14 @@ export const PROVIDER_MODELS: Record<Provider, string[]> = {
     "claude-opus-4-6",
     "claude-sonnet-4-5",
     "claude-opus-4-5",
+  ],
+  openai: [
+    "gpt-4.1",
+    "gpt-4.1-mini",
+    "gpt-4o",
+    "gpt-4o-mini",
+    "o4-mini",
+    "o3",
   ],
   hf: [
     "Qwen/Qwen2.5-Coder-32B-Instruct",

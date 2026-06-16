@@ -7,6 +7,7 @@ import type {
   FileCheckpoint,
   GitHubAccount,
   GitLabAccount,
+  Hook,
   McpServer,
   MemoryItem,
   ModelProfile,
@@ -222,6 +223,7 @@ export function mergeConfigs(local: Config, remote: Partial<Config>): Config {
   base.skills = mergeById(local.skills, remote.skills ?? []);
   base.projects = mergeById(local.projects, remote.projects ?? []);
   base.mcpServers = mergeById(local.mcpServers ?? [], remote.mcpServers ?? []);
+  base.hooks = mergeById(local.hooks ?? [], remote.hooks ?? []);
   base.repos = [...new Set([...(remote.repos ?? []), ...(local.repos ?? [])])];
   /* Aktif id'ler hâlâ listede mevcutsa korunur, değilse ilk öğeye düşülür. */
   const has = <T extends { id: string }>(arr: T[], id: string | null) => !!id && arr.some((x) => x.id === id);
@@ -424,6 +426,9 @@ interface StoreState {
   addMcpServer: (s: Omit<McpServer, "id">) => void;
   removeMcpServer: (id: string) => void;
   updateMcpServer: (id: string, patch: Partial<McpServer>) => void;
+  addHook: (h: Omit<Hook, "id">) => void;
+  removeHook: (id: string) => void;
+  updateHook: (id: string, patch: Partial<Hook>) => void;
 
   // compare view
 }
@@ -1328,6 +1333,22 @@ export const useStore = create<StoreState>()((set, get) => ({
     get().saveConfig({
       ...config,
       mcpServers: (config.mcpServers ?? []).map((s) => s.id === id ? { ...s, ...patch } : s),
+    });
+  },
+  addHook: (h) => {
+    const hook: Hook = { ...h, id: uid() };
+    const config = get().config;
+    get().saveConfig({ ...config, hooks: [...(config.hooks ?? []), hook] });
+  },
+  removeHook: (id) => {
+    const config = get().config;
+    get().saveConfig({ ...config, hooks: (config.hooks ?? []).filter((h) => h.id !== id) });
+  },
+  updateHook: (id, patch) => {
+    const config = get().config;
+    get().saveConfig({
+      ...config,
+      hooks: (config.hooks ?? []).map((h) => h.id === id ? { ...h, ...patch } : h),
     });
   },
 

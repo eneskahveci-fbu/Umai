@@ -15,6 +15,11 @@ const eslintConfig = defineConfig([
     // Bağımsız Node (CommonJS) PTY terminal servisi — Next.js app kaynağı değil,
     // kendi çalışma zamanı/konvansiyonları var (require vb.).
     "terminal-server/**",
+    // Bağımsız Node (CommonJS) Yerel Köprü — gerçek FS/shell/MCP, app kaynağı değil.
+    "local-bridge/**",
+    // Bağımsız Node (ESM) Başsız SDK + CLI — app kaynağı değil, kendi çalışma
+    // zamanı (Node fetch/stdin, JSDoc tipleri) var.
+    "sdk/**",
   ]),
 ]);
 

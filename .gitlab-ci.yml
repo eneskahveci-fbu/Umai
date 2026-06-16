@@ -1,7 +1,15 @@
-# craft.ai — kota dostu CI
-# Tek hafif doğrulama job'ı: lint + test + build. Sadece Merge Request'lerde
-# ve main dalında çalışır (gereksiz pipeline tetiklenmez → compute kotası korunur).
+# craft.ai — CI GEÇİCİ OLARAK KAPALI
+# GitLab paylaşımlı runner CI/CD dakika kotası tükendi → pipeline'lar
+# "ci_quota_exceeded" ile düşüyordu (kod sorunu değil). Vercel deploy'u
+# GitLab CI'dan bağımsızdır, bundan etkilenmez.
+# Kod kontrolleri yerelde: npx tsc --noEmit && npm run lint && npm test && npm run build
+# YENİDEN AÇMAK için aşağıdaki `workflow:` bloğunu sil (kota ayın 1'inde
+# sıfırlanır; ya da kendi GitLab Runner'ını kaydet → ücretsiz, sınırsız).
+workflow:
+  rules:
+    - when: never
 
+# --- Kota dönünce aktifleşecek hafif doğrulama işi (şimdilik workflow ile kapalı) ---
 stages:
   - verify
 
@@ -20,6 +28,7 @@ verify:
     policy: pull-push
   script:
     - npm ci --no-audit --no-fund
+    - npx tsc --noEmit
     - npm run lint
     - npm test
     - npm run build

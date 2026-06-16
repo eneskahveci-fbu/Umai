@@ -1,0 +1,15 @@
+{
+  "name": "craft-local-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "craft.ai'ı yerelde çalıştırmak için sıfır-bağımlılıklı yerel köprü (gerçek FS + shell + arka plan görev + stdio MCP)",
+  "bin": {
+    "craft-local-bridge": "server.js"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

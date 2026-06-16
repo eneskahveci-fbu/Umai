@@ -90,7 +90,7 @@ import { ALL_AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
 import { buildContextSections } from "@/lib/prompt";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
-import { addPendingAction, removePendingAction, isCommandAllowed, DEFAULT_COMMAND_ALLOWLIST, type PendingAction } from "@/lib/agentActions";
+import { addPendingAction, removePendingAction, isCommandAllowed, matchDangerousCommand, DEFAULT_COMMAND_ALLOWLIST, type PendingAction } from "@/lib/agentActions";
 
 declare global {
   interface SpeechRecognition {
@@ -389,7 +389,9 @@ export function CoderView() {
   const setFollowUpSuggestions = useStore((s) => s.setFollowUpSuggestions);
   const addToast = useStore((s) => s.addToast);
 
-  const toolsEnabled = toolsEnabledStore && !!repo;
+  /* Yerel Mod aktifse github/gitlab repo olmadan da araçlar açılır (gerçek FS+shell). */
+  const localActive = !!(config.localMode && config.localBridgeUrl?.trim());
+  const toolsEnabled = toolsEnabledStore && (!!repo || localActive);
 
   const [filesOpen, setFilesOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
@@ -421,6 +423,9 @@ export function CoderView() {
   useEffect(() => { swarmModeRef.current = swarmMode; }, [swarmMode]);
   /* Plan onayı: bir sonraki istekte plan-modu kapısını geçici aşar. */
   const planApprovedRef = useRef(false);
+  /* afterEdit kancası geri-besleme döngü sayacı (her kullanıcı mesajında sıfırlanır,
+     turda en çok 3 tur lint→düzelt → sonsuz döngü engellenir). */
+  const hookRunsRef = useRef(0);
   const [repoSearch, setRepoSearch] = useState("");
   const [connecting, setConnecting] = useState(false);
   const connectingRef = useRef(false);
@@ -1063,6 +1068,82 @@ export function CoderView() {
     } catch { /* yoksay */ }
   }, []);
 
+  /* Tek bir kanca komutunu çalıştırıp çıktısını döndür (yalnız Yerel Mod köprüsü
+     çıktıyı doğrudan yakalayabilir). Köprü yoksa null. */
+  const runHookCommand = useCallback(async (command: string): Promise<string | null> => {
+    const cfg = useStore.getState().config;
+    if (cfg.localMode && cfg.localBridgeUrl?.trim()) {
+      try {
+        const r = await fetch(`${cfg.localBridgeUrl.replace(/\/$/, "")}/exec`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.localBridgeToken || ""}` },
+          body: JSON.stringify({ command }),
+        });
+        const d = await r.json();
+        return typeof d.error === "string" ? `Hata: ${d.error}` : String(d.output ?? "").slice(0, 8000);
+      } catch (e) {
+        return `Yerel köprüye ulaşılamadı: ${(e as Error).message}`;
+      }
+    }
+    return null;
+  }, []);
+
+  /* Olay kancalarını çalıştır. `edited` = bu tur dosya düzenlendi mi.
+     - afterEdit: düzenleme olduysa komutu çalıştır, çıktıyı ajana GERİ BESLE
+       (kendi kendine lint/test düzeltsin). En çok 3 tur (hookRunsRef) → döngü yok.
+     - onFinish: ajan tamamen durunca yalnız bildir (geri besleme yok). */
+  const runHooks = useCallback(async (edited: boolean, phase: "finish" | "error" = "finish") => {
+    const hooks = (useStore.getState().config.hooks ?? []).filter((h) => h.enabled);
+    if (!hooks.length) return;
+    /* onError — ajan/komut hata verince yalnız bildir (geri besleme yok; köprü ile). */
+    if (phase === "error") {
+      const errHooks = hooks.filter((h) => h.event === "onError");
+      const cfg = useStore.getState().config;
+      if (errHooks.length && cfg.localMode && cfg.localBridgeUrl?.trim()) {
+        for (const h of errHooks) {
+          addToast(`🪝 ${h.label || h.command}`, "info");
+          await runHookCommand(h.command);
+        }
+      }
+      return;
+    }
+    /* afterEdit — geri-beslemeli oto-düzelt */
+    if (edited && hookRunsRef.current < 3) {
+      const editHooks = hooks.filter((h) => h.event === "afterEdit");
+      if (editHooks.length) {
+        hookRunsRef.current += 1;
+        let fedBack = false;
+        for (const h of editHooks) {
+          addToast(`🪝 ${h.label || h.command}`, "info");
+          const out = await runHookCommand(h.command);
+          if (out !== null) {
+            /* Yerel Mod: çıktıyı doğrudan ajana besle (terminal-output dinleyicisi
+               yeni bir callApi başlatır → ajan sonucu görür, hatayı düzeltir). */
+            window.dispatchEvent(new CustomEvent("craftai:terminal-output", { detail: { command: h.command, output: out || "(çıktı yok)" } }));
+          } else {
+            /* Köprü yok: komutu terminalde çalıştır; terminal çıktıyı geri besler. */
+            setTerminalOpen(true);
+            window.dispatchEvent(new CustomEvent("craftai:terminal-run", { detail: { command: h.command } }));
+          }
+          fedBack = true;
+        }
+        if (fedBack) return; // geri-besleme yeni turu tetikler → onFinish'i bu turda atla
+      }
+    }
+    /* onFinish — yalnız bildir (geri besleme yok; sadece köprü ile çalışır) */
+    const finishHooks = hooks.filter((h) => h.event === "onFinish");
+    if (finishHooks.length) {
+      const cfg = useStore.getState().config;
+      if (cfg.localMode && cfg.localBridgeUrl?.trim()) {
+        for (const h of finishHooks) {
+          addToast(`🪝 ${h.label || h.command}`, "info");
+          const out = await runHookCommand(h.command);
+          if (out !== null) addToast(`🪝 ${h.label || h.command} ✓`, "success");
+        }
+      }
+    }
+  }, [addToast, runHookCommand]);
+
   const callApi = useCallback(async (
     overrideAgent?: Agent | null,
     opts?: { continuation?: boolean; depth?: number },
@@ -1156,7 +1237,7 @@ export function CoderView() {
     const coderSystemPrompt = [
       config.systemPrompt,
       agent
-        ? agent.systemPrompt + ((store.toolsEnabled && !!store.repo)
+        ? agent.systemPrompt + ((store.toolsEnabled && (!!store.repo || (store.config.localMode && store.config.localBridgeUrl?.trim())))
             ? "\n\n[Araçlar açık] Tahmin etme — gerektiğinde read_file/read_files/grep/glob ile ilgili dosyaları incele, git_diff/git_log/git_blame ile değişiklikleri ve geçmişi gör, discover_rules ile proje kurallarını (CLAUDE.md/.rules) oku. ÖNCE keşfet, SONRA yanıtla; iddialarını dosya kanıtına dayandır."
             : "")
         : "Sen uzman bir yazılım geliştiricisisin. Claude Code tarzında çalış: kullanıcının kod tabanını anla, dosya içeriklerini incele, sorunlara adım adım yaklaş. Kod yazarken best practice'leri uygula, okunabilir ve sürdürülebilir çözümler sun. KARMAŞIK (çok adımlı) görevlerde ÖNCE update_plan ile KISA bir plan (yapılacaklar listesi) sun, sonra adım adım uygula ve her adım bitince planı güncelle.",
@@ -1209,7 +1290,10 @@ export function CoderView() {
     const repo = store.repo;
     const activeGithub = store.activeGithub();
     const activeGitlab = store.activeGitlab();
-    const toolsEnabled = store.toolsEnabled && !!repo;
+    /* Yerel Mod: köprü tanımlı ve açıksa, github/gitlab repo'ya gerek kalmadan
+       araçlar gerçek dosya sistemine + kabuğa erişir. */
+    const localActive = !!(store.config.localMode && store.config.localBridgeUrl?.trim());
+    const toolsEnabled = store.toolsEnabled && (!!repo || localActive);
     const activeRepo = store.config.activeRepo || "";
     const repoIsGitLab = isGitLabRepo(activeRepo);
 
@@ -1280,18 +1364,29 @@ export function CoderView() {
           planApproved: planApprovedRef.current,
           blockNetworkTools: store.config.blockNetworkTools,
           /* Terminal varsa ajana run_command aracı sunulur (uzak WS veya WebContainer). */
-          terminalAvailable: !!(store.config.terminalWsUrl?.trim()) || terminalSupported,
+          terminalAvailable: localActive || !!(store.config.terminalWsUrl?.trim()) || terminalSupported,
           temperature: activeProjectCfg?.temperature,
           maxTokens: activeProjectCfg?.maxTokens,
           effort: thinkingMode,
           searchContext: webSearchContext || undefined,
-          repoCtx: toolsEnabled && repo ? {
-            owner: repo.owner,
-            repo: repo.repo,
-            branch: repo.branch,
-            token: repoIsGitLab ? activeGitlab?.token : activeGithub?.token,
-            provider: repoIsGitLab ? "gitlab" : "github",
-          } : undefined,
+          repoCtx: toolsEnabled
+            ? (localActive
+                ? {
+                    owner: "local", repo: "local", branch: "main",
+                    provider: "local",
+                    bridgeUrl: store.config.localBridgeUrl,
+                    bridgeToken: store.config.localBridgeToken,
+                  }
+                : repo
+                  ? {
+                      owner: repo.owner,
+                      repo: repo.repo,
+                      branch: repo.branch,
+                      token: repoIsGitLab ? activeGitlab?.token : activeGithub?.token,
+                      provider: repoIsGitLab ? "gitlab" : "github",
+                    }
+                  : undefined)
+            : undefined,
           mcpServers: (store.config.mcpServers ?? []).filter((s) => s.enabled).map((s) => ({
             url: s.url,
             headers: s.headers,
@@ -1469,9 +1564,22 @@ export function CoderView() {
             /* run_command: ajan terminalde komut çalıştırmak istiyor → terminali
                aç ve komutu gönder. Çıktı craftai:terminal-output ile geri döner. */
             if (parsed.run_command_event) {
-              /* Terminali ARKAPLANDA hazırla; komut arkaplanda çalışır, ilerleme
-                 sohbetteki "Terminal" todo kutusunda görünür, çıktı AI'ya döner. */
-              runInTerminal(String(parsed.run_command_event.command ?? ""));
+              const command = String(parsed.run_command_event.command ?? "").trim();
+              const lcfg = useStore.getState().config;
+              /* Tehlikeli komut kalkanı: katastrofik kalıpları (rm -rf /, fork bomb,
+                 mkfs, curl|sh…) çalıştırmadan engelle; engellenen komutu "Terminal"
+                 kutusunda göster ve sonucu ajana geri besle (loop sürer, ajan daha
+                 güvenli komutla devam eder). */
+              const danger = command && lcfg.commandGuard !== false ? matchDangerousCommand(command) : null;
+              if (danger) {
+                addToast(`⛔ Güvenlik: komut engellendi (${danger})`, "error");
+                useStore.getState().addCommandRun(command);
+                window.dispatchEvent(new CustomEvent("craftai:terminal-output", { detail: { command, output: `⛔ Güvenlik politikası bu komutu engelledi: ${danger}. Komut ÇALIŞTIRILMADI. Gerçekten gerekliyse kullanıcıdan açık onay iste; aksi halde daha güvenli bir komutla devam et.` } }));
+              } else {
+                /* Terminali ARKAPLANDA hazırla; komut arkaplanda çalışır, ilerleme
+                   sohbetteki "Terminal" todo kutusunda görünür, çıktı AI'ya döner. */
+                runInTerminal(String(parsed.run_command_event.command ?? ""));
+              }
               continue;
             }
             /* bitiş nedeni: "length" ⇒ token sınırında kesildi → şerit + oto-devam */
@@ -1609,6 +1717,7 @@ export function CoderView() {
         if (!full) useStore.getState().popLastMessage();
       } else {
         useStore.getState().updateLastContent(`**Hata:** ${friendlyError((err as Error).message)}`);
+        void runHooks(false, "error");
       }
     } finally {
       coderAbort = null;
@@ -1630,12 +1739,15 @@ export function CoderView() {
     if (cutAtLength && useStore.getState().config.autoContinue !== false && depth < 8 && !abortCtl.signal.aborted) {
       useStore.getState().addToast("Yanıt sınırda kesildi — kaldığı yerden devam ediliyor…", "info");
       await callApi(overrideAgent, { continuation: true, depth: depth + 1 });
+    } else if (!abortCtl.signal.aborted) {
+      /* Tur tamamlandı (sınırda kesilmedi) → olay kancalarını çalıştır. */
+      await runHooks(turnCheckpoints.length > 0);
     }
   /* callApi reads the rest of its inputs live via useStore.getState() during
      streaming, so it deliberately keeps a minimal dep set — recreating it on
      every config change would break in-flight requests. */
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.systemPrompt, fetchFollowUps, extractMemory]);
+  }, [config.systemPrompt, fetchFollowUps, extractMemory, runHooks]);
 
   const send = async () => {
     const text = input.trim();
@@ -1644,6 +1756,7 @@ export function CoderView() {
     if (!store.activeModel()) { store.setSettingsOpen(true); return; }
     if (!store.currentId) store.newChat(incognito);
     setPendingCommit(null);
+    hookRunsRef.current = 0; // yeni kullanıcı mesajı → afterEdit döngü sayacını sıfırla
     if (store.config.soundEnabled) import("@/lib/sounds").then((m) => m.playSend());
 
     /* slash command algıla */
