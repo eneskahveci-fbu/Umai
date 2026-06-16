@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { InstallCommand } from "@/components/InstallCommand";
 import {
   ArrowRight,
   Boxes,
@@ -231,6 +232,9 @@ export default function Home() {
             Hemen Başla <ArrowRight size={16} />
           </Link>
         </div>
+
+        {/* Terminal kurulum komutu (Mac & Linux) */}
+        <InstallCommand />
 
         {/* Stats */}
         <div className="flex flex-wrap justify-center gap-10 mt-14">

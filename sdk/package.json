@@ -1,10 +1,11 @@
 {
-  "name": "craftcoder-sdk",
+  "name": "craft-coder",
   "version": "1.0.0",
-  "description": "Craft.Coder için başsız (headless) SDK + CLI — UI olmadan ajanı programatik sürün.",
+  "description": "Craft.Coder CLI — Mac/Linux terminalinde tek komutla kurulan, etkileşimli (Claude Code tarzı, craft temalı) AI kod asistanı + başsız SDK.",
   "type": "module",
   "main": "craftcoder.mjs",
   "bin": {
+    "craft-coder": "cli.mjs",
     "craftcoder": "cli.mjs"
   },
   "exports": {
@@ -16,7 +17,16 @@
   "files": [
     "craftcoder.mjs",
     "cli.mjs",
-    "README.md"
+    "README.md",
+    "install.sh"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "keywords": [
+    "ai",
+    "cli",
+    "coding-assistant",
+    "craft-coder",
+    "agent",
+    "tui"
+  ]
 }
