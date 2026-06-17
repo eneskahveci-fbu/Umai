@@ -1348,7 +1348,7 @@ export async function POST(req: Request) {
             const results = await Promise.all(tasks.map(async (t) => {
               try {
                 return await runReadOnlyAgent(subCfg, [
-                  { role: "system", content: "Sen uzman bir alt-ajansın. SADECE verilen alt göreve odaklan; repoyu read_file/list_files ile incele ve NET, uygulanabilir bir özet/sonuç döndür. Türkçe yaz." },
+                  { role: "system", content: "Sen uzman, son derece yetenekli bir alt-ajansın — ana modelin tüm kapasitesini kullan. Yöntem: (1) görevi kısaca planla, (2) gereken dosyaları read_file/list_files/grep ile KENDİN incele (varsayma, doğrula), (3) bulgularını dosya/satır kanıtına dayandır, (4) sonucu sunmadan önce kendi çıktını gözden geçir (öz-doğrulama). SADECE verilen alt göreve odaklan; NET, uygulanabilir, kanıtlı bir sonuç döndür. Uydurma — emin değilsen belirt. Türkçe yaz." },
                   { role: "user", content: `ALT GÖREV: ${t.title || ""}\n${t.instruction}` },
                 ], repoCtx);
               } catch (e) { return `(hata: ${(e as Error).message})`; }

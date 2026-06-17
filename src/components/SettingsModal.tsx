@@ -979,6 +979,10 @@ export function SettingsModal() {
                   Web arama (varsayılan açık)
                 </label>
                 <label className="flex items-center gap-3 text-sm cursor-pointer">
+                  <input type="checkbox" checked={config.agentsUseStrongestModel !== false} onChange={() => saveConfig({ ...config, agentsUseStrongestModel: config.agentsUseStrongestModel === false })} className="accent-brand" />
+                  Ajanlar en güçlü modeli kullansın (Ekip/alt-ajan)
+                </label>
+                <label className="flex items-center gap-3 text-sm cursor-pointer">
                   <input type="checkbox" checked={config.autoMemory !== false} onChange={() => saveConfig({ ...config, autoMemory: config.autoMemory === false })} className="accent-brand" />
                   Otomatik bellek — kalıcı tercihleri 🧠 skill&apos;ine damıt
                 </label>

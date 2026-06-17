@@ -253,6 +253,9 @@ export interface Config {
   /** Çok-geçişli kalite modu: taslak → öz-eleştiri → düzeltme (tek yanıtta). */
   qualityMode?: boolean;
   webSearch: boolean;
+  /** Ajan Ekibi (swarm) ve alt-ajanlar otomatik EN GÜÇLÜ yapılandırılmış modeli
+      kullansın → ajanlar en yetenekli modelle çalışır. Tanımsız = açık. */
+  agentsUseStrongestModel?: boolean;
   cliMode: boolean;
   autoTerminal: boolean;
   /** Editörde satır içi (ghost text) AI tamamlama. Aktif modelin API kotasını

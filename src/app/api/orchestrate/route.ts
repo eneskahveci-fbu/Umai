@@ -262,8 +262,10 @@ export async function POST(req: Request) {
             const workerSys =
               `${ROLE_GUIDE[t.role] ?? ROLE_GUIDE.genel} ` +
               `SADECE sana verilen alt göreve odaklan; diğer alt görevleri YAPMA. ` +
+              `Önce kısaca planla, sonra çöz; çıktını sunmadan önce öz-doğrula (hata/eksik yakala). ` +
+              `Uydurma — emin olmadığın yeri belirt. ` +
               `Net, uygulanabilir sonuç üret (gerekiyorsa kod blokları). Türkçe yaz.` +
-              (repoCtx ? ` Gerekirse read_file/list_files/grep araçlarıyla repoyu kendin incele.` : ``);
+              (repoCtx ? ` Gerekirse read_file/list_files/grep araçlarıyla repoyu kendin incele (varsayma, doğrula).` : ``);
             const wmsgs = [
               { role: "system", content: workerSys },
               ...shared,
