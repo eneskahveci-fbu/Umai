@@ -10,6 +10,7 @@ import { useStore } from "@/lib/store";
 import { ALL_AGENTS, type Agent } from "@/lib/agents";
 import { getUserAgents, saveUserAgents } from "@/lib/extensions/customAgents";
 import type { Skill } from "@/lib/types";
+import SkillImport from "./SkillImport";
 
 type Tab = "skills" | "files" | "agents" | "progress";
 
@@ -197,6 +198,7 @@ function SkillsTab({
 
   return (
     <>
+      <SkillImport />
       <div className="px-4 sm:px-5 py-3 border-b border-line/40 shrink-0 space-y-2">
         <div className="flex flex-col sm:flex-row gap-2">
           <input

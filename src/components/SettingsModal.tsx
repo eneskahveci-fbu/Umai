@@ -975,10 +975,6 @@ export function SettingsModal() {
               <h4 className="text-sm font-bold mb-2">Ajan Davranışı</h4>
               <div className="flex flex-col gap-2">
                 <label className="flex items-center gap-3 text-sm cursor-pointer">
-                  <input type="checkbox" checked={config.followUps} onChange={() => saveConfig({ ...config, followUps: !config.followUps })} className="accent-brand" />
-                  Takip soruları öner
-                </label>
-                <label className="flex items-center gap-3 text-sm cursor-pointer">
                   <input type="checkbox" checked={config.webSearch} onChange={() => saveConfig({ ...config, webSearch: !config.webSearch })} className="accent-brand" />
                   Web arama (varsayılan açık)
                 </label>

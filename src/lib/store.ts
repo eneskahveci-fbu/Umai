@@ -384,8 +384,6 @@ interface StoreState {
   maybeSetTitle: (text: string) => void;
   persistCurrent: () => Promise<void>;
   exportChat: (id: string) => void;
-  exportChatHtml: (id: string) => void;
-  exportChatJson: (id: string) => void;
   copyChatMarkdown: (id: string) => Promise<void>;
 
   // follow-up
@@ -1202,29 +1200,6 @@ export const useStore = create<StoreState>()((set, get) => ({
     download(md, `${safeName(chat.title)}.md`, "text/markdown");
   },
 
-  exportChatJson: (id: string) => {
-    const chat = get().chats.find((c) => c.id === id);
-    if (!chat) return;
-    const payload = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      chat: {
-        title: chat.title,
-        createdAt: chat.created_at,
-        projectId: chat.projectId,
-        totalInTokens: chat.totalInTokens,
-        totalOutTokens: chat.totalOutTokens,
-        messages: chat.messages.map((m) => ({
-          role: m.role,
-          content: m.content,
-          tokenIn: m.tokenIn,
-          tokenOut: m.tokenOut,
-        })),
-      },
-    };
-    download(JSON.stringify(payload, null, 2), `${safeName(chat.title)}.json`, "application/json");
-  },
-
   copyChatMarkdown: async (id: string) => {
     const chat = get().chats.find((c) => c.id === id);
     if (!chat) return;
@@ -1238,23 +1213,6 @@ export const useStore = create<StoreState>()((set, get) => ({
     } catch {
       get().addToast("Kopyalanamadı", "error");
     }
-  },
-
-  exportChatHtml: (id) => {
-    const chat = get().chats.find((c) => c.id === id);
-    if (!chat) return;
-    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    const safeTitle = esc(chat.title);
-    const msgs = chat.messages
-      .map((m) => {
-        const cls = m.role === "user" ? "user" : "assistant";
-        const label = m.role === "user" ? "Kullanıcı" : "Asistan";
-        const escaped = esc(m.content);
-        return `<div class="msg ${cls}"><div class="role">${label}</div><pre>${escaped}</pre></div>`;
-      })
-      .join("\n");
-    const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeTitle} — Craft.Coder</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#111110;color:#f0ebe0;padding:2rem;max-width:800px;margin:auto}.msg{padding:1rem;border-radius:12px;margin-bottom:1rem}.user{background:#1b1a17;border:1px solid #2e2a24}.assistant{background:#181714;border:1px solid #2e2a24}.role{font-size:.75rem;font-weight:700;color:#c8a87e;margin-bottom:.5rem;text-transform:uppercase}pre{white-space:pre-wrap;font-size:.9rem;line-height:1.6}h1{text-align:center;margin-bottom:2rem;background:linear-gradient(120deg,#c8a87e,#e0caa8);-webkit-background-clip:text;background-clip:text;color:transparent}footer{text-align:center;margin-top:2rem;font-size:.75rem;color:#9a9080}</style></head><body><h1>${safeTitle}</h1>${msgs}<footer>Craft.Coder ile oluşturuldu</footer></body></html>`;
-    download(html, `${safeName(chat.title)}.html`, "text/html");
   },
 
   followUpSuggestions: [],

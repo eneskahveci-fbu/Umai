@@ -377,7 +377,6 @@ export function CoderView() {
   const incognito = useStore((s) => s.incognito);
   const streaming = useStore((s) => s.streaming);
   const pendingInput = useStore((s) => s.pendingInput);
-  const followUpSuggestions = useStore((s) => s.followUpSuggestions);
 
   const toolsEnabledStore = useStore((s) => s.toolsEnabled);
   const artifact = useStore((s) => s.artifact);
@@ -386,7 +385,6 @@ export function CoderView() {
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const setPendingInput = useStore((s) => s.setPendingInput);
-  const setFollowUpSuggestions = useStore((s) => s.setFollowUpSuggestions);
   const addToast = useStore((s) => s.addToast);
 
   /* Yerel Mod aktifse github/gitlab repo olmadan da araçlar açılır (gerçek FS+shell). */
@@ -1015,28 +1013,6 @@ export function CoderView() {
     reader.readAsText(f);
   };
 
-  /* API */
-  const fetchFollowUps = useCallback(async () => {
-    const store = useStore.getState();
-    if (!store.config.followUps) return;
-    const active = store.activeModel();
-    if (!active) return;
-    const chat = store.current();
-    if (!chat || chat.messages.length < 2) return;
-    try {
-      const res = await fetch("/api/suggest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: chat.messages.map((m) => ({ role: m.role, content: m.content })),
-          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey || useStore.getState().config.providerKeys?.[active.provider] || "",
-        }),
-      });
-      const { suggestions } = await res.json();
-      store.setFollowUpSuggestions(suggestions || []);
-    } catch { /* yoksay */ }
-  }, []);
-
   /* Otomatik bellek: yanıt bittikten sonra arka planda son alışverişten kalıcı
      tercihleri damıt ve "🧠 Otomatik Bellek" skill'ine ekle. Gizli sohbetlerde
      ve ayar kapalıyken çalışmaz; hata ana akışı asla etkilemez. */
@@ -1258,7 +1234,6 @@ export function CoderView() {
     const turnCheckpoints: { path: string; previous: string | null }[] =
       isContinuation ? [...(lastMsg?.checkpoints ?? [])] : []; // devamda önceki yazmalar korunur
     setPendingActions([]); // bekleyen yıkıcı işlem önerileri
-    store.setFollowUpSuggestions([]);
     coderAbort = new AbortController();
     const abortCtl = coderAbort;
 
@@ -1728,7 +1703,6 @@ export function CoderView() {
         playReady();
         notifyReady("Craft.Coder", "Yanıt hazır.");
       }
-      fetchFollowUps();
       void extractMemory();
       fireHooks("onStop");
     }
@@ -1747,7 +1721,7 @@ export function CoderView() {
      streaming, so it deliberately keeps a minimal dep set — recreating it on
      every config change would break in-flight requests. */
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.systemPrompt, fetchFollowUps, extractMemory, runHooks]);
+  }, [config.systemPrompt, extractMemory, runHooks]);
 
   const send = async () => {
     const text = input.trim();
@@ -1855,8 +1829,8 @@ export function CoderView() {
       )}
       {/* Header */}
       <div
-        className="h-12 shrink-0 flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 border-b border-line/60 bg-surface/60 backdrop-blur-sm overflow-x-auto scrollbar-none"
-        style={{ paddingTop: "env(safe-area-inset-top)" }}
+        className="shrink-0 flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 border-b border-line/60 bg-surface/60 backdrop-blur-sm overflow-x-auto scrollbar-none"
+        style={{ height: "calc(3rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}
       >
         <button
           onClick={() => setSidebarOpen(true)}
@@ -1914,7 +1888,7 @@ export function CoderView() {
           )}
           <ThinkingModeToggle />
           {/* Birleşik ⋯ menüsü: Editör · Terminal · Git · PR · Skills · Dışa aktar */}
-          <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen || toolsEnabled || !!config.safeMode || !!artifact}>
+          <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen || toolsEnabled || !!config.safeMode || !!artifact || swarmMode}>
             <MoreItem
               icon={<Code2 size={14} />}
               label={editorOpen ? "Editörü kapat" : "Editör (IDE)"}
@@ -1977,12 +1951,11 @@ export function CoderView() {
             <MoreItem icon={<BookOpen size={14} />} label="Kütüphane" onClick={() => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); }} />
             <MoreItem icon={<Zap size={14} />} label="Skills" onClick={() => useStore.getState().setSkillsOpen(true)} />
             <MoreItem icon={<Activity size={14} />} label="Etkinlik günlüğü" onClick={() => useStore.getState().setActivityOpen(true)} />
+            <MoreItem icon={<Users size={14} />} label="Ajan Ekibi (Swarm)" active={swarmMode} onClick={() => setSwarmMode((v) => !v)} />
             {current && messages.length > 0 && (
               <>
                 <div className="h-px bg-line/60 my-1 mx-1" />
                 <MoreItem icon={<Download size={14} />} label="Markdown indir" onClick={() => useStore.getState().exportChat(current.id)} />
-                <MoreItem icon={<Download size={14} />} label="HTML indir" onClick={() => useStore.getState().exportChatHtml(current.id)} />
-                <MoreItem icon={<Download size={14} />} label="JSON indir" onClick={() => useStore.getState().exportChatJson(current.id)} />
                 <MoreItem icon={<Copy size={14} />} label="Markdown kopyala" onClick={() => useStore.getState().copyChatMarkdown(current.id)} />
               </>
             )}
@@ -2338,19 +2311,6 @@ export function CoderView() {
                     </div>
                   );
                 })}
-                {!streaming && followUpSuggestions.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3 mb-4">
-                    {followUpSuggestions.map((s, i) => (
-                      <button
-                        key={i}
-                        onClick={() => { setInput(s); setFollowUpSuggestions([]); }}
-                        className="text-xs px-3 py-1.5 rounded-full border border-line bg-surface hover:border-brand/50 transition-colors text-muted hover:text-ink"
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                )}
                 <div ref={endRef} />
               </div>
             )}
@@ -2531,11 +2491,10 @@ export function CoderView() {
                   />
                 )}
                 {/* Daha fazla — mikrofon ile gönder arasında; mesaj-oluşturma eylemleri */}
-                <MoreMenu active={searchOn || swarmMode}>
+                <MoreMenu active={searchOn}>
                   <MoreItem icon={<Paperclip size={14} />} label="Dosya ekle" onClick={() => fileRef.current?.click()} />
                   <MoreItem icon={<ImageIcon size={14} />} label="Görsel ekle" onClick={() => imgRef.current?.click()} />
                   <MoreItem icon={<Globe size={14} />} label="Web arama" active={searchOn} onClick={() => setSearchOn(!searchOn)} />
-                  <MoreItem icon={<Users size={14} />} label="Ajan Ekibi (Swarm)" active={swarmMode} onClick={() => setSwarmMode((v) => !v)} />
                 </MoreMenu>
                 {streaming ? (
                   <button onClick={stop} className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-red hover:bg-red/80 active:bg-red/70 text-white grid place-items-center transition-colors" title="Durdur">
