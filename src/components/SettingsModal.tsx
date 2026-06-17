@@ -1048,6 +1048,41 @@ export function SettingsModal() {
               />
             </div>
 
+            {/* Hibrit Sunucu — tek adres hem terminal hem dosya sistemi kurar */}
+            <div>
+              <h4 className="text-sm font-bold mb-1 flex items-center gap-1.5">🔗 Hibrit Sunucu <span className="text-[10px] font-normal text-brand/80 bg-brand/10 px-1.5 py-0.5 rounded">tek adres</span></h4>
+              <p className="text-xs text-muted/70 mb-2 leading-relaxed">
+                Oracle/sunucu kurulumunun verdiği{" "}
+                <code className="text-brand/80 bg-bgsoft px-1 rounded text-[11px]">wss://…/?token=…</code>{" "}
+                adresini buraya yapıştır → <strong className="text-muted">terminal + gerçek dosya sistemi</strong> birlikte kurulur (aşağıdaki alanlar otomatik dolar).
+                <br />
+                <span className="text-muted/50 text-[11px]">Kurulum: <code className="bg-bgsoft px-1 rounded">deploy/oracle/setup.sh</code> — repo bağlamadan, mobil Safari/Firefox dahil çalışır.</span>
+              </p>
+              <input
+                type="text"
+                value={config.terminalWsUrl ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value.trim();
+                  let host = "", token = "", ws = "wss", http = "https";
+                  try {
+                    const u = new URL(v);
+                    host = u.host;
+                    token = u.searchParams.get("token") || "";
+                    if (u.protocol === "ws:" || u.protocol === "http:") { ws = "ws"; http = "http"; }
+                  } catch { /* tam URL değil — yalnızca terminal alanına yaz */ }
+                  if (host) {
+                    saveConfig({ ...config, terminalWsUrl: `${ws}://${host}/${token ? "?token=" + token : ""}`, localMode: true, localBridgeUrl: `${http}://${host}`, localBridgeToken: token });
+                  } else {
+                    saveConfig({ ...config, terminalWsUrl: v });
+                  }
+                }}
+                placeholder="wss://<alan>.sslip.io/?token=..."
+                className="input-mono w-full"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+
             {/* Terminal WebSocket URL */}
             <div>
               <h4 className="text-sm font-bold mb-1">Terminal Sunucusu (WebSocket)</h4>
@@ -1152,13 +1187,15 @@ export function SettingsModal() {
               <h4 className="text-sm font-bold mb-1">🖥️ Yerel Mod (Local Bridge)</h4>
               <p className="text-xs text-muted/70 mb-2 leading-relaxed">
                 Açıkken ajan GitHub/GitLab API yerine{" "}
-                <strong className="text-muted">kendi bilgisayarındaki gerçek dosya sistemine ve kabuğa</strong>{" "}
-                erişir (Claude Code gibi). Tamamen ücretsiz; sunucu/bulut yok.
+                <strong className="text-muted">gerçek dosya sistemine ve kabuğa</strong>{" "}
+                erişir (Claude Code gibi). İki yol:
                 <br />
-                Köprüyü çalıştır:{" "}
+                • <strong className="text-muted">Hibrit sunucu</strong> (Oracle/VPS): yukarıdaki tek adresi yapıştırınca otomatik dolar — mobil dahil her yerden çalışır.
+                <br />
+                • <strong className="text-muted">Kendi bilgisayarın</strong> (yerelde):{" "}
                 <code className="text-brand/80 bg-bgsoft px-1 rounded text-[11px]">cd local-bridge &amp;&amp; BRIDGE_TOKEN=gizli WORK_DIR=/proje node server.js</code>
                 <br />
-                <span className="text-muted/50 text-[11px]">Yalnızca localhost dinler; token zorunlu. Uygulamayı yerelde (npm run dev) çalıştırırken kullan.</span>
+                <span className="text-muted/50 text-[11px]">Token her zaman zorunlu. Public sunucuda HTTPS (Caddy) arkasında çalıştır.</span>
               </p>
               <label className="flex items-center gap-2 cursor-pointer mb-2">
                 <input
