@@ -141,7 +141,10 @@ function translateStream(src: ReadableStream<Uint8Array>): ReadableStream<Uint8A
                 else if (ev.delta?.type === "input_json_delta") emit(controller, { choices: [{ delta: { tool_calls: [{ index: toolIndex, function: { arguments: ev.delta.partial_json } }] } }] });
                 break;
               case "message_delta": {
-                const fr = ev.delta?.stop_reason === "tool_use" ? "tool_calls" : (ev.delta?.stop_reason ? "stop" : null);
+                /* stop_reason eşlemesi: max_tokens → "length" (yoksa kesilen yanıt
+                   "tamamlandı" sanılır; istemci otomatik "devam" tetiklemez). */
+                const sr = ev.delta?.stop_reason;
+                const fr = sr === "tool_use" ? "tool_calls" : sr === "max_tokens" ? "length" : (sr ? "stop" : null);
                 if (fr) emit(controller, { choices: [{ delta: {}, finish_reason: fr }] });
                 if (ev.usage) emit(controller, { choices: [], usage: { prompt_tokens: inputTokens, completion_tokens: ev.usage.output_tokens ?? 0 } });
                 break;
