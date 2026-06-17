@@ -11,6 +11,7 @@ import { ALL_AGENTS, type Agent } from "@/lib/agents";
 import { getUserAgents, saveUserAgents } from "@/lib/extensions/customAgents";
 import type { Skill } from "@/lib/types";
 import SkillImport from "./SkillImport";
+import AgentImport from "./AgentImport";
 
 type Tab = "skills" | "files" | "agents" | "progress";
 
@@ -438,6 +439,8 @@ function AgentsTab() {
           </div>
         )}
       </div>
+
+      <AgentImport userAgents={userAgents} persist={persist} />
 
       {/* Kullanıcı agent'ları */}
       {userAgents.length > 0 && (
