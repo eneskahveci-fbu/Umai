@@ -2,6 +2,8 @@
    Ayrı modül: çalışan /api/chat akışına dokunmaz (regresyon riski yok).
    Yalnızca okuma/listeleme — yazma/silme YOK (işçiler değiştiremez). */
 
+import { isSafeRemoteUrl } from "./urlSafety";
+
 export interface RepoReadCtx {
   owner: string;
   repo: string;
@@ -16,6 +18,9 @@ export interface RepoReadCtx {
 /* Yerel Mod köprüsüne çağrı (alt-ajanların salt-okunur erişimi için). */
 async function bridgeCall(ctx: RepoReadCtx, endpoint: string, payload?: unknown): Promise<Record<string, unknown>> {
   const base = (ctx.bridgeUrl || "").replace(/\/$/, "");
+  if (process.env.NODE_ENV === "production" && !isSafeRemoteUrl(base)) {
+    throw new Error("Güvensiz köprü adresi — yalnızca genel (public) HTTPS adresleri kabul edilir.");
+  }
   const res = await fetch(`${base}${endpoint}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${ctx.bridgeToken || ""}` },

@@ -33,6 +33,12 @@ interface RepoCtx {
 /* Yerel Mod köprüsüne JSON çağrısı (gerçek FS/shell, kullanıcının makinesinde). */
 async function bridgeCall(ctx: RepoCtx, endpoint: string, payload?: unknown): Promise<Record<string, unknown>> {
   const base = (ctx.bridgeUrl || "").replace(/\/$/, "");
+  /* SSRF: köprü adresi istemciden gelir; canlıda (Vercel) yalnız genel adres
+     kabul et — iç ağ/loopback/bulut-metadata (169.254.169.254) engellenir.
+     Yerelde (npm run dev) localhost köprüsü meşrudur → yalnız production'da kısıtla. */
+  if (process.env.NODE_ENV === "production" && !isSafeRemoteUrl(base)) {
+    throw new Error("Güvensiz köprü adresi — yalnızca genel (public) HTTPS adresleri kabul edilir.");
+  }
   const res = await fetch(`${base}${endpoint}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${ctx.bridgeToken || ""}` },
@@ -142,7 +148,7 @@ async function getAllPaths(ctx: RepoCtx): Promise<string[]> {
     return data.filter((t) => t.type === "blob").map((t) => t.path);
   }
   const res = await fetch(
-    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/trees/${ctx.branch}?recursive=1`,
+    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/trees/${encodeURIComponent(ctx.branch)}?recursive=1`,
     { headers: ghHeaders(ctx.token) },
   );
   if (!res.ok) throw new Error(`${res.status} ${(await res.text().catch(() => "")).slice(0, 120)}`);
@@ -444,7 +450,7 @@ async function execSearchFiles(ctx: RepoCtx, args: { query: string }): Promise<s
     return matches.length ? matches.join("\n") : "(eşleşme yok)";
   }
   const res = await fetch(
-    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/trees/${ctx.branch}?recursive=1`,
+    `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/trees/${encodeURIComponent(ctx.branch)}?recursive=1`,
     { headers: ghHeaders(ctx.token) },
   );
   if (!res.ok) return `Hata: ${res.status}`;
