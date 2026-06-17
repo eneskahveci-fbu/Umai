@@ -1148,6 +1148,11 @@ export async function POST(req: Request) {
     } catch { /* harita yoksa sessiz geç — araçlar yine çalışır */ }
     sysPrompt +=
       `\n\n[Ajan modu — Repo: ${body.repoCtx.owner}/${body.repoCtx.repo} (${body.repoCtx.branch})]\n` +
+      `ÖNEMLİ — SEN GERÇEK BİR KODLAMA AJANISIN, sohbet botu DEĞİL. "üret / oluştur / yaz / ekle / kur / yap" ` +
+      `istendiğinde kodu SOHBETE YAPIŞTIRMA; write_file/str_replace araçlarıyla repoda GERÇEK dosyalar oluştur/düzenle ve commit'le. ` +
+      `Açıklama değil EYLEM: "şöyle yapabilirsin" deyip örnek kod göstermek YETMEZ — aracı çağırıp uygula. ` +
+      `Görev bitince dosyalar gerçekten oluşmuş/commit'lenmiş olmalı. Çok dosyalı bir proje istense bile ` +
+      `dosyaları tek tek write_file ile oluştur (sohbete tek büyük blok dökme).\n` +
       `Mevcut araçlar:\n` +
       `• list_files(filter?) — repo dosya ağacını listele\n` +
       `• read_file(path) — dosya içeriğini oku (SATIR NUMARALARIYLA döner)\n` +
