@@ -1122,15 +1122,18 @@ export function CoderView() {
 
   const callApi = useCallback(async (
     overrideAgent?: Agent | null,
-    opts?: { continuation?: boolean; depth?: number },
+    opts?: { continuation?: boolean; depth?: number; noStrongest?: boolean },
   ) => {
     const store = useStore.getState();
     let active = store.activeModel();
     if (!active) { store.setSettingsOpen(true); return; }
     /* Ajan Ekibi (swarm) turunda otomatik EN GÜÇLÜ modeli kullan (ayar açıksa)
-       → ekip en yetenekli modelle çalışır. */
-    if (swarmModeRef.current && useStore.getState().config.agentsUseStrongestModel !== false) {
-      active = store.strongestModel() ?? active;
+       → ekip en yetenekli modelle çalışır. Hata olursa (kredi/anahtar yok) aşağıdaki
+       catch bloğu sessizce AKTİF modele döner ve tekrar dener. */
+    let usedStrongest = false;
+    if (swarmModeRef.current && !opts?.noStrongest && useStore.getState().config.agentsUseStrongestModel !== false) {
+      const strong = store.strongestModel();
+      if (strong && strong.id !== active.id) { active = strong; usedStrongest = true; }
     }
 
     /* Proje-başına model/örnekleme: aktif projenin ayarları global'i geçersiz kılar. */
@@ -1695,6 +1698,13 @@ export function CoderView() {
       if ((err as Error).name === "AbortError") {
         /* Kullanıcı durdurdu: hiç içerik gelmediyse boş asistan baloncuğunu kaldır. */
         if (!full) useStore.getState().popLastMessage();
+      } else if (usedStrongest) {
+        /* En güçlü model hata verdi (kredisi/anahtarı yok olabilir) → başarısız
+           baloncuğu kaldır, AKTİF modele dön ve aynı turu bir kez daha dene.
+           Kullanıcı hata görmez; noStrongest=true sonsuz döngüyü engeller. */
+        useStore.getState().popLastMessage();
+        useStore.getState().addToast("En güçlü model yanıt vermedi (kredi/anahtar?), aktif modele dönülüyor…", "info");
+        await callApi(overrideAgent, { ...opts, noStrongest: true });
       } else {
         useStore.getState().updateLastContent(`**Hata:** ${friendlyError((err as Error).message)}`);
         void runHooks(false, "error");
