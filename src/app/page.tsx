@@ -220,8 +220,8 @@ export default function Home() {
         </h1>
 
         <p className="text-lg text-muted max-w-2xl mx-auto mt-6 leading-relaxed">
-          Craft.Coder dosyalarını okur, kod yazar, GitHub ve GitLab depolarını gezer — istediğin modelle.
-          Hugging Face, DeepSeek, Groq, Anthropic ya da kendi yerel modelin: hepsi tek arayüzde.
+          Dosyalarını okur, kod yazar, GitHub ve GitLab depolarını gezer — hepsi istediğin modelle.
+          Anthropic, DeepSeek, Groq, Gemini ya da kendi yerel modelin: tek arayüzde, anahtarın sende kalır.
         </p>
 
         <div className="flex gap-3 justify-center mt-10 flex-wrap">

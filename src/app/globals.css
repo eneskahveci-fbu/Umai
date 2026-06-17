@@ -164,18 +164,6 @@ body {
 .scrollbar-none { scrollbar-width: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
-::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--color-line);
-  border-radius: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
 /* ─── Markdown çıktısı ─── */
 .prose-chat {
   line-height: 1.7;
@@ -327,7 +315,7 @@ html { scroll-behavior: smooth; }
   border-radius: 0.5rem;
 }
 
-/* ─── Subtle scrollbar ─── */
+/* ─── İnce, premium scrollbar (WebKit + Firefox) ─── */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
@@ -341,6 +329,10 @@ html { scroll-behavior: smooth; }
   background-clip: padding-box;
   border: 2px solid transparent;
 }
+/* Firefox: ince + tema renkli scrollbar (WebKit dışı tarayıcılarda da premium). */
+html { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--color-muted) 30%, transparent) transparent; }
+/* Kaydırma zincirini kes: panel içi kaydırma sayfayı sürüklemesin → app hissi. */
+.overflow-y-auto, .overflow-auto, .overflow-y-scroll { overscroll-behavior: contain; }
 
 /* ─── Yanıp sönen cursor ─── */
 @keyframes blink {
