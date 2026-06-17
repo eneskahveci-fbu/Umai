@@ -301,6 +301,8 @@ interface StoreState {
   removeModel: (id: string) => void;
   setActiveModel: (id: string) => void;
   activeModel: () => ModelProfile | null;
+  /** Yapılandırılmış modeller arasında EN GÜÇLÜSÜNÜ seçer (ajanlar için). */
+  strongestModel: () => ModelProfile | null;
   addGithub: (a: Omit<GitHubAccount, "id">) => void;
   removeGithub: (id: string) => void;
   setActiveGithub: (id: string | null) => void;
@@ -604,6 +606,18 @@ export const useStore = create<StoreState>()((set, get) => ({
   activeModel: () => {
     const { models, activeModelId } = get().config;
     return models.find((m) => m.id === activeModelId) || models[0] || null;
+  },
+  strongestModel: () => {
+    const { models } = get().config;
+    if (models.length <= 1) return get().activeModel();
+    /* En güçlüden zayıfa öncelik sırası — ilk eşleşen yapılandırılmış model
+       seçilir; hiçbiri tanınmıyorsa aktif modele düşer. */
+    const order = ["opus", "gpt-5", "o4", "o3", "deepseek-reasoner", "sonnet", "claude-3.7", "grok-4", "gpt-4.1", "gemini-2.5-pro", "gpt-4o", "deepseek", "gemini-2.5", "llama-3.3-70b", "70b", "qwen3", "mistral-large", "codestral"];
+    for (const key of order) {
+      const m = models.find((x) => `${x.model} ${x.label}`.toLowerCase().includes(key));
+      if (m) return m;
+    }
+    return get().activeModel();
   },
   addGithub: (a) => {
     const acc: GitHubAccount = { ...a, id: uid() };

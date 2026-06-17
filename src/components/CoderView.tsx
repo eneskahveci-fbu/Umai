@@ -1127,6 +1127,11 @@ export function CoderView() {
     const store = useStore.getState();
     let active = store.activeModel();
     if (!active) { store.setSettingsOpen(true); return; }
+    /* Ajan Ekibi (swarm) turunda otomatik EN GÜÇLÜ modeli kullan (ayar açıksa)
+       → ekip en yetenekli modelle çalışır. */
+    if (swarmModeRef.current && useStore.getState().config.agentsUseStrongestModel !== false) {
+      active = store.strongestModel() ?? active;
+    }
 
     /* Proje-başına model/örnekleme: aktif projenin ayarları global'i geçersiz kılar. */
     const activeProjectCfg = store.config.projects.find((p) => p.id === store.config.activeProjectId);

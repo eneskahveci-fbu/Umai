@@ -484,6 +484,7 @@ export const DEFAULT_CONFIG: Config = {
   autoContinue: true,
   qualityMode: false,
   webSearch: false,
+  agentsUseStrongestModel: true,
   cliMode: false,
   autoTerminal: false,
   inlineCompletion: true,
