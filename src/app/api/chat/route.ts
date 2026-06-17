@@ -150,6 +150,24 @@ async function getAllPaths(ctx: RepoCtx): Promise<string[]> {
   return (data.tree ?? []).filter((t) => t.type === "blob").map((t) => t.path);
 }
 
+/* Repo dosya haritası: gürültüyü (node_modules/dist/binary) ayıklar, kaynak
+   dosyaları öne alır, ~250 yolla sınırlar → büyük projelerde ajan yapıyı kompakt
+   görür, list_files'a gerek kalmadan doğru dosyayı hedefler. */
+const REPO_MAP_NOISE = /(^|\/)(node_modules|\.git|\.next|dist|build|coverage|vendor|out|\.turbo|__pycache__)\//;
+const REPO_MAP_BINARY = /\.(png|jpe?g|gif|svg|ico|webp|avif|woff2?|ttf|eot|mp[34]|wav|pdf|zip|gz|tgz|map|lock)$|\.min\.(js|css)$/i;
+const REPO_MAP_SRC = /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|php|c|cc|cpp|h|hpp|cs|swift|kt|vue|svelte|sql|sh|css|scss|less|html|json|md|ya?ml|toml|prisma)$/i;
+function buildRepoMap(paths: string[]): string {
+  const clean = paths.filter((p) => !REPO_MAP_NOISE.test(p) && !REPO_MAP_BINARY.test(p));
+  const src = clean.filter((p) => REPO_MAP_SRC.test(p)).sort();
+  const rest = clean.filter((p) => !REPO_MAP_SRC.test(p)).sort();
+  const ordered = [...src, ...rest];
+  const CAP = 250;
+  const shown = ordered.slice(0, CAP).join("\n");
+  return ordered.length > CAP
+    ? `${shown}\n[+${ordered.length - CAP} dosya daha — glob/grep ile bul]`
+    : shown;
+}
+
 async function execListFiles(ctx: RepoCtx, args: { filter?: string }): Promise<string> {
   let items: string[];
   try { items = await getAllPaths(ctx); } catch (e) { return `Hata: ${(e as Error).message}`; }
@@ -1119,6 +1137,15 @@ export async function POST(req: Request) {
         sysPrompt += `\n• .gitignore kalıpları (bunlara dokunma/oluşturma): ${ignored}`;
       }
     }
+    /* Büyük kod tabanı: repo DOSYA HARİTASINI prompt'a enjekte et → ajan
+       list_files çağırmadan yapıyı bilir, doğru dosyayı hedefler. Tek tree
+       çağrısı; Anthropic'te cache'lenir, diğerlerinde kompakt (yalnız yollar). */
+    try {
+      const allPaths = await getAllPaths(body.repoCtx);
+      if (allPaths.length) {
+        sysPrompt += `\n\n[Repo dosya haritası — ${allPaths.length} dosya]\n${buildRepoMap(allPaths)}`;
+      }
+    } catch { /* harita yoksa sessiz geç — araçlar yine çalışır */ }
     sysPrompt +=
       `\n\n[Ajan modu — Repo: ${body.repoCtx.owner}/${body.repoCtx.repo} (${body.repoCtx.branch})]\n` +
       `Mevcut araçlar:\n` +
