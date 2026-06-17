@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import {
   Activity,
   ArrowDown,
@@ -286,6 +287,28 @@ function getAllFiles(node: TreeNode): TreeFile[] {
 
 /* Ham hata mesajını kullanıcının anlayacağı, çözüm önerili Türkçe metne çevirir.
    Tanınmayan hatalarda orijinal mesaj korunur. */
+/* API anahtarını isteğin TAM ANINDA çöz: rehydrate yarışı ya da AES anahtar
+   uyuşmazlığı olsa bile sağlayıcıya ASLA 'enc:1:…' şifreli blob gitmesin
+   (kredili anahtarda bile 401 sorununu önler). Çözülemezse boş döndür + bir kez uyar. */
+let warnedDecrypt = false;
+async function usableApiKey(model: { apiKey?: string; provider: string }): Promise<string> {
+  const cfg = useStore.getState().config;
+  let k = model.apiKey || (cfg.providerKeys as Record<string, string> | undefined)?.[model.provider] || "";
+  if (k) {
+    k = await decryptField(k);
+    if (isEncrypted(k)) {
+      k = "";
+      if (!warnedDecrypt) {
+        warnedDecrypt = true;
+        useStore.getState().addToast("Kayıtlı API anahtarı çözülemedi (tarayıcı verisi değişmiş olabilir). Ayarlar → Modeller'den anahtarı tekrar gir.", "error");
+      }
+    } else {
+      warnedDecrypt = false;
+    }
+  }
+  return k;
+}
+
 function friendlyError(raw: string): string {
   const m = (raw || "").toLowerCase();
   if (/(401|403|unauthorized|invalid api key|invalid_api_key|authentication)/.test(m))
@@ -1034,7 +1057,7 @@ export function CoderView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userText: lastUser, assistantText: lastAssistant, existing,
-          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey || useStore.getState().config.providerKeys?.[active.provider] || "",
+          baseUrl: active.baseUrl, model: active.model, apiKey: await usableApiKey(active),
         }),
       });
       const { facts } = await res.json();
@@ -1143,6 +1166,10 @@ export function CoderView() {
       if (override) active = override;
     }
 
+    /* API anahtarını ŞİMDİ çöz (active artık kesin) → sağlayıcıya asla şifreli
+       blob gitmesin; çözülemezse boş + kullanıcı uyarısı (usableApiKey). */
+    const reqKey = await usableApiKey(active);
+
     const chat = store.current();
     const lastUserMsg = chat?.messages.findLast?.((m) => m.role === "user");
     const messageAgentId = lastUserMsg?.agentId;
@@ -1200,7 +1227,7 @@ export function CoderView() {
               transcript,
               baseUrl: active.baseUrl,
               model: active.model,
-              apiKey: active.apiKey || store.config.providerKeys?.[active.provider] || "",
+              apiKey: reqKey,
             }),
           });
           summary = (await cr.json())?.summary || "";
@@ -1331,7 +1358,7 @@ export function CoderView() {
         signal: abortCtl.signal,
         body: JSON.stringify({
           messages: apiMessages,
-          baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey || useStore.getState().config.providerKeys?.[active.provider] || "",
+          baseUrl: active.baseUrl, model: active.model, apiKey: reqKey,
           provider: active.provider, systemPrompt: finalSystemPrompt,
           style: store.config.style,
           memories: store.config.memories,
@@ -1414,7 +1441,7 @@ export function CoderView() {
         /* Opsiyonel ücretsiz Pollinations token'ı (Ayarlar'da model anahtarı
            alanına yapıştırılırsa) limiti yükseltir; yoksa anonim denenir. */
         const polHeaders: Record<string, string> = { "Content-Type": "application/json" };
-        if (active.apiKey) polHeaders["Authorization"] = `Bearer ${active.apiKey}`;
+        if (reqKey) polHeaders["Authorization"] = `Bearer ${reqKey}`;
         try {
           while (true) {
             res = await fetch(`${active.baseUrl}/chat/completions`, {
