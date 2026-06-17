@@ -1,4 +1,5 @@
 import { rateLimit } from "@/lib/rate-limit";
+import { anthropicUpstream, type OpenAIChatBody } from "@/lib/anthropic";
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/constants";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { buildContextSections } from "@/lib/prompt";
@@ -1157,10 +1158,12 @@ export async function POST(req: Request) {
     if (provider === "pollinations") upstreamBody.referrer = "craft-coder";
 
     try {
-      upstream = await fetch(url, {
-        method: "POST", headers: upstreamHeaders,
-        body: JSON.stringify(upstreamBody),
-      });
+      upstream = provider === "anthropic"
+        ? await anthropicUpstream(baseUrl, apiKey, upstreamBody as unknown as OpenAIChatBody)
+        : await fetch(url, {
+            method: "POST", headers: upstreamHeaders,
+            body: JSON.stringify(upstreamBody),
+          });
     } catch (err) {
       return new Response(`Sağlayıcıya bağlanılamadı: ${(err as Error).message}`, { status: 502 });
     }
@@ -1262,19 +1265,22 @@ export async function POST(req: Request) {
         let upstream: Response;
 
         try {
-          upstream = await fetch(url, {
-            method: "POST", headers: upstreamHeaders,
-            body: JSON.stringify({
-              model,
-              /* Bağlam yönetimi: eski/büyük tool çıktılarını kırp (yapı korunur). */
-              messages: pruneMessages(convo, { keepRecent: 16, maxContentChars: 12000 }),
-              stream: true,
-              tools: allTools,
-              tool_choice: round === MAX_ROUNDS - 1 ? "none" : "auto",
-              ...(supportsUsageStream ? { stream_options: { include_usage: true } } : {}),
-              ...sampling,
-            }),
-          });
+          const toolBody = {
+            model,
+            /* Bağlam yönetimi: eski/büyük tool çıktılarını kırp (yapı korunur). */
+            messages: pruneMessages(convo, { keepRecent: 16, maxContentChars: 12000 }),
+            stream: true,
+            tools: allTools,
+            tool_choice: round === MAX_ROUNDS - 1 ? "none" : "auto",
+            ...(supportsUsageStream ? { stream_options: { include_usage: true } } : {}),
+            ...sampling,
+          };
+          upstream = provider === "anthropic"
+            ? await anthropicUpstream(baseUrl, apiKey, toolBody as unknown as OpenAIChatBody)
+            : await fetch(url, {
+                method: "POST", headers: upstreamHeaders,
+                body: JSON.stringify(toolBody),
+              });
         } catch (err) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**Bağlantı hatası:** ${(err as Error).message}` } }] })}\n\n`));
           break;
