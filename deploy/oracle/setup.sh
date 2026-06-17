@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════
-# craft.ai — Oracle (Always Free) terminal köprüsü TEK-KOMUT kurulumu
+# craft.ai — Oracle (Always Free) HİBRİT köprü TEK-KOMUT kurulumu
 # Ubuntu 22.04 (ARM Ampere A1 veya AMD) üzerinde çalışır. Root/sudo gerekir.
 #
-# Ne yapar:
+# Ne yapar (TEK port, TEK token → terminal + sunucu birlikte):
 #   • Node + derleme araçları (node-pty derlenir) + git
-#   • Terminal köprüsünü /opt/craft-bridge'e kurar, ayrı 'craftbridge'
+#   • Hibrit köprüyü /opt/craft-bridge'e kurar, ayrı 'craftbridge'
 #     kullanıcısıyla (root DEĞİL) çalıştırır → güvenli
+#   • Kalıcı workspace dizini (/opt/craft-bridge/workspace) — repo burada yaşar
 #   • systemd servisi: makine yeniden başlasa bile otomatik açılır
-#   • Caddy ile OTOMATİK HTTPS (yeşil kilit) + ws→wss reverse proxy
+#   • Caddy ile OTOMATİK HTTPS (yeşil kilit) + ws/http reverse proxy
 #   • OS güvenlik duvarında yalnız 80/443 açar
-#   • Sonunda uygulamaya yapıştırılacak  wss://…/?token=…  adresini yazar
+#   • Sonunda uygulamaya yapıştırılacak İKİ adresi yazar:
+#       - Terminal WS URL :  wss://<alan>/?token=…
+#       - Yerel Mod adresi:  https://<alan>   (+ aynı token)
 #
 # Kullanım (repo klonlandıktan sonra):
 #   sudo bash deploy/oracle/setup.sh [alan-adı]
@@ -40,9 +43,10 @@ if ! command -v node >/dev/null 2>&1; then
   apt-get install -y nodejs
 fi
 
-# 2) Köprü dosyaları + ayrı kullanıcı + bağımlılıklar ----------------------
+# 2) Köprü dosyaları + ayrı kullanıcı + kalıcı workspace + bağımlılıklar -----
 id craftbridge >/dev/null 2>&1 || useradd -r -m -d /opt/craft-bridge -s /usr/sbin/nologin craftbridge
 install -d -o craftbridge -g craftbridge /opt/craft-bridge
+install -d -o craftbridge -g craftbridge /opt/craft-bridge/workspace   # repo/projeler burada KALICI yaşar
 cp "$BRIDGE_SRC/bridge.mjs" "$BRIDGE_SRC/package.json" /opt/craft-bridge/
 chown -R craftbridge:craftbridge /opt/craft-bridge
 sudo -u craftbridge bash -lc 'cd /opt/craft-bridge && npm install --omit=dev --no-audit --no-fund'
@@ -58,6 +62,7 @@ WorkingDirectory=/opt/craft-bridge
 Environment=HOST=127.0.0.1
 Environment=PORT=7777
 Environment=TOKEN=${TOKEN}
+Environment=WORK_DIR=/opt/craft-bridge/workspace
 ExecStart=/usr/bin/env node /opt/craft-bridge/bridge.mjs
 Restart=always
 RestartSec=3
@@ -70,7 +75,7 @@ EOF
 systemctl daemon-reload
 systemctl enable --now craft-bridge
 
-# 4) Caddy = otomatik HTTPS + WebSocket reverse proxy ----------------------
+# 4) Caddy = otomatik HTTPS + ws/http reverse proxy (ikisi de 7777'ye) ------
 if ! command -v caddy >/dev/null 2>&1; then
   apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
@@ -96,16 +101,28 @@ netfilter-persistent save >/dev/null 2>&1 || true
 cat <<EOF
 
 ════════════════════════════════════════════════════════════════════════
-✅ KURULUM TAMAM.
+✅ KURULUM TAMAM — TEK sunucu, terminal + gerçek dosya sistemi birlikte.
 
-Uygulamada  Ayarlar → (Gelişmiş) Terminal sunucu adresi  alanına yapıştır:
+Uygulamada Ayarlar'a şu İKİ adresi gir (ikisi de aynı sunucu, aynı token):
 
-    wss://${DOMAIN}/?token=${TOKEN}
+  1) Terminal  →  Terminal WS URL:
+       wss://${DOMAIN}/?token=${TOKEN}
+
+  2) Sunucu    →  Yerel Mod'u AÇ, sonra:
+       Adres : https://${DOMAIN}
+       Token : ${TOKEN}
+
+  (Tek alana yapıştırma kolaylığı: aşağıdaki adres ikisini de kurar)
+       wss://${DOMAIN}/?token=${TOKEN}
+
+Artık repo bağlamadan da çalışır: workspace /opt/craft-bridge/workspace
+içinde KALICI. Mobil Safari/Firefox dahil gerçek terminal + dosya sistemi.
 
 NOTLAR
  • Oracle konsolunda alt ağın (subnet) Security List'ine 80 ve 443 TCP
    "Ingress" kuralı eklemeyi UNUTMA (yoksa dışarıdan erişilemez).
  • HTTPS sertifikası 1-2 dk içinde otomatik alınır (ilk istekte).
  • Durum:   systemctl status craft-bridge caddy
+ • Sağlık:  curl https://${DOMAIN}/health
 ════════════════════════════════════════════════════════════════════════
 EOF
