@@ -289,6 +289,40 @@ async function execReadFile(ctx: RepoCtx, args: { path: string }, cache?: Map<st
   return numbered;
 }
 
+/* str_replace yardımcıları: model old_string'i biraz hatalı kopyalasa bile
+   düzenleme tutar (boşluk-duyarsız) ya da net yön gösterir → ajan tek seferde
+   doğru düzenler (her modelde güvenilirlik). */
+function findWhitespaceTolerant(content: string, target: string): string | null {
+  const cLines = content.split("\n");
+  const tLines = target.split("\n");
+  if (tLines.length === 0) return null;
+  const tNorm = tLines.map((l) => l.trim());
+  let found: string | null = null;
+  for (let i = 0; i + tLines.length <= cLines.length; i++) {
+    let ok = true;
+    for (let j = 0; j < tLines.length; j++) {
+      if (cLines[i + j].trim() !== tNorm[j]) { ok = false; break; }
+    }
+    if (ok) {
+      if (found) return null; // benzersiz değil → güvenli değil, dokunma
+      found = cLines.slice(i, i + tLines.length).join("\n");
+    }
+  }
+  return found;
+}
+
+function closestContext(content: string, target: string): string {
+  const firstLine = target.split("\n").map((l) => l.trim()).find((l) => l.length > 3);
+  if (!firstLine) return "";
+  const cLines = content.split("\n");
+  const idx = cLines.findIndex((l) => { const t = l.trim(); return !!t && (t.includes(firstLine) || firstLine.includes(t)); });
+  if (idx < 0) return "";
+  const from = Math.max(0, idx - 4);
+  const to = Math.min(cLines.length, idx + 5);
+  const snippet = cLines.slice(from, to).join("\n");
+  return `\n\nDosyadaki en yakın bölge (satır ${from + 1}-${to}) — bunu birebir kopyalayıp tekrar dene:\n\`\`\`\n${snippet}\n\`\`\``;
+}
+
 /* str_replace: hedefli düzenleme. old_string birebir + benzersiz eşleşmeli. */
 async function execStrReplace(
   ctx: RepoCtx,
@@ -312,10 +346,16 @@ async function execStrReplace(
     const stripped = oldStr.split("\n").map((l) => l.replace(/^\s*\d+\t/, "")).join("\n");
     if (stripped !== oldStr && content.split(stripped).length - 1 >= 1) oldStr = stripped;
   }
+  /* Tolerans 2: hâlâ eşleşme yoksa satır-bazlı BOŞLUK-DUYARSIZ benzersiz eşleşme
+     dene (girinti/sondaki boşluk farkı) → dosyadaki GERÇEK metni hedef al. */
+  if (content.split(oldStr).length - 1 === 0) {
+    const ws = findWhitespaceTolerant(content, oldStr);
+    if (ws) oldStr = ws;
+  }
 
   const occurrences = content.split(oldStr).length - 1;
   if (occurrences === 0) {
-    return `Hata: old_string '${args.path}' içinde bulunamadı. Önce read_file ile mevcut metni kontrol et (satır numarası ve baştaki '<sayı><TAB>' olmadan, birebir kopyala).`;
+    return `Hata: old_string '${args.path}' içinde bulunamadı. Önce read_file ile mevcut metni kontrol et (satır numarası ve baştaki '<sayı><TAB>' olmadan, birebir kopyala).${closestContext(content, oldStr)}`;
   }
   if (occurrences > 1 && !replaceAll) {
     return `Hata: old_string ${occurrences} kez eşleşti. Benzersiz olması için daha fazla bağlam ekle ya da replace_all:true kullan.`;
