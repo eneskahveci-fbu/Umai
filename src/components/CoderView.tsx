@@ -2287,7 +2287,10 @@ export function CoderView() {
                   return (
                     /* cv-msg: ekran dışı eski mesajları sanallaştırır (akıcı
                        kaydırma). Son mesaj akış/paneller için hariç tutulur. */
-                    <div key={i} className={isLast ? undefined : "cv-msg"}>
+                    <div
+                      key={i}
+                      className={[!isLast && "cv-msg", m.role === "user" && i > 0 && "mt-1 pt-4 border-t border-line/15"].filter(Boolean).join(" ") || undefined}
+                    >
                       <MessageBubble
                         index={i}
                         message={m}
