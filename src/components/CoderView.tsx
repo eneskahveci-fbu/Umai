@@ -215,77 +215,33 @@ function autoSwarm(text: string): boolean {
   return false;
 }
 
-function ThinkingModeToggle() {
+/* ⋯ menüsü içinde kompakt düşünme-eforu seçici. Varsayılan "Oto": efor göreve
+   göre otomatik seçilir; kullanıcı isterse buradan elle geçersiz kılar. Menüyü
+   kapatmamak için tıklamalar stopPropagation ile durdurulur. */
+function EffortMenuControl() {
   const thinkingMode = useStore((s) => s.thinkingMode);
   const setThinkingMode = useStore((s) => s.setThinkingMode);
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, right: 0 });
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const current = THINKING_LEVELS.find((l) => l.key === thinkingMode) ?? THINKING_LEVELS[1];
-
-  const handleOpen = () => {
-    if (btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
-    }
-    setOpen((o) => !o);
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (
-        !btnRef.current?.contains(e.target as Node) &&
-        !dropdownRef.current?.contains(e.target as Node)
-      ) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  const dropdown = open ? (
-    <div
-      ref={dropdownRef}
-      style={{ top: pos.top, right: pos.right, position: "fixed", zIndex: 9999 }}
-      className="bg-surface border border-line rounded-xl shadow-2xl shadow-black/50 p-1 min-w-[140px] animate-fade-in"
-    >
-      <div className="text-[9px] font-bold uppercase tracking-widest text-muted/50 px-2 pt-1 pb-1.5">Efor Seviyesi</div>
-      {THINKING_LEVELS.map((l) => (
-        <button
-          key={l.key}
-          onClick={() => { setThinkingMode(l.key); setOpen(false); }}
-          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[12px] transition-colors ${
-            thinkingMode === l.key
-              ? "bg-brand/15 text-brand font-semibold"
-              : "text-muted hover:text-ink hover:bg-bgsoft"
-          }`}
-        >
-          <span>{l.label}</span>
-          {thinkingMode === l.key && <span className="text-[9px] text-brand/60">●</span>}
-        </button>
-      ))}
-    </div>
-  ) : null;
-
   return (
-    <div className="relative">
-      <button
-        ref={btnRef}
-        onClick={handleOpen}
-        title="Efor seviyesi"
-        className="flex items-center gap-1.5 text-[12px] px-2 py-1.5 rounded-lg transition-colors font-semibold text-brand bg-brand/10 hover:bg-brand/15"
-      >
-        <Brain size={13} />
-        <span className="hidden sm:inline">{current.label}</span>
-        <span className="sm:hidden">{current.short}</span>
-      </button>
-      {typeof document !== "undefined" && createPortal(dropdown, document.body)}
+    <div className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-muted/50 pb-1.5">
+        <Brain size={11} /> Düşünme eforu
+      </div>
+      <div className="flex gap-1">
+        {THINKING_LEVELS.map((l) => (
+          <button
+            key={l.key}
+            onClick={() => setThinkingMode(l.key)}
+            title={l.label}
+            className={`flex-1 px-1.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+              thinkingMode === l.key
+                ? "bg-brand/15 text-brand"
+                : "text-muted hover:text-ink hover:bg-bgsoft"
+            }`}
+          >
+            {l.short}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1964,9 +1920,10 @@ export function CoderView() {
               <VenetianMask size={9} /> Gizli
             </span>
           )}
-          <ThinkingModeToggle />
-          {/* Birleşik ⋯ menüsü: Editör · Terminal · Git · PR · Skills · Dışa aktar */}
+          {/* Birleşik ⋯ menüsü: Düşünme eforu · Editör · Terminal · Git · PR · Skills · Dışa aktar */}
           <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen || toolsEnabled || !!config.safeMode || !!artifact || swarmMode}>
+            <EffortMenuControl />
+            <div className="h-px bg-line my-1" />
             <MoreItem
               icon={<Code2 size={14} />}
               label={editorOpen ? "Editörü kapat" : "Editör (IDE)"}
