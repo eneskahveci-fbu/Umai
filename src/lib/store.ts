@@ -610,11 +610,16 @@ export const useStore = create<StoreState>()((set, get) => ({
   strongestModel: () => {
     const { models } = get().config;
     if (models.length <= 1) return get().activeModel();
+    /* Yalnızca API anahtarı OLAN modeller arasından seç — erişimi olmayan
+       (anahtarsız) bir modele düşüp 403 "No access" almayı önler (ör. preset
+       gpt-4o-mini anahtarsızsa atlanır, aktif modele/anahtarlı güçlüye gidilir). */
+    const pool = models.filter((m) => (m.apiKey || "").trim().length > 0);
+    if (pool.length === 0) return get().activeModel();
     /* En güçlüden zayıfa öncelik sırası — ilk eşleşen yapılandırılmış model
        seçilir; hiçbiri tanınmıyorsa aktif modele düşer. */
     const order = ["opus", "gpt-5", "o4", "o3", "deepseek-reasoner", "sonnet", "claude-3.7", "grok-4", "gpt-4.1", "gemini-2.5-pro", "gpt-4o", "deepseek", "gemini-2.5", "llama-3.3-70b", "70b", "qwen3", "mistral-large", "codestral"];
     for (const key of order) {
-      const m = models.find((x) => `${x.model} ${x.label}`.toLowerCase().includes(key));
+      const m = pool.find((x) => `${x.model} ${x.label}`.toLowerCase().includes(key));
       if (m) return m;
     }
     return get().activeModel();
