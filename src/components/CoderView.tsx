@@ -716,16 +716,16 @@ export function CoderView() {
      kendiliğinden açılmaz; kullanıcı isterse butonla açar. Komut çıktıları
      sohbette "Terminal" todo kutusunda görünür. Bir kez mount olunca kapanmaz. */
   useEffect(() => {
-    if (!repo) return;
     const useWs = !!config.terminalWsUrl?.trim();
-    /* Varsayılan: yalnızca arkaplanda mount (ön plana açılmaz). Kullanıcı
-       ayarlardan "Terminal panelini otomatik aç"ı açıkça seçerse ön plana da gelir. */
-    const mount = () => { setTerminalMounted(true); if (config.autoTerminal) setTerminalOpen(true); };
-    if (useWs) { const id = setTimeout(mount, 0); return () => clearTimeout(id); }
+    /* Terminal HER ZAMAN arka planda mount olur (WS URL'i varsa repo gerekmez) →
+       hep bağlı/hazır, ekranı KAPLAMAZ. Ön plana KENDİLİĞİNDEN açılmaz; kullanıcı
+       üstteki terminal ikonundan açıp bakar. Bir kez mount olunca kapanmaz. */
+    if (useWs) { const id = setTimeout(() => setTerminalMounted(true), 0); return () => clearTimeout(id); }
+    if (!repo) return; // WebContainer (yerel sanal) yalnızca repo bağlıyken
     let alive = true;
-    import("@/lib/webcontainer").then(({ isSupported }) => { if (alive && isSupported()) mount(); });
+    import("@/lib/webcontainer").then(({ isSupported }) => { if (alive && isSupported()) setTerminalMounted(true); });
     return () => { alive = false; };
-  }, [repo, config.autoTerminal, config.terminalWsUrl]);
+  }, [repo, config.terminalWsUrl]);
 
   /* Terminal hazır olduğunda işaretle; kapanınca sıfırla → run_command'ı doğru anda gönder. */
   useEffect(() => {
