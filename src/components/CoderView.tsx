@@ -433,6 +433,10 @@ export function CoderView() {
   /* afterEdit kancası geri-besleme döngü sayacı (her kullanıcı mesajında sıfırlanır,
      turda en çok 3 tur lint→düzelt → sonsuz döngü engellenir). */
   const hookRunsRef = useRef(0);
+  /* Otonom Doğrula-Düzelt: tur sayacı (her kullanıcı mesajında sıfırlanır, en çok
+     5 tur → sonsuz döngü engellenir) + tespit edilen doğrulama komutu önbelleği. */
+  const verifyRunsRef = useRef(0);
+  const verifyCmdRef = useRef<string | null>(null);
   const [repoSearch, setRepoSearch] = useState("");
   const [connecting, setConnecting] = useState(false);
   const connectingRef = useRef(false);
@@ -1129,6 +1133,52 @@ export function CoderView() {
     }
   }, [addToast, runHookCommand]);
 
+  /* Otonom doğrulama komutunu tespit et (repo package.json'ından, bir kez önbelleğe
+     alınır). Öncelik: check > lint (+typecheck/tsc). Bulunamazsa makul varsayılan. */
+  const detectVerifyCommand = useCallback(async (): Promise<string> => {
+    if (verifyCmdRef.current !== null) return verifyCmdRef.current;
+    let cmd = "npm run lint";
+    try {
+      const store = useStore.getState();
+      const r = store.repo;
+      if (r) {
+        const activeRepo = store.config.activeRepo || "";
+        const pkgRaw = isGitLabRepo(activeRepo)
+          ? await fetchGitLabFileContent(r.owner, r.repo, r.branch, "package.json", store.activeGitlab()?.token)
+          : await fetchFileContent(r.owner, r.repo, r.branch, "package.json", store.activeGithub()?.token);
+        const pkg = JSON.parse(pkgRaw) as { scripts?: Record<string, string>; devDependencies?: Record<string, string>; dependencies?: Record<string, string> };
+        const scripts = pkg.scripts ?? {};
+        const hasTs = !!(pkg.devDependencies?.typescript || pkg.dependencies?.typescript || scripts.typecheck);
+        const parts: string[] = [];
+        if (scripts.check) parts.push("npm run check");
+        else {
+          if (scripts.lint) parts.push("npm run lint");
+          if (scripts.typecheck) parts.push("npm run typecheck");
+          else if (hasTs) parts.push("npx tsc --noEmit");
+        }
+        if (parts.length) cmd = parts.join(" && ");
+      }
+    } catch { /* repo/paket okunamadı → varsayılan komut */ }
+    verifyCmdRef.current = cmd;
+    return cmd;
+  }, []);
+
+  /* Otonom Doğrula-Düzelt: ajan bir turda dosya düzenlediyse, arka plandaki terminalde
+     doğrulama komutunu çalıştırır. Çıktı craftai:terminal-output ile ajana OTOMATİK
+     döner → hata varsa düzeltir (sonraki tur tekrar doğrulanır), temizse onaylar.
+     En çok 5 tur (verifyRunsRef) → döngü güvenliği. WS terminal yoksa sessizce atlar. */
+  const runAutoVerify = useCallback(async (edited: boolean) => {
+    const cfg = useStore.getState().config;
+    if (!edited || cfg.autoVerify === false) return;
+    if (!cfg.terminalWsUrl?.trim()) return;
+    if (verifyRunsRef.current >= 5) return;
+    verifyRunsRef.current += 1;
+    const cmd = await detectVerifyCommand();
+    if (!cmd) return;
+    addToast(`🔎 Otonom doğrulama (${verifyRunsRef.current}/5): ${cmd}`, "info");
+    runInTerminal(cmd);
+  }, [addToast, detectVerifyCommand]);
+
   const callApi = useCallback(async (
     overrideAgent?: Agent | null,
     opts?: { continuation?: boolean; depth?: number; noStrongest?: boolean },
@@ -1750,12 +1800,13 @@ export function CoderView() {
     } else if (!abortCtl.signal.aborted) {
       /* Tur tamamlandı (sınırda kesilmedi) → olay kancalarını çalıştır. */
       await runHooks(turnCheckpoints.length > 0);
+      await runAutoVerify(turnCheckpoints.length > 0);
     }
   /* callApi reads the rest of its inputs live via useStore.getState() during
      streaming, so it deliberately keeps a minimal dep set — recreating it on
      every config change would break in-flight requests. */
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.systemPrompt, extractMemory, runHooks]);
+  }, [config.systemPrompt, extractMemory, runHooks, runAutoVerify]);
 
   const send = async () => {
     const text = input.trim();
@@ -1765,6 +1816,7 @@ export function CoderView() {
     if (!store.currentId) store.newChat(incognito);
     setPendingCommit(null);
     hookRunsRef.current = 0; // yeni kullanıcı mesajı → afterEdit döngü sayacını sıfırla
+    verifyRunsRef.current = 0; // otonom doğrulama tur sayacını da sıfırla
     if (store.config.soundEnabled) import("@/lib/sounds").then((m) => m.playSend());
 
     /* slash command algıla */
