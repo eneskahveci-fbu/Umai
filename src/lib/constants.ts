@@ -487,6 +487,7 @@ export const DEFAULT_CONFIG: Config = {
   agentsUseStrongestModel: true,
   cliMode: false,
   autoTerminal: false,
+  autoSwarm: true,
   inlineCompletion: true,
   requireWriteApproval: false,
   safeMode: false,

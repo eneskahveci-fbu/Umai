@@ -179,11 +179,41 @@ function MoreItem({ onClick, icon, label, active }: { onClick: () => void; icon:
 }
 
 const THINKING_LEVELS = [
-  { key: "low",    label: "Düşük", short: "D" },
-  { key: "medium", label: "Orta",  short: "O" },
+  { key: "auto",   label: "Oto",    short: "A" },
+  { key: "low",    label: "Düşük",  short: "D" },
+  { key: "medium", label: "Orta",   short: "O" },
   { key: "high",   label: "Yüksek", short: "Y" },
-  { key: "max",    label: "Max",   short: "M" },
+  { key: "max",    label: "Max",    short: "M" },
 ] as const;
+
+/* Otomatik düşünme eforu: kullanıcı mesajının karmaşıklığına göre efor seçer.
+   Kısa/basit → düşük-orta; uzun/kod/ağır anahtar kelime → yüksek; çok ağır → max.
+   thinkingMode "auto" iken callApi bununla somut efora çözer. */
+function autoEffort(text: string): "low" | "medium" | "high" | "max" {
+  const t = (text || "").trim();
+  const len = t.length;
+  if (/derinlemesine|kapsamlı|baştan (yaz|kur)|comprehensive|in.?depth/i.test(t)) return "max";
+  if (
+    len > 280 ||
+    /```/.test(t) ||
+    /\b(refactor|optimi|debug|implement|mimari|architect|algorithm|performans|g[üu]venlik|security|migrate|taşı|tasarla|yeniden yaz)\b/i.test(t)
+  ) return "high";
+  if (len < 36 && !/\?/.test(t)) return "low";
+  return "medium";
+}
+
+/* Otomatik Ajan Ekibi: yalnızca AÇIKÇA çok-parçalı/çok-adımlı ağır isteklerde
+   true döner (maliyet/sürpriz olmasın diye temkinli eşik; kısa istek → tek ajan). */
+function autoSwarm(text: string): boolean {
+  const t = (text || "").trim();
+  if (t.length < 120) return false;
+  const listItems = (t.match(/^\s*(?:[-*•]|\d+[.)])\s+/gm) || []).length;
+  if (listItems >= 3) return true;
+  const verbs = (t.toLowerCase().match(/\b(ekle|oluştur|yaz|düzenle|refactor|kur|taşı|sil|güncelle|test et|implement|build)\b/g) || []).length;
+  if (verbs >= 4 && t.length > 280) return true;
+  if (/(her .{2,30} için|tüm .{2,40}(?:ler|lar))/i.test(t) && t.length > 200) return true;
+  return false;
+}
 
 function ThinkingModeToggle() {
   const thinkingMode = useStore((s) => s.thinkingMode);
@@ -1150,11 +1180,17 @@ export function CoderView() {
     const store = useStore.getState();
     let active = store.activeModel();
     if (!active) { store.setSettingsOpen(true); return; }
-    /* Ajan Ekibi (swarm) turunda otomatik EN GÜÇLÜ modeli kullan (ayar açıksa)
-       → ekip en yetenekli modelle çalışır. Hata olursa (kredi/anahtar yok) aşağıdaki
-       catch bloğu sessizce AKTİF modele döner ve tekrar dener. */
+    /* Otomatik efor/Ajan-Ekibi için son kullanıcı mesajı. */
+    const _lastUserText = String(store.current()?.messages.findLast?.((m) => m.role === "user")?.content ?? "");
+    /* Ajan Ekibi: kullanıcı elle açtıysa VEYA otomatik eşik (açıkça çok-parçalı
+       ağır istek) tetiklendiyse devreye girer. Devam turlarında otomatik açılmaz. */
+    const useSwarm = swarmModeRef.current
+      || (store.config.autoSwarm !== false && !opts?.continuation && autoSwarm(_lastUserText));
+    /* Ajan Ekibi turunda otomatik EN GÜÇLÜ modeli kullan (ayar açıksa) → ekip en
+       yetenekli modelle çalışır. Hata olursa (kredi/anahtar yok) aşağıdaki catch
+       bloğu sessizce AKTİF modele döner ve tekrar dener. */
     let usedStrongest = false;
-    if (swarmModeRef.current && !opts?.noStrongest && useStore.getState().config.agentsUseStrongestModel !== false) {
+    if (useSwarm && !opts?.noStrongest && useStore.getState().config.agentsUseStrongestModel !== false) {
       const strong = store.strongestModel();
       if (strong && strong.id !== active.id) { active = strong; usedStrongest = true; }
     }
@@ -1272,7 +1308,7 @@ export function CoderView() {
     coderAbort = new AbortController();
     const abortCtl = coderAbort;
 
-    const thinkingMode = store.thinkingMode;
+    const thinkingMode = store.thinkingMode === "auto" ? autoEffort(_lastUserText) : store.thinkingMode;
     let finalSystemPrompt = coderSystemPrompt;
     if (thinkingMode === "medium") {
       finalSystemPrompt += "\n\n[EFOR: ORTA] Yanıtlamadan önce kısa bir iç değerlendirme yap, ardından net ve eksiksiz yanıt ver.";
@@ -1351,7 +1387,7 @@ export function CoderView() {
          Sunucu Pollinations'ı anahtarsız destekler). */
       /* Ajan Ekibi modunda orkestrasyon endpoint'ine git (planlayıcı → paralel
          işçiler → birleştirici). Aynı gövdeyi alır, aynı OpenAI-uyumlu SSE'yi döner. */
-      const endpoint = swarmModeRef.current && !isContinuation ? "/api/orchestrate" : "/api/chat";
+      const endpoint = useSwarm && !isContinuation ? "/api/orchestrate" : "/api/chat";
       const callViaServer = () => fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
