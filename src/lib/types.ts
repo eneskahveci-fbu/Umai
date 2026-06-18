@@ -261,6 +261,10 @@ export interface Config {
   /** Otomatik Ajan Ekibi: açıkça çok-parçalı/çok-adımlı ağır isteklerde swarm
       kendiliğinden devreye girer. Tanımsız = açık. */
   autoSwarm?: boolean;
+  /** Otonom Doğrula-Düzelt: ajan dosya yazınca arka plandaki terminalde otomatik
+      lint/tip/derleme çalışır, hata varsa ajana beslenir → hata kalmayana kadar
+      düzeltir (en çok 5 tur). Tanımsız = açık. */
+  autoVerify?: boolean;
   /** Editörde satır içi (ghost text) AI tamamlama. Aktif modelin API kotasını
       kullandığı için kapatılabilir. Tanımsız = açık. */
   inlineCompletion?: boolean;

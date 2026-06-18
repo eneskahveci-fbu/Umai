@@ -488,6 +488,7 @@ export const DEFAULT_CONFIG: Config = {
   cliMode: false,
   autoTerminal: false,
   autoSwarm: true,
+  autoVerify: true,
   inlineCompletion: true,
   requireWriteApproval: false,
   safeMode: false,
