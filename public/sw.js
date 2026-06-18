@@ -12,7 +12,7 @@
 
    Böylece kurulabilir bir PWA elde edilir ama bayat paket sorunu geri gelmez. */
 
-const VERSION = "craft-v2";
+const VERSION = "craft-v3";
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL_CACHE = `${VERSION}-shell`;
 const OFFLINE_FALLBACK = "/app";
