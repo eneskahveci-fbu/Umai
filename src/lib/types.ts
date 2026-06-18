@@ -258,6 +258,9 @@ export interface Config {
   agentsUseStrongestModel?: boolean;
   cliMode: boolean;
   autoTerminal: boolean;
+  /** Otomatik Ajan Ekibi: açıkça çok-parçalı/çok-adımlı ağır isteklerde swarm
+      kendiliğinden devreye girer. Tanımsız = açık. */
+  autoSwarm?: boolean;
   /** Editörde satır içi (ghost text) AI tamamlama. Aktif modelin API kotasını
       kullandığı için kapatılabilir. Tanımsız = açık. */
   inlineCompletion?: boolean;
