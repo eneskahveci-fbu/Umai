@@ -1,4 +1,6 @@
 import { rateLimit } from "@/lib/rate-limit";
+import { resolveModelAccess } from "@/lib/plan";
+import { isProRequest } from "@/lib/serverPlan";
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/constants";
 import { buildContextSections, type SkillLike } from "@/lib/prompt";
 import type { RepoReadCtx } from "@/lib/repoRead";
@@ -186,10 +188,31 @@ export async function POST(req: Request) {
   let body: OrchestrateRequest;
   try { body = await req.json(); } catch { return new Response("Geçersiz istek gövdesi", { status: 400 }); }
 
-  const baseUrl = (body.baseUrl || process.env.LLM_BASE_URL || "https://router.huggingface.co/v1").replace(/\/$/, "");
-  const model = body.model || process.env.LLM_MODEL || "";
-  const apiKey = body.apiKey || process.env.LLM_API_KEY || "";
-  const provider = (body.provider || "hf") as Provider;
+  /* Pro kapısı (chat route ile aynı): sunucu LLM anahtarı yalnızca Pro'ya; Pro
+     değilse ücretsiz Pollinations'a düş. BYOK herkes için çalışır. */
+  let baseUrl = (body.baseUrl || "").replace(/\/$/, "");
+  let model = body.model || "";
+  let apiKey = body.apiKey || "";
+  let provider = (body.provider || "hf") as Provider;
+  const providerNeedsKey = provider !== "pollinations" && provider !== "ollama";
+  const hasServerKey = !!process.env.LLM_API_KEY;
+  const access = resolveModelAccess({
+    hasClientKey: !!apiKey,
+    providerNeedsKey,
+    hasServerKey,
+    isPro: !apiKey && hasServerKey && providerNeedsKey ? await isProRequest() : false,
+  });
+  if (access === "server") {
+    baseUrl = (body.baseUrl || process.env.LLM_BASE_URL || "https://router.huggingface.co/v1").replace(/\/$/, "");
+    model = body.model || process.env.LLM_MODEL || model;
+    apiKey = process.env.LLM_API_KEY || "";
+  } else if (access === "free-fallback") {
+    baseUrl = "https://text.pollinations.ai/openai";
+    provider = "pollinations" as Provider;
+    model = model || "openai";
+    apiKey = "";
+  }
+  if (!baseUrl) baseUrl = "https://router.huggingface.co/v1";
   if (!model) return new Response("Model seçilmedi.", { status: 400 });
   if (!apiKey && provider !== "pollinations" && provider !== "ollama") {
     return new Response("API anahtarı yok.", { status: 400 });

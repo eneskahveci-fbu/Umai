@@ -11,3 +11,28 @@ export const PRO_FEATURES = {
   readyToUse: "Anahtarsız hazır kullanım (sunucu LLM)",
   unlimitedSync: "Sınırsız bulut senkron",
 } as const;
+
+export type ModelAccess = "client" | "server" | "free-fallback" | "none";
+
+/* Bir LLM isteği hangi anahtarla servis edilmeli? SAF + test edilebilir karar.
+   MUTLAK KURAL: BYOK ve anahtar gerektirmeyen sağlayıcılar HER ZAMAN çalışır;
+   sunucunun (ücretli) anahtarı YALNIZCA Pro'ya açılır. Pro değilse ücretsiz
+   Pollinations'a düşülür → ücretsiz kullanıcı yine yanıt alır (kırılma yok).
+
+   - "client"        : istemci kendi anahtarını/sağlayıcısını verdi ya da sağlayıcı
+                       anahtar istemiyor (pollinations/ollama) → olduğu gibi kullan.
+   - "server"        : istemci anahtarsız + sunucu anahtarı var + kullanıcı Pro → sunucu LLM.
+   - "free-fallback" : istemci anahtarsız + sunucu anahtarı var ama kullanıcı Pro değil
+                       → ücretsiz Pollinations'a düş.
+   - "none"          : istemci anahtarsız + sunucu anahtarı yok → mevcut "anahtar yok" hatası. */
+export function resolveModelAccess(opts: {
+  hasClientKey: boolean;
+  providerNeedsKey: boolean;
+  hasServerKey: boolean;
+  isPro: boolean;
+}): ModelAccess {
+  if (opts.hasClientKey || !opts.providerNeedsKey) return "client";
+  if (!opts.hasServerKey) return "none";
+  return opts.isPro ? "server" : "free-fallback";
+}
+
