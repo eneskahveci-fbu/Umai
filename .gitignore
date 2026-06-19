@@ -47,3 +47,8 @@ next-env.d.ts
 # Capacitor native projeleri (kendi makinende üretilir)
 /ios/
 /android/
+
+# Playwright E2E
+/test-results/
+/playwright-report/
+/playwright/.cache/
