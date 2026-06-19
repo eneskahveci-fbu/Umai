@@ -91,6 +91,7 @@ import { ALL_AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
 import { buildContextSections } from "@/lib/prompt";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
+import { CRAFT_OPERATING_MANUAL } from "@/lib/constants";
 import { addPendingAction, removePendingAction, isCommandAllowed, matchDangerousCommand, DEFAULT_COMMAND_ALLOWLIST, type PendingAction } from "@/lib/agentActions";
 
 declare global {
@@ -1289,6 +1290,7 @@ export function CoderView() {
     const activeProject = config.projects.find((p) => p.id === config.activeProjectId);
     const coderSystemPrompt = [
       config.systemPrompt,
+      CRAFT_OPERATING_MANUAL,
       agent
         ? agent.systemPrompt + ((store.toolsEnabled && (!!store.repo || (store.config.localMode && store.config.localBridgeUrl?.trim())))
             ? "\n\n[Araçlar açık] Tahmin etme — gerektiğinde read_file/read_files/grep/glob ile ilgili dosyaları incele, git_diff/git_log/git_blame ile değişiklikleri ve geçmişi gör, discover_rules ile proje kurallarını (CLAUDE.md/.rules) oku. ÖNCE keşfet, SONRA yanıtla; iddialarını dosya kanıtına dayandır."
