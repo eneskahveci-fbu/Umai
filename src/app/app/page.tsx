@@ -97,6 +97,13 @@ export default function AppPage() {
   return (
     <ErrorBoundary>
       <div className="flex h-screen overflow-hidden bg-bg">
+        {/* Erişilebilirlik: klavyeyle ilk Tab'da görünen "içeriğe atla" bağlantısı. */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-brand focus:text-[#111110] focus:font-semibold focus:text-sm focus:shadow-lg"
+        >
+          İçeriğe atla
+        </a>
         <Sidebar />
 
         {sidebarOpen && (
@@ -107,6 +114,8 @@ export default function AppPage() {
         )}
 
         <main
+          id="main-content"
+          tabIndex={-1}
           className={`flex-1 min-w-0 flex flex-col transition-[margin] duration-300 ease-in-out ${
             sidebarOpen ? "md:ml-64" : "md:ml-14"
           }`}

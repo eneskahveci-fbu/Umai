@@ -1,5 +1,29 @@
 import type { NextConfig } from "next";
 
+/* CSP politikası — tek kaynak. connect-src https:/wss: geniş (BYOK doğrudan
+   çağrılar); WebContainer için eval/blob izinli. */
+const CSP_VALUE = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' https: wss: blob:",
+  "worker-src 'self' blob:",
+  "frame-src 'self' blob:",
+  "media-src 'self' blob: data:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join("; ");
+
+/* CSP_ENFORCE=1 → gerçek engelleyici CSP. Aksi halde Report-Only (varsayılan):
+   hiçbir şeyi engellemez, yalnızca ihlalleri raporlar → canlı site bozulmaz.
+   Sahip, raporları doğruladıktan sonra tek env bayrağıyla enforce'a geçer. */
+const CSP_HEADER = process.env.CSP_ENFORCE === "1"
+  ? { key: "Content-Security-Policy", value: CSP_VALUE }
+  : { key: "Content-Security-Policy-Report-Only", value: CSP_VALUE };
+
 const SECURITY_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
@@ -10,30 +34,9 @@ const SECURITY_HEADERS = [
     value: "camera=(), microphone=(self), geolocation=(), browsing-topics=()",
   },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
-  /* HSTS — tarayıcıya bu siteyi yalnızca HTTPS ile aç dedirtir. Üretimde
-     güvenli; localhost'u etkilemez. */
+  /* HSTS — tarayıcıya bu siteyi yalnızca HTTPS ile aç dedirtir. */
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
-  /* CSP — ÖNCE Report-Only: hiçbir şeyi ENGELLEMEZ, yalnızca ihlalleri raporlar.
-     Böylece canlı site/BYOK doğrudan çağrıları bozulmadan politika olgunlaştırılır.
-     (connect-src https:/wss: geniş — kullanıcı kendi sağlayıcısına çağrı yapar;
-     WebContainer için eval/blob izinli.) */
-  {
-    key: "Content-Security-Policy-Report-Only",
-    value: [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https:",
-      "font-src 'self' data:",
-      "connect-src 'self' https: wss: blob:",
-      "worker-src 'self' blob:",
-      "frame-src 'self' blob:",
-      "media-src 'self' blob: data:",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join("; "),
-  },
+  CSP_HEADER,
 ];
 
 /* WebContainer needs cross-origin isolation (SharedArrayBuffer).
