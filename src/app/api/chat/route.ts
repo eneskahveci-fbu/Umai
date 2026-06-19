@@ -1,4 +1,6 @@
 import { rateLimit } from "@/lib/rate-limit";
+import { resolveModelAccess } from "@/lib/plan";
+import { isProRequest } from "@/lib/serverPlan";
 import { anthropicUpstream, type OpenAIChatBody } from "@/lib/anthropic";
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/constants";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
@@ -1060,10 +1062,34 @@ export async function POST(req: Request) {
   let body: ChatRequest;
   try { body = await req.json(); } catch { return new Response("Geçersiz istek gövdesi", { status: 400 }); }
 
-  const baseUrl = (body.baseUrl || process.env.LLM_BASE_URL || "https://router.huggingface.co/v1").replace(/\/$/, "");
-  const model = body.model || process.env.LLM_MODEL || "";
-  const apiKey = body.apiKey || process.env.LLM_API_KEY || "";
-  const provider = body.provider || "hf";
+  /* Pro kapısı: sunucunun (ücretli) LLM anahtarı YALNIZCA Pro kullanıcıya açılır.
+     BYOK ve anahtar gerektirmeyen sağlayıcılar herkes için çalışır; Pro değilse
+     ücretsiz Pollinations'a düşülür → kırılma olmaz (bkz. resolveModelAccess). */
+  let baseUrl = (body.baseUrl || "").replace(/\/$/, "");
+  let model = body.model || "";
+  let apiKey = body.apiKey || "";
+  let provider: string = body.provider || "hf";
+  const providerNeedsKey = provider !== "pollinations" && provider !== "ollama" && provider !== "local";
+  const hasServerKey = !!process.env.LLM_API_KEY;
+
+  const access = resolveModelAccess({
+    hasClientKey: !!apiKey,
+    providerNeedsKey,
+    hasServerKey,
+    isPro: !apiKey && hasServerKey && providerNeedsKey ? await isProRequest() : false,
+  });
+  if (access === "server") {
+    baseUrl = (body.baseUrl || process.env.LLM_BASE_URL || "https://router.huggingface.co/v1").replace(/\/$/, "");
+    model = body.model || process.env.LLM_MODEL || model;
+    apiKey = process.env.LLM_API_KEY || "";
+  } else if (access === "free-fallback") {
+    /* Pro olmayan, anahtarsız istek → ücretsiz Pollinations (yine yanıt alır). */
+    baseUrl = "https://text.pollinations.ai/openai";
+    provider = "pollinations";
+    model = model || "openai";
+    apiKey = "";
+  }
+  if (!baseUrl) baseUrl = "https://router.huggingface.co/v1";
 
   if (!model) return new Response("Model seçilmedi.", { status: 400 });
   /* pollinations ve ollama API anahtarı gerektirmez */
