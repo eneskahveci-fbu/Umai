@@ -1100,7 +1100,8 @@ export function SettingsModal() {
               </label>
             </div>
 
-            {/* WebContainer API key */}
+            {/* WebContainer API key — yalnız admin */}
+            {isAdmin && (
             <div>
               <h4 className="text-sm font-bold mb-1">WebContainer API Key</h4>
               <p className="text-xs text-muted/70 mb-2 leading-relaxed">
@@ -1121,6 +1122,7 @@ export function SettingsModal() {
                 autoComplete="off"
               />
             </div>
+            )}
 
             {/* Hassas sunucu/terminal ayarları — yalnız admin görür (yeni kullanıcılar gizli) */}
             {isAdmin && (

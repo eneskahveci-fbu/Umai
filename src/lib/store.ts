@@ -32,6 +32,17 @@ const CONFIG_KEY = "craftai_config";
 const CHATS_KEY = "craftai_chats";
 const SNIPPETS_KEY = "craftai_snippets";
 const GUEST_KEY = "craftai_guest";
+/* Yerel config'in HANGİ kullanıcıya ait olduğu. Farklı kullanıcı giriş yaparsa
+   önceki kullanıcının modeli/git'i sızmasın diye birleştirme YAPILMAZ. */
+const CONFIG_OWNER_KEY = "craftai_config_owner";
+function getConfigOwner(): string | null {
+  if (typeof window === "undefined") return null;
+  try { return window.localStorage.getItem(CONFIG_OWNER_KEY); } catch { return null; }
+}
+function setConfigOwner(id: string | null): void {
+  if (typeof window === "undefined") return;
+  try { if (id) window.localStorage.setItem(CONFIG_OWNER_KEY, id); else window.localStorage.removeItem(CONFIG_OWNER_KEY); } catch { /* yok */ }
+}
 
 /* Guest mode: API keys/tokens live in sessionStorage so they vanish on
    browser/tab close. Useful on shared machines. The flag itself is in
@@ -475,7 +486,21 @@ export const useStore = create<StoreState>()((set, get) => ({
   userId: null,
   plan: "free",
   userEmail: null,
-  setUser: (id, email) => set({ userId: id, userEmail: email }),
+  setUser: (id, email) => {
+    const prev = get().userId;
+    set({ userId: id, userEmail: email });
+    /* Çıkış (önceki kullanıcı vardı, şimdi yok) → yerel config'i temizle ki
+       önceki kullanıcının modelleri/git hesapları tarayıcıda kalmasın. Sonraki
+       giriş owner kontrolüyle zaten kendi config'ini yükler. */
+    if (!id && prev) {
+      const clean: Config = { ...DEFAULT_CONFIG };
+      applyTheme(clean.theme ?? "dark");
+      const store = getStore();
+      if (store) { try { store.setItem(CONFIG_KEY, JSON.stringify(clean)); } catch { /* yok */ } }
+      setConfigOwner(null);
+      set({ config: clean, chats: [], currentId: null });
+    }
+  },
   loadPlan: async (userId) => {
     if (!userId) { set({ plan: "free" }); return; }
     const sb = createClient();
@@ -522,6 +547,7 @@ export const useStore = create<StoreState>()((set, get) => ({
        kullanıcı tek seferlik bir uyarı görür (tablo/RLS eksikse "kayboluyor"
        hissinin sessiz kalmaması için). */
     const { userId } = get();
+    if (userId) setConfigOwner(userId);
     if (userId && !isGuestMode()) pushCloudConfig(get, userId, c);
   },
   rehydrateSecrets: async () => {
@@ -562,19 +588,26 @@ export const useStore = create<StoreState>()((set, get) => ({
         get().addToast("Hesap senkronu okunamadı — Supabase 'user_config' tablosunu kontrol et.", "error");
         return;
       }
-      const local = get().config;
-      if (data?.config) {
-        /* Uzak config var → yerelle birleştir (anahtar/model kaybetmeden). */
-        const merged = mergeConfigs(local, data.config as Partial<Config>);
-        applyTheme(merged.theme ?? "dark");
+      const remote = (data?.config ?? null) as Partial<Config> | null;
+      const owner = getConfigOwner();
+      const apply = (cfg: Config) => {
+        applyTheme(cfg.theme ?? "dark");
         const store = getStore();
-        if (store) store.setItem(CONFIG_KEY, JSON.stringify(merged));
-        set({ config: merged });
-        /* Birleşmiş hali buluta geri yaz ki tüm cihazlar aynı kümeyi görsün. */
-        pushCloudConfig(get, userId, merged);
+        if (store) store.setItem(CONFIG_KEY, JSON.stringify(cfg));
+        set({ config: cfg });
+        setConfigOwner(userId);
+      };
+      if (owner === userId) {
+        /* Aynı kullanıcı → cihazlar arası birleştir (model/git kaybetme). */
+        const local = get().config;
+        if (remote) { const merged = mergeConfigs(local, remote); apply(merged); pushCloudConfig(get, userId, merged); }
+        else { apply(local); pushCloudConfig(get, userId, local); }
       } else {
-        /* İlk giriş → yerel config'i buluta kaydet. */
-        pushCloudConfig(get, userId, local);
+        /* Farklı kullanıcı (veya bu hesap bu tarayıcıda ilk kez) → YEREL config'i
+           KULLANMA (önceki kullanıcının modeli/git'i sızmasın). Buluttaki kendi
+           config'i varsa onu TEMİZ tabana uygula; yoksa temiz varsayılan (Pollinations). */
+        if (remote) { apply(mergeConfigs(DEFAULT_CONFIG, remote)); }
+        else { apply({ ...DEFAULT_CONFIG }); pushCloudConfig(get, userId, DEFAULT_CONFIG); }
       }
     } catch {
       get().addToast("Hesap senkronu sırasında hata oluştu.", "error");

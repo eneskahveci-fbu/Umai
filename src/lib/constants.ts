@@ -477,8 +477,12 @@ export const POLLINATIONS_DEFAULT_MODEL: ModelProfile = {
 };
 
 export const DEFAULT_CONFIG: Config = {
-  models: [],
-  activeModelId: null,
+  /* Her hesapta hazır gelen ücretsiz, anahtarsız model (Pollinations). Kullanıcı
+     kendi modellerini ekleyebilir; bu varsayılan herkeste kalır. */
+  models: [
+    { id: "pollinations-free", label: "Pollinations (Ücretsiz)", provider: "pollinations", baseUrl: "https://text.pollinations.ai/openai", model: "openai", apiKey: "" },
+  ],
+  activeModelId: "pollinations-free",
   providerKeys: {},
   githubAccounts: [],
   activeGithubId: null,
