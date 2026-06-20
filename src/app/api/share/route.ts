@@ -51,7 +51,12 @@ export async function GET(req: NextRequest) {
   const sb = await createClient();
   if (!sb) return NextResponse.json({ error: "Veritabanı bağlantısı yok" }, { status: 503 });
 
-  const { data, error } = await sb.from("shared_chats").select("*").eq("id", id).single();
+  /* Yalnız herkese açık alanları seç — sahip kimliği (user_id) sızdırma. */
+  const { data, error } = await sb
+    .from("shared_chats")
+    .select("id, title, messages, created_at")
+    .eq("id", id)
+    .single();
   if (error || !data) return NextResponse.json({ error: "Sohbet bulunamadı" }, { status: 404 });
 
   return NextResponse.json(data);

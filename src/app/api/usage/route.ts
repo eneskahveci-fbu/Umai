@@ -1,4 +1,5 @@
 import { rateLimit } from "@/lib/rate-limit";
+import { isSafeRemoteUrl } from "@/lib/urlSafety";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -37,6 +38,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Geçersiz istek" }, { status: 400 });
   }
   if (!apiKey) return NextResponse.json({ supported: false, note: "Anahtar yok" } satisfies UsageResult);
+  /* SSRF: baseUrl istemciden gelir → canlıda iç ağ/loopback/metadata adreslerini
+     reddet (yerelde localhost meşru). Boş baseUrl güvenli varsayılana düşer. */
+  if (process.env.NODE_ENV === "production" && baseUrl && !isSafeRemoteUrl(baseUrl)) {
+    return NextResponse.json({ error: "Güvensiz baseUrl" }, { status: 400 });
+  }
 
   try {
     /* ── OpenRouter: en zengin kota verisi ── */
