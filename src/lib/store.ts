@@ -354,6 +354,8 @@ interface StoreState {
   setSettingsOpen: (b: boolean) => void;
   imageStudioOpen: boolean;
   setImageStudioOpen: (b: boolean) => void;
+  designStudioOpen: boolean;
+  setDesignStudioOpen: (b: boolean) => void;
   streaming: boolean;
   setStreaming: (b: boolean) => void;
 
@@ -875,6 +877,8 @@ export const useStore = create<StoreState>()((set, get) => ({
   setSettingsOpen: (b) => set({ settingsOpen: b }),
   imageStudioOpen: false,
   setImageStudioOpen: (b) => set({ imageStudioOpen: b }),
+  designStudioOpen: false,
+  setDesignStudioOpen: (b) => set({ designStudioOpen: b }),
   streaming: false,
   setStreaming: (b) => set({ streaming: b }),
 

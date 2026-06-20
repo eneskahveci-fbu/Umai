@@ -77,6 +77,7 @@ export function Sidebar() {
   const pinChat = useStore((s) => s.pinChat);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const setImageStudioOpen = useStore((s) => s.setImageStudioOpen);
+  const setDesignStudioOpen = useStore((s) => s.setDesignStudioOpen);
   const sidebarOpen = useStore((s) => s.sidebarOpen);
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
   const addProject = useStore((s) => s.addProject);
@@ -335,6 +336,13 @@ export function Sidebar() {
         >
           <ImageIcon size={15} className="text-brand" /> Görüntü Stüdyosu
           <span className="ml-auto text-[9px] font-bold uppercase tracking-wider text-brand/70 bg-brand/10 px-1.5 py-0.5 rounded">Ücretsiz</span>
+        </button>
+        <button
+          onClick={() => setDesignStudioOpen(true)}
+          className="premium-card w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-ink/80 hover:text-ink hover:border-brand/40 transition-all hover:-translate-y-0.5"
+        >
+          <Code2 size={15} className="text-brand" /> Tasarım Stüdyosu
+          <span className="ml-auto text-[9px] font-bold uppercase tracking-wider text-brand/70 bg-brand/10 px-1.5 py-0.5 rounded">Canlı</span>
         </button>
       </div>
 
