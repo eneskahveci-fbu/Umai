@@ -180,10 +180,11 @@ export const PROVIDER_MODELS: Record<Provider, string[]> = {
   deepseek: ["deepseek-chat", "deepseek-reasoner"],
   openrouter: [
     "deepseek/deepseek-chat-v3-0324:free",
+    "qwen/qwen3-coder:free",
     "deepseek/deepseek-r1:free",
+    "qwen/qwen-2.5-coder-32b-instruct",
     "meta-llama/llama-3.3-70b-instruct:free",
     "google/gemini-2.0-flash-exp:free",
-    "qwen/qwen-2.5-coder-32b-instruct",
     "openai/gpt-4o-mini",
   ],
   groq: [

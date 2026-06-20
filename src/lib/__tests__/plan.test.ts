@@ -31,7 +31,7 @@ describe("resolveModelAccess — Pro kapısı (MUTLAK KURAL: BYOK hep çalışı
     expect(resolveModelAccess({ ...base, isPro: false })).toBe("free-fallback");
   });
 
-  it("anahtarsız + sunucu anahtarı YOK → 'none' (mevcut hata)", () => {
-    expect(resolveModelAccess({ ...base, hasServerKey: false })).toBe("none");
+  it("anahtarsız + sunucu anahtarı YOK → 'free-fallback' (sert hata yok, Pollinations'a düşer)", () => {
+    expect(resolveModelAccess({ ...base, hasServerKey: false })).toBe("free-fallback");
   });
 });

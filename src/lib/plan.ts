@@ -32,7 +32,10 @@ export function resolveModelAccess(opts: {
   isPro: boolean;
 }): ModelAccess {
   if (opts.hasClientKey || !opts.providerNeedsKey) return "client";
-  if (!opts.hasServerKey) return "none";
-  return opts.isPro ? "server" : "free-fallback";
+  /* Sunucu anahtarı + Pro → ücretli sunucu LLM. Aksi her durumda (sunucu
+     anahtarı yok ya da Pro değil) SERT HATA verme — ücretsiz Pollinations'a
+     düş ki kullanıcı her zaman yanıt alsın (kırılma yok). */
+  if (opts.hasServerKey && opts.isPro) return "server";
+  return "free-fallback";
 }
 
