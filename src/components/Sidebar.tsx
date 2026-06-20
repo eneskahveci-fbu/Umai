@@ -11,6 +11,7 @@ import {
   Layers,
   MessageSquare,
   Moon,
+  Image as ImageIcon,
   Pencil,
   Pin,
   Plus,
@@ -75,6 +76,7 @@ export function Sidebar() {
   const tagChat = useStore((s) => s.tagChat);
   const pinChat = useStore((s) => s.pinChat);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
+  const setImageStudioOpen = useStore((s) => s.setImageStudioOpen);
   const sidebarOpen = useStore((s) => s.sidebarOpen);
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
   const addProject = useStore((s) => s.addProject);
@@ -320,12 +322,19 @@ export function Sidebar() {
       </div>
 
       {/* New session */}
-      <div className="px-3 py-3 border-b border-line/60 shrink-0">
+      <div className="px-3 py-3 border-b border-line/60 shrink-0 space-y-2">
         <button
           onClick={() => newChat(false)}
-          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-brand hover:bg-branddim text-[#111110] font-semibold text-sm transition-colors"
+          className="btn-brand-glow w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[#111110] font-semibold text-sm transition-transform hover:-translate-y-0.5"
         >
           <Plus size={15} /> Yeni Oturum
+        </button>
+        <button
+          onClick={() => setImageStudioOpen(true)}
+          className="premium-card w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-ink/80 hover:text-ink hover:border-brand/40 transition-all hover:-translate-y-0.5"
+        >
+          <ImageIcon size={15} className="text-brand" /> Görüntü Stüdyosu
+          <span className="ml-auto text-[9px] font-bold uppercase tracking-wider text-brand/70 bg-brand/10 px-1.5 py-0.5 rounded">Ücretsiz</span>
         </button>
       </div>
 
