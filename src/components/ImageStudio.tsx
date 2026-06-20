@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, ImageIcon, Loader2, Sparkles, Wand2, X } from "lucide-react";
+import { Download, ImageIcon, Loader2, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 
 /* Görüntü Stüdyosu — ücretsiz, anahtarsız görüntü üretimi (Pollinations image).
@@ -63,6 +63,8 @@ export function ImageStudio() {
 
   const mark = (id: string, patch: Partial<GenItem>) =>
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+
+  const remove = (id: string) => setItems((prev) => prev.filter((it) => it.id !== id));
 
   const download = async (it: GenItem) => {
     try {
@@ -173,15 +175,24 @@ export function ImageStudio() {
                         onError={() => mark(it.id, { loading: false, error: true })}
                       />
                     )}
-                    {!it.loading && !it.error && (
+                    <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-0 group-hover/img:opacity-100 transition-opacity">
+                      {!it.loading && !it.error && (
+                        <button
+                          onClick={() => download(it)}
+                          className="w-8 h-8 grid place-items-center rounded-lg bg-bg/70 backdrop-blur text-ink/80 hover:text-brand"
+                          title="İndir"
+                        >
+                          <Download size={14} />
+                        </button>
+                      )}
                       <button
-                        onClick={() => download(it)}
-                        className="absolute top-2 right-2 w-8 h-8 grid place-items-center rounded-lg bg-bg/70 backdrop-blur text-ink/80 hover:text-brand opacity-0 group-hover/img:opacity-100 transition-opacity"
-                        title="İndir"
+                        onClick={() => remove(it.id)}
+                        className="w-8 h-8 grid place-items-center rounded-lg bg-bg/70 backdrop-blur text-ink/80 hover:text-red"
+                        title="Sil"
                       >
-                        <Download size={14} />
+                        <Trash2 size={14} />
                       </button>
-                    )}
+                    </div>
                   </div>
                   <p className="px-3 py-2 text-[11px] text-muted/60 line-clamp-2 leading-snug">{it.prompt}</p>
                 </div>

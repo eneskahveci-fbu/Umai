@@ -70,6 +70,7 @@ const RealTerminal = dynamic(() => import("./RealTerminal").then((m) => m.RealTe
   ),
 });
 import { useStore } from "@/lib/store";
+import { isAdminEmail } from "@/lib/admin";
 import { MessageBubble } from "./MessageBubble";
 import { SlashMenu } from "./SlashMenu";
 import { MentionMenu } from "./MentionMenu";
@@ -382,6 +383,7 @@ const RAG_MAX_FILES = 150;
 
 export function CoderView() {
   const config = useStore((s) => s.config);
+  const isAdmin = isAdminEmail(useStore((s) => s.userEmail));
   const repo = useStore((s) => s.repo);
   const tree = useStore((s) => s.tree);
   const chats = useStore((s) => s.chats);
@@ -2031,12 +2033,14 @@ export function CoderView() {
               active={editorOpen}
               onClick={() => setEditorOpen((v) => !v)}
             />
-            <MoreItem
-              icon={<Terminal size={14} />}
-              label={terminalSupported ? (terminalOpen ? "Terminal'i kapat" : "Terminal") : "Terminal (masaüstü Chrome/Edge)"}
-              active={terminalOpen}
-              onClick={() => { setTerminalMounted(true); setTerminalOpen((v) => !v); }}
-            />
+            {isAdmin && (
+              <MoreItem
+                icon={<Terminal size={14} />}
+                label={terminalSupported ? (terminalOpen ? "Terminal'i kapat" : "Terminal") : "Terminal (masaüstü Chrome/Edge)"}
+                active={terminalOpen}
+                onClick={() => { setTerminalMounted(true); setTerminalOpen((v) => !v); }}
+              />
+            )}
             <MoreItem icon={<GitBranch size={14} />} label="Git & PR (dal, PR/MR, incele)" active={gitPanelOpen} onClick={() => setGitPanelOpen((v) => !v)} />
             <MoreItem icon={<FolderOpen size={14} />} label="Dosyalar (depo)" active={filesOpen} onClick={() => setFilesOpen((v) => !v)} />
             {localActive && (
