@@ -1,16 +1,11 @@
 import { createBrowserClient } from "@supabase/ssr";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, supabaseConfigured } from "./config";
 
-/** Supabase ortam değişkenleri tanımlı mı? Değilse uygulama localStorage moduna düşer. */
-export const supabaseConfigured = Boolean(
-  process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-);
+/** Supabase env'leri (ya da fallback sabitleri) tanımlı mı? */
+export { supabaseConfigured };
 
 /** Tarayıcı tarafı Supabase istemcisi. Yapılandırılmamışsa null döner. */
 export function createClient() {
   if (!supabaseConfigured) return null;
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
+  return createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
