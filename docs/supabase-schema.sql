@@ -36,6 +36,9 @@ create table if not exists public.chats (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- Sohbetin ait olduğu proje (cihazlar arası senkron). Uygulama okur/yazar;
+-- eski kurulumlarda idempotent eklenir.
+alter table public.chats add column if not exists project_id text;
 alter table public.chats enable row level security;
 create index if not exists chats_user_id_idx on public.chats(user_id);
 drop policy if exists "chats sahibi" on public.chats;
