@@ -6,7 +6,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
    `webDir` (mobile/) içindeki yerel yedek gösterilir. */
 const config: CapacitorConfig = {
   appId: "ai.craftcoder.app",
-  appName: "Craft.Coder",
+  appName: "Craft Coder",
   webDir: "mobile",
   server: {
     // Üretim URL'i; geliştirme için CAP_SERVER_URL ile geçersiz kıl.
