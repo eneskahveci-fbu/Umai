@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { CoderView } from "@/components/CoderView";
 import { SettingsModal } from "@/components/SettingsModal";
+import { ImageStudio } from "@/components/ImageStudio";
 import { LibraryModal } from "@/components/LibraryModal";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ToastContainer } from "@/components/Toast";
@@ -124,6 +125,7 @@ export default function AppPage() {
         </main>
 
         <SettingsModal />
+        <ImageStudio />
         <LibraryModal />
         <CommandPalette />
         <KeyboardShortcuts />
