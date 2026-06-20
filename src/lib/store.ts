@@ -907,6 +907,7 @@ export const useStore = create<StoreState>()((set, get) => ({
                 user_id: userId,
                 title: c.title,
                 messages: c.messages,
+                project_id: c.projectId ?? null,
                 created_at: new Date(c.created_at).toISOString(),
                 updated_at: new Date().toISOString(),
               })),
@@ -1200,6 +1201,7 @@ export const useStore = create<StoreState>()((set, get) => ({
           user_id: userId,
           title: chat.title,
           messages: chat.messages,
+          project_id: chat.projectId ?? null,
           created_at: new Date(chat.created_at).toISOString(),
           updated_at: new Date().toISOString(),
         });
