@@ -1083,10 +1083,12 @@ export async function POST(req: Request) {
     model = body.model || process.env.LLM_MODEL || model;
     apiKey = process.env.LLM_API_KEY || "";
   } else if (access === "free-fallback") {
-    /* Pro olmayan, anahtarsız istek → ücretsiz Pollinations (yine yanıt alır). */
+    /* Anahtarsız istek → ücretsiz Pollinations (yine yanıt alır, kırılma yok).
+       Seçili model BAŞKA sağlayıcıya ait (ör. deepseek/...:free) — Pollinations'ta
+       o ID yok, korunursa 404 olur. Geçerli bir Pollinations modeline eşle. */
     baseUrl = "https://text.pollinations.ai/openai";
     provider = "pollinations";
-    model = model || "openai";
+    model = "openai";
     apiKey = "";
   }
   if (!baseUrl) baseUrl = "https://router.huggingface.co/v1";
