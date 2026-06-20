@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { CoderView } from "@/components/CoderView";
 import { SettingsModal } from "@/components/SettingsModal";
@@ -19,7 +20,7 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { useStore } from "@/lib/store";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, supabaseConfigured } from "@/lib/supabase/client";
 import { registerServiceWorker, watchConnection } from "@/lib/sw-register";
 
 export default function AppPage() {
@@ -28,6 +29,12 @@ export default function AppPage() {
   const setUser = useStore((s) => s.setUser);
   const loadChats = useStore((s) => s.loadChats);
   const syncConfig = useStore((s) => s.syncConfig);
+  const router = useRouter();
+  /* Giriş zorunlu: Supabase yapılandırılmışsa oturumsuz kullanıcı uygulamayı
+     açamaz, login/kayıt ekranına gider. Supabase yoksa (yerel mod) serbest. */
+  const [authState, setAuthState] = useState<"checking" | "in" | "out">(
+    supabaseConfigured ? "checking" : "in",
+  );
 
   useEffect(() => {
     if (window.innerWidth >= 768) setSidebarOpen(false);
@@ -61,6 +68,7 @@ export default function AppPage() {
       loadChats(u?.id ?? null);
       void useStore.getState().loadPlan(u?.id ?? null);
       if (u?.id) void syncConfig(u.id);
+      setAuthState(u ? "in" : "out");
     });
     const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
       const u = session?.user;
@@ -68,6 +76,7 @@ export default function AppPage() {
       loadChats(u?.id ?? null);
       void useStore.getState().loadPlan(u?.id ?? null);
       if (u?.id) void syncConfig(u.id);
+      setAuthState(u ? "in" : "out");
     });
     return () => sub.subscription.unsubscribe();
   }, [setUser, loadChats, syncConfig]);
@@ -120,6 +129,18 @@ export default function AppPage() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  /* Oturumsuz → login ekranına yönlendir (giriş zorunlu). */
+  useEffect(() => {
+    if (authState === "out") router.replace("/login");
+  }, [authState, router]);
+
+  if (authState === "checking") {
+    return <div className="h-screen grid place-items-center bg-bg text-muted/60 text-sm">Yükleniyor…</div>;
+  }
+  if (authState === "out") {
+    return <div className="h-screen grid place-items-center bg-bg text-muted/60 text-sm">Giriş ekranına yönlendiriliyor…</div>;
+  }
 
   return (
     <ErrorBoundary>

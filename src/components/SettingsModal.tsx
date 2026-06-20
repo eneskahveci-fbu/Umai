@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
 import { isAdminEmail } from "@/lib/admin";
+import { createClient } from "@/lib/supabase/client";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, ALL_TOOL_CATALOG } from "@/lib/constants";
 import { calculateCost, formatCost } from "@/lib/pricing";
 import { fetchUserRepos } from "@/lib/github";
@@ -36,6 +37,14 @@ export function SettingsModal() {
   /* Admin kapısı: hassas sunucu/terminal ayarları yalnız admin e-postasına açık.
      Liste boşken (kurulum öncesi) herkese açık — kimse kilitlenmez. */
   const isAdmin = isAdminEmail(useStore((s) => s.userEmail));
+  const userEmail = useStore((s) => s.userEmail);
+  const plan = useStore((s) => s.plan);
+  const signOut = async () => {
+    const sb = createClient();
+    if (sb) await sb.auth.signOut();
+    useStore.getState().setUser(null, null);
+    window.location.href = "/login";
+  };
   const addModel = useStore((s) => s.addModel);
   const updateModel = useStore((s) => s.updateModel);
   const removeModel = useStore((s) => s.removeModel);
@@ -73,7 +82,7 @@ export function SettingsModal() {
   const [hookCommand, setHookCommand] = useState("");
   const [hookEvent, setHookEvent] = useState<"afterEdit" | "onFinish" | "onError">("afterEdit");
 
-  const [tab, setTab] = useState<"model" | "github" | "general" | "advanced" | "mcp" | "hooks">("model");
+  const [tab, setTab] = useState<"model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap">("model");
   const [search, setSearch] = useState("");
   /* Hibrit/Oracle köprü sağlık testi — /health ucu (token gerektirmez, CORS açık). */
   const [bridgeTest, setBridgeTest] = useState<
@@ -113,7 +122,8 @@ export function SettingsModal() {
 
   /* Keyword index — typing in the search box jumps to whichever tab
      contains the matching keyword (first hit wins). */
-  const SEARCH_INDEX: Record<"model" | "github" | "general" | "advanced" | "mcp" | "hooks", string[]> = {
+  const SEARCH_INDEX: Record<"model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap", string[]> = {
+    hesap:    ["hesap", "account", "e-posta", "email", "giriş", "çıkış", "oturum", "admin", "plan"],
     model:    ["model", "api", "anahtar", "key", "openai", "anthropic", "huggingface", "hf", "provider", "test"],
     github:   ["github", "gitlab", "token", "depo", "repo", "branch", "dal", "kullanıcı", "username"],
     general:  ["sistem", "prompt", "stil", "style", "tema", "theme", "renk", "color", "accent", "font", "yazı", "ses", "sound", "skill", "memori", "ayar"],
@@ -136,7 +146,7 @@ export function SettingsModal() {
   if (search !== prevSearch) {
     setPrevSearch(search);
     if (search.trim() && matchingTabs.size > 0) {
-      const first = (["model", "github", "general", "advanced", "mcp", "hooks"] as const).find((k) => matchingTabs.has(k));
+      const first = (["model", "github", "general", "advanced", "mcp", "hooks", "hesap"] as const).find((k) => matchingTabs.has(k));
       if (first && first !== tab) setTab(first);
     }
   }
@@ -458,7 +468,7 @@ export function SettingsModal() {
         </div>
 
         <div className="flex gap-1 mb-5 border-b border-line">
-          {([["model", "Model"], ["github", "Git"], ["general", "Temel"], ["advanced", "Gelişmiş"], ["mcp", "MCP"], ["hooks", "Kancalar"]] as const).map(([key, lbl]) => {
+          {([["hesap", "Hesap"], ["model", "Model"], ["github", "Git"], ["general", "Temel"], ["advanced", "Gelişmiş"], ["mcp", "MCP"], ["hooks", "Kancalar"]] as const).map(([key, lbl]) => {
             const hit = matchingTabs.has(key);
             return (
               <button
@@ -478,6 +488,36 @@ export function SettingsModal() {
         </div>
 
         {/* MODEL */}
+        {tab === "hesap" && (
+          <div className="space-y-4">
+            <h4 className="text-sm font-bold">Hesap</h4>
+            {userEmail ? (
+              <div className="premium-card rounded-xl p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-brand/15 border border-brand/20 grid place-items-center text-brand font-bold shrink-0">
+                  {userEmail[0]?.toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold truncate">{userEmail}</div>
+                  <div className="text-[11px] text-muted/60 flex items-center gap-1.5">
+                    <span>Plan: {plan === "pro" ? "Pro" : "Ücretsiz"}</span>
+                    {isAdmin && <span className="text-brand/80 font-bold">· Admin</span>}
+                  </div>
+                </div>
+                <button onClick={signOut} className="px-3 py-1.5 rounded-lg border border-line hover:border-red/50 text-xs font-semibold text-muted hover:text-red transition-colors shrink-0">
+                  Çıkış yap
+                </button>
+              </div>
+            ) : (
+              <div className="premium-card rounded-xl p-4 text-sm text-muted/70">
+                Giriş yapılmadı. <a href="/login" className="text-brand hover:underline font-semibold">Giriş / Kayıt ol</a>
+              </div>
+            )}
+            <p className="text-[11px] text-muted/50 leading-relaxed">
+              Sohbetlerin, ayarların, kayıtlı tasarımların ve git hesapların yalnızca senin hesabına özeldir; başka kullanıcılar erişemez (Supabase RLS).
+            </p>
+          </div>
+        )}
+
         {tab === "model" && (
           <section>
             <p className="text-xs text-muted mb-3">Birden fazla model ekleyebilirsin. Anahtarlar yalnızca bu tarayıcıda saklanır.</p>
