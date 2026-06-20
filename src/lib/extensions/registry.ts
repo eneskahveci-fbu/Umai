@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Extension Registry — Craft.Coder genişletilebilirlik merkezi.
+// Extension Registry — Craft Coder genişletilebilirlik merkezi.
 // Tüm yeni araçlar ve agent'lar BU dosyada birleştirilir.
 // Yeni bir extension eklemek için:
 //   1. Kendi dizinde araç/agent tanımını yaz

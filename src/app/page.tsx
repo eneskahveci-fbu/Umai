@@ -114,8 +114,8 @@ const HOW_IT_WORKS = [
 
 const FAQS = [
   {
-    q: "Craft.Coder ücretsiz mi?",
-    a: "Evet, tamamen ücretsiz. Kendi API anahtarını getir (BYOK) modeliyle çalışır; Craft.Coder herhangi bir model ücreti almaz.",
+    q: "Craft Coder ücretsiz mi?",
+    a: "Evet, tamamen ücretsiz. Kendi API anahtarını getir (BYOK) modeliyle çalışır; Craft Coder herhangi bir model ücreti almaz.",
   },
   {
     q: "Hangi modeller destekleniyor?",
@@ -141,7 +141,7 @@ const SITE_URL =
 const JSON_LD_APP = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "Craft.Coder",
+  name: "Craft Coder",
   description:
     "OpenAI-uyumlu herhangi bir modelle çalışan AI kod asistanı. Sohbet, gizli sohbet ve GitHub/GitLab deposuna bağlı kod üretimi — sohbet, kod ve terminal tek ekranda.",
   url: SITE_URL,

@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Çerez Politikası — Craft.Coder",
+  title: "Çerez Politikası — Craft Coder",
   description:
-    "Craft.Coder'nin hangi çerezleri kullandığı ve bunları nasıl yönetebileceğinize dair bilgiler.",
+    "Craft Coder'nin hangi çerezleri kullandığı ve bunları nasıl yönetebileceğinize dair bilgiler.",
 };
 
 export default function CookiesPage() {
@@ -43,7 +43,7 @@ export default function CookiesPage() {
               kalitesini artırmak amacıyla kullanılırlar.
             </p>
             <p className="mt-2">
-              Craft.Coder, kullanıcı deneyimini bozmayacak şekilde{" "}
+              Craft Coder, kullanıcı deneyimini bozmayacak şekilde{" "}
               <strong>yalnızca zorunlu çerezler</strong> kullanır. Reklam,
               izleme veya davranışsal analiz çerezleri kullanılmamaktadır.
             </p>
@@ -82,7 +82,7 @@ export default function CookiesPage() {
 
           <Section title="3. localStorage ile Saklanan Veriler">
             <p>
-              Çerez olmamakla birlikte, Craft.Coder tarayıcınızın{" "}
+              Çerez olmamakla birlikte, Craft Coder tarayıcınızın{" "}
               <strong>localStorage</strong> alanını aşağıdaki veriler için
               kullanır:
             </p>
@@ -116,7 +116,7 @@ export default function CookiesPage() {
 
           <Section title="4. Üçüncü Taraf Çerezleri">
             <p>
-              Craft.Coder herhangi bir üçüncü taraf reklam veya analitik
+              Craft Coder herhangi bir üçüncü taraf reklam veya analitik
               çerezi kullanmamaktadır. Yüklenen harici kaynaklar şunlardır:
             </p>
             <ul>
@@ -170,7 +170,7 @@ export default function CookiesPage() {
           <Section title="6. localStorage Temizleme">
             <p>
               Tarayıcı geliştirici araçları (F12) → <strong>Uygulama</strong> →
-              <strong>Yerel Depolama</strong> bölümünden Craft.Coder verilerini
+              <strong>Yerel Depolama</strong> bölümünden Craft Coder verilerini
               silebilirsiniz. Bu işlem ayarlarınızı ve giriş yapmadan saklanan
               sohbet geçmişinizi sıfırlar.
             </p>
