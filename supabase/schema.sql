@@ -77,6 +77,11 @@ drop policy if exists "shared_chats - delete" on public.shared_chats;
 create policy "shared_chats - delete"
   on public.shared_chats for delete using (auth.uid() = user_id);
 
+-- ── chats: proje ilişkisi (sohbetin ait olduğu projenin cihazlar arası senkronu) ──
+-- Uygulama bu sütunu okur/yazar; eski kurulumlarda idempotent olarak eklenir.
+alter table public.chats
+  add column if not exists project_id text;
+
 -- ── updated_at otomatik güncelleme (uygulama unutsa bile DB tutarlı kalır) ──
 create or replace function public.set_updated_at()
 returns trigger language plpgsql as $$
