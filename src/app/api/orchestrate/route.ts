@@ -1,4 +1,5 @@
 import { rateLimit } from "@/lib/rate-limit";
+import { isSafeRemoteUrl } from "@/lib/urlSafety";
 import { resolveModelAccess } from "@/lib/plan";
 import { isProRequest } from "@/lib/serverPlan";
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/constants";
@@ -216,6 +217,10 @@ export async function POST(req: Request) {
   if (!model) return new Response("Model seçilmedi.", { status: 400 });
   if (!apiKey && provider !== "pollinations" && provider !== "ollama") {
     return new Response("API anahtarı yok.", { status: 400 });
+  }
+  /* SSRF: baseUrl istemciden gelir → canlıda iç ağ/loopback/metadata engellenir. */
+  if (process.env.NODE_ENV === "production" && !isSafeRemoteUrl(baseUrl)) {
+    return new Response("Güvensiz baseUrl — yalnızca genel (public) adresler kabul edilir.", { status: 400 });
   }
 
   const cfg: Cfg = { baseUrl, model, provider, headers: buildHeaders(provider, apiKey, req), effort: body.effort };
