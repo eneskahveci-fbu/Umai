@@ -29,8 +29,11 @@ export function CodeBlock({
   }, [children]);
 
   const codeChild = Array.isArray(children) ? children[0] : children;
-  const className =
-    (codeChild as React.ReactElement<{ className?: string }>)?.props?.className || "";
+  const codeProps = (codeChild as React.ReactElement<{ className?: string; "data-file"?: string }>)?.props;
+  const className = codeProps?.className || "";
+  /* `dil:dosya/yolu` fence'inde remarkSplitFileLang yolu data-file'a taşır;
+     dil sınıfı zaten temiz (language-ts) olduğundan başlıkta temiz dil görünür. */
+  const filePath = codeProps?.["data-file"] || "";
   const lang = className
     .replace(/language-/g, "")
     .replace(/hljs/g, "")
@@ -103,7 +106,10 @@ export function CodeBlock({
   return (
     <div className="relative group/code">
       <div className="flex items-center justify-between px-4 py-1.5 bg-[#0c0e14] rounded-t-[10px] border border-b-0 border-line text-xs text-muted">
-        <span className="font-mono">{lang || "code"}</span>
+        <span className="font-mono flex items-center gap-1.5 min-w-0">
+          <span className="shrink-0">{lang || "code"}</span>
+          {filePath && <span className="text-muted/40 truncate">· {filePath}</span>}
+        </span>
         <div className="flex items-center gap-2.5">
           {isPreviewable && (
             <button onClick={preview} className="flex items-center gap-1 hover:text-brand transition-colors">

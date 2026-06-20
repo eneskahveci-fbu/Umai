@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { memo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -17,6 +17,36 @@ import type { ChatMessage, SwarmState } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { CodeBlock } from "./CodeBlock";
 import { ALL_AGENTS } from "@/lib/agents";
+
+/* ── Kod-fence dili normalizasyonu ─────────────────────────────────────
+   AI, kod bloğunu `dil:dosya/yolu` biçiminde yazabilir (sistem prompt'u bunu
+   ister → editörde otomatik açılsın). Ama `language-ts:src/app.ts` sınıfını
+   rehype-highlight TANIMAZ → syntax highlight kaybolur ve başlıkta dil yerine
+   tüm yol görünür. Bu remark plugin highlight'tan ÖNCE çalışıp code düğümünün
+   dilini temiz dile (ts) indirger ve dosya yolunu `data-file` olarak saklar
+   (CodeBlock başlıkta gösterir). Ham markdown'dan dosya çıkaran parsers.ts
+   etkilenmez (o string üzerinde çalışır). */
+interface MdNode {
+  type?: string;
+  lang?: string | null;
+  data?: { hProperties?: Record<string, unknown> };
+  children?: MdNode[];
+}
+function remarkSplitFileLang() {
+  const walk = (node: MdNode) => {
+    if (node.type === "code" && typeof node.lang === "string" && node.lang.includes(":")) {
+      const colon = node.lang.indexOf(":");
+      const file = node.lang.slice(colon + 1).trim();
+      node.lang = node.lang.slice(0, colon).trim() || null;
+      if (file) {
+        node.data = node.data ?? {};
+        node.data.hProperties = { ...(node.data.hProperties ?? {}), "data-file": file };
+      }
+    }
+    node.children?.forEach(walk);
+  };
+  return (tree: MdNode) => walk(tree);
+}
 
 /* ── Tool metadata ─────────────────────────────────────────────────── */
 
@@ -414,7 +444,7 @@ function ToolCallGroup({ calls }: { calls: NonNullable<ChatMessage["toolCalls"]>
 
 /* ── MessageBubble ─────────────────────────────────────────────────── */
 
-export function MessageBubble({
+function MessageBubbleImpl({
   message,
   index,
   chatId,
@@ -647,7 +677,7 @@ export function MessageBubble({
         {message.content ? (
           <div className="prose-chat">
             <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkMath]}
+              remarkPlugins={[remarkGfm, remarkMath, remarkSplitFileLang]}
               rehypePlugins={[rehypeHighlight, rehypeKatex]}
               components={{ pre: CodeBlock }}
             >
@@ -765,3 +795,20 @@ export function MessageBubble({
     </div>
   );
 }
+
+/* Performans: store streaming sırasında yalnız SON mesaj nesnesini değiştirir
+   (diğerlerinin referansı sabit kalır). Bu yüzden mesaj referansı + ilgili skaler
+   prop'lar değişmedikçe yeniden render etme — her token'da tüm sohbetin markdown +
+   syntax-highlight yeniden parse edilmesini önler (uzun sohbetlerde belirgin
+   akıcılık). Fonksiyon prop'ları davranışsal olarak sabittir (argümanlarını açıkça
+   alır), o yüzden kimlik karşılaştırması yapılmaz. */
+export const MessageBubble = memo(MessageBubbleImpl, (prev, next) =>
+  prev.message === next.message &&
+  prev.index === next.index &&
+  prev.chatId === next.chatId &&
+  prev.showRegenerate === next.showRegenerate &&
+  prev.streamingNow === next.streamingNow &&
+  !!prev.onContinue === !!next.onContinue &&
+  !!prev.onEdit === !!next.onEdit &&
+  !!prev.onSwitchVersion === !!next.onSwitchVersion,
+);

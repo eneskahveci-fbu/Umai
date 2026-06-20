@@ -3,13 +3,21 @@
    için kullanılır. Şemalar PERMISSIVE (.passthrough) — geçerli istekleri AYNEN
    geçirir, yalnızca biçimsel olarak bozuk/aşırı büyük/SSRF-şüpheli girdiyi reddeder. */
 import { z } from "zod";
+import { isSafeRemoteUrl } from "./urlSafety";
 
-/* baseUrl: ör. https://api.groq.com/openai/v1 — http(s) zorunlu (SSRF azaltma). */
+/* baseUrl: ör. https://api.groq.com/openai/v1 — http(s) zorunlu (SSRF azaltma).
+   Canlıda (production) ek olarak iç ağ/loopback/bulut-metadata (169.254.169.254)
+   adreslerini reddeder; yerelde (npm run dev) localhost LLM uçları (Ollama/LM
+   Studio) meşru olduğundan yalnız production'da kısıtlanır. */
 export const baseUrlSchema = z
   .string()
   .trim()
   .max(2048)
-  .refine((s) => /^https?:\/\//i.test(s), "baseUrl http(s) olmalı");
+  .refine((s) => /^https?:\/\//i.test(s), "baseUrl http(s) olmalı")
+  .refine(
+    (s) => process.env.NODE_ENV !== "production" || isSafeRemoteUrl(s),
+    "baseUrl iç ağ/loopback adresine işaret edemez",
+  );
 
 export const messageSchema = z
   .object({ role: z.string().max(32), content: z.unknown() })
