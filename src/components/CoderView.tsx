@@ -34,6 +34,7 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
+  Server,
   Sparkles,
   Trash2,
   Square,
@@ -48,6 +49,7 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { detectLanguage, type EditorFile } from "@/lib/editor";
+import { bridgeListFiles, bridgeReadFile, buildTreeFromPaths } from "@/lib/bridgeFs";
 import { extractAllFileFences } from "@/lib/parsers";
 import { fuzzyFiles } from "@/lib/fuzzy";
 import { buildPreview } from "@/lib/preview";
@@ -402,6 +404,13 @@ export function CoderView() {
   const toolsEnabled = toolsEnabledStore && (!!repo || localActive);
 
   const [filesOpen, setFilesOpen] = useState(false);
+  /* Sunucu (Hibrit köprü) workspace gezgini — ajanların çalıştığı gerçek dizin. */
+  const [wsOpen, setWsOpen] = useState(false);
+  const [wsTree, setWsTree] = useState<TreeNode | null>(null);
+  const [wsPaths, setWsPaths] = useState<string[]>([]);
+  const [wsLoading, setWsLoading] = useState(false);
+  const [wsSearch, setWsSearch] = useState("");
+  const [wsFetching, setWsFetching] = useState<string | null>(null);
   const [terminalOpen, setTerminalOpen] = useState(false);
   /* Terminal bir kez boot olur ve ARKAPLANDA mount kalır (kapatınca unmount
      olmaz) → ajan run_command'ları her zaman çalışır; buton sadece görünürlüğü
@@ -777,6 +786,44 @@ export function CoderView() {
       addToast(`Dosya okunamadı: ${(e as Error).message}`, "error");
     } finally {
       setFetchingFile(null);
+    }
+  };
+
+  /* ── Sunucu (Hibrit köprü) workspace gezgini ──────────────────────────
+     Ajanların çalıştığı gerçek dizini (ör. /opt/craft-bridge/workspace) köprünün
+     /fs/list ucundan listeler; dosyaya tıklanınca /fs/read ile okuyup editörde
+     açar. Repo mantığından tamamen bağımsız — yalnız localMode'da görünür. */
+  const loadWorkspace = async () => {
+    const cfg = useStore.getState().config;
+    const url = cfg.localBridgeUrl?.trim();
+    const token = cfg.localBridgeToken || "";
+    if (!url) { addToast("Önce Ayarlar → Hibrit Sunucu adresini gir", "info"); return; }
+    setWsLoading(true);
+    try {
+      const paths = await bridgeListFiles(url, token);
+      setWsPaths(paths);
+      setWsTree(buildTreeFromPaths(paths));
+      if (paths.length === 0) addToast("Workspace boş", "info");
+    } catch (e) {
+      addToast(`Workspace okunamadı: ${(e as Error).message}`, "error");
+    } finally {
+      setWsLoading(false);
+    }
+  };
+
+  const openWorkspaceFile = async (file: TreeFile) => {
+    const cfg = useStore.getState().config;
+    const url = cfg.localBridgeUrl?.trim();
+    const token = cfg.localBridgeToken || "";
+    if (!url) return;
+    setWsFetching(file.path);
+    try {
+      const content = await bridgeReadFile(url, token, file.path);
+      openInEditor({ path: file.path, content, language: detectLanguage(file.path) });
+    } catch (e) {
+      addToast(`Dosya okunamadı: ${(e as Error).message}`, "error");
+    } finally {
+      setWsFetching(null);
     }
   };
 
@@ -1992,6 +2039,14 @@ export function CoderView() {
             />
             <MoreItem icon={<GitBranch size={14} />} label="Git & PR (dal, PR/MR, incele)" active={gitPanelOpen} onClick={() => setGitPanelOpen((v) => !v)} />
             <MoreItem icon={<FolderOpen size={14} />} label="Dosyalar (depo)" active={filesOpen} onClick={() => setFilesOpen((v) => !v)} />
+            {localActive && (
+              <MoreItem
+                icon={<Server size={14} />}
+                label="Sunucu (workspace)"
+                active={wsOpen}
+                onClick={() => setWsOpen((v) => { const nv = !v; if (nv && !wsTree && !wsLoading) loadWorkspace(); return nv; })}
+              />
+            )}
             <MoreItem
               icon={<Wrench size={14} />}
               label="Tools (araç kullanımı)"
@@ -2243,6 +2298,79 @@ export function CoderView() {
               >
                 <Paperclip size={11} /> Dosya ekle
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Sunucu (Hibrit köprü) workspace gezgini — ajanların çalıştığı gerçek dizin.
+            Repo panelinden bağımsız; yalnız localMode'da açılır. */}
+        {wsOpen && (
+          <div className="w-56 shrink-0 flex flex-col border-r border-line/60 bg-surface/40 overflow-hidden">
+            <div className="px-3 py-2 border-b border-line/40 flex items-center justify-between shrink-0">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted/50 flex items-center gap-1.5">
+                <Server size={11} className="text-brand/70" /> Sunucu • workspace
+              </span>
+              <div className="flex items-center gap-1">
+                <button onClick={loadWorkspace} disabled={wsLoading} title="Yenile" className="text-muted/40 hover:text-brand transition-colors disabled:opacity-30">
+                  <RefreshCw size={10} className={wsLoading ? "animate-spin" : ""} />
+                </button>
+                <button onClick={() => setWsOpen(false)} className="text-muted/40 hover:text-muted transition-colors">
+                  <X size={11} />
+                </button>
+              </div>
+            </div>
+
+            {wsTree && wsPaths.length > 0 && (
+              <div className="px-2 py-1.5 border-b border-line/40 shrink-0">
+                <div className="relative">
+                  <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted/40" />
+                  <input
+                    value={wsSearch}
+                    onChange={(e) => setWsSearch(e.target.value)}
+                    placeholder="Workspace'te ara…"
+                    className="w-full bg-bgsoft/60 rounded-lg pl-6 pr-2 py-1.5 text-[11px] outline-none focus:ring-1 ring-brand/30 placeholder:text-muted/30"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto p-1.5">
+              {wsLoading ? (
+                <div className="flex items-center gap-2 px-2 py-3 text-[11px] text-muted/60">
+                  <Loader2Icon size={12} className="animate-spin" /> Yükleniyor…
+                </div>
+              ) : !wsTree ? (
+                <div className="px-2 py-3 text-[11px] text-muted/50">
+                  Workspace&apos;i yüklemek için{" "}
+                  <button onClick={loadWorkspace} className="text-brand hover:underline">tıkla</button>.
+                </div>
+              ) : wsPaths.length === 0 ? (
+                <div className="px-2 py-3 text-[11px] text-muted/50">Workspace boş.</div>
+              ) : wsSearch ? (
+                <div className="py-1">
+                  {wsPaths
+                    .filter((p) => p.toLowerCase().includes(wsSearch.toLowerCase()))
+                    .slice(0, 100)
+                    .map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => openWorkspaceFile({ name: p.split("/").pop() || p, path: p })}
+                        className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-left rounded transition-colors text-muted/80 hover:text-ink hover:bg-bgsoft/50"
+                      >
+                        {wsFetching === p
+                          ? <RefreshCw size={10} className="animate-spin shrink-0 text-brand" />
+                          : <FileIcon name={p.split("/").pop() || p} size={10} />}
+                        <span className="truncate flex-1">{p}</span>
+                      </button>
+                    ))}
+                </div>
+              ) : (
+                <FileTreeNode node={wsTree} onSelect={openWorkspaceFile} attached={[]} />
+              )}
+            </div>
+
+            <div className="px-3 py-2 border-t border-line/40 shrink-0 text-[10px] text-muted/40">
+              {wsPaths.length > 0 ? `${wsPaths.length} dosya` : "—"}
             </div>
           </div>
         )}
