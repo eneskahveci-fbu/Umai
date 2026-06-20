@@ -71,6 +71,36 @@ export function SettingsModal() {
 
   const [tab, setTab] = useState<"model" | "github" | "general" | "advanced" | "mcp" | "hooks">("model");
   const [search, setSearch] = useState("");
+  /* Hibrit/Oracle köprü sağlık testi — /health ucu (token gerektirmez, CORS açık). */
+  const [bridgeTest, setBridgeTest] = useState<
+    | { status: "idle" }
+    | { status: "testing" }
+    | { status: "ok"; root?: string; terminal?: boolean }
+    | { status: "fail"; message: string }
+  >({ status: "idle" });
+
+  /* Hibrit köprüyü test et: terminalWsUrl/localBridgeUrl'den HTTP tabanı türetip
+     /health ucuna vurur (tarayıcıdan doğrudan; ucu token istemez, CORS açık). */
+  const testBridge = async () => {
+    const raw = (config.terminalWsUrl || config.localBridgeUrl || "").trim();
+    if (!raw) { setBridgeTest({ status: "fail", message: "Önce bir adres gir." }); return; }
+    let base: string;
+    try {
+      const u = new URL(raw);
+      const proto = u.protocol === "ws:" || u.protocol === "http:" ? "http:" : "https:";
+      base = `${proto}//${u.host}`;
+    } catch { setBridgeTest({ status: "fail", message: "Adres geçersiz — tam URL gir." }); return; }
+    setBridgeTest({ status: "testing" });
+    try {
+      const r = await fetch(`${base}/health`, { signal: AbortSignal.timeout(12000) });
+      if (!r.ok) { setBridgeTest({ status: "fail", message: `Sunucu ${r.status} döndü.` }); return; }
+      const d = (await r.json().catch(() => ({}))) as { ok?: boolean; root?: string; terminal?: boolean };
+      if (d?.ok) setBridgeTest({ status: "ok", root: d.root, terminal: d.terminal });
+      else setBridgeTest({ status: "fail", message: "Beklenmeyen yanıt — köprü değil?" });
+    } catch {
+      setBridgeTest({ status: "fail", message: "Ulaşılamadı — tünel kapalı ya da adres yanlış." });
+    }
+  };
   const modalRef = useRef<HTMLDivElement>(null);
   useModalA11y(modalRef, open, () => setOpen(false));
   const [guestMode, setGuestModeState] = useState(() =>
@@ -1081,6 +1111,30 @@ export function SettingsModal() {
                 autoComplete="off"
                 spellCheck={false}
               />
+
+              {/* Bağlantı testi — /health ucuna vurup terminal + dosya sistemi hazır mı gösterir */}
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={testBridge}
+                  disabled={bridgeTest.status === "testing"}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line hover:border-brand text-xs font-semibold transition-colors disabled:opacity-50"
+                >
+                  {bridgeTest.status === "testing"
+                    ? <><Loader2 size={12} className="animate-spin" /> Test ediliyor…</>
+                    : <><Play size={12} /> Bağlantıyı test et</>}
+                </button>
+                {bridgeTest.status === "ok" && (
+                  <span className="flex items-center gap-1.5 text-xs text-green">
+                    <Check size={13} /> Bağlı{bridgeTest.terminal ? " — terminal + dosya sistemi hazır" : ""}
+                    {bridgeTest.root && <code className="text-[10px] text-muted/60 bg-bgsoft px-1 rounded">{bridgeTest.root}</code>}
+                  </span>
+                )}
+                {bridgeTest.status === "fail" && (
+                  <span className="flex items-center gap-1.5 text-xs text-red">
+                    <X size={13} /> {bridgeTest.message}
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Terminal WebSocket URL */}
