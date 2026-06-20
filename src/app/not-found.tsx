@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Compass, Home, MessageSquare } from "lucide-react";
 
 export const metadata = {
-  title: "Sayfa bulunamadı — Craft.Coder",
+  title: "Sayfa bulunamadı — Craft Coder",
   description: "Aradığın sayfa burada değil.",
 };
 

@@ -1136,7 +1136,7 @@ export async function POST(req: Request) {
 
   if (provider === "openrouter") {
     upstreamHeaders["HTTP-Referer"] = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://craft-ai-web.vercel.app";
-    upstreamHeaders["X-Title"] = "Craft.Coder";
+    upstreamHeaders["X-Title"] = "Craft Coder";
   }
 
   let sysPrompt = body.systemPrompt || DEFAULT_SYSTEM_PROMPT;

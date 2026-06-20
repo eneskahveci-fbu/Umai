@@ -36,8 +36,8 @@ export function InstallCommand() {
         )}
       </button>
       <p className="text-[11px] text-muted/50 mt-2 text-center">
-        Ardından <code className="text-brand/80">craft-coder</code> yazıp çalıştır. (Veya{" "}
-        <code className="text-brand/80">npm i -g craft-coder</code>)
+        Sonra proje klasöründe <code className="text-brand/80">craft-coder</code> yaz → verdiği{" "}
+        <code className="text-brand/80">ws://localhost…</code> adresini Ayarlar → Hibrit Sunucu&apos;ya yapıştır.
       </p>
     </div>
   );

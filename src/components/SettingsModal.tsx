@@ -1477,7 +1477,7 @@ export function SettingsModal() {
 
             <div className="p-3 bg-brand/5 border border-brand/20 rounded-xl text-xs text-muted space-y-1.5">
               <div className="font-semibold text-brand">MCP nedir?</div>
-              <p>Model Context Protocol, Anthropic tarafından geliştirilen bir standarttır. Kendi araçlarını (veritabanı sorgu, dosya okuma, API çağrısı vb.) Craft.Coder&apos;a bağlayarak AI&apos;ın bunları otomatik kullanmasını sağlar.</p>
+              <p>Model Context Protocol, Anthropic tarafından geliştirilen bir standarttır. Kendi araçlarını (veritabanı sorgu, dosya okuma, API çağrısı vb.) Craft Coder&apos;a bağlayarak AI&apos;ın bunları otomatik kullanmasını sağlar.</p>
               <p>Aktif sunucuların araçları, araç kullanımı açıkken her sohbette AI&apos;a sunulur.</p>
             </div>
           </section>

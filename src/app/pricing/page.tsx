@@ -6,7 +6,7 @@ import { ProUpgrade } from "@/components/ProUpgrade";
 export const metadata: Metadata = {
   title: "Fiyatlandırma",
   description:
-    "craft.coder fiyatlandırma — kendi anahtarınla (BYOK) hep ücretsiz; Pro ile hazır kullanım + sınırsız bulut senkron.",
+    "craft coder fiyatlandırma — kendi anahtarınla (BYOK) hep ücretsiz; Pro ile hazır kullanım + sınırsız bulut senkron.",
 };
 
 const FREE = [
@@ -29,7 +29,7 @@ export default function PricingPage() {
       <nav className="sticky top-0 z-50 backdrop-blur-md bg-bg/85 border-b border-line/40">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
-            <ArrowLeft size={15} /> craft.coder
+            <ArrowLeft size={15} /> craft coder
           </Link>
           <Link
             href="/app"
@@ -44,7 +44,7 @@ export default function PricingPage() {
         <div className="text-center mb-14">
           <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">Basit, şeffaf fiyatlandırma</h1>
           <p className="text-muted mt-4 max-w-xl mx-auto leading-relaxed">
-            Kendi anahtarınla (BYOK) craft.coder <strong className="text-ink">her zaman ücretsiz</strong>.
+            Kendi anahtarınla (BYOK) craft coder <strong className="text-ink">her zaman ücretsiz</strong>.
             Anahtar uğraşmak istemeyenler için Pro: hazır kullanım + sınırsız bulut senkron.
           </p>
         </div>
@@ -105,7 +105,7 @@ export default function PricingPage() {
           <h2 className="text-2xl font-extrabold text-center mb-8">Sık sorulanlar</h2>
           <div className="space-y-5">
             {[
-              ["Free gerçekten ücretsiz mi?", "Evet. Kendi API anahtarınla (BYOK) craft.coder'ın tüm çekirdek özelliklerini sınırsız ve ücretsiz kullanırsın. Anahtarların yalnızca tarayıcında saklanır."],
+              ["Free gerçekten ücretsiz mi?", "Evet. Kendi API anahtarınla (BYOK) craft coder'ın tüm çekirdek özelliklerini sınırsız ve ücretsiz kullanırsın. Anahtarların yalnızca tarayıcında saklanır."],
               ["Pro ne ekliyor?", "Kendi anahtarın olmadan kullanım (sunucu LLM) ve sınırsız bulut senkron. Yani kurulum/anahtar uğraşı olmadan her cihazda hazır."],
               ["İptal edebilir miyim?", "İstediğin an. Müşteri portalından aboneliğini tek tıkla yönetir/iptal edersin; verilerin kaybolmaz."],
               ["Pro olmazsam ne olur?", "Hiçbir şey kaybetmezsin — kendi anahtarınla (BYOK) her şey çalışmaya devam eder."],
