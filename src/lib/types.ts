@@ -223,6 +223,14 @@ export interface PromptTemplate {
   prompt: string;
 }
 
+/** Tasarım Stüdyosu'nda kaydedilen tek bir tasarım (HTML/CSS/JS). */
+export interface SavedDesign {
+  id: string;
+  title: string;
+  code: string;
+  createdAt: number;
+}
+
 export interface Config {
   models: ModelProfile[];
   activeModelId: string | null;
@@ -303,6 +311,8 @@ export interface Config {
   terminalSetupCommand?: string;
   /** Olaya bağlı otomasyonlar (Claude Code hooks benzeri). */
   automations?: Automation[];
+  /** Tasarım Stüdyosu'nda kaydedilen tasarımlar (kişiye özel; user_config ile senkron). */
+  savedDesigns?: SavedDesign[];
   mcpServers?: McpServer[];
   /** Yerel Mod: kullanıcının makinesindeki Local Bridge adresi (ör. http://localhost:4319).
       Doluysa ve localMode açıksa ajan GitHub/GitLab API yerine gerçek dosya

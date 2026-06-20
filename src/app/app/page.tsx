@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { CoderView } from "@/components/CoderView";
 import { SettingsModal } from "@/components/SettingsModal";
 import { ImageStudio } from "@/components/ImageStudio";
+import { DesignStudio } from "@/components/DesignStudio";
 import { LibraryModal } from "@/components/LibraryModal";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ToastContainer } from "@/components/Toast";
@@ -151,6 +152,7 @@ export default function AppPage() {
 
         <SettingsModal />
         <ImageStudio />
+        <DesignStudio />
         <LibraryModal />
         <CommandPalette />
         <KeyboardShortcuts />
