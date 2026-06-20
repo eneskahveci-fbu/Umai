@@ -8,7 +8,7 @@
    KURULUM: admin e-postanı ADMIN_EMAILS dizisine ekle (küçük/büyük harf önemsiz).
    Liste BOŞSA hiç kimse kilitlenmez (kurulum öncesi güvenli varsayılan). */
 const RAW_ADMINS: string[] = [
-  // "ben@ornek.com",   ← admin e-postanı buraya ekle
+  "muhammeteneskahveci@gmail.com",
 ];
 
 export const ADMIN_EMAILS: string[] = RAW_ADMINS.map((e) => e.trim().toLowerCase()).filter(Boolean);

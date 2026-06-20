@@ -71,6 +71,31 @@ export default function AppPage() {
     return () => sub.subscription.unsubscribe();
   }, [setUser, loadChats, syncConfig]);
 
+  /* Geri tuşu: açık bir panel/modal varsa siteden çıkmak yerine ÖNCE onu kapat.
+     Panel açılınca geçmişe bir "sentinel" eklenir; geri basınca popstate ile en
+     üstteki panel kapatılır. Hiç panel yoksa geri normal çalışır (siteden çıkar). */
+  useEffect(() => {
+    const anyOpen = () => {
+      const s = useStore.getState();
+      return s.settingsOpen || s.imageStudioOpen || s.skillsOpen || s.libraryOpen;
+    };
+    let armed = false;
+    const unsub = useStore.subscribe(() => {
+      if (anyOpen()) { if (!armed) { armed = true; history.pushState({ craftOverlay: true }, ""); } }
+      else armed = false;
+    });
+    const onPop = () => {
+      armed = false;
+      const s = useStore.getState();
+      if (s.settingsOpen) s.setSettingsOpen(false);
+      else if (s.imageStudioOpen) s.setImageStudioOpen(false);
+      else if (s.skillsOpen) s.setSkillsOpen(false);
+      else if (s.libraryOpen) s.setLibraryOpen(false);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => { unsub(); window.removeEventListener("popstate", onPop); };
+  }, []);
+
   useEffect(() => {
     const { theme, accentColor, fontScale } = useStore.getState().config;
     const cl = document.documentElement.classList;

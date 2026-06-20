@@ -327,7 +327,7 @@ export function Sidebar() {
           onClick={() => newChat(false)}
           className="btn-brand-glow w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[#111110] font-semibold text-sm transition-transform hover:-translate-y-0.5"
         >
-          <Plus size={15} /> Yeni Oturum
+          <Plus size={15} /> Yeni Sohbet
         </button>
         <button
           onClick={() => setImageStudioOpen(true)}
