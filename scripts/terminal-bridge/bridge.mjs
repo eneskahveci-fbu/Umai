@@ -331,15 +331,11 @@ wss.on("connection", (ws) => {
 
 server.listen(PORT, HOST, () => {
   const shown = HOST === "0.0.0.0" ? "localhost" : HOST;
-  console.log("┌──────────────────────────────────────────────");
-  console.log("│ craft.coder HİBRİT köprü çalışıyor (terminal + sunucu)");
-  console.log("│ Shell     :", SHELL);
-  console.log("│ Workspace :", ROOT);
-  console.log("│ Terminal  : ws://" + shown + ":" + PORT + "/?token=" + TOKEN);
-  console.log("│ Sunucu    : http://" + shown + ":" + PORT + "  (token: " + TOKEN.slice(0, 4) + "…)");
-  console.log("│ → Caddy önünde: wss://<alan>/?token=…  ve  https://<alan>");
-  if (!process.env.TOKEN && !process.env.BRIDGE_TOKEN) console.log("│ UYARI: TOKEN env vermedin; üretilen token yukarıda.");
-  console.log("└──────────────────────────────────────────────");
+  /* Sade çıktı: sunucu içyapısını (kabuk, workspace yolu) dökme; bağlantı
+     adresini YALNIZ BİR kez göster (uygulamaya yapıştırmak için gerekli). */
+  console.log("\n  Craft Coder köprüsü çalışıyor.");
+  console.log("  Uygulamada Ayarlar -> Hibrit Sunucu alanina yapistir:");
+  console.log("    ws://" + shown + ":" + PORT + "/?token=" + TOKEN + "\n");
 });
 
 process.on("SIGINT", () => { try { wss.close(); } catch { /* yok say */ } server.close(); process.exit(0); });
