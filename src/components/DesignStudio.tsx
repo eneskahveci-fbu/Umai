@@ -421,7 +421,7 @@ KURALLAR:
           <div className="text-sm font-bold leading-tight">Tasarım Stüdyosu</div>
           <div className="text-[11px] text-muted/60 leading-tight">AI ile tasarla · ücretsiz</div>
         </div>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tasarım adı…" className="ml-2 w-28 sm:w-40 bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50" />
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tasarım adı…" className="hidden sm:block ml-2 w-40 bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50" />
 
         {/* Araç anahtarları (Claude Design tarzı segment) */}
         <div className="ml-2 hidden md:flex items-center gap-1 bg-bgsoft border border-line rounded-lg p-0.5">
@@ -438,7 +438,7 @@ KURALLAR:
           {/* Dışa aktar menüsü */}
           <div className="relative">
             <button onClick={() => setExportMenu((v) => !v)} disabled={exporting} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line hover:border-brand/50 text-xs font-semibold transition-colors disabled:opacity-50">
-              {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} İndir
+              {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} <span className="hidden sm:inline">İndir</span>
             </button>
             {exportMenu && (
               <>
@@ -452,13 +452,13 @@ KURALLAR:
             )}
           </div>
 
-          <button onClick={save} className="btn-brand-glow flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-bold"><Save size={13} /> Kaydet</button>
+          <button onClick={save} className="btn-brand-glow flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-white text-xs font-bold"><Save size={13} /> <span className="hidden sm:inline">Kaydet</span></button>
           <button onClick={() => setView((v) => (v === "gallery" ? "design" : "gallery"))} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${view === "gallery" ? "border-brand/50 text-brand" : "border-line hover:border-brand/40"}`}><LayoutGrid size={13} /> {saved.length}</button>
           <button onClick={() => setOpen(false)} className="w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors"><X size={16} /></button>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 flex overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col sm:flex-row overflow-hidden">
         {view === "gallery" ? (
           <div className="flex-1 overflow-y-auto p-4 sm:p-6">
             {saved.length === 0 ? (
@@ -486,7 +486,7 @@ KURALLAR:
           <>
             {/* SOL — Sohbet paneli */}
             {chatOpen && (
-              <div className="w-full sm:w-80 shrink-0 border-r border-line/60 flex flex-col bg-surface/40">
+              <div className="w-full sm:w-80 h-[44%] sm:h-auto shrink-0 border-b sm:border-b-0 sm:border-r border-line/60 flex flex-col bg-surface/40">
                 <div className="px-3 pt-3 pb-2 border-b border-line/50">
                   <div className="text-[10px] font-bold uppercase tracking-widest text-muted/45 mb-1.5">Hadi tasarlayalım</div>
                   <div className="grid grid-cols-4 gap-1">
@@ -545,7 +545,7 @@ KURALLAR:
             )}
 
             {/* ORTA — Tuval */}
-            <div className="flex-1 min-h-0 hidden sm:grid place-items-center p-4 sm:p-8 overflow-auto bg-[#0a0a0d]">
+            <div className="flex-1 min-h-0 grid place-items-center p-4 sm:p-8 overflow-auto bg-[#0a0a0d]">
               <div ref={previewRef} className="relative shadow-2xl rounded-sm overflow-hidden" style={{ ...bgStyle, width: "min(100%, 640px)", aspectRatio: `${vd.w} / ${vd.h}` }}>
                 {vd.layers.map((ly, i) => (
                   <div
