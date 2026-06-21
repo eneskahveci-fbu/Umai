@@ -20,7 +20,6 @@ import {
   Folder,
   Command,
   Plus,
-  Settings,
   GraduationCap,
   Circle,
   CircleCheck,
@@ -182,11 +181,6 @@ function MoreItem({ onClick, icon, label, active }: { onClick: () => void; icon:
       <span>{label}</span>
     </button>
   );
-}
-
-/* ⋯ menüsü grup başlığı (sadeleştirilmiş, gruplu düzen için). */
-function MoreSection({ children }: { children: React.ReactNode }) {
-  return <div className="px-2.5 pt-2 pb-0.5 text-[10px] font-bold uppercase tracking-widest text-muted/40 select-none">{children}</div>;
 }
 
 /* Mod geçişi — kompakt çip (Tools/Güvenli/Öğrenme/Kalite/Ekip tek satırda). */
@@ -459,6 +453,8 @@ export function CoderView() {
   /* Çoklu-ajan ("Ajan Ekibi" / Swarm) modu: planlayıcı → paralel uzman işçiler
      → birleştirici (/api/orchestrate). Tek mesajda bir ajan ekibi çalışır. */
   const [swarmMode, setSwarmMode] = useState(false);
+  /* ⋯ menüsü sekme durumu: Çalışma Alanı · Modlar · Araçlar. */
+  const [moreTab, setMoreTab] = useState<"workspace" | "modes" | "tools">("workspace");
   const swarmModeRef = useRef(false);
   useEffect(() => { swarmModeRef.current = swarmMode; }, [swarmMode]);
   /* Plan onayı: bir sonraki istekte plan-modu kapısını geçici aşar. */
@@ -2060,55 +2056,74 @@ export function CoderView() {
             <EffortMenuControl />
             <div className="h-px bg-line my-1" />
 
-            {/* Hızlı eylemler */}
+            {/* Hızlı eylemler (Ayarlar sidebar'da olduğu için burada yok) */}
             <MoreItem icon={<Plus size={14} />} label="Yeni sohbet" onClick={() => useStore.getState().newChat(false)} />
             <MoreItem icon={<Command size={14} />} label="Komut paleti (⌘K)" onClick={() => useStore.getState().setCommandPaletteOpen(true)} />
-            <MoreItem icon={<Settings size={14} />} label="Ayarlar (⌘,)" onClick={() => useStore.getState().setSettingsOpen(true)} />
 
-            {/* Çalışma Alanı */}
-            <MoreSection>Çalışma Alanı</MoreSection>
-            <MoreItem icon={<Code2 size={14} />} label={editorOpen ? "Editörü kapat" : "Editör (IDE)"} active={editorOpen} onClick={() => setEditorOpen((v) => !v)} />
-            {isAdmin && (
-              <MoreItem
-                icon={<Terminal size={14} />}
-                label={terminalSupported ? (terminalOpen ? "Terminal'i kapat" : "Terminal") : "Terminal (masaüstü Chrome/Edge)"}
-                active={terminalOpen}
-                onClick={() => { setTerminalMounted(true); setTerminalOpen((v) => !v); }}
-              />
-            )}
-            <MoreItem icon={<GitBranch size={14} />} label="Git & PR (dal, PR/MR, incele)" active={gitPanelOpen} onClick={() => setGitPanelOpen((v) => !v)} />
-            <MoreItem icon={<FolderOpen size={14} />} label="Dosyalar (depo)" active={filesOpen} onClick={() => setFilesOpen((v) => !v)} />
-            {localActive && (
-              <MoreItem
-                icon={<Server size={14} />}
-                label="Sunucu (workspace)"
-                active={wsOpen}
-                onClick={() => setWsOpen((v) => { const nv = !v; if (nv && !wsTree && !wsLoading) loadWorkspace(); return nv; })}
-              />
-            )}
-
-            {/* Modlar — kompakt çip satırı (tıklayınca menü açık kalır) */}
-            <MoreSection>Modlar</MoreSection>
-            <div className="px-1.5 pb-1 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
-              <ModeChip
-                icon={<Wrench size={12} />} label="Tools" active={toolsEnabled}
-                onClick={() => {
-                  const store = useStore.getState();
-                  if (!store.repo) { addToast("Tool-use için önce bir GitHub deposu bağla", "error"); return; }
-                  store.setToolsEnabled(!store.toolsEnabled);
-                }}
-              />
-              <ModeChip icon={<ShieldCheck size={12} />} label="Güvenli" active={!!config.safeMode} onClick={() => useStore.getState().saveConfig({ ...config, safeMode: !config.safeMode })} />
-              <ModeChip icon={<GraduationCap size={12} />} label="Öğrenme" active={!!config.learningMode} onClick={() => useStore.getState().saveConfig({ ...config, learningMode: !config.learningMode })} />
-              <ModeChip icon={<Sparkles size={12} />} label="Kalite" active={!!config.qualityMode} onClick={() => useStore.getState().saveConfig({ ...config, qualityMode: !config.qualityMode })} />
-              <ModeChip icon={<Users size={12} />} label="Ekip" active={swarmMode} onClick={() => setSwarmMode((v) => !v)} />
+            {/* Sekme çubuğu — tıklanınca menü açık kalır */}
+            <div className="flex gap-0.5 px-1 pt-1.5 pb-1" onClick={(e) => e.stopPropagation()}>
+              {([["workspace", "Çalışma"], ["modes", "Modlar"], ["tools", "Araçlar"]] as const).map(([key, lbl]) => (
+                <button
+                  key={key}
+                  onClick={() => setMoreTab(key)}
+                  className={`flex-1 px-1.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                    moreTab === key ? "bg-brand/15 text-brand" : "text-muted hover:text-ink hover:bg-bgsoft"
+                  }`}
+                >
+                  {lbl}
+                </button>
+              ))}
             </div>
 
-            {/* Araçlar */}
-            <MoreSection>Araçlar</MoreSection>
-            <MoreItem icon={<Zap size={14} />} label="Skills" onClick={() => useStore.getState().setSkillsOpen(true)} />
-            <MoreItem icon={<BookOpen size={14} />} label="Kütüphane" onClick={() => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); }} />
-            <MoreItem icon={<Activity size={14} />} label="Etkinlik günlüğü" onClick={() => useStore.getState().setActivityOpen(true)} />
+            {/* Sekme içeriği */}
+            {moreTab === "workspace" && (
+              <>
+                <MoreItem icon={<Code2 size={14} />} label={editorOpen ? "Editörü kapat" : "Editör (IDE)"} active={editorOpen} onClick={() => setEditorOpen((v) => !v)} />
+                {isAdmin && (
+                  <MoreItem
+                    icon={<Terminal size={14} />}
+                    label={terminalSupported ? (terminalOpen ? "Terminal'i kapat" : "Terminal") : "Terminal (masaüstü Chrome/Edge)"}
+                    active={terminalOpen}
+                    onClick={() => { setTerminalMounted(true); setTerminalOpen((v) => !v); }}
+                  />
+                )}
+                <MoreItem icon={<GitBranch size={14} />} label="Git & PR (dal, PR/MR, incele)" active={gitPanelOpen} onClick={() => setGitPanelOpen((v) => !v)} />
+                <MoreItem icon={<FolderOpen size={14} />} label="Dosyalar (depo)" active={filesOpen} onClick={() => setFilesOpen((v) => !v)} />
+                {localActive && (
+                  <MoreItem
+                    icon={<Server size={14} />}
+                    label="Sunucu (workspace)"
+                    active={wsOpen}
+                    onClick={() => setWsOpen((v) => { const nv = !v; if (nv && !wsTree && !wsLoading) loadWorkspace(); return nv; })}
+                  />
+                )}
+              </>
+            )}
+
+            {moreTab === "modes" && (
+              <div className="px-1.5 pb-1 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+                <ModeChip
+                  icon={<Wrench size={12} />} label="Tools" active={toolsEnabled}
+                  onClick={() => {
+                    const store = useStore.getState();
+                    if (!store.repo) { addToast("Tool-use için önce bir GitHub deposu bağla", "error"); return; }
+                    store.setToolsEnabled(!store.toolsEnabled);
+                  }}
+                />
+                <ModeChip icon={<ShieldCheck size={12} />} label="Güvenli" active={!!config.safeMode} onClick={() => useStore.getState().saveConfig({ ...config, safeMode: !config.safeMode })} />
+                <ModeChip icon={<GraduationCap size={12} />} label="Öğrenme" active={!!config.learningMode} onClick={() => useStore.getState().saveConfig({ ...config, learningMode: !config.learningMode })} />
+                <ModeChip icon={<Sparkles size={12} />} label="Kalite" active={!!config.qualityMode} onClick={() => useStore.getState().saveConfig({ ...config, qualityMode: !config.qualityMode })} />
+                <ModeChip icon={<Users size={12} />} label="Ekip" active={swarmMode} onClick={() => setSwarmMode((v) => !v)} />
+              </div>
+            )}
+
+            {moreTab === "tools" && (
+              <>
+                <MoreItem icon={<Zap size={14} />} label="Skills" onClick={() => useStore.getState().setSkillsOpen(true)} />
+                <MoreItem icon={<BookOpen size={14} />} label="Kütüphane" onClick={() => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); }} />
+                <MoreItem icon={<Activity size={14} />} label="Etkinlik günlüğü" onClick={() => useStore.getState().setActivityOpen(true)} />
+              </>
+            )}
           </MoreMenu>
         </div>
       </div>
@@ -3017,7 +3032,7 @@ function UsageBadge({ chat, pendingTokens = 0 }: { chat: { totalInTokens?: numbe
       <button
         ref={btnRef}
         onClick={toggle}
-        className={`flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded-lg border mr-1 transition-colors hover:border-brand/40 ${
+        className={`flex items-center gap-1 sm:gap-1.5 text-[10px] font-mono px-1.5 sm:px-2 py-1 rounded-lg border mr-0.5 sm:mr-1 transition-colors hover:border-brand/40 ${
           danger ? "border-red/40 bg-red/5 text-red"
           : warn ? "border-amber-400/40 bg-amber-400/5 text-amber-400"
           : "border-line/40 text-muted/70"
@@ -3030,15 +3045,15 @@ function UsageBadge({ chat, pendingTokens = 0 }: { chat: { totalInTokens?: numbe
           <span className="absolute inset-0 rounded-full bg-current opacity-15" />
           <span className="absolute inset-0 rounded-full bg-current" style={{ clipPath: `inset(${100 - pct}% 0 0 0)` }} />
         </span>
-        <span>{total.toLocaleString()} tok</span>
+        <span>{total.toLocaleString()}<span className="hidden sm:inline"> tok</span></span>
         {pendingTokens > 0 && (
-          <span className="text-brand/80" title="Göndermeden önce tahmini ek token">+~{pendingTokens.toLocaleString()}</span>
+          <span className="hidden sm:inline text-brand/80" title="Göndermeden önce tahmini ek token">+~{pendingTokens.toLocaleString()}</span>
         )}
         {cost !== null && hasPrice && (
-          <>
+          <span className="hidden sm:flex items-center gap-1.5">
             <span className="opacity-40">·</span>
             <span className={danger || warn ? "" : "text-brand/80"}>{formatCost(cost)}</span>
-          </>
+          </span>
         )}
       </button>
       {open && pos && <UsageModal chat={chat} pos={pos} onClose={() => setOpen(false)} />}
