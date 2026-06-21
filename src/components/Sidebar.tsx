@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import {
   Check,
   Code2,
+  Copy,
   Download,
   Folder,
   FolderOpen,
@@ -73,6 +74,7 @@ export function Sidebar() {
   const deleteChat = useStore((s) => s.deleteChat);
   const renameChat = useStore((s) => s.renameChat);
   const exportChat = useStore((s) => s.exportChat);
+  const copyChatMarkdown = useStore((s) => s.copyChatMarkdown);
   const tagChat = useStore((s) => s.tagChat);
   const pinChat = useStore((s) => s.pinChat);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
@@ -230,8 +232,11 @@ export function Sidebar() {
         <ActionIcon title={sharingId === c.id ? "Paylaşılıyor…" : "Paylaş (link kopyala)"} onClick={(e) => { e.stopPropagation(); if (!sharingId) shareChat(c.id); }}>
           <Share2 size={10} />
         </ActionIcon>
-        <ActionIcon title="İndir" onClick={(e) => { e.stopPropagation(); exportChat(c.id); }}>
+        <ActionIcon title="İndir (Markdown)" onClick={(e) => { e.stopPropagation(); exportChat(c.id); }}>
           <Download size={10} />
+        </ActionIcon>
+        <ActionIcon title="Kopyala (Markdown)" onClick={(e) => { e.stopPropagation(); void copyChatMarkdown(c.id); }}>
+          <Copy size={10} />
         </ActionIcon>
         <ActionIcon title="Sil" danger onClick={(e) => { e.stopPropagation(); deleteChat(c.id); }}>
           <Trash2 size={10} />

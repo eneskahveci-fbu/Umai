@@ -14,11 +14,13 @@ import {
   ChevronRight,
   Code2,
   Copy,
-  Download,
   File,
   FolderGit2,
   FolderOpen,
   Folder,
+  Command,
+  Plus,
+  Settings,
   GraduationCap,
   Circle,
   CircleCheck,
@@ -27,7 +29,6 @@ import {
   MoreHorizontal,
   Image as ImageIcon,
   Loader2 as Loader2Icon,
-  Palette,
   PanelLeft,
   Paperclip,
   Check,
@@ -179,6 +180,25 @@ function MoreItem({ onClick, icon, label, active }: { onClick: () => void; icon:
     >
       {icon}
       <span>{label}</span>
+    </button>
+  );
+}
+
+/* ⋯ menüsü grup başlığı (sadeleştirilmiş, gruplu düzen için). */
+function MoreSection({ children }: { children: React.ReactNode }) {
+  return <div className="px-2.5 pt-2 pb-0.5 text-[10px] font-bold uppercase tracking-widest text-muted/40 select-none">{children}</div>;
+}
+
+/* Mod geçişi — kompakt çip (Tools/Güvenli/Öğrenme/Kalite/Ekip tek satırda). */
+function ModeChip({ icon, label, active, onClick }: { icon: React.ReactNode; label: string; active?: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
+        active ? "border-brand/40 bg-brand/12 text-brand" : "border-line/60 text-muted hover:text-ink hover:border-brand/30"
+      }`}
+    >
+      {icon}{label}
     </button>
   );
 }
@@ -2035,16 +2055,19 @@ export function CoderView() {
               <VenetianMask size={9} /> Gizli
             </span>
           )}
-          {/* Birleşik ⋯ menüsü: Düşünme eforu · Editör · Terminal · Git · PR · Skills · Dışa aktar */}
-          <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen || toolsEnabled || !!config.safeMode || !!artifact || swarmMode}>
+          {/* Birleşik ⋯ menüsü — gruplu: Hızlı eylemler · Çalışma Alanı · Modlar · Araçlar */}
+          <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen || toolsEnabled || !!config.safeMode || swarmMode}>
             <EffortMenuControl />
             <div className="h-px bg-line my-1" />
-            <MoreItem
-              icon={<Code2 size={14} />}
-              label={editorOpen ? "Editörü kapat" : "Editör (IDE)"}
-              active={editorOpen}
-              onClick={() => setEditorOpen((v) => !v)}
-            />
+
+            {/* Hızlı eylemler */}
+            <MoreItem icon={<Plus size={14} />} label="Yeni sohbet" onClick={() => useStore.getState().newChat(false)} />
+            <MoreItem icon={<Command size={14} />} label="Komut paleti (⌘K)" onClick={() => useStore.getState().setCommandPaletteOpen(true)} />
+            <MoreItem icon={<Settings size={14} />} label="Ayarlar (⌘,)" onClick={() => useStore.getState().setSettingsOpen(true)} />
+
+            {/* Çalışma Alanı */}
+            <MoreSection>Çalışma Alanı</MoreSection>
+            <MoreItem icon={<Code2 size={14} />} label={editorOpen ? "Editörü kapat" : "Editör (IDE)"} active={editorOpen} onClick={() => setEditorOpen((v) => !v)} />
             {isAdmin && (
               <MoreItem
                 icon={<Terminal size={14} />}
@@ -2063,64 +2086,29 @@ export function CoderView() {
                 onClick={() => setWsOpen((v) => { const nv = !v; if (nv && !wsTree && !wsLoading) loadWorkspace(); return nv; })}
               />
             )}
-            <MoreItem
-              icon={<Wrench size={14} />}
-              label="Tools (araç kullanımı)"
-              active={toolsEnabled}
-              onClick={() => {
-                const store = useStore.getState();
-                if (!store.repo) { addToast("Tool-use için önce bir GitHub deposu bağla", "error"); return; }
-                store.setToolsEnabled(!store.toolsEnabled);
-              }}
-            />
-            <MoreItem
-              icon={<ShieldCheck size={14} />}
-              label="Güvenli Mod (salt-okunur)"
-              active={!!config.safeMode}
-              onClick={() => useStore.getState().saveConfig({ ...config, safeMode: !config.safeMode })}
-            />
-            <MoreItem
-              icon={<Palette size={14} />}
-              label="Canvas önizleme"
-              active={!!artifact}
-              onClick={() => {
-                const msgs = useStore.getState().current()?.messages ?? [];
-                for (let i = msgs.length - 1; i >= 0; i--) {
-                  const content = msgs[i].content;
-                  if (!content) continue;
-                  const directMatch = /```(?:html|svg|mermaid)(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
-                  if (directMatch) {
-                    const lang = /```(html|svg|mermaid)/.exec(content)?.[1] ?? "html";
-                    useStore.getState().setArtifact({ type: lang as "html" | "svg" | "mermaid", content: directMatch[1], title: `${lang.toUpperCase()} Önizleme` });
-                    return;
-                  }
-                  const cssMatch = /```css(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
-                  if (cssMatch) {
-                    useStore.getState().setArtifact({ type: "html", content: `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${cssMatch[1]}</style></head><body></body></html>`, title: "CSS Önizleme" });
-                    return;
-                  }
-                  const jsMatch = /```(?:javascript|js|jsx|ts|tsx)(?::[^\n]*)?\n([\s\S]*?)```/.exec(content);
-                  if (jsMatch) {
-                    useStore.getState().setArtifact({ type: "html", content: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><script>${jsMatch[1]}<\/script></body></html>`, title: "JS Önizleme" });
-                    return;
-                  }
-                }
-                addToast("Önizlenecek HTML, SVG, CSS veya Mermaid kodu bulunamadı", "info");
-              }}
-            />
-            <MoreItem icon={<BookOpen size={14} />} label="Kütüphane" onClick={() => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); }} />
+
+            {/* Modlar — kompakt çip satırı (tıklayınca menü açık kalır) */}
+            <MoreSection>Modlar</MoreSection>
+            <div className="px-1.5 pb-1 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+              <ModeChip
+                icon={<Wrench size={12} />} label="Tools" active={toolsEnabled}
+                onClick={() => {
+                  const store = useStore.getState();
+                  if (!store.repo) { addToast("Tool-use için önce bir GitHub deposu bağla", "error"); return; }
+                  store.setToolsEnabled(!store.toolsEnabled);
+                }}
+              />
+              <ModeChip icon={<ShieldCheck size={12} />} label="Güvenli" active={!!config.safeMode} onClick={() => useStore.getState().saveConfig({ ...config, safeMode: !config.safeMode })} />
+              <ModeChip icon={<GraduationCap size={12} />} label="Öğrenme" active={!!config.learningMode} onClick={() => useStore.getState().saveConfig({ ...config, learningMode: !config.learningMode })} />
+              <ModeChip icon={<Sparkles size={12} />} label="Kalite" active={!!config.qualityMode} onClick={() => useStore.getState().saveConfig({ ...config, qualityMode: !config.qualityMode })} />
+              <ModeChip icon={<Users size={12} />} label="Ekip" active={swarmMode} onClick={() => setSwarmMode((v) => !v)} />
+            </div>
+
+            {/* Araçlar */}
+            <MoreSection>Araçlar</MoreSection>
             <MoreItem icon={<Zap size={14} />} label="Skills" onClick={() => useStore.getState().setSkillsOpen(true)} />
+            <MoreItem icon={<BookOpen size={14} />} label="Kütüphane" onClick={() => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); }} />
             <MoreItem icon={<Activity size={14} />} label="Etkinlik günlüğü" onClick={() => useStore.getState().setActivityOpen(true)} />
-            <MoreItem icon={<Users size={14} />} label="Ajan Ekibi (Swarm)" active={swarmMode} onClick={() => setSwarmMode((v) => !v)} />
-            <MoreItem icon={<GraduationCap size={14} />} label="Öğrenme Modu" active={!!config.learningMode} onClick={() => useStore.getState().saveConfig({ ...config, learningMode: !config.learningMode })} />
-            <MoreItem icon={<Sparkles size={14} />} label="Kalite Modu" active={!!config.qualityMode} onClick={() => useStore.getState().saveConfig({ ...config, qualityMode: !config.qualityMode })} />
-            {current && messages.length > 0 && (
-              <>
-                <div className="h-px bg-line/60 my-1 mx-1" />
-                <MoreItem icon={<Download size={14} />} label="Markdown indir" onClick={() => useStore.getState().exportChat(current.id)} />
-                <MoreItem icon={<Copy size={14} />} label="Markdown kopyala" onClick={() => useStore.getState().copyChatMarkdown(current.id)} />
-              </>
-            )}
           </MoreMenu>
         </div>
       </div>
