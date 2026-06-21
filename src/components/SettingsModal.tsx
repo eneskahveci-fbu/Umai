@@ -18,6 +18,12 @@ import {
   Search,
   Sun,
   Trash2,
+  User,
+  Cpu,
+  SlidersHorizontal,
+  Wrench,
+  Plug,
+  Webhook,
   X,
   Zap,
 } from "lucide-react";
@@ -146,7 +152,9 @@ export function SettingsModal() {
   if (search !== prevSearch) {
     setPrevSearch(search);
     if (search.trim() && matchingTabs.size > 0) {
-      const first = (["model", "github", "general", "advanced", "mcp", "hooks", "hesap"] as const).find((k) => matchingTabs.has(k));
+      const adminOnly = new Set(["advanced", "mcp", "hooks"]);
+      const first = (["model", "github", "general", "advanced", "mcp", "hooks", "hesap"] as const)
+        .find((k) => matchingTabs.has(k) && (isAdmin || !adminOnly.has(k)));
       if (first && first !== tab) setTab(first);
     }
   }
@@ -462,6 +470,23 @@ export function SettingsModal() {
 
   const activeProj = config.projects.find((p) => p.id === config.activeProjectId);
 
+  /* GNOME tarzı dikey sekmeler. `admin: true` olanlar (teknik ayarlar) admin
+     dışındaki kullanıcılardan tamamen gizlenir → sade deneyim. */
+  const ALL_TABS = [
+    { key: "hesap", label: "Hesap", icon: User, admin: false },
+    { key: "model", label: "Model", icon: Cpu, admin: false },
+    { key: "github", label: "Git", icon: GitBranch, admin: false },
+    { key: "general", label: "Temel", icon: SlidersHorizontal, admin: false },
+    { key: "advanced", label: "Gelişmiş", icon: Wrench, admin: true },
+    { key: "mcp", label: "MCP", icon: Plug, admin: true },
+    { key: "hooks", label: "Kancalar", icon: Webhook, admin: true },
+  ] as const;
+  const visibleTabs = ALL_TABS.filter((t) => isAdmin || !t.admin);
+  /* Admin dışı kullanıcı gizli bir sekmedeyse (ör. arama/eski durum) Hesap'a düş. */
+  if (!visibleTabs.some((t) => t.key === tab)) {
+    if (tab !== "hesap") setTab("hesap");
+  }
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setOpen(false)}>
       <div
@@ -469,53 +494,56 @@ export function SettingsModal() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className="w-full max-w-lg rounded-2xl border border-line bg-surface p-6 max-h-[92dvh] overflow-auto"
+        className="w-full max-w-3xl h-[88dvh] rounded-2xl border border-line bg-surface overflow-hidden flex flex-col sm:flex-row"
         onClick={(e) => e.stopPropagation()}
-        style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
       >
-        <div className="flex items-center justify-between mb-3">
-          <h3 id="settings-title" className="text-lg font-bold">Ayarlar</h3>
-          <button onClick={() => setOpen(false)} className="text-muted hover:text-ink p-1 rounded-lg hover:bg-bgsoft"><X size={18} /></button>
-        </div>
+        {/* SOL — GNOME tarzı dikey kenar çubuğu */}
+        <aside className="sm:w-56 shrink-0 border-b sm:border-b-0 sm:border-r border-line/60 bg-bgsoft/40 flex flex-col">
+          <div className="flex items-center justify-between px-4 pt-4 pb-3 sm:pb-2">
+            <h3 id="settings-title" className="text-lg font-bold">Ayarlar</h3>
+            <button onClick={() => setOpen(false)} className="sm:hidden text-muted hover:text-ink p-1 rounded-lg hover:bg-bgsoft"><X size={18} /></button>
+          </div>
+          <div className="px-3 pb-2">
+            <div className="relative">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted/50" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Ayar ara…"
+                className="w-full bg-surface border border-line/60 rounded-lg pl-9 pr-8 py-2 text-sm outline-none focus:border-brand/50 placeholder:text-muted/40 transition-colors"
+              />
+              {search && (
+                <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted/40 hover:text-ink p-1 rounded transition-colors" title="Temizle"><X size={12} /></button>
+              )}
+            </div>
+          </div>
+          <nav className="flex sm:flex-col gap-0.5 px-2 pb-3 overflow-x-auto sm:overflow-y-auto">
+            {visibleTabs.map(({ key, label, icon: Icon }) => {
+              const hit = matchingTabs.has(key);
+              const active = tab === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setTab(key)}
+                  className={`relative flex items-center gap-2.5 shrink-0 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
+                    active ? "bg-brand/12 text-brand" : "text-muted hover:text-ink hover:bg-surface"
+                  }`}
+                >
+                  <Icon size={16} className="shrink-0" />
+                  <span className="whitespace-nowrap">{label}</span>
+                  {hit && !active && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />}
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
 
-        <div className="relative mb-4">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted/50" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Ayar ara — örn. font, github, webcontainer…"
-            className="w-full bg-bgsoft/60 border border-line/60 rounded-xl pl-9 pr-8 py-2 text-sm outline-none focus:border-brand/50 placeholder:text-muted/40 transition-colors"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted/40 hover:text-ink p-1 rounded transition-colors"
-              title="Temizle"
-            >
-              <X size={12} />
-            </button>
-          )}
-        </div>
-
-        <div className="flex gap-1 mb-5 border-b border-line">
-          {([["hesap", "Hesap"], ["model", "Model"], ["github", "Git"], ["general", "Temel"], ["advanced", "Gelişmiş"], ["mcp", "MCP"], ["hooks", "Kancalar"]] as const).map(([key, lbl]) => {
-            const hit = matchingTabs.has(key);
-            return (
-              <button
-                key={key}
-                onClick={() => setTab(key)}
-                className={`relative px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
-                  tab === key ? "border-brand text-brand" : "border-transparent text-muted hover:text-ink"
-                }`}
-              >
-                {lbl}
-                {hit && tab !== key && (
-                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-                )}
-              </button>
-            );
-          })}
-        </div>
+        {/* SAĞ — içerik */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          <div className="hidden sm:flex items-center justify-end px-4 pt-3">
+            <button onClick={() => setOpen(false)} className="text-muted hover:text-ink p-1 rounded-lg hover:bg-bgsoft" title="Kapat"><X size={18} /></button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-5 pb-6 sm:pt-1" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
 
         {/* MODEL */}
         {tab === "hesap" && (
@@ -1652,6 +1680,8 @@ export function SettingsModal() {
             </div>
           </section>
         )}
+          </div>
+        </div>
       </div>
     </div>
   );
