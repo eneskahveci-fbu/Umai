@@ -544,3 +544,34 @@ html.light body {
   backdrop-filter: saturate(140%) blur(12px);
   border: 1px solid color-mix(in srgb, var(--color-ink) 7%, var(--color-line));
 }
+
+/* 9) Aurora — marka tonlu (amber), çok yavaş süzülen ışıma. Fütüristik his verir
+   ama YALNIZCA --color-brand kullanır → tema birebir korunur. */
+@keyframes aurora-drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1);    opacity: .75; }
+  50%  { transform: translate3d(2%, -2%, 0) scale(1.08); opacity: 1; }
+  100% { transform: translate3d(0, 0, 0) scale(1);    opacity: .75; }
+}
+.aurora {
+  pointer-events: none;
+  background:
+    radial-gradient(42% 32% at 22% 18%, color-mix(in srgb, var(--color-brand) 13%, transparent), transparent 70%),
+    radial-gradient(36% 28% at 80% 32%, color-mix(in srgb, var(--color-brand) 9%, transparent), transparent 70%);
+  filter: blur(6px);
+  animation: aurora-drift 20s ease-in-out infinite;
+}
+
+/* 10) Giriş animasyonu — yumuşak yükselerek belirme (akıcılık). */
+@keyframes rise-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.animate-rise { animation: rise-in .6s cubic-bezier(.22,.61,.36,1) both; }
+
+/* 11) Hover-lift — kart/öğe üzerine gelince hafif yükselme (mikro-etkileşim). */
+.hover-lift { transition: transform .2s ease, box-shadow .2s ease; }
+.hover-lift:hover { transform: translateY(-3px); box-shadow: 0 16px 40px -16px rgba(0,0,0,.55); }
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora { animation: none; }
+  .animate-rise { animation: none; }
+  .hover-lift { transition: none; }
+  .hover-lift:hover { transform: none; }
+}

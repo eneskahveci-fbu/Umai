@@ -213,19 +213,20 @@ export default function Home() {
       <header className="relative max-w-6xl mx-auto px-6 pt-24 pb-20 text-center overflow-hidden w-full">
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_65%_50%_at_50%_0%,rgba(200,168,126,0.12),transparent)]" />
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_35%_25%_at_85%_65%,rgba(200,168,126,0.05),transparent)]" />
+        <div className="aurora absolute inset-0 -z-10" aria-hidden />
 
-        <span className="inline-flex items-center gap-2 text-sm text-muted border border-line bg-surface/70 backdrop-blur-sm px-4 py-1.5 rounded-full mb-8">
+        <span className="animate-rise inline-flex items-center gap-2 text-sm text-muted border border-line bg-surface/70 backdrop-blur-sm px-4 py-1.5 rounded-full mb-8">
           <span className="w-2 h-2 rounded-full bg-green animate-pulse" />
           model bağımsız · gizlilik önce · ücretsiz
         </span>
 
-        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-tight">
+        <h1 className="animate-rise text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-tight" style={{ animationDelay: "60ms" }}>
           Kod için tasarlanmış
           <br />
           <span className="brand-text">AI asistanın</span>
         </h1>
 
-        <p className="text-lg text-muted max-w-2xl mx-auto mt-6 leading-relaxed">
+        <p className="animate-rise text-lg text-muted max-w-2xl mx-auto mt-6 leading-relaxed" style={{ animationDelay: "120ms" }}>
           Dosyalarını okur, kod yazar, GitHub ve GitLab depolarını gezer — hepsi istediğin modelle.
           Anthropic, DeepSeek, Groq, Gemini ya da kendi yerel modelin: tek arayüzde, anahtarın sende kalır.
         </p>
@@ -265,7 +266,7 @@ export default function Home() {
         </div>
         <div className="grid sm:grid-cols-3 gap-6">
           {HOW_IT_WORKS.map((step) => (
-            <div key={step.step} className="relative rounded-2xl border border-line bg-surface p-6">
+            <div key={step.step} className="hover-lift relative rounded-2xl border border-line bg-surface p-6 hover:border-brand/40">
               <div className="flex items-center gap-3 mb-4">
                 <span className="w-8 h-8 rounded-full brand-gradient grid place-items-center text-[#111110] font-bold text-sm flex-shrink-0">
                   {step.step}
@@ -291,7 +292,7 @@ export default function Home() {
           {FEATURES.map((f) => (
             <div
               key={f.title}
-              className="group rounded-2xl border border-line bg-surface p-6 hover:border-brand/40 hover:shadow-lg hover:shadow-brand/5 transition-all duration-200"
+              className="hover-lift group rounded-2xl border border-line bg-surface p-6 hover:border-brand/40 hover:shadow-lg hover:shadow-brand/5"
             >
               <div className="w-11 h-11 rounded-xl bg-brand/10 text-brand grid place-items-center mb-4 group-hover:bg-brand/15 transition-colors">
                 {f.icon}
