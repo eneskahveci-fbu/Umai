@@ -56,3 +56,25 @@ describe("buildPreview", () => {
     expect(blocks[0].code).toContain("const x=1");
   });
 });
+
+describe("gömülü console paneli (sandbox)", () => {
+  it("React önizlemesine console panelini gömer", () => {
+    const a = buildPreview("```jsx\nfunction App(){return <div/>;}\n```");
+    expect(a?.content).toContain('id="__cns"');
+    expect(a?.content).toContain("console[k]");
+  });
+  it("JS önizlemesine console panelini gömer", () => {
+    const a = buildPreview("```js\nconsole.log('x')\n```");
+    expect(a?.content).toContain('id="__cns"');
+  });
+  it("düz HTML önizlemesine console panelini gömer", () => {
+    const a = buildPreview("```html\n<p>selam</p>\n```");
+    expect(a?.content).toContain('id="__cns"');
+  });
+  it("yakalanmayan hataları ve promise reddini dinler", () => {
+    const a = buildPreview("```js\nx()\n```");
+    expect(a?.content).toContain("addEventListener('error'");
+    expect(a?.content).toContain("unhandledrejection");
+  });
+});
+
