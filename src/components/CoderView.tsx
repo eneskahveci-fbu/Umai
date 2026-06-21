@@ -2745,6 +2745,11 @@ export function CoderView() {
                     </span>
                   )}
                   {searchOn && <span className="text-brand font-medium">Web</span>}
+                  {config.autoSwarm !== false && !swarmMode && (
+                    <span className="flex items-center gap-1 text-muted/70 font-medium" title="Otomatik ajan açık: ihtiyaca göre tek ajan veya ajan ekibi butona basmadan kendiliğinden çalışır">
+                      <Sparkles size={12} className="text-brand/70" /> Oto-ajan
+                    </span>
+                  )}
                   {swarmMode && <span className="flex items-center gap-1 text-brand font-medium" title="Ajan Ekibi: planlayıcı → paralel uzman işçiler → birleştirici"><Users size={12} /> Ekip</span>}
                   {toolsEnabled && <span className="text-green/80 font-medium">Tools</span>}
                   {activeAgent && <span className="text-brand font-medium">{activeAgent.command}</span>}
