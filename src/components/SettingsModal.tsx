@@ -161,6 +161,7 @@ export function SettingsModal() {
   const [ghUser, setGhUser] = useState("");
   const [ghToken, setGhToken] = useState("");
   const [verifyingGithub, setVerifyingGithub] = useState(false);
+  const [oauthBusy, setOauthBusy] = useState<"github" | "gitlab" | null>(null);
   const [glUser, setGlUser] = useState("");
   const [glToken, setGlToken] = useState("");
   const [repoInput, setRepoInput] = useState("");
@@ -345,6 +346,35 @@ export function SettingsModal() {
     addGitlab({ username: glUser.trim(), token: glToken.trim() });
     addToast("GitLab hesabı eklendi.", "success");
     setGlUser(""); setGlToken("");
+  };
+
+  /* Claude tarzı tek tıkla bağlama: Supabase OAuth (linkIdentity) ile GitHub/
+     GitLab hesabını mevcut oturuma bağlar. Dönüşte /app?gitlink=... yakalanıp
+     hesap eklenir. Supabase'de ilgili provider + "Manual linking" açık olmalı. */
+  const connectGitOAuth = async (prov: "github" | "gitlab") => {
+    const sb = createClient();
+    if (!sb) {
+      addToast("Supabase bağlı değil — aşağıdan token ile ekleyebilirsin.", "error");
+      return;
+    }
+    setOauthBusy(prov);
+    try {
+      const scopes = prov === "github" ? "repo read:user read:org" : "api read_user";
+      const redirectTo = `${window.location.origin}/app?gitlink=${prov}`;
+      const { error } = await sb.auth.linkIdentity({ provider: prov, options: { scopes, redirectTo } });
+      if (error) {
+        addToast(
+          `${prov === "github" ? "GitHub" : "GitLab"} bağlanamadı: ${error.message}. ` +
+          `Supabase → Authentication'da ${prov} provider'ı ve "Manual linking" açık olmalı.`,
+          "error",
+        );
+        setOauthBusy(null);
+      }
+      // Başarılıysa tarayıcı OAuth sayfasına yönlenir; setOauthBusy sıfırlamaya gerek yok.
+    } catch (err) {
+      addToast(`Bağlantı hatası: ${err instanceof Error ? err.message : "bilinmeyen"}`, "error");
+      setOauthBusy(null);
+    }
   };
 
   const submitRepo = () => {
@@ -667,8 +697,16 @@ export function SettingsModal() {
                   })}
                 </div>
               )}
+              <button
+                onClick={() => connectGitOAuth("github")}
+                disabled={oauthBusy !== null}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-brand text-white font-semibold text-sm hover:bg-brand/90 transition-colors disabled:opacity-50 mb-3"
+              >
+                {oauthBusy === "github" ? <Loader2 size={16} className="animate-spin" /> : <GitBranch size={16} />}
+                GitHub ile bağlan
+              </button>
               <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50">
-                <div className="text-xs font-bold text-muted uppercase tracking-wide mb-2.5">+ Hesap Ekle</div>
+                <div className="text-xs font-bold text-muted uppercase tracking-wide mb-2.5">veya token ile ekle</div>
                 <div className="grid gap-2">
                   <input value={ghUser} onChange={(e) => setGhUser(e.target.value)} placeholder="Kullanıcı adı (opsiyonel)" className="input-mono" />
                   <input type="password" value={ghToken} onChange={(e) => setGhToken(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !verifyingGithub) submitGithub(); }} placeholder="GitHub token (ghp_...)" className="input-mono" />
@@ -769,8 +807,16 @@ export function SettingsModal() {
                   })}
                 </div>
               )}
+              <button
+                onClick={() => connectGitOAuth("gitlab")}
+                disabled={oauthBusy !== null}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-brand text-white font-semibold text-sm hover:bg-brand/90 transition-colors disabled:opacity-50 mb-3"
+              >
+                {oauthBusy === "gitlab" ? <Loader2 size={16} className="animate-spin" /> : <GitBranch size={16} />}
+                GitLab ile bağlan
+              </button>
               <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50">
-                <div className="text-xs font-bold text-muted uppercase tracking-wide mb-2.5">+ GitLab Hesap Ekle</div>
+                <div className="text-xs font-bold text-muted uppercase tracking-wide mb-2.5">veya token ile ekle</div>
                 <div className="grid gap-2">
                   <input value={glUser} onChange={(e) => setGlUser(e.target.value)} placeholder="Kullanıcı adı" className="input-mono" />
                   <input type="password" value={glToken} onChange={(e) => setGlToken(e.target.value)} placeholder="GitLab token (glpat-...)" className="input-mono" />
