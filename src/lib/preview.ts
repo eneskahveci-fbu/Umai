@@ -30,6 +30,23 @@ function safeScript(code: string): string {
   return code.replace(/<\/script>/gi, "<\\/script>");
 }
 
+/* Gömülü console paneli — iframe'in KENDİ içinde çalışır (parent'a mesaj yok →
+   sandbox basit kalır). console.log/info/warn/error + yakalanmayan hataları alt
+   panelde gösterir. Öğrenciler için öğretici; çıktı olmadıkça gizli durur.
+   Override scripti kullanıcı kodundan ÖNCE çalışmalı → body başına konur. */
+const CONSOLE_UI =
+  `<div id="__cns" style="display:none;position:fixed;left:0;right:0;bottom:0;max-height:40%;overflow:auto;` +
+  `background:#0b0b0d;color:#d6d6d6;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;border-top:1px solid #333;z-index:99999"></div>` +
+  `<script>(function(){var b=document.getElementById('__cns');` +
+  `function esc(s){return String(s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}` +
+  `function fmt(a){return [].map.call(a,function(x){try{return typeof x==='object'?JSON.stringify(x):String(x);}catch(e){return String(x);}}).join(' ');}` +
+  `function add(t,a){if(!b)return;b.style.display='block';var c=({log:'#d6d6d6',info:'#7db3ff',warn:'#e6b800',error:'#ff6b6b'})[t]||'#d6d6d6';` +
+  `var d=document.createElement('div');d.style.cssText='padding:2px 10px;border-bottom:1px solid #1a1a1d;color:'+c;d.innerHTML=esc(fmt(a));b.appendChild(d);b.scrollTop=b.scrollHeight;}` +
+  `['log','info','warn','error'].forEach(function(k){var o=console[k];console[k]=function(){add(k,arguments);if(o)o.apply(console,arguments);};});` +
+  `window.addEventListener('error',function(e){add('error',[e.message+' (satır '+e.lineno+')']);});` +
+  `window.addEventListener('unhandledrejection',function(e){add('error',['Promise: '+((e.reason&&e.reason.message)||e.reason)]);});` +
+  `})();<\/script>`;
+
 function reactDoc(code: string, css: string): string {
   /* ESM import/export CDN-global yaklaşımıyla uyumsuz → temizle. */
   const src = code
@@ -50,7 +67,7 @@ function reactDoc(code: string, css: string): string {
 <script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
 <script crossorigin src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
 <style>body{margin:0;font-family:system-ui,sans-serif;background:#fff}${css}</style>
-</head><body><div id="root"></div>
+</head><body>${CONSOLE_UI}<div id="root"></div>
 <script type="text/babel" data-presets="typescript,react">
 const {useState,useEffect,useRef,useMemo,useCallback,useReducer,useContext,Fragment}=React;
 ${safeScript(src)}
@@ -59,7 +76,7 @@ ${mount}
 }
 
 function jsDoc(js: string, css: string): string {
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;margin:1rem}${css}</style></head><body>
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;margin:1rem}${css}</style></head><body>${CONSOLE_UI}
 <script>try{${safeScript(js)}}catch(e){document.body.innerHTML='<pre style="color:#c00;white-space:pre-wrap">'+(e&&e.stack||e)+'</pre>';}</script></body></html>`;
 }
 
@@ -71,7 +88,7 @@ function htmlDoc(html: string, css: string, js: string): string {
     if (js) doc = /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, `<script>${safeScript(js)}</script></body>`) : doc + `<script>${safeScript(js)}</script>`;
     return doc;
   }
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;margin:1rem}${css}</style></head><body>
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;margin:1rem}${css}</style></head><body>${CONSOLE_UI}
 ${html}
 ${js ? `<script>${safeScript(js)}</script>` : ""}</body></html>`;
 }

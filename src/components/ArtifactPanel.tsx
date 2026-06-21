@@ -1,6 +1,6 @@
 "use client";
 
-import { Maximize2, Minimize2, X } from "lucide-react";
+import { ExternalLink, Maximize2, Minimize2, RotateCw, X } from "lucide-react";
 import { useState } from "react";
 import { useStore } from "@/lib/store";
 
@@ -8,6 +8,7 @@ export function ArtifactPanel() {
   const artifact = useStore((s) => s.artifact);
   const setArtifact = useStore((s) => s.setArtifact);
   const [expanded, setExpanded] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   if (!artifact) return null;
 
@@ -34,6 +35,25 @@ export function ArtifactPanel() {
         </span>
         <div className="flex items-center gap-1">
           <button
+            onClick={() => setReloadKey((k) => k + 1)}
+            className="text-muted hover:text-ink p-1 rounded hover:bg-bgsoft"
+            title="Yenile"
+          >
+            <RotateCw size={15} />
+          </button>
+          <button
+            onClick={() => {
+              const blob = new Blob([srcdoc], { type: "text/html" });
+              const url = URL.createObjectURL(blob);
+              window.open(url, "_blank", "noopener");
+              setTimeout(() => URL.revokeObjectURL(url), 10000);
+            }}
+            className="text-muted hover:text-ink p-1 rounded hover:bg-bgsoft"
+            title="Yeni sekmede aç"
+          >
+            <ExternalLink size={15} />
+          </button>
+          <button
             onClick={() => setExpanded(!expanded)}
             className="text-muted hover:text-ink p-1 rounded hover:bg-bgsoft"
           >
@@ -52,6 +72,7 @@ export function ArtifactPanel() {
       </div>
       <div className="flex-1 min-h-0 bg-white">
         <iframe
+          key={reloadKey}
           srcDoc={srcdoc}
           sandbox="allow-scripts allow-modals"
           allow=""
