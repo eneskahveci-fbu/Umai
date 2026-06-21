@@ -260,6 +260,9 @@ export interface Config {
   autoContinue?: boolean;
   /** Çok-geçişli kalite modu: taslak → öz-eleştiri → düzeltme (tek yanıtta). */
   qualityMode?: boolean;
+  /** Öğrenme Modu: yanıtlar eğitsel olur — adım adım açıklama, kavram/jargon
+      tanımı, "neden" gerekçesi, sırada öğrenilecekler. Yazılım öğrencileri için. */
+  learningMode?: boolean;
   webSearch: boolean;
   /** Ajan Ekibi (swarm) ve alt-ajanlar otomatik EN GÜÇLÜ yapılandırılmış modeli
       kullansın → ajanlar en yetenekli modelle çalışır. Tanımsız = açık. */
