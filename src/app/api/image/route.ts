@@ -50,8 +50,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ image: `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}` });
     }
 
+    /* Hugging Face — açık kaynak FLUX.1-schnell (ücretsiz anahtar). İkili (binary)
+       görüntü döner → base64 data URL'e çevrilir. Cold-start'ta 503 dönebilir. */
+    if (provider === "hf") {
+      const r = await fetch("https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", Accept: "image/png" },
+        body: JSON.stringify({ inputs: prompt }),
+        signal: AbortSignal.timeout(90000),
+      });
+      if (!r.ok) {
+        let msg = `HF ${r.status}`;
+        try { const ej = await r.json() as { error?: string }; if (ej?.error) msg = ej.error; } catch { /* ikili/boş */ }
+        if (r.status === 503) msg = "HF modeli yükleniyor (cold-start) — birkaç saniye sonra tekrar dene.";
+        return NextResponse.json({ error: msg }, { status: 502 });
+      }
+      const ct = r.headers.get("content-type") || "image/png";
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.length < 100) return NextResponse.json({ error: "HF boş görüntü döndürdü — tekrar dene." }, { status: 502 });
+      return NextResponse.json({ image: `data:${ct};base64,${buf.toString("base64")}` });
+    }
+
     const cfg = OPENAI_COMPAT[provider];
-    if (!cfg) return NextResponse.json({ error: `'${provider}' için görüntü üretimi henüz desteklenmiyor. (Gemini, OpenAI, xAI veya Pollinations kullan.)` }, { status: 400 });
+    if (!cfg) return NextResponse.json({ error: `'${provider}' için görüntü üretimi henüz desteklenmiyor. (Gemini, OpenAI, xAI, HF veya Pollinations kullan.)` }, { status: 400 });
     const payload: Record<string, unknown> = { model: cfg.model, prompt, n: 1 };
     if (cfg.size) payload.size = size;
     const r = await fetch(`${cfg.base}/images/generations`, {

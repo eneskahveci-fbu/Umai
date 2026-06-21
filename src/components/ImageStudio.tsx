@@ -64,7 +64,7 @@ export function ImageStudio() {
   /* Eklenen modeller arasından görüntü üretebilenler (BYOK). Kullanıcı kendi
      anahtarıyla bu sağlayıcının görüntü modelini Görüntü Stüdyosu'nda kullanır. */
   const userImgModels = useMemo(() => {
-    const labels: Record<string, string> = { gemini: "Gemini (görüntü)", openai: "OpenAI (DALL·E)", xai: "xAI (Grok)" };
+    const labels: Record<string, string> = { gemini: "Gemini (görüntü)", openai: "OpenAI (DALL·E)", xai: "xAI (Grok)", hf: "HF FLUX (açık kaynak)" };
     const seen = new Set<string>();
     const out: { id: string; label: string }[] = [];
     for (const m of config.models) {

@@ -568,10 +568,23 @@ export function SettingsModal() {
               <div className="flex items-center gap-1.5 text-xs font-bold text-brand mb-1.5">
                 <Zap size={14} /> Hızlı kurulum — bir sağlayıcı seç, anahtarı yapıştır
               </div>
-              <p className="text-[11px] text-muted leading-relaxed mb-2.5">
+              <p className="text-[11px] text-muted leading-relaxed mb-2">
                 Sağlayıcıyı seç, anahtarını yapıştır — base URL ve varsayılan model otomatik
                 ayarlanır, eklenip test edilir ve aktif olur. Anahtar yalnızca tarayıcında kalır.
               </p>
+              {/* Önerilen ücretsiz açık-kaynak modeller — tek tıkla seç (ücretsiz anahtar) */}
+              <div className="flex flex-wrap gap-1.5 mb-2.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted/45 w-full">Önerilen ücretsiz · açık kaynak</span>
+                {(["gemini", "groq", "cerebras", "openrouter"] as Provider[]).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => { setQuickProvider(p); setQuickResult(null); setQuickKey(config.providerKeys?.[p] ?? ""); }}
+                    className={`px-2.5 py-1 rounded-full border text-[11px] font-semibold transition-colors ${quickProvider === p ? "border-brand/50 bg-brand/12 text-brand" : "border-line/60 text-muted hover:text-ink hover:border-brand/30"}`}
+                  >
+                    {cleanLabel(p)}
+                  </button>
+                ))}
+              </div>
               <select
                 value={quickProvider}
                 onChange={(e) => { const p = e.target.value as Provider; setQuickProvider(p); setQuickResult(null); setQuickKey(config.providerKeys?.[p] ?? ""); }}
