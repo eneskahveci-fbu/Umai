@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
 import { isAdminEmail } from "@/lib/admin";
+import { AccountSettings } from "@/components/AccountSettings";
 import { createClient } from "@/lib/supabase/client";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, ALL_TOOL_CATALOG } from "@/lib/constants";
 import { calculateCost, formatCost } from "@/lib/pricing";
@@ -43,14 +44,6 @@ export function SettingsModal() {
   /* Admin kapısı: hassas sunucu/terminal ayarları yalnız admin e-postasına açık.
      Liste boşken (kurulum öncesi) herkese açık — kimse kilitlenmez. */
   const isAdmin = isAdminEmail(useStore((s) => s.userEmail));
-  const userEmail = useStore((s) => s.userEmail);
-  const plan = useStore((s) => s.plan);
-  const signOut = async () => {
-    const sb = createClient();
-    if (sb) await sb.auth.signOut();
-    useStore.getState().setUser(null, null);
-    window.location.href = "/login";
-  };
   const addModel = useStore((s) => s.addModel);
   const updateModel = useStore((s) => s.updateModel);
   const removeModel = useStore((s) => s.removeModel);
@@ -546,35 +539,7 @@ export function SettingsModal() {
           <div className="flex-1 overflow-y-auto px-5 pb-6 sm:pt-1" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
 
         {/* MODEL */}
-        {tab === "hesap" && (
-          <div className="space-y-4">
-            <h4 className="text-sm font-bold">Hesap</h4>
-            {userEmail ? (
-              <div className="premium-card rounded-xl p-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-brand/15 border border-brand/20 grid place-items-center text-brand font-bold shrink-0">
-                  {userEmail[0]?.toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold truncate">{userEmail}</div>
-                  <div className="text-[11px] text-muted/60 flex items-center gap-1.5">
-                    <span>Plan: {plan === "pro" ? "Pro" : "Ücretsiz"}</span>
-                    {isAdmin && <span className="text-brand/80 font-bold">· Admin</span>}
-                  </div>
-                </div>
-                <button onClick={signOut} className="px-3 py-1.5 rounded-lg border border-line hover:border-red/50 text-xs font-semibold text-muted hover:text-red transition-colors shrink-0">
-                  Çıkış yap
-                </button>
-              </div>
-            ) : (
-              <div className="premium-card rounded-xl p-4 text-sm text-muted/70">
-                Giriş yapılmadı. <a href="/login" className="text-brand hover:underline font-semibold">Giriş / Kayıt ol</a>
-              </div>
-            )}
-            <p className="text-[11px] text-muted/50 leading-relaxed">
-              Sohbetlerin, ayarların, kayıtlı tasarımların ve git hesapların yalnızca senin hesabına özeldir; başka kullanıcılar erişemez (Supabase RLS).
-            </p>
-          </div>
-        )}
+        {tab === "hesap" && <AccountSettings />}
 
         {tab === "model" && (
           <section>
