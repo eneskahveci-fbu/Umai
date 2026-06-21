@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 @AGENTS.md
 
 # craft.ai — Proje Rehberi (CLAUDE.md)
@@ -66,11 +70,59 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
 ## Geliştirme Komutları
 
 ```bash
-npm run dev      # geliştirme sunucusu
-npm run build    # üretim derlemesi
-npm run lint     # eslint
-npm run test     # vitest (tek seferlik)
+npm run dev        # geliştirme sunucusu (predev: tree-sitter wasm kopyalar)
+npm run build      # üretim derlemesi (prebuild: tree-sitter wasm kopyalar)
+npm run lint       # eslint
+npm test           # vitest run (tek seferlik)
+npm run test:watch # vitest izleme modu
+npx vitest run src/lib/__tests__/validate.test.ts   # tek dosya
+npx vitest run -t "isim parçası"                     # tek test (başlığa göre)
+npm run test:e2e   # Playwright e2e (e2e/*.spec.ts)
+npm run cap:sync   # Capacitor iOS/Android senkron
 ```
+
+Birim testler `src/lib/__tests__/*.test.ts` altında (vitest, `environment:
+node`, `@` → `src` alias — bkz. `vitest.config.ts`). E2E `e2e/` altında
+Playwright ile.
+
+## Mimari (Büyük Resim)
+
+> Birden çok dosya okumadan anlaşılmayan akışlar.
+
+- **LLM proxy + tool döngüsü** (`src/app/api/chat/route.ts` + `src/lib/tools.ts`
+  → `CODER_TOOLS`): Tek uç, çok sağlayıcılı (`Provider` birliği `src/lib/types.ts`:
+  hf, deepseek, openrouter, groq, gemini, mistral, cerebras, together, xai,
+  anthropic, pollinations…). İstekteki `provider` alanı dosya araçlarının
+  **nereye** gideceğini belirler: `"github"` / `"gitlab"` → ilgili Git API
+  (`src/app/api/github/*`, `src/lib/gitlab.ts`); `"local"` → hibrit köprü dosya
+  sistemi. Araç çağrıları sunucuda döngüyle çözülür.
+- **Sağlayıcı sabitleri:** `src/lib/constants.ts` → `PRESETS`, `DEFAULT_CONFIG`,
+  `DEFAULT_SKILLS`, `PROVIDER_MODELS`. Varsayılan model anahtarsız
+  `pollinations-free`.
+- **Durum + kalıcılık:** `src/lib/store.ts` (Zustand) tek kaynak. `saveConfig`
+  hem state'e hem `localStorage`'a (`craftai_config`) yazar. Giriş yapılınca
+  `syncConfig(userId)` Supabase `user_config` ile birleştirir. **Per-user
+  izolasyon:** `CONFIG_OWNER_KEY` ile config sahibi takip edilir; farklı
+  kullanıcı girişinde yerel config sızmaz (temiz `DEFAULT_CONFIG`'e düşer).
+- **Auth + admin:** Supabase (`src/lib/supabase/{client,server,config}.ts`);
+  `config.ts` env yoksa sabit fallback'e düşer (login hep çalışır).
+  `src/lib/admin.ts` → `isAdminEmail()`; hassas ayarlar (Hibrit Sunucu,
+  Terminal, WebContainer API anahtarı) yalnız admin'e görünür. `/app` girişsiz
+  açılmaz (auth gate — `src/app/app/page.tsx`).
+- **Git bağlama:** Settings → Git'te tek tıkla OAuth (`linkIdentity`;
+  `/app?gitlink=...` dönüşünde `provider_token` yakalanıp hesap eklenir)
+  **veya** token ile manuel ekleme.
+- **Hibrit köprü:** `scripts/terminal-bridge/bridge.mjs` (node-pty + ws) →
+  terminal (WS) + `/fs/*` + `/exec` + tokensız `/health`; istemci tarafı
+  `src/lib/bridgeFs.ts`.
+- **Native sarmalayıcı:** Capacitor (`capacitor.config.ts` canlı siteyi
+  `server.url` ile yükler); `src/lib/native.ts` web'de no-op.
+
+## Dağıtım
+
+Canlı site **GitLab** `main`'den (Vercel) dağıtılır; `origin` GitHub'dır ve iki
+repo bazı dosyalarda (özellikle `chat/route.ts`) ıraksamıştır. Değişiklikler
+GitLab `main`'e cherry-pick ile taşınır — toptan branch push'tan kaçın.
 
 ## Kod Konvansiyonları
 
