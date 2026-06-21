@@ -502,6 +502,7 @@ export const DEFAULT_CONFIG: Config = {
   autoMemory: true,
   autoContinue: true,
   qualityMode: false,
+  learningMode: false,
   webSearch: true,
   agentsUseStrongestModel: true,
   cliMode: false,

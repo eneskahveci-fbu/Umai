@@ -19,6 +19,7 @@ import {
   FolderGit2,
   FolderOpen,
   Folder,
+  GraduationCap,
   Circle,
   CircleCheck,
   GitPullRequest,
@@ -1389,6 +1390,17 @@ export function CoderView() {
         "(3) DÜZELTME: eleştirini uygulayıp en doğru, eksiksiz ve sağlam yanıtı ver. " +
         "Taslak ve eleştiri sürecini YAZMA; sadece nihai, düzeltilmiş yanıtı sun.";
     }
+    /* Öğrenme Modu: üniversite yazılım öğrencileri için eğitsel yanıt. Kodun
+       yanında "neden"i, kavram tanımlarını ve sırada öğrenilecekleri ver. */
+    if (store.config.learningMode) {
+      finalSystemPrompt +=
+        "\n\n[ÖĞRENME MODU] Kullanıcı yazılım öğrenen bir öğrenci. Yanıtını eğitsel kur: " +
+        "(1) Önce kısa, sade bir genel bakışla NE yapacağını ve NEDEN bu yaklaşımı seçtiğini açıkla. " +
+        "(2) Kodu adım adım, yorum satırlarıyla ver; geçen teknik terim/jargonu (ör. closure, async, big-O) parantez içinde kısaca Türkçe tanımla. " +
+        "(3) Yaygın hataları/edge-case'leri ve 'neden böyle' mantığını belirt. " +
+        "(4) Sonunda 'Sırada öğren' başlığıyla 2-3 ilgili kavram/kaynak öner. " +
+        "Üstten bakmadan, anlaşılır ve cesaretlendirici bir dille yaz. Kod kalitesinden ödün verme.";
+    }
 
     const repo = store.repo;
     const activeGithub = store.activeGithub();
@@ -2100,6 +2112,8 @@ export function CoderView() {
             <MoreItem icon={<Zap size={14} />} label="Skills" onClick={() => useStore.getState().setSkillsOpen(true)} />
             <MoreItem icon={<Activity size={14} />} label="Etkinlik günlüğü" onClick={() => useStore.getState().setActivityOpen(true)} />
             <MoreItem icon={<Users size={14} />} label="Ajan Ekibi (Swarm)" active={swarmMode} onClick={() => setSwarmMode((v) => !v)} />
+            <MoreItem icon={<GraduationCap size={14} />} label="Öğrenme Modu" active={!!config.learningMode} onClick={() => useStore.getState().saveConfig({ ...config, learningMode: !config.learningMode })} />
+            <MoreItem icon={<Sparkles size={14} />} label="Kalite Modu" active={!!config.qualityMode} onClick={() => useStore.getState().saveConfig({ ...config, qualityMode: !config.qualityMode })} />
             {current && messages.length > 0 && (
               <>
                 <div className="h-px bg-line/60 my-1 mx-1" />
@@ -2752,6 +2766,7 @@ export function CoderView() {
                   )}
                   {swarmMode && <span className="flex items-center gap-1 text-brand font-medium" title="Ajan Ekibi: planlayıcı → paralel uzman işçiler → birleştirici"><Users size={12} /> Ekip</span>}
                   {toolsEnabled && <span className="text-green/80 font-medium">Tools</span>}
+                  {config.learningMode && <span className="flex items-center gap-1 text-brand font-medium" title="Öğrenme Modu: adım adım eğitsel açıklama"><GraduationCap size={12} /> Öğrenme</span>}
                   {activeAgent && <span className="text-brand font-medium">{activeAgent.command}</span>}
                 </div>
               </div>
