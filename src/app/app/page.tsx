@@ -81,6 +81,56 @@ export default function AppPage() {
     return () => sub.subscription.unsubscribe();
   }, [setUser, loadChats, syncConfig]);
 
+  /* OAuth ile Git bağlama dönüşü: linkIdentity sonrası Supabase bizi
+     /app?gitlink=github|gitlab adresine döndürür. Oturumdaki provider_token'ı
+     alıp ilgili Git hesabını kullanıcıya özel olarak ekleriz. Token yalnızca
+     dönüşten hemen sonra erişilebilir olduğundan burada yakalanır. */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const which = params.get("gitlink");
+    if (which !== "github" && which !== "gitlab") return;
+    const clean = () => window.history.replaceState({}, "", "/app");
+    (async () => {
+      const sb = createClient();
+      if (!sb) { clean(); return; }
+      try {
+        const { data } = await sb.auth.getSession();
+        const token = data.session?.provider_token;
+        const addToast = useStore.getState().addToast;
+        if (!token) {
+          addToast("Git bağlantısı tamamlanamadı: erişim anahtarı alınamadı. Tekrar dene.", "error");
+          clean();
+          return;
+        }
+        if (which === "github") {
+          const r = await fetch("https://api.github.com/user", {
+            headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
+          });
+          if (!r.ok) throw new Error(`GitHub ${r.status}`);
+          const u = await r.json();
+          useStore.getState().addGithub({ username: u.login ?? "github", token });
+          addToast(`GitHub bağlandı: ${u.login} ✓`, "success");
+        } else {
+          const r = await fetch("https://gitlab.com/api/v4/user", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!r.ok) throw new Error(`GitLab ${r.status}`);
+          const u = await r.json();
+          useStore.getState().addGitlab({ username: u.username ?? "gitlab", token });
+          addToast(`GitLab bağlandı: ${u.username} ✓`, "success");
+        }
+        useStore.getState().setSettingsOpen(true);
+      } catch (err) {
+        useStore.getState().addToast(
+          `Git bağlanamadı: ${err instanceof Error ? err.message : "bilinmeyen hata"}`,
+          "error",
+        );
+      } finally {
+        clean();
+      }
+    })();
+  }, []);
+
   /* Geri tuşu: açık bir panel/modal varsa siteden çıkmak yerine ÖNCE onu kapat.
      Panel açılınca geçmişe bir "sentinel" eklenir; geri basınca popstate ile en
      üstteki panel kapatılır. Hiç panel yoksa geri normal çalışır (siteden çıkar). */
