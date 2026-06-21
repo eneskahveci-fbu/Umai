@@ -65,7 +65,19 @@ export default function LoginPage() {
         options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
       });
       setLoading(false);
-      if (err) { setError(err.message); return; }
+      if (err) {
+        const m = err.message.toLowerCase();
+        if (m.includes("rate limit")) {
+          setError("E-posta gönderme limiti doldu (Supabase ücretsiz katman saatte birkaç e-posta gönderir). Biraz bekleyip tekrar dene, ya da 'Google ile Giriş Yap' kullan. Kalıcı çözüm: Supabase → Authentication → e-posta onayını kapat.");
+        } else if (m.includes("already") && m.includes("regist")) {
+          setError("Bu e-posta zaten kayıtlı. Üstten 'Giriş Yap'a geç.");
+        } else if (m.includes("password")) {
+          setError("Şifre çok zayıf — en az 6 karakter olmalı.");
+        } else {
+          setError(err.message);
+        }
+        return;
+      }
       setSuccess("Hesap oluşturuldu! E-postanı kontrol et, onay bağlantısı gönderildi.");
       return;
     }
