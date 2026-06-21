@@ -5,6 +5,8 @@ import { useModalA11y } from "@/lib/useModalA11y";
 import {
   Brain,
   Check,
+  ChevronRight,
+  ChevronLeft,
   ExternalLink,
   Download,
   FolderGit2,
@@ -85,6 +87,10 @@ export function SettingsModal() {
 
   const [tab, setTab] = useState<"model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions">("model");
   const [search, setSearch] = useState("");
+  /* iOS tarzı mobil drill-down: mobilde önce kategori listesi gösterilir; bir
+     satıra dokununca detay (mobileDetail=true) tam ekran açılır, geri ile listeye
+     dönülür. sm+ (masaüstü) bu state'i yok sayar (yan-yana GNOME düzeni). */
+  const [mobileDetail, setMobileDetail] = useState(false);
   /* Hibrit/Oracle köprü sağlık testi — /health ucu (token gerektirmez, CORS açık). */
   const [bridgeTest, setBridgeTest] = useState<
     | { status: "idle" }
@@ -485,60 +491,67 @@ export function SettingsModal() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setOpen(false)}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-0 sm:p-4" onClick={() => { setOpen(false); setMobileDetail(false); }}>
       <div
         ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className="relative w-full max-w-3xl h-[88dvh] rounded-2xl border border-line bg-surface overflow-hidden flex"
+        className="relative w-full max-w-none sm:max-w-3xl h-dvh sm:h-[88dvh] rounded-none sm:rounded-2xl border-0 sm:border border-line bg-surface overflow-hidden flex"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Kapat — sağ üst köşe (her düzende çalışır) */}
-        <button onClick={() => setOpen(false)} className="absolute top-3 right-3 z-10 text-muted hover:text-ink p-1.5 rounded-lg hover:bg-bgsoft" title="Kapat"><X size={18} /></button>
-
-        {/* SOL — GNOME tarzı dikey kenar çubuğu (her zaman solda, alt alta) */}
-        <aside className="w-36 sm:w-56 shrink-0 border-r border-line/60 bg-bgsoft/40 flex flex-col min-h-0">
-          <div className="px-4 pt-4 pb-2">
-            <h3 id="settings-title" className="text-base sm:text-lg font-bold">Ayarlar</h3>
+        {/* SOL — GNOME (masaüstü) / iOS liste (mobil). Mobilde detayda gizlenir. */}
+        <aside className={`${mobileDetail ? "hidden sm:flex" : "flex"} w-full sm:w-56 shrink-0 border-r border-line/60 bg-bgsoft/40 flex-col min-h-0`}>
+          <div className="flex items-center justify-between gap-1 px-4 sm:px-4 pt-4 pb-2">
+            <h3 id="settings-title" className="text-xl sm:text-lg font-bold">Ayarlar</h3>
+            <button onClick={() => { setOpen(false); setMobileDetail(false); }} className="shrink-0 text-muted hover:text-ink p-1 rounded-lg hover:bg-bgsoft" title="Kapat"><X size={18} /></button>
           </div>
-          <div className="px-2.5 pb-2">
+          <div className="px-3 sm:px-2.5 pb-2">
             <div className="relative">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted/50" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Ara…"
-                className="w-full bg-surface border border-line/60 rounded-lg pl-8 pr-7 py-1.5 text-sm outline-none focus:border-brand/50 placeholder:text-muted/40 transition-colors"
+                className="w-full bg-surface border border-line/60 rounded-lg pl-8 pr-7 py-2 sm:py-1.5 text-sm outline-none focus:border-brand/50 placeholder:text-muted/40 transition-colors"
               />
               {search && (
                 <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted/40 hover:text-ink p-1 rounded transition-colors" title="Temizle"><X size={12} /></button>
               )}
             </div>
           </div>
-          <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 pb-3">
+          {/* sm+: pill listesi (GNOME). Mobil: iOS satırları (chevron + büyük dokunma). */}
+          <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-3 sm:px-2 pb-3 sm:gap-0.5">
             {visibleTabs.map(({ key, label, icon: Icon }) => {
               const hit = matchingTabs.has(key);
               const active = tab === key;
               return (
                 <button
                   key={key}
-                  onClick={() => setTab(key)}
-                  className={`relative w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
-                    active ? "bg-brand/12 text-brand" : "text-muted hover:text-ink hover:bg-surface"
+                  onClick={() => { setTab(key); setMobileDetail(true); }}
+                  className={`relative w-full flex items-center gap-3 sm:gap-2.5 px-3 py-3 sm:py-2 rounded-xl sm:rounded-lg text-[15px] sm:text-sm font-medium transition-colors text-left ${
+                    active ? "sm:bg-brand/12 sm:text-brand bg-bgsoft text-ink" : "text-ink sm:text-muted hover:text-ink hover:bg-bgsoft sm:hover:bg-surface"
                   }`}
                 >
-                  <Icon size={16} className="shrink-0" />
-                  <span className="truncate">{label}</span>
-                  {hit && !active && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />}
+                  <Icon size={18} className="shrink-0 text-brand sm:text-current" />
+                  <span className="truncate flex-1">{label}</span>
+                  {hit && !active && <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse shrink-0" />}
+                  <ChevronRight size={16} className="sm:hidden text-muted/40 shrink-0" />
                 </button>
               );
             })}
           </nav>
         </aside>
 
-        {/* SAĞ — kaydırılabilir içerik */}
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+        {/* SAĞ — içerik. Mobilde liste görünümünde gizli, detayda tam ekran. */}
+        <div className={`${mobileDetail ? "flex" : "hidden sm:flex"} flex-1 min-w-0 min-h-0 flex-col`}>
+          {/* Mobil iOS geri başlığı */}
+          <div className="sm:hidden relative shrink-0 flex items-center gap-1 px-1.5 py-2 border-b border-line/60">
+            <button onClick={() => setMobileDetail(false)} className="flex items-center gap-0.5 text-brand font-semibold text-[15px] px-2 py-1 rounded-lg hover:bg-bgsoft">
+              <ChevronLeft size={20} /> Ayarlar
+            </button>
+            <span className="font-bold text-sm absolute left-1/2 -translate-x-1/2 pointer-events-none">{visibleTabs.find((t) => t.key === tab)?.label}</span>
+          </div>
           <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-5" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
 
         {/* MODEL */}
