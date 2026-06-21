@@ -487,30 +487,32 @@ export function SettingsModal() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className="w-full max-w-3xl h-[88dvh] rounded-2xl border border-line bg-surface overflow-hidden flex flex-col sm:flex-row"
+        className="relative w-full max-w-3xl h-[88dvh] rounded-2xl border border-line bg-surface overflow-hidden flex"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* SOL — GNOME tarzı dikey kenar çubuğu */}
-        <aside className="sm:w-56 shrink-0 border-b sm:border-b-0 sm:border-r border-line/60 bg-bgsoft/40 flex flex-col">
-          <div className="flex items-center justify-between px-4 pt-4 pb-3 sm:pb-2">
-            <h3 id="settings-title" className="text-lg font-bold">Ayarlar</h3>
-            <button onClick={() => setOpen(false)} className="sm:hidden text-muted hover:text-ink p-1 rounded-lg hover:bg-bgsoft"><X size={18} /></button>
+        {/* Kapat — sağ üst köşe (her düzende çalışır) */}
+        <button onClick={() => setOpen(false)} className="absolute top-3 right-3 z-10 text-muted hover:text-ink p-1.5 rounded-lg hover:bg-bgsoft" title="Kapat"><X size={18} /></button>
+
+        {/* SOL — GNOME tarzı dikey kenar çubuğu (her zaman solda, alt alta) */}
+        <aside className="w-36 sm:w-56 shrink-0 border-r border-line/60 bg-bgsoft/40 flex flex-col min-h-0">
+          <div className="px-4 pt-4 pb-2">
+            <h3 id="settings-title" className="text-base sm:text-lg font-bold">Ayarlar</h3>
           </div>
-          <div className="px-3 pb-2">
+          <div className="px-2.5 pb-2">
             <div className="relative">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted/50" />
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted/50" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Ayar ara…"
-                className="w-full bg-surface border border-line/60 rounded-lg pl-9 pr-8 py-2 text-sm outline-none focus:border-brand/50 placeholder:text-muted/40 transition-colors"
+                placeholder="Ara…"
+                className="w-full bg-surface border border-line/60 rounded-lg pl-8 pr-7 py-1.5 text-sm outline-none focus:border-brand/50 placeholder:text-muted/40 transition-colors"
               />
               {search && (
                 <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted/40 hover:text-ink p-1 rounded transition-colors" title="Temizle"><X size={12} /></button>
               )}
             </div>
           </div>
-          <nav className="flex sm:flex-col gap-0.5 px-2 pb-3 overflow-x-auto sm:overflow-y-auto">
+          <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-2 pb-3">
             {visibleTabs.map(({ key, label, icon: Icon }) => {
               const hit = matchingTabs.has(key);
               const active = tab === key;
@@ -518,12 +520,12 @@ export function SettingsModal() {
                 <button
                   key={key}
                   onClick={() => setTab(key)}
-                  className={`relative flex items-center gap-2.5 shrink-0 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
+                  className={`relative w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
                     active ? "bg-brand/12 text-brand" : "text-muted hover:text-ink hover:bg-surface"
                   }`}
                 >
                   <Icon size={16} className="shrink-0" />
-                  <span className="whitespace-nowrap">{label}</span>
+                  <span className="truncate">{label}</span>
                   {hit && !active && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />}
                 </button>
               );
@@ -531,12 +533,9 @@ export function SettingsModal() {
           </nav>
         </aside>
 
-        {/* SAĞ — içerik */}
-        <div className="flex-1 min-w-0 flex flex-col">
-          <div className="hidden sm:flex items-center justify-end px-4 pt-3">
-            <button onClick={() => setOpen(false)} className="text-muted hover:text-ink p-1 rounded-lg hover:bg-bgsoft" title="Kapat"><X size={18} /></button>
-          </div>
-          <div className="flex-1 overflow-y-auto px-5 pb-6 sm:pt-1" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
+        {/* SAĞ — kaydırılabilir içerik */}
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-5" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
 
         {/* MODEL */}
         {tab === "hesap" && <AccountSettings />}
