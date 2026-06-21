@@ -24,12 +24,14 @@ import {
   Wrench,
   Plug,
   Webhook,
+  Blocks,
   X,
   Zap,
 } from "lucide-react";
 import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
 import { isAdminEmail } from "@/lib/admin";
 import { AccountSettings } from "@/components/AccountSettings";
+import { ExtensionsSettings } from "@/components/ExtensionsSettings";
 import { createClient } from "@/lib/supabase/client";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, ALL_TOOL_CATALOG } from "@/lib/constants";
 import { calculateCost, formatCost } from "@/lib/pricing";
@@ -81,7 +83,7 @@ export function SettingsModal() {
   const [hookCommand, setHookCommand] = useState("");
   const [hookEvent, setHookEvent] = useState<"afterEdit" | "onFinish" | "onError">("afterEdit");
 
-  const [tab, setTab] = useState<"model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap">("model");
+  const [tab, setTab] = useState<"model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions">("model");
   const [search, setSearch] = useState("");
   /* Hibrit/Oracle köprü sağlık testi — /health ucu (token gerektirmez, CORS açık). */
   const [bridgeTest, setBridgeTest] = useState<
@@ -121,8 +123,9 @@ export function SettingsModal() {
 
   /* Keyword index — typing in the search box jumps to whichever tab
      contains the matching keyword (first hit wins). */
-  const SEARCH_INDEX: Record<"model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap", string[]> = {
+  const SEARCH_INDEX: Record<"model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions", string[]> = {
     hesap:    ["hesap", "account", "e-posta", "email", "giriş", "çıkış", "oturum", "admin", "plan"],
+    extensions: ["eklenti", "extension", "paket", "pack", "git", "ci", "cd", "kural", "web", "modül", "modular"],
     model:    ["model", "api", "anahtar", "key", "openai", "anthropic", "huggingface", "hf", "provider", "test"],
     github:   ["github", "gitlab", "token", "depo", "repo", "branch", "dal", "kullanıcı", "username"],
     general:  ["sistem", "prompt", "stil", "style", "tema", "theme", "renk", "color", "accent", "font", "yazı", "ses", "sound", "skill", "memori", "ayar"],
@@ -146,7 +149,7 @@ export function SettingsModal() {
     setPrevSearch(search);
     if (search.trim() && matchingTabs.size > 0) {
       const adminOnly = new Set(["advanced", "mcp", "hooks"]);
-      const first = (["model", "github", "general", "advanced", "mcp", "hooks", "hesap"] as const)
+      const first = (["model", "github", "extensions", "general", "advanced", "mcp", "hooks", "hesap"] as const)
         .find((k) => matchingTabs.has(k) && (isAdmin || !adminOnly.has(k)));
       if (first && first !== tab) setTab(first);
     }
@@ -469,6 +472,7 @@ export function SettingsModal() {
     { key: "hesap", label: "Hesap", icon: User, admin: false },
     { key: "model", label: "Model", icon: Cpu, admin: false },
     { key: "github", label: "Git", icon: GitBranch, admin: false },
+    { key: "extensions", label: "Eklentiler", icon: Blocks, admin: false },
     { key: "general", label: "Temel", icon: SlidersHorizontal, admin: false },
     { key: "advanced", label: "Gelişmiş", icon: Wrench, admin: true },
     { key: "mcp", label: "MCP", icon: Plug, admin: true },
@@ -539,6 +543,8 @@ export function SettingsModal() {
 
         {/* MODEL */}
         {tab === "hesap" && <AccountSettings />}
+
+        {tab === "extensions" && <ExtensionsSettings />}
 
         {tab === "model" && (
           <section>
