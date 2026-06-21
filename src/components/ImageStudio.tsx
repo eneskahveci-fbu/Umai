@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, ImageIcon, Loader2, Send, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
@@ -59,6 +59,24 @@ export function ImageStudio() {
   const open = useStore((s) => s.imageStudioOpen);
   const setOpen = useStore((s) => s.setImageStudioOpen);
   const addToast = useStore((s) => s.addToast);
+  const config = useStore((s) => s.config);
+
+  /* Eklenen modeller arasından görüntü üretebilenler (BYOK). Kullanıcı kendi
+     anahtarıyla bu sağlayıcının görüntü modelini Görüntü Stüdyosu'nda kullanır. */
+  const userImgModels = useMemo(() => {
+    const labels: Record<string, string> = { gemini: "Gemini (görüntü)", openai: "OpenAI (DALL·E)", xai: "xAI (Grok)" };
+    const seen = new Set<string>();
+    const out: { id: string; label: string }[] = [];
+    for (const m of config.models) {
+      if (labels[m.provider] && !seen.has(m.provider)) { seen.add(m.provider); out.push({ id: `prov:${m.provider}`, label: labels[m.provider] }); }
+    }
+    return out;
+  }, [config.models]);
+
+  const keyForProvider = async (provider: string) => {
+    const m = config.models.find((x) => x.provider === provider);
+    return m ? usableApiKey(m) : "";
+  };
 
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState("flux");
@@ -76,6 +94,45 @@ export function ImageStudio() {
 
   const runGenerate = (p: string, mdl: string, n: number) => {
     const fmt = FORMATS.find((f) => f.id === format) ?? FORMATS[0];
+
+    /* Eklenen model (BYOK) → /api/image üzerinden sağlayıcının görüntü modeli. */
+    if (mdl.startsWith("prov:")) {
+      const provider = mdl.slice(5);
+      const items: GenItem[] = Array.from({ length: n }, (_, i) => ({
+        id: `${Date.now()}_${i}_${Math.random().toString(36).slice(2, 7)}`, url: "", w: fmt.w, h: fmt.h, loading: true, error: false,
+      }));
+      setMsgs((prev) => [
+        ...prev,
+        { id: `u_${Date.now()}`, role: "user", text: p, model: mdl },
+        { id: `a_${Date.now()}`, role: "assistant", model: mdl, items },
+      ]);
+      void (async () => {
+        const apiKey = await keyForProvider(provider);
+        if (!apiKey) {
+          items.forEach((it) => mark(it.id, { loading: false, error: true }));
+          addToast(`${provider} için API anahtarı yok — Ayarlar → Modeller'den ekle.`, "error");
+          return;
+        }
+        await Promise.all(items.map(async (it) => {
+          try {
+            const res = await fetch("/api/image", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ provider, apiKey, prompt: p, size: `${fmt.w}x${fmt.h}` }),
+            });
+            const j = await res.json() as { image?: string; error?: string };
+            if (!res.ok || !j.image) throw new Error(j.error || `Hata ${res.status}`);
+            mark(it.id, { url: j.image, loading: false });
+          } catch (e) {
+            mark(it.id, { loading: false, error: true });
+            addToast(`Görüntü üretilemedi: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+          }
+        }));
+      })();
+      return;
+    }
+
+    /* Pollinations (ücretsiz, anahtarsız) — doğrudan <img> URL'i. */
     const items: GenItem[] = Array.from({ length: n }, () => {
       const seed = Math.floor(Math.random() * 1_000_000);
       return { id: `${Date.now()}_${seed}`, url: imgUrl(p, mdl, fmt.w, fmt.h, seed), w: fmt.w, h: fmt.h, loading: true, error: false };
@@ -286,7 +343,14 @@ export function ImageStudio() {
           {/* Seçenekler: model · format · adet */}
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             <select value={model} onChange={(e) => setModel(e.target.value)} className="bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs outline-none focus:border-brand/50 cursor-pointer">
-              {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              <optgroup label="Ücretsiz (Pollinations)">
+                {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              </optgroup>
+              {userImgModels.length > 0 && (
+                <optgroup label="Eklediğin modeller (kendi anahtarın)">
+                  {userImgModels.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                </optgroup>
+              )}
             </select>
             <select value={format} onChange={(e) => setFormat(e.target.value)} className="bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs outline-none focus:border-brand/50 cursor-pointer">
               {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
