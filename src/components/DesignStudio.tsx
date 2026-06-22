@@ -115,6 +115,104 @@ const TEMPLATES: Template[] = [
     { text: "YENİ KOLEKSİYON", x: 0.5, y: 0.4, sizePct: 0.075, color: "#ffffff", weight: 800, align: "center", font: 5 },
     { text: "Kaydır → keşfet", x: 0.5, y: 0.85, sizePct: 0.03, color: "#f5d0fe", weight: 500, align: "center", font: 5 },
   ] },
+
+  // ── Slaytlar (sunum) ──────────────────────────────────────────────
+  { name: "Bölüm Başlığı", cat: "Sunum", fmt: "slide", bgType: "gradient", c1: "#0f172a", c2: "#334155", layers: [
+    { text: "01", x: 0.08, y: 0.34, sizePct: 0.12, color: "#38bdf8", weight: 800, align: "left", font: 5 },
+    { text: "Bölüm Başlığı", x: 0.08, y: 0.52, sizePct: 0.06, color: "#f1f5f9", weight: 800, align: "left", font: 5 },
+    { text: "kısa açıklama satırı", x: 0.08, y: 0.62, sizePct: 0.026, color: "#94a3b8", weight: 400, align: "left", font: 5 },
+  ] },
+  { name: "Ajanda", cat: "Sunum", fmt: "slide", bgType: "color", c1: "#fafaf9", c2: "#fafaf9", layers: [
+    { text: "Ajanda", x: 0.08, y: 0.2, sizePct: 0.06, color: "#1c1917", weight: 800, align: "left", font: 5 },
+    { text: "1 · Giriş", x: 0.1, y: 0.4, sizePct: 0.034, color: "#44403c", weight: 600, align: "left", font: 5 },
+    { text: "2 · Problem ve çözüm", x: 0.1, y: 0.52, sizePct: 0.034, color: "#44403c", weight: 600, align: "left", font: 5 },
+    { text: "3 · Sonuç", x: 0.1, y: 0.64, sizePct: 0.034, color: "#44403c", weight: 600, align: "left", font: 5 },
+  ] },
+  { name: "İstatistik", cat: "Sunum", fmt: "slide", bgType: "gradient", c1: "#064e3b", c2: "#10b981", layers: [
+    { text: "%87", x: 0.5, y: 0.42, sizePct: 0.16, color: "#ecfdf5", weight: 800, align: "center", font: 2 },
+    { text: "kullanıcı memnuniyeti", x: 0.5, y: 0.62, sizePct: 0.034, color: "#a7f3d0", weight: 500, align: "center", font: 5 },
+  ] },
+  { name: "Alıntı Slaytı", cat: "Sunum", fmt: "slide", bgType: "gradient", c1: "#1e1b4b", c2: "#4338ca", layers: [
+    { text: "Basit olan ölçeklenir.", x: 0.5, y: 0.44, sizePct: 0.055, color: "#eef2ff", weight: 700, align: "center", font: 3 },
+    { text: "— Anonim", x: 0.5, y: 0.6, sizePct: 0.028, color: "#c7d2fe", weight: 500, align: "center", font: 3 },
+  ] },
+  { name: "Teşekkürler", cat: "Sunum", fmt: "slide", bgType: "gradient", c1: "#7c2d12", c2: "#ea580c", layers: [
+    { text: "Teşekkürler", x: 0.5, y: 0.44, sizePct: 0.085, color: "#fff7ed", weight: 800, align: "center", font: 5 },
+    { text: "sorular & iletişim · @hesap", x: 0.5, y: 0.6, sizePct: 0.028, color: "#fed7aa", weight: 400, align: "center", font: 5 },
+  ] },
+  { name: "Pitch Kapağı", cat: "Sunum", fmt: "slide", bgType: "color", c1: "#0a0a0a", c2: "#0a0a0a", layers: [
+    { text: "STARTUP ADI", x: 0.5, y: 0.4, sizePct: 0.075, color: "#ffffff", weight: 800, align: "center", font: 2 },
+    { text: "tek cümlelik değer önerisi", x: 0.5, y: 0.54, sizePct: 0.03, color: "#a3a3a3", weight: 400, align: "center", font: 5 },
+    { text: "Seri A · 2025", x: 0.5, y: 0.86, sizePct: 0.022, color: "#737373", weight: 500, align: "center", font: 4 },
+  ] },
+  { name: "Karşılaştırma", cat: "Sunum", fmt: "slide", bgType: "gradient", c1: "#1e293b", c2: "#0f172a", layers: [
+    { text: "Önce vs Sonra", x: 0.5, y: 0.18, sizePct: 0.05, color: "#f8fafc", weight: 800, align: "center", font: 5 },
+    { text: "Önce", x: 0.27, y: 0.55, sizePct: 0.045, color: "#fca5a5", weight: 700, align: "center", font: 5 },
+    { text: "Sonra", x: 0.73, y: 0.55, sizePct: 0.045, color: "#86efac", weight: 700, align: "center", font: 5 },
+  ] },
+  { name: "Ders Slaytı", cat: "Sunum", fmt: "slide", bgType: "color", c1: "#1e3a8a", c2: "#1e3a8a", layers: [
+    { text: "Ders 1", x: 0.08, y: 0.22, sizePct: 0.03, color: "#93c5fd", weight: 700, align: "left", font: 5 },
+    { text: "Konu Başlığı", x: 0.08, y: 0.34, sizePct: 0.06, color: "#eff6ff", weight: 800, align: "left", font: 5 },
+    { text: "• madde bir   • madde iki   • madde üç", x: 0.08, y: 0.58, sizePct: 0.028, color: "#bfdbfe", weight: 400, align: "left", font: 5 },
+  ] },
+
+  // ── Afişler (poster) ──────────────────────────────────────────────
+  { name: "Konferans", cat: "Afiş", fmt: "poster", bgType: "gradient", c1: "#0c4a6e", c2: "#0891b2", layers: [
+    { text: "TECH KONF 2025", x: 0.5, y: 0.22, sizePct: 0.072, color: "#ecfeff", weight: 800, align: "center", font: 2 },
+    { text: "Yapay Zekâ & Gelecek", x: 0.5, y: 0.34, sizePct: 0.034, color: "#a5f3fc", weight: 500, align: "center", font: 5 },
+    { text: "12-13 Eylül", x: 0.5, y: 0.7, sizePct: 0.05, color: "#ffffff", weight: 700, align: "center", font: 5 },
+    { text: "İstanbul · konf.com", x: 0.5, y: 0.8, sizePct: 0.03, color: "#cffafe", weight: 400, align: "center", font: 5 },
+  ] },
+  { name: "Atölye", cat: "Afiş", fmt: "poster", bgType: "gradient", c1: "#831843", c2: "#db2777", layers: [
+    { text: "ATÖLYE", x: 0.5, y: 0.2, sizePct: 0.09, color: "#fdf2f8", weight: 800, align: "center", font: 2 },
+    { text: "Yaratıcı Tasarım", x: 0.5, y: 0.33, sizePct: 0.04, color: "#fbcfe8", weight: 600, align: "center", font: 5 },
+    { text: "Cumartesi · 14:00", x: 0.5, y: 0.72, sizePct: 0.04, color: "#ffffff", weight: 700, align: "center", font: 5 },
+    { text: "Ücretsiz · kayıt zorunlu", x: 0.5, y: 0.8, sizePct: 0.028, color: "#fce7f3", weight: 400, align: "center", font: 5 },
+  ] },
+  { name: "İş İlanı", cat: "Afiş", fmt: "poster", bgType: "color", c1: "#111827", c2: "#111827", layers: [
+    { text: "İŞ İLANI", x: 0.5, y: 0.16, sizePct: 0.045, color: "#60a5fa", weight: 700, align: "center", font: 5 },
+    { text: "Frontend Geliştirici", x: 0.5, y: 0.4, sizePct: 0.06, color: "#f9fafb", weight: 800, align: "center", font: 5 },
+    { text: "React · TypeScript · Uzaktan", x: 0.5, y: 0.52, sizePct: 0.03, color: "#9ca3af", weight: 400, align: "center", font: 5 },
+    { text: "Başvur → kariyer.com", x: 0.5, y: 0.84, sizePct: 0.032, color: "#60a5fa", weight: 600, align: "center", font: 5 },
+  ] },
+  { name: "Restoran", cat: "Afiş", fmt: "poster", bgType: "gradient", c1: "#1c1917", c2: "#78350f", layers: [
+    { text: "Lezzet Durağı", x: 0.5, y: 0.24, sizePct: 0.062, color: "#fef3c7", weight: 700, align: "center", font: 3 },
+    { text: "AÇILDIK", x: 0.5, y: 0.46, sizePct: 0.09, color: "#fbbf24", weight: 800, align: "center", font: 2 },
+    { text: "Her gün 10:00 — 23:00", x: 0.5, y: 0.74, sizePct: 0.03, color: "#fde68a", weight: 400, align: "center", font: 5 },
+  ] },
+  { name: "Konser", cat: "Afiş", fmt: "poster", bgType: "gradient", c1: "#18181b", c2: "#7c3aed", layers: [
+    { text: "CANLI KONSER", x: 0.5, y: 0.2, sizePct: 0.06, color: "#faf5ff", weight: 800, align: "center", font: 2 },
+    { text: "Sahne Adı", x: 0.5, y: 0.46, sizePct: 0.085, color: "#c4b5fd", weight: 800, align: "center", font: 5 },
+    { text: "30 Ağustos · 21:00", x: 0.5, y: 0.74, sizePct: 0.038, color: "#ffffff", weight: 700, align: "center", font: 5 },
+    { text: "Biletler · bilet.com", x: 0.5, y: 0.82, sizePct: 0.026, color: "#ddd6fe", weight: 400, align: "center", font: 5 },
+  ] },
+  { name: "Fitness", cat: "Afiş", fmt: "poster", bgType: "gradient", c1: "#052e16", c2: "#65a30d", layers: [
+    { text: "FORMDA KAL", x: 0.5, y: 0.22, sizePct: 0.08, color: "#f7fee7", weight: 800, align: "center", font: 2 },
+    { text: "Yeni dönem kayıtları", x: 0.5, y: 0.35, sizePct: 0.032, color: "#d9f99d", weight: 500, align: "center", font: 5 },
+    { text: "%40 İNDİRİM", x: 0.5, y: 0.7, sizePct: 0.055, color: "#ffffff", weight: 800, align: "center", font: 2 },
+    { text: "salon.com", x: 0.5, y: 0.8, sizePct: 0.028, color: "#ecfccb", weight: 400, align: "center", font: 5 },
+  ] },
+  { name: "Emlak", cat: "Afiş", fmt: "poster", bgType: "gradient", c1: "#0c0a09", c2: "#1c1917", layers: [
+    { text: "SATILIK", x: 0.5, y: 0.18, sizePct: 0.05, color: "#d6d3d1", weight: 700, align: "center", font: 5 },
+    { text: "3+1 Daire", x: 0.5, y: 0.42, sizePct: 0.08, color: "#fafaf9", weight: 800, align: "center", font: 3 },
+    { text: "Merkezde · Geniş · Asansörlü", x: 0.5, y: 0.54, sizePct: 0.028, color: "#a8a29e", weight: 400, align: "center", font: 5 },
+    { text: "0500 000 00 00", x: 0.5, y: 0.84, sizePct: 0.04, color: "#fbbf24", weight: 700, align: "center", font: 5 },
+  ] },
+  { name: "Film Gecesi", cat: "Afiş", fmt: "poster", bgType: "gradient", c1: "#450a0a", c2: "#dc2626", layers: [
+    { text: "FİLM GECESİ", x: 0.5, y: 0.22, sizePct: 0.07, color: "#fef2f2", weight: 800, align: "center", font: 2 },
+    { text: "Açık hava sineması", x: 0.5, y: 0.34, sizePct: 0.032, color: "#fecaca", weight: 500, align: "center", font: 5 },
+    { text: "Cuma · 20:30", x: 0.5, y: 0.74, sizePct: 0.044, color: "#ffffff", weight: 700, align: "center", font: 5 },
+  ] },
+
+  // ── Sosyal ekstra ─────────────────────────────────────────────────
+  { name: "Duyuru", cat: "Sosyal", fmt: "square", bgType: "gradient", c1: "#0ea5e9", c2: "#2563eb", layers: [
+    { text: "ÖNEMLİ DUYURU", x: 0.5, y: 0.4, sizePct: 0.06, color: "#ffffff", weight: 800, align: "center", font: 5 },
+    { text: "detaylar açıklamada 👇", x: 0.5, y: 0.56, sizePct: 0.032, color: "#dbeafe", weight: 500, align: "center", font: 5 },
+  ] },
+  { name: "İpucu", cat: "Sosyal", fmt: "square", bgType: "color", c1: "#fafaf9", c2: "#fafaf9", layers: [
+    { text: "💡 Günün İpucu", x: 0.5, y: 0.34, sizePct: 0.05, color: "#1c1917", weight: 800, align: "center", font: 5 },
+    { text: "Kısa, faydalı bir öneri buraya gelir.", x: 0.5, y: 0.52, sizePct: 0.034, color: "#57534e", weight: 500, align: "center", font: 5 },
+  ] },
 ];
 
 /* Hadi Prototip Yapalım — yeni proje başlatma sekmeleri (Claude Design'daki gibi). */
@@ -203,6 +301,7 @@ export function DesignStudio() {
   const [d, setD] = useState<Design>(() => template(FORMATS[0]));
   const [sel, setSel] = useState(0);
   const [view, setView] = useState<"design" | "gallery" | "templates">("design");
+  const [tplCat, setTplCat] = useState<"Hepsi" | "Sunum" | "Afiş" | "Sosyal">("Hepsi");
   const [genPrompt, setGenPrompt] = useState("");
   const [exporting, setExporting] = useState(false);
   const [title, setTitle] = useState("");
@@ -636,10 +735,18 @@ KURALLAR:
           <div className="flex-1 overflow-y-auto p-4 sm:p-6">
             <div className="mb-3">
               <div className="text-sm font-bold">Hazır şablonlar</div>
-              <div className="text-[11px] text-muted/60">Bir şablona dokun, hemen düzenlemeye başla. Sohbetten de değiştirebilirsin.</div>
+              <div className="text-[11px] text-muted/60">Bir şablona dokun, hemen düzenlemeye başla. Sonra sohbetten “{`başlığı X yap`}” gibi komutlarla ücretsiz değiştir.</div>
+            </div>
+            {/* Kategori filtresi */}
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {(["Hepsi", "Sunum", "Afiş", "Sosyal"] as const).map((c) => (
+                <button key={c} onClick={() => setTplCat(c)} className={`px-3 py-1 rounded-full border text-[11px] font-semibold transition-colors ${tplCat === c ? "border-brand/50 bg-brand/12 text-brand" : "border-line/60 text-muted hover:text-ink hover:border-brand/30"}`}>
+                  {c}{c !== "Hepsi" ? ` (${TEMPLATES.filter((t) => t.cat === c).length})` : ` (${TEMPLATES.length})`}
+                </button>
+              ))}
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {TEMPLATES.map((t) => {
+              {TEMPLATES.filter((t) => tplCat === "Hepsi" || t.cat === tplCat).map((t) => {
                 const f = FORMATS.find((x) => x.id === t.fmt) ?? FORMATS[0];
                 const bg = t.bgType === "color" ? { background: t.c1 } : { background: `linear-gradient(135deg, ${t.c1}, ${t.c2})` };
                 const top = t.layers[0];
