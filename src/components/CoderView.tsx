@@ -18,8 +18,6 @@ import {
   FolderGit2,
   FolderOpen,
   Folder,
-  Command,
-  Plus,
   GraduationCap,
   Circle,
   CircleCheck,
@@ -2056,12 +2054,8 @@ export function CoderView() {
             <EffortMenuControl />
             <div className="h-px bg-line my-1" />
 
-            {/* Hızlı eylemler (Ayarlar sidebar'da olduğu için burada yok) */}
-            <MoreItem icon={<Plus size={14} />} label="Yeni sohbet" onClick={() => useStore.getState().newChat(false)} />
-            <MoreItem icon={<Command size={14} />} label="Komut paleti (⌘K)" onClick={() => useStore.getState().setCommandPaletteOpen(true)} />
-
             {/* Sekme çubuğu — tıklanınca menü açık kalır */}
-            <div className="flex gap-0.5 px-1 pt-1.5 pb-1" onClick={(e) => e.stopPropagation()}>
+            <div className="flex gap-0.5 px-1 pt-1 pb-1" onClick={(e) => e.stopPropagation()}>
               {([["workspace", "Çalışma"], ["modes", "Modlar"], ["tools", "Araçlar"]] as const).map(([key, lbl]) => (
                 <button
                   key={key}
@@ -2129,11 +2123,11 @@ export function CoderView() {
       </div>
 
       {/* Body */}
-      <div className="flex-1 flex min-h-0 overflow-hidden">
+      <div className="relative flex-1 flex min-h-0 overflow-hidden">
 
-        {/* Files panel (left) */}
+        {/* Files panel (left) — mobilde içeriği ezmesin diye overlay */}
         {filesOpen && (
-          <div className="w-56 shrink-0 flex flex-col border-r border-line/60 bg-surface/40 overflow-hidden">
+          <div className="absolute sm:relative inset-y-0 left-0 z-30 w-64 sm:w-56 max-w-[85%] shrink-0 flex flex-col border-r border-line/60 bg-surface sm:bg-surface/40 shadow-2xl sm:shadow-none overflow-hidden">
             <div className="px-3 py-2 border-b border-line/40 flex items-center justify-between shrink-0">
               <span className="text-[10px] font-bold uppercase tracking-widest text-muted/50">
                 {repo ? `${repo.owner}/${repo.repo}` : "Dosyalar"}
@@ -2326,7 +2320,7 @@ export function CoderView() {
         {/* Sunucu (Hibrit köprü) workspace gezgini — ajanların çalıştığı gerçek dizin.
             Repo panelinden bağımsız; yalnız localMode'da açılır. */}
         {wsOpen && (
-          <div className="w-56 shrink-0 flex flex-col border-r border-line/60 bg-surface/40 overflow-hidden">
+          <div className="absolute sm:relative inset-y-0 left-0 z-30 w-64 sm:w-56 max-w-[85%] shrink-0 flex flex-col border-r border-line/60 bg-surface sm:bg-surface/40 shadow-2xl sm:shadow-none overflow-hidden">
             <div className="px-3 py-2 border-b border-line/40 flex items-center justify-between shrink-0">
               <span className="text-[10px] font-bold uppercase tracking-widest text-muted/50 flex items-center gap-1.5">
                 <Server size={11} className="text-brand/70" /> Sunucu • workspace
