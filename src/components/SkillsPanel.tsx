@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useModalA11y } from "@/lib/useModalA11y";
 import {
-  BookMarked, Check, FileText, FileUp, Folder, GitBranch,
-  Pencil, Plus, RotateCcw, Search, Sparkles, Trash2, X, Zap,
+  BookMarked, Check, Download, FileText, FileUp, Folder, GitBranch,
+  Pencil, Plus, RotateCcw, Search, Sparkles, Trash2, Upload, X, Zap,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { ALL_AGENTS, type Agent } from "@/lib/agents";
@@ -19,6 +19,7 @@ export function SkillsPanel() {
   const open = useStore((s) => s.skillsOpen);
   const setOpen = useStore((s) => s.setSkillsOpen);
   const skills = useStore((s) => s.config.skills);
+  const config = useStore((s) => s.config);
   const addSkill = useStore((s) => s.addSkill);
   const updateSkill = useStore((s) => s.updateSkill);
   const removeSkill = useStore((s) => s.removeSkill);
@@ -29,7 +30,47 @@ export function SkillsPanel() {
   const [tab, setTab] = useState<Tab>("skills");
   const [search, setSearch] = useState("");
   const modalRef = useRef<HTMLDivElement>(null);
+  const bundleRef = useRef<HTMLInputElement>(null);
   useModalA11y(modalRef, open, () => setOpen(false));
+
+  /* #6 — skill + ajanları taşınabilir bir JSON dosyasına indir / geri yükle.
+     Workspace'e/diske kaydedip paylaşılabilir, başka cihaza taşınabilir. */
+  const exportBundle = () => {
+    const bundle = { version: 1, skills, userAgents: config.userAgents ?? [] };
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `craft-skills-agents-${Date.now()}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    addToast("Skill + ajan paketi indirildi", "success");
+  };
+  const importBundle = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result)) as { skills?: Skill[]; userAgents?: Agent[] };
+        let n = 0;
+        if (Array.isArray(data.skills)) {
+          for (const s of data.skills) {
+            if (s && typeof s.title === "string" && typeof s.content === "string") {
+              addSkill({ title: s.title, content: s.content, tags: s.tags ?? [], enabled: s.enabled ?? true, source: s.source === "file" ? "file" : "manual", fileName: s.fileName });
+              n++;
+            }
+          }
+        }
+        if (Array.isArray(data.userAgents)) {
+          const cur = useStore.getState(); // taze: addSkill sonrası skill'leri ezme
+          const existing = cur.config.userAgents ?? [];
+          const cmds = new Set(existing.map((a) => a.command));
+          const add = data.userAgents.filter((a) => a && typeof a.command === "string" && a.command.startsWith("/") && !cmds.has(a.command));
+          if (add.length) { cur.saveConfig({ ...cur.config, userAgents: [...existing, ...add] }); n += add.length; }
+        }
+        addToast(n ? `${n} öğe içe aktarıldı` : "İçe aktarılacak geçerli öğe yok", n ? "success" : "error");
+      } catch { addToast("Geçersiz dosya (JSON bekleniyor)", "error"); }
+    };
+    reader.readAsText(file);
+  };
 
   if (!open) return null;
 
@@ -74,12 +115,17 @@ export function SkillsPanel() {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setOpen(false)}
-            className="w-7 h-7 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
-          >
-            <X size={14} />
-          </button>
+          <div className="flex items-center gap-1">
+            <input ref={bundleRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importBundle(f); e.target.value = ""; }} />
+            <button onClick={() => bundleRef.current?.click()} title="Skill + ajan paketi içe aktar (JSON)" className="w-7 h-7 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"><Upload size={14} /></button>
+            <button onClick={exportBundle} title="Skill + ajan paketini indir (JSON)" className="w-7 h-7 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"><Download size={14} /></button>
+            <button
+              onClick={() => setOpen(false)}
+              className="w-7 h-7 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Tabs — dar iOS ekranlarında yatay kaydırılabilir, taşma olmaz */}
