@@ -13,7 +13,7 @@ import type { Skill } from "@/lib/types";
 import SkillImport from "./SkillImport";
 import AgentImport from "./AgentImport";
 
-type Tab = "skills" | "files" | "agents" | "progress";
+type Tab = "skills" | "agents" | "progress";
 
 export function SkillsPanel() {
   const open = useStore((s) => s.skillsOpen);
@@ -26,15 +26,7 @@ export function SkillsPanel() {
   const resetSkillProgress = useStore((s) => s.resetSkillProgress);
   const addToast = useStore((s) => s.addToast);
 
-  const [tab, setTab] = useState<Tab>(() => {
-    /* Boş "Skills" sekmesiyle açılıp panel boş görünmesin: içerik olan ilk
-       sekmeyi seç. Varsayılan skill dosyaları "file" türünde olduğundan
-       genelde "Dosyalar" sekmesi açılır. */
-    const hasManual = skills.some((s) => s.source === "manual");
-    const hasFiles = skills.some((s) => s.source === "file");
-    if (!hasManual && hasFiles) return "files";
-    return "skills";
-  });
+  const [tab, setTab] = useState<Tab>("skills");
   const [search, setSearch] = useState("");
   const modalRef = useRef<HTMLDivElement>(null);
   useModalA11y(modalRef, open, () => setOpen(false));
@@ -47,8 +39,7 @@ export function SkillsPanel() {
   const enabledCount = skills.filter((s) => s.enabled).length;
 
   const tabs: { id: Tab; label: string; icon: typeof Zap; count: number }[] = [
-    { id: "skills", label: "Skills", icon: Zap, count: manualSkills.length },
-    { id: "files", label: "Dosyalar", icon: FileText, count: fileSkills.length },
+    { id: "skills", label: "Skills & Dosyalar", icon: Zap, count: skills.length },
     { id: "agents", label: "Agents", icon: Sparkles, count: ALL_AGENTS.length },
     { id: "progress", label: "İlerleme", icon: GitBranch, count: totalUsage },
   ];
@@ -115,26 +106,26 @@ export function SkillsPanel() {
         {/* Body */}
         <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
           {tab === "skills" && (
-            <SkillsTab
-              skills={manualSkills}
-              search={search}
-              setSearch={setSearch}
-              addSkill={addSkill}
-              updateSkill={updateSkill}
-              removeSkill={removeSkill}
-              toggleSkill={toggleSkill}
-              addToast={addToast}
-            />
-          )}
-          {tab === "files" && (
-            <FilesTab
-              fileSkills={fileSkills}
-              addSkill={addSkill}
-              updateSkill={updateSkill}
-              removeSkill={removeSkill}
-              toggleSkill={toggleSkill}
-              addToast={addToast}
-            />
+            <>
+              <FilesTab
+                fileSkills={fileSkills}
+                addSkill={addSkill}
+                updateSkill={updateSkill}
+                removeSkill={removeSkill}
+                toggleSkill={toggleSkill}
+                addToast={addToast}
+              />
+              <SkillsTab
+                skills={manualSkills}
+                search={search}
+                setSearch={setSearch}
+                addSkill={addSkill}
+                updateSkill={updateSkill}
+                removeSkill={removeSkill}
+                toggleSkill={toggleSkill}
+                addToast={addToast}
+              />
+            </>
           )}
           {tab === "agents" && <AgentsTab />}
           {tab === "progress" && (
