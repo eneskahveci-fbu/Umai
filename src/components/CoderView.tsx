@@ -94,6 +94,7 @@ import type { TreeFile, TreeNode } from "@/lib/types";
 import { ALL_AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agents";
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
 import { buildContextSections } from "@/lib/prompt";
+import { detectSensitive } from "@/lib/pii";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { CRAFT_OPERATING_MANUAL } from "@/lib/constants";
 import { addPendingAction, removePendingAction, isCommandAllowed, matchDangerousCommand, DEFAULT_COMMAND_ALLOWLIST, type PendingAction } from "@/lib/agentActions";
@@ -2013,6 +2014,8 @@ export function CoderView() {
   };
 
   const allFiles = useMemo(() => (tree ? getAllFiles(tree) : []), [tree]);
+  /* Hassas veri uyarısı — yazılan istemde API anahtarı/kredi kartı/IBAN olursa. */
+  const sensitiveHits = useMemo(() => detectSensitive(input), [input]);
   const filteredFiles = useMemo(
     () => fuzzyFiles(allFiles, repoSearch),
     [allFiles, repoSearch],
@@ -2833,6 +2836,11 @@ export function CoderView() {
                   {toolsEnabled && <span className="text-green/80 font-medium">Tools</span>}
                   {config.learningMode && <span className="flex items-center gap-1 text-brand font-medium" title="Öğrenme Modu: adım adım eğitsel açıklama"><GraduationCap size={12} /> Öğrenme</span>}
                   {activeAgent && <span className="text-brand font-medium">{activeAgent.command}</span>}
+                  {sensitiveHits.length > 0 && (
+                    <span className="flex items-center gap-1 text-amber-400 font-medium" title={`Mesajında hassas veri olabilir (${sensitiveHits.join(", ")}). API anahtarlarını/kart bilgilerini sohbete yazma.`}>
+                      <ShieldCheck size={12} /> Hassas veri?
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
