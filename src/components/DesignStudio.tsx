@@ -298,7 +298,25 @@ export function DesignStudio() {
   const addToast = useStore((s) => s.addToast);
 
   const saved: SavedDesign[] = config.savedDesigns ?? [];
-  const [d, setD] = useState<Design>(() => template(FORMATS[0]));
+  /* Çok-sayfalı belge (Canva tarzı slayt/sayfa). `d` = aktif sayfa, `setD` aktif
+     sayfayı günceller → mevcut tüm kullanımlar değişmeden çalışır. */
+  const [pages, setPages] = useState<Design[]>(() => [template(FORMATS[0])]);
+  const [pageIndexRaw, setPageIndexRaw] = useState(0);
+  const pageIdx = Math.min(pageIndexRaw, pages.length - 1);
+  const d = pages[pageIdx];
+  const setD = (u: Design | ((p: Design) => Design)) =>
+    setPages((ps) => ps.map((p, i) => (i === pageIdx ? (typeof u === "function" ? (u as (p: Design) => Design)(p) : u) : p)));
+  const setPageIndex = (i: number) => setPageIndexRaw(Math.max(0, Math.min(pages.length - 1, i)));
+  const resetDoc = (designs: Design[]) => { setPages(designs.length ? designs : [template(FORMATS[0])]); setPageIndexRaw(0); };
+  const addPage = () => { const f = FORMATS.find((x) => x.id === d.fmt) ?? FORMATS[0]; setPages((ps) => [...ps, { ...template(f, "bos"), c1: d.c1, c2: d.c2, bgType: d.bgType }]); setPageIndexRaw(pages.length); };
+  const dupPage = () => {
+    const copy = JSON.parse(JSON.stringify(d)) as Design;
+    copy.layers = copy.layers.map((l) => ({ ...l, id: uid() }));
+    if (copy.images) copy.images = copy.images.map((im) => ({ ...im, id: uid() }));
+    setPages((ps) => { const n = [...ps]; n.splice(pageIdx + 1, 0, copy); return n; });
+    setPageIndexRaw(pageIdx + 1);
+  };
+  const delPage = () => { if (pages.length <= 1) return; setPages((ps) => ps.filter((_, i) => i !== pageIdx)); setPageIndexRaw(Math.max(0, pageIdx - 1)); };
   const [sel, setSel] = useState(0);
   const [view, setView] = useState<"design" | "gallery" | "templates">("design");
   const [tplCat, setTplCat] = useState<"Hepsi" | "Sunum" | "Afiş" | "Sosyal">("Hepsi");
@@ -356,7 +374,7 @@ export function DesignStudio() {
   const startProject = (t: typeof START_TABS[number]) => {
     if (t.id === "sablon") { setView("templates"); return; }
     const f = FORMATS.find((x) => x.id === t.fmt) ?? FORMATS[0];
-    setD(template(f, t.id));
+    resetDoc([template(f, t.id)]);
     setSel(0); setSpacing(1); setScale(1); setHue(0);
   };
 
@@ -630,9 +648,16 @@ KURALLAR:
     ? `background:url('${x.bgImage}') center/cover;`
     : x.bgType === "color" ? `background:${x.c1};` : `background:linear-gradient(135deg,${x.c1},${x.c2});`;
 
+  /* Tek sayfa stage HTML'i — slider'lar uygulanmış, inline arka plan + en/boy. */
+  const pageStage = (p: Design, extra: string) => {
+    const x = applyView(p, spacing, scale, hue);
+    return `<div class="stage" style="aspect-ratio:${x.w}/${x.h};${bgCss(x)}${extra}">${imagesHtml(x)}${layersHtml(x)}</div>`;
+  };
+
   const exportHtml = () => {
     setExportMenu(false);
-    const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title || "Tasarım")}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a0d;display:grid;place-items:center;min-height:100vh}.stage{container-type:inline-size;width:min(96vw,960px);aspect-ratio:${vd.w}/${vd.h};position:relative;overflow:hidden;border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,.5);${bgCss(vd)}}</style></head><body><div class="stage">${imagesHtml(vd)}${layersHtml(vd)}</div></body></html>`;
+    const stages = pages.map((p) => pageStage(p, "")).join("");
+    const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title || "Tasarım")}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a0d;display:flex;flex-direction:column;align-items:center;gap:24px;padding:24px;min-height:100vh}.stage{container-type:inline-size;width:min(96vw,960px);position:relative;overflow:hidden;border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,.5)}</style></head><body>${stages}</body></html>`;
     const blob = new Blob([html], { type: "text/html" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
     a.download = `${(title || "tasarim").replace(/\s+/g, "-")}.html`; a.click();
@@ -643,19 +668,26 @@ KURALLAR:
     setExportMenu(false);
     const w = window.open("", "_blank");
     if (!w) { addToast("Açılır pencere engellendi — PDF için açılır pencereye izin ver.", "error"); return; }
-    const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHtml(title || "Tasarım")}</title><style>@page{size:${vd.w > vd.h ? "landscape" : "portrait"};margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{height:100%}body{display:grid;place-items:center}.stage{container-type:inline-size;width:100vw;aspect-ratio:${vd.w}/${vd.h};position:relative;overflow:hidden;${bgCss(vd)}}@media print{.stage{width:100vw}}</style></head><body><div class="stage">${imagesHtml(vd)}${layersHtml(vd)}</div><script>window.onload=function(){setTimeout(function(){window.print()},350)}</script></body></html>`;
+    const first = pages[0];
+    const stages = pages.map((p, i) => pageStage(p, `width:100vw;${i < pages.length - 1 ? "page-break-after:always;" : ""}`)).join("");
+    const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHtml(title || "Tasarım")}</title><style>@page{size:${first.w > first.h ? "landscape" : "portrait"};margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{height:100%}body{display:block}.stage{container-type:inline-size;position:relative;overflow:hidden}</style></head><body>${stages}<script>window.onload=function(){setTimeout(function(){window.print()},400)}</script></body></html>`;
     w.document.open(); w.document.write(html); w.document.close();
   };
 
   /* ---- Galeri ---- */
   const save = () => {
     const t = title.trim() || `Tasarım ${saved.length + 1}`;
-    const design: SavedDesign = { id: `${Date.now()}`, title: t, code: JSON.stringify(d), createdAt: Date.now() };
+    /* Çok-sayfalı belge: tüm sayfaları sakla (eski tekil format ile geri uyumlu). */
+    const design: SavedDesign = { id: `${Date.now()}`, title: t, code: JSON.stringify({ pages }), createdAt: Date.now() };
     saveConfig({ ...config, savedDesigns: [design, ...saved].slice(0, 100) });
-    addToast("Tasarım kaydedildi", "success");
+    addToast(`Tasarım kaydedildi${pages.length > 1 ? ` (${pages.length} sayfa)` : ""}`, "success");
   };
   const load = (sd: SavedDesign) => {
-    try { setD(JSON.parse(sd.code) as Design); setTitle(sd.title); setSel(0); setSpacing(1); setScale(1); setHue(0); setView("design"); } catch { /* eski format */ }
+    try {
+      const parsed = JSON.parse(sd.code) as Design | { pages: Design[] };
+      const ps = "pages" in parsed && Array.isArray(parsed.pages) ? parsed.pages : [parsed as Design];
+      resetDoc(ps); setTitle(sd.title); setSel(0); setSpacing(1); setScale(1); setHue(0); setView("design");
+    } catch { /* eski format */ }
   };
   const del = (id: string) => saveConfig({ ...config, savedDesigns: saved.filter((x) => x.id !== id) });
 
@@ -664,6 +696,10 @@ KURALLAR:
     vd.bgType === "image" && vd.bgImage ? { backgroundImage: `url(${vd.bgImage})`, backgroundSize: "cover", backgroundPosition: "center" }
       : vd.bgType === "color" ? { background: vd.c1 }
         : { background: `linear-gradient(135deg, ${vd.c1}, ${vd.c2})` };
+  const thumbBg = (p: Design): React.CSSProperties =>
+    p.bgType === "image" && p.bgImage ? { backgroundImage: `url(${p.bgImage})`, backgroundSize: "cover", backgroundPosition: "center" }
+      : p.bgType === "color" ? { background: p.c1 }
+        : { background: `linear-gradient(135deg, ${p.c1}, ${p.c2})` };
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg" style={{ paddingTop: "env(safe-area-inset-top)" }}>
@@ -771,7 +807,8 @@ KURALLAR:
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {saved.map((sd) => {
-                  let dd: Design | null = null; try { dd = JSON.parse(sd.code) as Design; } catch { /* yok */ }
+                  let dd: Design | null = null;
+                  try { const pr = JSON.parse(sd.code) as Design | { pages: Design[] }; dd = "pages" in pr && Array.isArray(pr.pages) ? pr.pages[0] : (pr as Design); } catch { /* yok */ }
                   return (
                     <div key={sd.id} className="relative premium-card rounded-2xl overflow-hidden group/d">
                       <button onClick={() => load(sd)} className="block w-full text-left">
@@ -876,7 +913,8 @@ KURALLAR:
                 </div>
               </div>
             ) : (
-            <div className="flex-1 min-h-0 grid place-items-center p-4 sm:p-8 overflow-auto bg-[#0a0a0d]">
+            <div className="flex-1 min-h-0 flex flex-col bg-[#0a0a0d]">
+              <div className="flex-1 min-h-0 grid place-items-center p-4 sm:p-8 overflow-auto">
               <div ref={previewRef} className="relative shadow-2xl rounded-sm overflow-hidden" style={{ ...bgStyle, width: "min(100%, 640px)", aspectRatio: `${vd.w} / ${vd.h}` }}>
                 {(vd.images ?? []).map((im) => (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -901,6 +939,19 @@ KURALLAR:
                     {ly.text}
                   </div>
                 ))}
+              </div>
+              </div>
+              {/* Sayfa şeridi (çok-sayfalı belge — Canva tarzı) */}
+              <div className="shrink-0 border-t border-line/40 bg-surface/40 px-3 py-2 flex items-center gap-2 overflow-x-auto">
+                {pages.map((p, i) => (
+                  <button key={i} onClick={() => setPageIndex(i)} title={`Sayfa ${i + 1}`} className={`relative shrink-0 rounded-md overflow-hidden border-2 transition-colors ${i === pageIdx ? "border-brand" : "border-line/40 hover:border-brand/40"}`} style={{ height: 40, aspectRatio: `${p.w}/${p.h}` }}>
+                    <span className="block w-full h-full" style={thumbBg(p)} />
+                    <span className="absolute bottom-0 right-0 text-[8px] font-mono bg-black/50 text-white px-1 rounded-tl">{i + 1}</span>
+                  </button>
+                ))}
+                <button onClick={addPage} title="Yeni sayfa" className="shrink-0 w-9 h-10 grid place-items-center rounded-md border border-dashed border-line/60 text-muted hover:text-brand hover:border-brand/50 transition-colors"><Plus size={15} /></button>
+                <button onClick={dupPage} title="Sayfayı çoğalt" className="shrink-0 px-2 py-1 rounded-lg border border-line text-[11px] font-semibold text-muted hover:text-ink transition-colors">Çoğalt</button>
+                {pages.length > 1 && <button onClick={delPage} title="Sayfayı sil" className="shrink-0 px-2 py-1 rounded-lg border border-line text-[11px] font-semibold text-muted hover:text-red transition-colors">Sil</button>}
               </div>
             </div>
             )}
