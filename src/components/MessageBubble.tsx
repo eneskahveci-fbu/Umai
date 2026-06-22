@@ -636,6 +636,21 @@ function MessageBubbleImpl({
         {/* Plan */}
         {message.plan && <PlanPanel plan={message.plan} />}
 
+        {/* Web arama kaynakları */}
+        {message.sources && message.sources.length > 0 && (
+          <div className="mt-3 border-t border-line/40 pt-2">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-muted/45 mb-1.5">Kaynaklar</div>
+            <div className="space-y-1">
+              {message.sources.map((s, i) => (
+                <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className="flex items-start gap-1.5 text-[11px] text-muted hover:text-brand transition-colors">
+                  <span className="text-muted/40 font-mono shrink-0">{i + 1}.</span>
+                  <span className="truncate">{s.title || s.url}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Thinking */}
         {message.thinking && (
           <div className="mb-3 border border-brand/15 rounded-xl overflow-hidden bg-brand/5">

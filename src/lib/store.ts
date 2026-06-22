@@ -391,6 +391,7 @@ interface StoreState {
   setCommandOutput: (command: string, output: string, status: "done" | "error") => void;
   setCheckpointsOnLast: (checkpoints: FileCheckpoint[]) => void;
   setFinishReasonOnLast: (finishReason: string | undefined) => void;
+  setSourcesOnLast: (sources: { title: string; url: string }[]) => void;
   updateLastTokens: (tokenIn: number, tokenOut: number) => void;
   setLastAgentId: (agentId: string | undefined) => void;
   popLastMessage: () => void;
@@ -1143,6 +1144,18 @@ export const useStore = create<StoreState>()((set, get) => ({
         const messages = c.messages.slice();
         if (messages.length) {
           messages[messages.length - 1] = { ...messages[messages.length - 1], finishReason };
+        }
+        return { ...c, messages };
+      }),
+    })),
+
+  setSourcesOnLast: (sources) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const messages = c.messages.slice();
+        if (messages.length) {
+          messages[messages.length - 1] = { ...messages[messages.length - 1], sources };
         }
         return { ...c, messages };
       }),
