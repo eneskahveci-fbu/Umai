@@ -39,10 +39,11 @@ export default function AgentImport({
     if (!/^https?:\/\//i.test(u)) { addToast("Geçerli bir http(s) URL gir", "error"); return; }
     setLoading(true);
     try {
-      const res = await fetch(u);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const text = (await res.text()).slice(0, 20000);
-      if (!text.trim()) throw new Error("boş içerik");
+      // Sunucu proxy → CORS engeli yok (GitHub raw, gist, herhangi public URL).
+      const res = await fetch(`/api/fetch-text?url=${encodeURIComponent(u)}`);
+      const body = await res.json().catch(() => ({})) as { text?: string; error?: string };
+      if (!res.ok || !body.text) throw new Error(body.error || `HTTP ${res.status}`);
+      const text = body.text;
       const base =
         decodeURIComponent(u.split("/").pop() || "")
           .replace(/\.[a-z]+$/i, "")
@@ -60,7 +61,7 @@ export default function AgentImport({
       });
       setUrl("");
     } catch (e) {
-      addToast(`Getirilemedi (${(e as Error).message}). GitHub'da "Raw" linkini dene; CORS engeli olabilir.`, "error");
+      addToast(`Getirilemedi (${(e as Error).message}). GitHub'da dosyanın "Raw" linkini kullan.`, "error");
     } finally {
       setLoading(false);
     }

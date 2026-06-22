@@ -505,6 +505,7 @@ export function SettingsModal() {
         aria-modal="true"
         aria-labelledby="settings-title"
         className="relative w-full max-w-none sm:max-w-3xl h-dvh sm:h-[88dvh] rounded-none sm:rounded-2xl border-0 sm:border border-line bg-surface overflow-hidden flex"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* SOL — GNOME (masaüstü) / iOS liste (mobil). Mobilde detayda gizlenir. */}

@@ -466,7 +466,7 @@ KURALLAR:
         : { background: `linear-gradient(135deg, ${vd.c1}, ${vd.c2})` };
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg">
+    <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       {/* Üst araç çubuğu */}
       <div className="brand-rule glass shrink-0 flex items-center gap-2 px-3 sm:px-5 py-2.5">
         <span className="w-8 h-8 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0"><Sparkles size={16} /></span>

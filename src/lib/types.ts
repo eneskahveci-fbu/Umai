@@ -248,6 +248,9 @@ export interface Config {
   style: ResponseStyle;
   memories: MemoryItem[];
   skills: Skill[];
+  /** Kullanıcı tanımlı slash-ajanları — config'te saklanır (kalıcı + senkron +
+      kişiye özel). Eskiden localStorage'daydı (kaybolma sorunu); migrate edilir. */
+  userAgents?: import("./agents").Agent[];
   projects: Project[];
   activeProjectId: string | null;
   followUps: boolean;
