@@ -2,12 +2,13 @@
 
 import { useMemo, useRef, useState } from "react";
 import {
-  Download, FileCode, FileImage, FileText, Image as ImageIcon, LayoutGrid, LayoutTemplate, Loader2,
-  MessageSquare, Plus, Save, Send, Sliders, Sparkles, Trash2, Type, Upload, Wand2, X,
+  Download, ExternalLink, FileCode, FileImage, FileText, Image as ImageIcon, LayoutGrid, LayoutTemplate, Loader2,
+  MessageSquare, Plus, RotateCw, Save, Send, Sliders, Sparkles, Trash2, Type, Upload, Wand2, X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import { buildFallbackChain } from "@/lib/fallback";
+import { buildSingleBlockPreview, parseBlocks } from "@/lib/preview";
 import type { SavedDesign } from "@/lib/types";
 
 /* Tasarım Stüdyosu — Claude Design benzeri AI tasarım alanı (craft teması).
@@ -205,6 +206,12 @@ export function DesignStudio() {
   const [title, setTitle] = useState("");
   const previewRef = useRef<HTMLDivElement>(null);
 
+  // (a) Kod tasarımı modu — sohbetle HTML/React üret, canlı render (preview.ts).
+  const [dmode, setDmode] = useState<"canvas" | "code">("canvas");
+  const [codeArt, setCodeArt] = useState<{ type: string; content: string } | null>(null);
+  const [codeView, setCodeView] = useState<"preview" | "code">("preview");
+  const [codeReload, setCodeReload] = useState(0);
+
   // Paneller
   const [chatOpen, setChatOpen] = useState(true);
   const [tweaksOpen, setTweaksOpen] = useState(true);
@@ -319,7 +326,8 @@ KURALLAR:
     setInput(""); const imgs = pendingImgs; setPendingImgs([]); setBusy(true);
     try {
       const cfg = useStore.getState().config;
-      const active = useStore.getState().activeModel();
+      // (b) Tasarım için en güçlü yapılandırılmış modeli tercih et → daha iyi estetik.
+      const active = useStore.getState().strongestModel() ?? useStore.getState().activeModel();
       if (!active) throw new Error("Önce Ayarlar → Modeller'den bir model seç.");
       const apiKey = await usableApiKey(active);
       const sys = `${DESIGN_SYSTEM}\n\nMevcut tuval: ${d.w}x${d.h} (${d.fmt}). Mevcut tasarım (değişiklik isteniyorsa bunu TEMEL al): ${JSON.stringify(toPartial(d))}`;
@@ -369,6 +377,77 @@ KURALLAR:
     } catch (e) {
       setMsgs((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: `Hata: ${e instanceof Error ? e.message : "bilinmeyen"}` }; return c; });
     } finally { setBusy(false); }
+  };
+
+  /* (a) Kod tasarımı — sohbetle HTML/React üret, preview.ts ile canlı render. */
+  const sendCode = async () => {
+    const text = input.trim();
+    if (!text || busy) return;
+    const next: Msg[] = [...msgs, { role: "user", text }];
+    setMsgs([...next, { role: "assistant", text: "" }]);
+    setInput(""); setBusy(true);
+    try {
+      const cfg = useStore.getState().config;
+      const active = useStore.getState().strongestModel() ?? useStore.getState().activeModel();
+      if (!active) throw new Error("Önce Ayarlar → Modeller'den bir model seç.");
+      const apiKey = await usableApiKey(active);
+      const sys = "Sen uzman bir front-end tasarımcı+geliştiricisin. Kullanıcının isteğine göre TEK, kendi kendine yeten, modern, estetik ve responsive bir tasarım üret. Çıktı: tek bir ```html bloğu (inline CSS; gerekirse vanilla JS). Erişilebilirlik ve dengeli boşluklar önemli. SADECE kod bloğunu ver, açıklama yazma. (React istenirse ```jsx ve bir App bileşeni kullan.)"
+        + (codeArt ? `\n\nMevcut kod (değişiklik isteniyorsa bunu TEMEL al):\n${codeArt.content.slice(0, 8000)}` : "");
+      const apiMsgs = next.slice(-6).map((m) => ({ role: m.role, content: m.text }));
+      const res = await fetch("/api/chat", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: apiMsgs, baseUrl: active.baseUrl, model: active.model, apiKey, provider: active.provider,
+          systemPrompt: sys, fallbacks: buildFallbackChain(cfg.models, cfg.activeModelId),
+          tools: false, webSearch: false, temperature: 0.6,
+        }),
+      });
+      if (!res.ok || !res.body) throw new Error(`LLM ${res.status}`);
+      const reader = res.body.getReader(); const dec = new TextDecoder();
+      let buf = ""; let full = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split("\n"); buf = lines.pop() || "";
+        for (const ln of lines) {
+          const t = ln.trim();
+          if (!t.startsWith("data:")) continue;
+          const payload = t.slice(5).trim();
+          if (!payload || payload === "[DONE]") continue;
+          try {
+            const j = JSON.parse(payload) as { choices?: { delta?: { content?: string } }[] };
+            const delta = j.choices?.[0]?.delta?.content ?? "";
+            if (delta) { full += delta; const shown = stripJson(full) || "Kod üretiliyor…"; setMsgs((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: shown }; return c; }); }
+          } catch { /* yoksay */ }
+        }
+      }
+      const blocks = parseBlocks(full);
+      const block = blocks.find((b) => ["html", "htm", "jsx", "tsx", "react", "js", "javascript", "svg"].includes(b.lang)) || blocks[0];
+      let ok = false;
+      if (block) {
+        const art = buildSingleBlockPreview(block.lang || "html", block.code);
+        if (art) { setCodeArt({ type: art.type, content: art.content }); setCodeView("preview"); setCodeReload((k) => k + 1); ok = true; }
+      } else if (/<[a-z]/i.test(full)) {
+        const art = buildSingleBlockPreview("html", full);
+        if (art) { setCodeArt({ type: art.type, content: art.content }); setCodeReload((k) => k + 1); ok = true; }
+      }
+      setMsgs((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: stripJson(full) || (ok ? "Tasarımı kodladım." : "Yanıt alındı.") }; return c; });
+      if (!ok) addToast("Kod üretilemedi — isteğini biraz daha açık yaz.", "error");
+    } catch (e) {
+      setMsgs((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: `Hata: ${e instanceof Error ? e.message : "bilinmeyen"}` }; return c; });
+    } finally { setBusy(false); }
+  };
+
+  /* Aktif moda göre gönder (Tuval = tasarım JSON; Kod = HTML/React). */
+  const onSend = () => { if (dmode === "code") void sendCode(); else void send(); };
+
+  const downloadCode = () => {
+    if (!codeArt) return;
+    const blob = new Blob([codeArt.content], { type: "text/html" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `${(title || "tasarim").replace(/\s+/g, "-")}.html`; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   };
 
   const onPickFiles = (files: FileList | null) => {
@@ -474,6 +553,11 @@ KURALLAR:
         <div className="flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
           <button className="px-2.5 py-1 rounded-md bg-brand/15 text-brand">Tasarım</button>
           <button onClick={() => { setOpen(false); setImageStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors">Görüntü</button>
+        </div>
+        {/* (a) Alt mod — Tuval (katman) | Kod (HTML/React) */}
+        <div className="flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
+          <button onClick={() => setDmode("canvas")} className={`px-2 py-1 rounded-md transition-colors ${dmode === "canvas" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`}>Tuval</button>
+          <button onClick={() => setDmode("code")} className={`px-2 py-1 rounded-md transition-colors ${dmode === "code" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`}>Kod</button>
         </div>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tasarım adı…" className="hidden sm:block ml-2 w-40 bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50" />
 
@@ -612,11 +696,11 @@ KURALLAR:
                     <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { onPickFiles(e.target.files); e.target.value = ""; }} />
                     <textarea
                       value={input} onChange={(e) => setInput(e.target.value)} rows={1}
-                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
-                      placeholder="Tasarım iste veya değişiklik söyle…"
+                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); } }}
+                      placeholder={dmode === "code" ? "Kod tasarımı iste (ör. fiyatlandırma sayfası)…" : "Tasarım iste veya değişiklik söyle…"}
                       className="flex-1 bg-transparent text-sm outline-none resize-none max-h-24 py-1"
                     />
-                    <button onClick={() => void send()} disabled={busy} className="shrink-0 w-7 h-7 grid place-items-center rounded-lg bg-brand text-white disabled:opacity-50 transition-opacity">
+                    <button onClick={onSend} disabled={busy} className="shrink-0 w-7 h-7 grid place-items-center rounded-lg bg-brand text-white disabled:opacity-50 transition-opacity">
                       {busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                     </button>
                   </div>
@@ -624,7 +708,33 @@ KURALLAR:
               </div>
             )}
 
-            {/* ORTA — Tuval */}
+            {/* ORTA — Kod modu (HTML/React canlı render) */}
+            {dmode === "code" ? (
+              <div className="flex-1 min-h-0 flex flex-col bg-[#0a0a0d]">
+                <div className="shrink-0 flex items-center gap-1.5 px-3 py-2 border-b border-line/60">
+                  <div className="flex items-center bg-bgsoft border border-line/60 rounded-lg p-0.5 text-[11px] font-semibold">
+                    <button onClick={() => setCodeView("preview")} className={`px-2 py-1 rounded-md transition-colors ${codeView === "preview" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`}>Önizleme</button>
+                    <button onClick={() => setCodeView("code")} className={`px-2 py-1 rounded-md transition-colors ${codeView === "code" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`}>Kod</button>
+                  </div>
+                  <div className="ml-auto flex items-center gap-1">
+                    <button onClick={() => setCodeReload((k) => k + 1)} disabled={!codeArt} title="Yenile" className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-bgsoft disabled:opacity-30 transition-colors"><RotateCw size={14} /></button>
+                    <button onClick={() => { if (codeArt) { const u = URL.createObjectURL(new Blob([codeArt.content], { type: "text/html" })); window.open(u, "_blank", "noopener"); setTimeout(() => URL.revokeObjectURL(u), 10000); } }} disabled={!codeArt} title="Yeni sekmede aç" className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-bgsoft disabled:opacity-30 transition-colors"><ExternalLink size={14} /></button>
+                    <button onClick={downloadCode} disabled={!codeArt} title="HTML indir" className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-bgsoft disabled:opacity-30 transition-colors"><Download size={14} /></button>
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0 bg-white">
+                  {!codeArt ? (
+                    <div className="h-full grid place-items-center text-center text-sm text-muted/50 bg-[#0a0a0d] px-6">
+                      Soldan kod tasarımı iste — ör. “API ürünü için hero + fiyatlandırma sayfası”. HTML/React üretir, burada canlı görünür.
+                    </div>
+                  ) : codeView === "preview" ? (
+                    <iframe key={codeReload} srcDoc={codeArt.content} sandbox="allow-scripts allow-modals" referrerPolicy="no-referrer" className="w-full h-full border-0" title="Kod önizleme" />
+                  ) : (
+                    <pre className="w-full h-full overflow-auto m-0 p-4 text-[12px] font-mono bg-[#0b0b0d] text-[#d6d6d6]"><code>{codeArt.content}</code></pre>
+                  )}
+                </div>
+              </div>
+            ) : (
             <div className="flex-1 min-h-0 grid place-items-center p-4 sm:p-8 overflow-auto bg-[#0a0a0d]">
               <div ref={previewRef} className="relative shadow-2xl rounded-sm overflow-hidden" style={{ ...bgStyle, width: "min(100%, 640px)", aspectRatio: `${vd.w} / ${vd.h}` }}>
                 {vd.layers.map((ly, i) => (
@@ -648,6 +758,7 @@ KURALLAR:
                 ))}
               </div>
             </div>
+            )}
 
             {/* SAĞ — Tweaks paneli */}
             {tweaksOpen && (
