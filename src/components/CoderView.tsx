@@ -95,6 +95,7 @@ import { ALL_AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
 import { buildContextSections } from "@/lib/prompt";
 import { detectSensitive } from "@/lib/pii";
+import { retrieve } from "@/lib/retrieval";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { CRAFT_OPERATING_MANUAL } from "@/lib/constants";
 import { addPendingAction, removePendingAction, isCommandAllowed, matchDangerousCommand, DEFAULT_COMMAND_ALLOWLIST, type PendingAction } from "@/lib/agentActions";
@@ -1403,6 +1404,19 @@ export function CoderView() {
     }
 
     const activeProject = config.projects.find((p) => p.id === config.activeProjectId);
+    /* Proje bilgi tabanı enjeksiyonu. Büyükse (RAG-lite): tüm dosyaları gömmek
+       yerine soruya en ilgili parçaları getir → token tasarrufu + alaka. Küçükse
+       veya eşleşme yoksa mevcut davranış (tüm dosyalar, kırpılmış). */
+    const pkFiles = activeProject?.files ?? [];
+    let projectKB = "";
+    if (pkFiles.length) {
+      const pkTotal = pkFiles.reduce((a, f) => a + f.content.length, 0);
+      if (pkTotal > 8000 && _lastUserText.trim()) {
+        const hits = retrieve(_lastUserText, pkFiles.map((f) => ({ name: f.name, content: f.content })), 6);
+        if (hits.length) projectKB = `## Proje Bilgi Tabanı (soruya en ilgili alıntılar)\n${hits.map((h) => `### ${h.name}\n${h.chunk}`).join("\n\n")}`;
+      }
+      if (!projectKB) projectKB = `## Proje Bilgi Tabanı (referans dosyalar — örnek/bağlam olarak kullan)\n${pkFiles.map((f) => `### ${f.name}\n${f.content.slice(0, 6000)}${f.content.length > 6000 ? "\n…(kırpıldı)" : ""}`).join("\n\n")}`;
+    }
     const coderSystemPrompt = [
       config.systemPrompt,
       CRAFT_OPERATING_MANUAL,
@@ -1412,12 +1426,7 @@ export function CoderView() {
             : "")
         : "Sen uzman bir yazılım geliştiricisisin. Claude Code tarzında çalış: kullanıcının kod tabanını anla, dosya içeriklerini incele, sorunlara adım adım yaklaş. Kod yazarken best practice'leri uygula, okunabilir ve sürdürülebilir çözümler sun. KARMAŞIK (çok adımlı) görevlerde ÖNCE update_plan ile KISA bir plan (yapılacaklar listesi) sun, sonra adım adım uygula ve her adım bitince planı güncelle.",
       activeProject?.systemPrompt?.trim() ? `## Proje: ${activeProject.name}\n${activeProject.systemPrompt.trim()}` : "",
-      /* Proje bilgi tabanı: yüklenen referans dosyalar (dosya başına kırpılır). */
-      activeProject?.files?.length
-        ? `## Proje Bilgi Tabanı (referans dosyalar — örnek/bağlam olarak kullan)\n${activeProject.files
-            .map((f) => `### ${f.name}\n${f.content.slice(0, 6000)}${f.content.length > 6000 ? "\n…(kırpıldı)" : ""}`)
-            .join("\n\n")}`
-        : "",
+      projectKB,
       config.rulesFile?.trim() ? `## Proje Kuralları (.rules)\n${config.rulesFile.trim()}` : "",
     ].filter(Boolean).join("\n\n");
 
