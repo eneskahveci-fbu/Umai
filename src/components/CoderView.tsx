@@ -2054,6 +2054,8 @@ export function CoderView() {
             <EffortMenuControl />
             <div className="h-px bg-line my-1" />
 
+            <MoreItem icon={<VenetianMask size={14} />} label="Gizli sohbet" onClick={() => useStore.getState().newChat(true)} />
+
             {/* Sekme çubuğu — tıklanınca menü açık kalır */}
             <div className="flex gap-0.5 px-1 pt-1 pb-1" onClick={(e) => e.stopPropagation()}>
               {([["workspace", "Çalışma"], ["modes", "Modlar"], ["tools", "Araçlar"]] as const).map(([key, lbl]) => (
