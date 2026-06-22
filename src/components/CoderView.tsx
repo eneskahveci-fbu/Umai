@@ -35,6 +35,7 @@ import {
   Search,
   Server,
   Sparkles,
+  Wand2,
   Trash2,
   Square,
   Terminal,
@@ -442,6 +443,54 @@ export function CoderView() {
 
 
   const [input, setInput] = useState("");
+  const [improvingPrompt, setImprovingPrompt] = useState(false);
+
+  /* Prompt geliştirici — composer'daki taslağı ücretsiz LLM ile daha net/etkili
+     bir isteme dönüştürür (akışı doğrudan input'a yazar). ⋯ → Modlar'dan tetiklenir. */
+  const improvePrompt = async () => {
+    const base = input.trim();
+    if (!base || improvingPrompt) return;
+    setImprovingPrompt(true);
+    try {
+      const store = useStore.getState();
+      const active = store.activeModel();
+      if (!active) throw new Error("Önce Ayarlar → Modeller'den bir model seç.");
+      const apiKey = await usableApiKey(active);
+      const sys = "Sen bir prompt mühendisisin. Kullanıcının taslak istemini; amacını koruyarak daha NET, eksiksiz ve etkili bir isteme dönüştür. Gerekli bağlamı, beklenen çıktı biçimini ve kısıtları ekle. SADECE geliştirilmiş istemi döndür — açıklama, tırnak veya etiket yazma. Kullanıcının diliyle aynı dilde yaz.";
+      const res = await fetch("/api/chat", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: base }],
+          baseUrl: active.baseUrl, model: active.model, apiKey, provider: active.provider,
+          systemPrompt: sys, fallbacks: buildFallbackChain(store.config.models, store.config.activeModelId),
+          tools: false, webSearch: false, temperature: 0.7,
+        }),
+      });
+      if (!res.ok || !res.body) throw new Error(`LLM ${res.status}`);
+      const reader = res.body.getReader(); const dec = new TextDecoder();
+      let buf = ""; let full = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split("\n"); buf = lines.pop() || "";
+        for (const ln of lines) {
+          const t = ln.trim();
+          if (!t.startsWith("data:")) continue;
+          const p = t.slice(5).trim();
+          if (!p || p === "[DONE]") continue;
+          try {
+            const j = JSON.parse(p) as { choices?: { delta?: { content?: string } }[] };
+            const d = j.choices?.[0]?.delta?.content ?? "";
+            if (d) { full += d; setInput(full); }
+          } catch { /* yoksay */ }
+        }
+      }
+      if (!full.trim()) addToast("İstem geliştirilemedi — tekrar dene.", "error");
+    } catch (e) {
+      addToast(`Geliştirme hatası: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+    } finally { setImprovingPrompt(false); }
+  };
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -2111,6 +2160,13 @@ export function CoderView() {
                 <ModeChip icon={<Sparkles size={12} />} label="Kalite" active={!!config.qualityMode} onClick={() => useStore.getState().saveConfig({ ...config, qualityMode: !config.qualityMode })} />
                 <ModeChip icon={<Users size={12} />} label="Ekip" active={swarmMode} onClick={() => setSwarmMode((v) => !v)} />
               </div>
+            )}
+            {moreTab === "modes" && (
+              <MoreItem
+                icon={improvingPrompt ? <Loader2Icon size={14} className="animate-spin" /> : <Wand2 size={14} />}
+                label="Prompt geliştir (yazdığın istemi iyileştir)"
+                onClick={() => void improvePrompt()}
+              />
             )}
 
             {moreTab === "tools" && (
