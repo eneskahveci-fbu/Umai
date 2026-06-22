@@ -5,6 +5,7 @@ import { BookmarkPlus, Check, ChevronDown, ChevronUp, Copy, Eye, GitCompareArrow
 import { useStore } from "@/lib/store";
 import { buildSingleBlockPreview } from "@/lib/preview";
 import { runPython } from "@/lib/python";
+import { runJs } from "@/lib/jsRunner";
 
 const COLLAPSE_LINE_THRESHOLD = 30;
 const COLLAPSED_PX = 240;
@@ -42,6 +43,8 @@ export function CodeBlock({
   const isPreviewable = ["html", "svg", "htm", "mermaid", "css", "js", "javascript", "mjs", "jsx", "tsx", "react"].includes(lang);
   const isRunnable = ["bash", "sh", "shell", "zsh"].includes(lang);
   const isPython = ["python", "py"].includes(lang);
+  /* Satır-içi JS çalıştırma (konsol çıktısı) — DOM'lu önizleme ayrı (Önizle). */
+  const isJs = ["js", "javascript", "mjs"].includes(lang);
 
   const getText = () => preRef.current?.textContent || "";
 
@@ -88,6 +91,15 @@ export function CodeBlock({
     setPyRunning(false);
   };
 
+  const runJsCode = async () => {
+    const code = getText();
+    if (!code.trim()) return;
+    setPyRunning(true);
+    setPyOut(null);
+    setPyOut(await runJs(code));
+    setPyRunning(false);
+  };
+
   const showDiff = () => {
     /* Editörde açık olan dosyayla karşılaştır — eski window.prompt yerine. */
     const open = useStore.getState().currentFile;
@@ -123,6 +135,11 @@ export function CodeBlock({
           )}
           {isPython && (
             <button onClick={runPy} disabled={pyRunning} className="flex items-center gap-1 hover:text-green transition-colors disabled:opacity-50" title="Python'u tarayıcıda çalıştır (Pyodide)">
+              {pyRunning ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />} Çalıştır
+            </button>
+          )}
+          {isJs && (
+            <button onClick={runJsCode} disabled={pyRunning} className="flex items-center gap-1 hover:text-green transition-colors disabled:opacity-50" title="JS'i izole çalıştır (konsol çıktısı)">
               {pyRunning ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />} Çalıştır
             </button>
           )}
