@@ -115,8 +115,8 @@ const BUILTIN_EXTENSION_AGENTS: Agent[] = [
   },
 ];
 
-/* ── localStorage'dan kullanıcı tanımlı agent'ları okuma ────────────────── */
-function loadUserAgents(): Agent[] {
+/* ── Eski localStorage anahtarından okuma (yalnız migrasyon/geri-dönüş) ──── */
+function loadLegacyUserAgents(): Agent[] {
   try {
     if (typeof window === "undefined") return [];
     const raw = localStorage.getItem("craft_user_agents");
@@ -136,19 +136,34 @@ function loadUserAgents(): Agent[] {
   }
 }
 
-/* ── Birleştirilmiş export ──────────────────────────────────────────────── */
-export const CUSTOM_AGENTS: Agent[] = [
-  ...BUILTIN_EXTENSION_AGENTS,
-  ...loadUserAgents(),
-];
+/* ── Birleştirilmiş export — yalnız yerleşikler (kullanıcı agent'ları runtime'da
+   config'ten getUserAgents ile gelir; modül-init'te store'a dokunulmaz). ──── */
+export const CUSTOM_AGENTS: Agent[] = [...BUILTIN_EXTENSION_AGENTS];
 
-/* ── Yardımcı: kullanıcı agent'ı kaydetme (bileşenlerden çağrılır) ──────── */
-export function saveUserAgents(agents: Agent[]): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem("craft_user_agents", JSON.stringify(agents));
+/* ── Kullanıcı agent'ları artık config.userAgents'te (kalıcı + senkron + izole).
+   Sunucu import zincirinde olduğumuz için store'u İMPORT ETMEYİZ (build bozulur);
+   yazma istemci bileşeninde (SkillsPanel) saveConfig ile yapılır. Burada yalnız
+   OKURUZ: config'i doğrudan localStorage/sessionStorage'dan (craftai_config). ── */
+function readConfigUserAgents(): Agent[] | null {
+  if (typeof window === "undefined") return null;
+  for (const store of [window.localStorage, window.sessionStorage]) {
+    try {
+      const raw = store?.getItem("craftai_config");
+      if (!raw) continue;
+      const cfg = JSON.parse(raw) as { userAgents?: unknown };
+      if (Array.isArray(cfg.userAgents)) {
+        return (cfg.userAgents as Agent[]).filter(
+          (a) => a && typeof a === "object" && typeof a.id === "string" && typeof a.command === "string" && a.command.startsWith("/"),
+        );
+      }
+    } catch { /* sıradaki */ }
+  }
+  return null;
 }
 
-/* ── Yardımcı: kullanıcı agent'larını okuma (bileşenlerden çağrılır) ────── */
 export function getUserAgents(): Agent[] {
-  return loadUserAgents();
+  if (typeof window === "undefined") return [];
+  const fromCfg = readConfigUserAgents();
+  if (fromCfg) return fromCfg;
+  return loadLegacyUserAgents(); // henüz migrate edilmemiş eski kayıtlar
 }

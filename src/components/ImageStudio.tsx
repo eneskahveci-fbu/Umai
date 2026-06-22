@@ -226,7 +226,7 @@ export function ImageStudio() {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg">
+    <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       {/* Üst bar */}
       <div className="brand-rule glass shrink-0 flex items-center gap-3 px-4 sm:px-6 py-3">
         <span className="w-8 h-8 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0">

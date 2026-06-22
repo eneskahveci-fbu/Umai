@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useModalA11y } from "@/lib/useModalA11y";
 import {
   BookMarked, Check, FileText, FileUp, Folder, GitBranch,
@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { ALL_AGENTS, type Agent } from "@/lib/agents";
-import { getUserAgents, saveUserAgents } from "@/lib/extensions/customAgents";
+import { getUserAgents } from "@/lib/extensions/customAgents";
 import type { Skill } from "@/lib/types";
 import SkillImport from "./SkillImport";
 import AgentImport from "./AgentImport";
@@ -369,7 +369,18 @@ function FilesTab({
 
 function AgentsTab() {
   const addToast = useStore((s) => s.addToast);
-  const [userAgents, setUserAgents] = useState<Agent[]>(() => getUserAgents());
+  const config = useStore((s) => s.config);
+  const saveConfig = useStore((s) => s.saveConfig);
+  /* Kullanıcı agent'ları artık config.userAgents'te (kalıcı + senkron + izole). */
+  const userAgents = config.userAgents ?? [];
+  /* Eski localStorage kayıtlarını bir kez config'e taşı (kaybolma fix'i). */
+  useEffect(() => {
+    if (config.userAgents === undefined) {
+      const legacy = getUserAgents();
+      if (legacy.length) saveConfig({ ...config, userAgents: legacy });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [creating, setCreating] = useState(false);
   const [cmd, setCmd] = useState("");
   const [label, setLabel] = useState("");
@@ -380,7 +391,7 @@ function AgentsTab() {
   const userCommands = new Set(userAgents.map((a) => a.command));
   const builtIn = ALL_AGENTS.filter((a) => !userCommands.has(a.command));
 
-  const persist = (next: Agent[]) => { setUserAgents(next); saveUserAgents(next); };
+  const persist = (next: Agent[]) => saveConfig({ ...config, userAgents: next });
   const reset = () => { setCmd(""); setLabel(""); setIcon("✨"); setDesc(""); setPrompt(""); };
 
   const create = () => {
