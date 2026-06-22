@@ -1,8 +1,9 @@
 "use client";
 
-import { Check, Code2, Copy, Download, ExternalLink, Eye, Maximize2, Minimize2, RotateCw, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, Eye, Maximize2, Minimize2, RotateCw, X } from "lucide-react";
 import { useState } from "react";
 import { useStore } from "@/lib/store";
+import type { Artifact } from "@/lib/types";
 
 export function ArtifactPanel() {
   const artifact = useStore((s) => s.artifact);
@@ -12,30 +13,51 @@ export function ArtifactPanel() {
   const [view, setView] = useState<"preview" | "code">("preview");
   const [copied, setCopied] = useState(false);
 
+  /* Sürüm geçmişi — aynı panel güncellendikçe son 5 sürümü tut, ‹ › ile gezin.
+     Render-anı türetme (effect yok): içerik değişince geçmişe ekle, son sürümü göster. */
+  const [versions, setVersions] = useState<Artifact[]>([]);
+  const [vIndexRaw, setVIndex] = useState(999);
+  const [prevKey, setPrevKey] = useState("");
+  const curKey = artifact ? `${artifact.type}|${artifact.content}` : "";
+  if (curKey !== prevKey) {
+    setPrevKey(curKey);
+    if (!artifact) { setVersions([]); }
+    else {
+      setVersions((prev) => {
+        const top = prev[prev.length - 1];
+        if (top && top.content === artifact.content && top.type === artifact.type) return prev;
+        return [...prev, artifact].slice(-5);
+      });
+      setVIndex(999); // yeni sürüm gelince en sona git
+    }
+  }
+
   if (!artifact) return null;
+  const vIndex = Math.min(vIndexRaw, Math.max(0, versions.length - 1));
+  const shown = versions[vIndex] ?? artifact;
 
   const srcdoc =
-    artifact.type === "mermaid"
-      ? `<!DOCTYPE html><html><head><meta charset="UTF-8"><script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"><\/script><style>body{margin:1.5rem;background:#fff;font-family:system-ui,sans-serif;}</style></head><body><div class="mermaid">${artifact.content}</div><script>mermaid.initialize({startOnLoad:true,theme:'default'});<\/script></body></html>`
-      : artifact.type === "svg"
-        ? `<!DOCTYPE html><html><head><style>body{margin:0;display:grid;place-items:center;min-height:100vh;background:#111110;}</style></head><body>${artifact.content}</body></html>`
-        : artifact.content.includes("<html")
-          ? artifact.content
-          : `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;margin:1rem;}</style></head><body>${artifact.content}</body></html>`;
+    shown.type === "mermaid"
+      ? `<!DOCTYPE html><html><head><meta charset="UTF-8"><script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"><\/script><style>body{margin:1.5rem;background:#fff;font-family:system-ui,sans-serif;}</style></head><body><div class="mermaid">${shown.content}</div><script>mermaid.initialize({startOnLoad:true,theme:'default'});<\/script></body></html>`
+      : shown.type === "svg"
+        ? `<!DOCTYPE html><html><head><style>body{margin:0;display:grid;place-items:center;min-height:100vh;background:#111110;}</style></head><body>${shown.content}</body></html>`
+        : shown.content.includes("<html")
+          ? shown.content
+          : `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;margin:1rem;}</style></head><body>${shown.content}</body></html>`;
 
-  const ext = artifact.type === "svg" ? "svg" : artifact.type === "mermaid" ? "mmd" : "html";
-  const downloadBody = artifact.type === "html" ? srcdoc : artifact.content;
+  const ext = shown.type === "svg" ? "svg" : shown.type === "mermaid" ? "mmd" : "html";
+  const downloadBody = shown.type === "html" ? srcdoc : shown.content;
 
   const copySource = async () => {
-    try { await navigator.clipboard.writeText(artifact.content); setCopied(true); setTimeout(() => setCopied(false), 1500); }
+    try { await navigator.clipboard.writeText(shown.content); setCopied(true); setTimeout(() => setCopied(false), 1500); }
     catch { useStore.getState().addToast("Kopyalanamadı", "error"); }
   };
   const download = () => {
-    const mime = artifact.type === "svg" ? "image/svg+xml" : "text/plain";
+    const mime = shown.type === "svg" ? "image/svg+xml" : "text/plain";
     const blob = new Blob([downloadBody], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `${(artifact.title || "artifact").replace(/\s+/g, "-").toLowerCase()}.${ext}`; a.click();
+    a.href = url; a.download = `${(shown.title || "artifact").replace(/\s+/g, "-").toLowerCase()}.${ext}`; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   };
 
@@ -44,13 +66,23 @@ export function ArtifactPanel() {
   return (
     <div
       role="region"
-      aria-label={artifact.title || "Önizleme"}
+      aria-label={shown.title || "Önizleme"}
       className={`shrink-0 border-line bg-surface flex flex-col transition-all ${
         expanded ? "fixed inset-0 z-50" : "w-full h-full"
       }`}
     >
       <div className="h-12 shrink-0 flex items-center justify-between px-3 sm:px-4 border-b border-line gap-2">
-        <span className="text-sm font-semibold truncate min-w-0">{artifact.title || "Önizleme"}</span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-sm font-semibold truncate min-w-0">{shown.title || "Önizleme"}</span>
+          {/* Sürüm gezinme (Claude Artifacts gibi) */}
+          {versions.length > 1 && (
+            <div className="flex items-center gap-0.5 shrink-0 text-[10px] font-mono text-muted/70 bg-bgsoft border border-line/60 rounded-lg px-1 py-0.5">
+              <button onClick={() => setVIndex((i) => Math.max(0, i - 1))} disabled={vIndex === 0} className="disabled:opacity-30 hover:text-ink" title="Önceki sürüm"><ChevronLeft size={13} /></button>
+              <span>v{vIndex + 1}/{versions.length}</span>
+              <button onClick={() => setVIndex((i) => Math.min(versions.length - 1, i + 1))} disabled={vIndex === versions.length - 1} className="disabled:opacity-30 hover:text-ink" title="Sonraki sürüm"><ChevronRight size={13} /></button>
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center gap-1 shrink-0">
           {/* Önizleme / Kod geçişi (Claude Artifacts gibi) */}
@@ -83,7 +115,7 @@ export function ArtifactPanel() {
       <div className="flex-1 min-h-0 bg-white">
         {view === "preview" ? (
           <iframe
-            key={reloadKey}
+            key={`${reloadKey}-${vIndex}`}
             srcDoc={srcdoc}
             sandbox="allow-scripts allow-modals"
             allow=""
@@ -92,7 +124,7 @@ export function ArtifactPanel() {
             title="Artifact preview"
           />
         ) : (
-          <pre className="w-full h-full overflow-auto m-0 p-4 text-[12px] leading-relaxed font-mono bg-[#0b0b0d] text-[#d6d6d6]"><code>{artifact.content}</code></pre>
+          <pre className="w-full h-full overflow-auto m-0 p-4 text-[12px] leading-relaxed font-mono bg-[#0b0b0d] text-[#d6d6d6]"><code>{shown.content}</code></pre>
         )}
       </div>
     </div>
