@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import {
   Download, ExternalLink, FileCode, FileImage, FileText, Image as ImageIcon, LayoutGrid, LayoutTemplate, Loader2,
-  MessageSquare, Plus, RotateCw, Save, Send, Sliders, Sparkles, Trash2, Type, Upload, Wand2, X,
+  MessageSquare, MoreHorizontal, Plus, RotateCw, Save, Send, Sliders, Sparkles, Trash2, Type, Upload, Wand2, X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
@@ -218,6 +218,7 @@ export function DesignStudio() {
   const [chatOpen, setChatOpen] = useState(true);
   const [tweaksOpen, setTweaksOpen] = useState(true);
   const [exportMenu, setExportMenu] = useState(false);
+  const [studioMenu, setStudioMenu] = useState(false);
 
   // Sohbet
   interface Msg { role: "user" | "assistant"; text: string; images?: string[] }
@@ -580,29 +581,18 @@ KURALLAR:
           <button onClick={() => setDmode("canvas")} className={`px-2 py-1 rounded-md transition-colors ${dmode === "canvas" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`}>Tuval</button>
           <button onClick={() => setDmode("code")} className={`px-2 py-1 rounded-md transition-colors ${dmode === "code" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`}>Kod</button>
         </div>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tasarım adı…" className="hidden sm:block ml-2 w-40 bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50" />
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tasarım adı…" className="hidden md:block ml-2 w-40 bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50" />
 
-        {/* Araç anahtarları (Claude Design tarzı segment) */}
-        <div className="ml-2 hidden md:flex items-center gap-1 bg-bgsoft border border-line rounded-lg p-0.5">
-          <button onClick={() => setChatOpen((v) => !v)} title="Sohbet" className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${chatOpen ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`}><MessageSquare size={13} /> Sohbet</button>
-          <button onClick={() => setTweaksOpen((v) => !v)} title="İyileştirmeler" className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${tweaksOpen ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`}><Sliders size={13} /> Tweaks</button>
-        </div>
-
-        <div className="ml-auto flex items-center gap-1 sm:gap-2">
-          {/* Kalite */}
-          <select value={quality} onChange={(e) => setQuality(e.target.value as keyof typeof QUALITY)} title="Çıktı kalitesi" className="hidden sm:block bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs outline-none focus:border-brand/50 cursor-pointer">
-            {Object.entries(QUALITY).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </select>
-
-          {/* Dışa aktar menüsü */}
+        <div className="ml-auto flex items-center gap-1 sm:gap-1.5">
+          {/* Dışa aktar */}
           <div className="relative">
-            <button onClick={() => setExportMenu((v) => !v)} disabled={exporting} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line hover:border-brand/50 text-xs font-semibold transition-colors disabled:opacity-50">
+            <button onClick={() => setExportMenu((v) => !v)} disabled={exporting} className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-line hover:border-brand/50 text-xs font-semibold transition-colors disabled:opacity-50">
               {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} <span className="hidden sm:inline">İndir</span>
             </button>
             {exportMenu && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setExportMenu(false)} />
-                <div className="absolute right-0 mt-1.5 z-20 w-40 bg-surface border border-line rounded-xl shadow-2xl p-1 text-sm">
+                <div className="absolute right-0 mt-1.5 z-20 w-44 bg-surface border border-line rounded-xl shadow-2xl p-1 text-sm">
                   <button onClick={exportPng} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><FileImage size={14} className="text-brand" /> PNG görsel</button>
                   <button onClick={exportHtml} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><FileCode size={14} className="text-brand" /> Bağımsız HTML</button>
                   <button onClick={exportPdf} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><FileText size={14} className="text-brand" /> PDF (yazdır)</button>
@@ -612,8 +602,31 @@ KURALLAR:
           </div>
 
           <button onClick={save} className="btn-brand-glow flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-white text-xs font-bold"><Save size={13} /> <span className="hidden sm:inline">Kaydet</span></button>
-          <button onClick={() => setView((v) => (v === "templates" ? "design" : "templates"))} title="Hazır şablonlar" className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${view === "templates" ? "border-brand/50 text-brand" : "border-line hover:border-brand/40"}`}><LayoutTemplate size={13} /> <span className="hidden sm:inline">Şablon</span></button>
-          <button onClick={() => setView((v) => (v === "gallery" ? "design" : "gallery"))} title="Kayıtlı tasarımlar" className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${view === "gallery" ? "border-brand/50 text-brand" : "border-line hover:border-brand/40"}`}><LayoutGrid size={13} /> {saved.length}</button>
+
+          {/* ⋯ ikincil eylemler (sade üst bar) */}
+          <div className="relative">
+            <button onClick={() => setStudioMenu((v) => !v)} title="Daha fazla" className={`w-8 h-8 grid place-items-center rounded-lg border transition-colors ${studioMenu || view !== "design" ? "border-brand/50 text-brand" : "border-line text-muted hover:text-ink"}`}><MoreHorizontal size={16} /></button>
+            {studioMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setStudioMenu(false)} />
+                <div className="absolute right-0 mt-1.5 z-20 w-52 bg-surface border border-line rounded-xl shadow-2xl p-1 text-sm">
+                  <button onClick={() => { setView((v) => (v === "templates" ? "design" : "templates")); setStudioMenu(false); }} className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left ${view === "templates" ? "text-brand" : ""}`}><LayoutTemplate size={14} className="text-brand" /> Hazır şablonlar</button>
+                  <button onClick={() => { setView((v) => (v === "gallery" ? "design" : "gallery")); setStudioMenu(false); }} className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left ${view === "gallery" ? "text-brand" : ""}`}><span className="flex items-center gap-2"><LayoutGrid size={14} className="text-brand" /> Kayıtlı tasarımlar</span><span className="text-[10px] font-mono text-muted/60">{saved.length}</span></button>
+                  <div className="h-px bg-line/60 my-1" />
+                  <button onClick={() => setChatOpen((v) => !v)} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><MessageSquare size={14} className={chatOpen ? "text-brand" : "text-muted/60"} /> Sohbet paneli {chatOpen ? "✓" : ""}</button>
+                  <button onClick={() => setTweaksOpen((v) => !v)} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><Sliders size={14} className={tweaksOpen ? "text-brand" : "text-muted/60"} /> Tweaks paneli {tweaksOpen ? "✓" : ""}</button>
+                  <div className="h-px bg-line/60 my-1" />
+                  <div className="flex items-center justify-between gap-2 px-2.5 py-1.5">
+                    <span className="text-xs text-muted/70">Kalite</span>
+                    <select value={quality} onChange={(e) => setQuality(e.target.value as keyof typeof QUALITY)} className="bg-bgsoft border border-line rounded-lg px-2 py-1 text-xs outline-none focus:border-brand/50 cursor-pointer">
+                      {Object.entries(QUALITY).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
           <button onClick={() => setOpen(false)} className="w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors"><X size={16} /></button>
         </div>
       </div>
