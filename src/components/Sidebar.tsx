@@ -12,7 +12,6 @@ import {
   Layers,
   MessageSquare,
   Moon,
-  VenetianMask,
   Pencil,
   Pin,
   Plus,
@@ -303,7 +302,7 @@ export function Sidebar() {
   /* ── Expanded ── */
   return (
     <aside
-      className="fixed top-0 left-0 z-40 h-full w-[min(80vw,16rem)] md:w-64 flex flex-col bg-surface border-r border-line/60"
+      className="fixed top-0 left-0 z-40 h-full w-full md:w-64 flex flex-col bg-surface border-r border-line/60"
       style={{
         paddingTop: "env(safe-area-inset-top)",
         paddingLeft: "env(safe-area-inset-left)",
@@ -328,10 +327,10 @@ export function Sidebar() {
       {/* New session */}
       <div className="px-3 py-3 border-b border-line/60 shrink-0 space-y-2">
         <button
-          onClick={() => newChat(true)}
+          onClick={() => newChat(false)}
           className="btn-brand-glow w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[#111110] font-semibold text-sm transition-transform hover:-translate-y-0.5"
         >
-          <VenetianMask size={15} /> Gizli Sohbet
+          <Plus size={15} /> Yeni Sohbet
         </button>
         <button
           onClick={() => setDesignStudioOpen(true)}
