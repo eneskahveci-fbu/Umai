@@ -162,20 +162,21 @@ export function ImageStudio() {
       .map((m) => m.items ? { ...m, items: m.items.filter((it) => it.id !== id) } : m)
       .filter((m) => !(m.role === "assistant" && m.items && m.items.length === 0)));
 
-  const download = async (it: GenItem) => {
+  const downloadUrl = async (url: string) => {
     try {
-      const res = await fetch(it.url);
+      const res = await fetch(url);
       const blob = await res.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `craft-${it.id}.png`;
+      a.download = `craft-${Date.now()}.png`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     } catch {
-      window.open(it.url, "_blank");
+      window.open(url, "_blank");
       addToast("İndirme engellendi — yeni sekmede açıldı", "info");
     }
   };
+  const download = (it: GenItem) => downloadUrl(it.url);
 
   /* Ücretsiz LLM ile prompt'u zengin betimleyici bir prompt'a geliştir (Qwen tarzı). */
   const enhance = async () => {
@@ -376,7 +377,7 @@ export function ImageStudio() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={lightbox} alt="" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
           <button onClick={() => setLightbox(null)} className="absolute top-4 right-4 w-9 h-9 grid place-items-center rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors"><X size={18} /></button>
-          <a href={lightbox} download={`craft-${Date.now()}.png`} onClick={(e) => e.stopPropagation()} className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/10 text-white text-sm font-semibold hover:bg-white/20 transition-colors"><Download size={15} /> İndir</a>
+          <button onClick={(e) => { e.stopPropagation(); void downloadUrl(lightbox); }} className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/10 text-white text-sm font-semibold hover:bg-white/20 transition-colors"><Download size={15} /> İndir</button>
         </div>
       )}
     </div>
