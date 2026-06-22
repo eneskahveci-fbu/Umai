@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { detectSensitive } from "../pii";
 
+/* NOT: test değerleri kasıtlı SAHTE ve düşük-entropili (gerçek anahtar değil) —
+   regex'i doğrular ama gizli-tarama/push-koruması tetiklemez. */
 describe("detectSensitive", () => {
-  it("API anahtarlarını yakalar", () => {
-    expect(detectSensitive("anahtarım sk-abcdef0123456789ABCDEF")).toContain("API anahtarı");
-    expect(detectSensitive("gsk_1234567890abcdef1234")).toContain("API anahtarı");
-    expect(detectSensitive("AIzaSyA1234567890abcdefghij1234567")).toContain("API anahtarı");
-    expect(detectSensitive("glpat-aaaaaaaaaaaaaaaaaaaa")).toContain("API anahtarı");
+  it("API anahtarı önekli dizeleri yakalar", () => {
+    expect(detectSensitive("anahtar sk-aaaaaaaaaaaaaaaa0000")).toContain("API anahtarı");
+    expect(detectSensitive("gsk_aaaaaaaaaaaaaaaa0000")).toContain("API anahtarı");
+    expect(detectSensitive("AIzaAAAAAAAAAAAAAAAAAAAA0000")).toContain("API anahtarı");
+    expect(detectSensitive("glpat-aaaaaaaaaaaaaaaa0000")).toContain("API anahtarı");
   });
 
   it("geçerli kredi kartını (Luhn) yakalar, rastgele sayıyı yakalamaz", () => {
@@ -14,8 +16,8 @@ describe("detectSensitive", () => {
     expect(detectSensitive("sipariş no 1234 5678 9012 3456")).not.toContain("kredi kartı");
   });
 
-  it("IBAN'ı yakalar", () => {
-    expect(detectSensitive("TR330006100519786457841326")).toContain("IBAN");
+  it("IBAN biçimini yakalar", () => {
+    expect(detectSensitive("TR000000000000000000000000")).toContain("IBAN");
   });
 
   it("meşru metinde (e-posta, kısa sayı) uyarı vermez", () => {
@@ -23,7 +25,7 @@ describe("detectSensitive", () => {
     expect(detectSensitive("merhaba dünya")).toEqual([]);
   });
 
-  it("boş/whitespace güvenli", () => {
+  it("boş güvenli", () => {
     expect(detectSensitive("")).toEqual([]);
   });
 });
