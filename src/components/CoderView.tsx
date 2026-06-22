@@ -1486,6 +1486,15 @@ export function CoderView() {
         });
         if (wsr.ok) webSearchContext = await wsr.text();
       } catch { /* ignore — continue without search */ }
+      /* Kaynakları metinden ayrıkla → yanıt altında "Kaynaklar" olarak göster. */
+      const sources: { title: string; url: string }[] = [];
+      for (const block of webSearchContext.split("\n\n")) {
+        const lines = block.split("\n");
+        const title = (lines[0] || "").replace(/^[•\-*]\s*/, "").trim();
+        const url = (lines.find((l) => /^\s*https?:\/\//.test(l)) || "").trim();
+        if (url && title && sources.length < 8 && !sources.some((s) => s.url === url)) sources.push({ title, url });
+      }
+      if (sources.length) store.setSourcesOnLast(sources);
     }
 
     /* Devam modunda full mevcut içerikten başlar → akış aynı baloncuğa eklenir. */

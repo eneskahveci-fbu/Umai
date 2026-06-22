@@ -23,6 +23,8 @@ export interface ChatMessage {
   role: Role;
   content: string;
   images?: string[];
+  /** Web aramada kullanılan kaynaklar — yanıt altında "Kaynaklar" olarak listelenir. */
+  sources?: { title: string; url: string }[];
   agentId?: string;
   tokenIn?: number;
   tokenOut?: number;
