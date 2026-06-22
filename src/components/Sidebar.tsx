@@ -12,6 +12,7 @@ import {
   Layers,
   MessageSquare,
   Moon,
+  VenetianMask,
   Pencil,
   Pin,
   Plus,
@@ -29,7 +30,6 @@ import { useStore } from "@/lib/store";
 import { PROJECT_TEMPLATES, projectColorHex } from "@/lib/constants";
 import type { Chat } from "@/lib/types";
 import { AuthButton } from "./AuthButton";
-import { ProUpgrade } from "./ProUpgrade";
 import { AccordionSection } from "./Accordion";
 
 /* Sohbetleri tarih kovalarına böler (Claude Code tarzı): Bugün, Dün, Son 7 gün… */
@@ -328,10 +328,10 @@ export function Sidebar() {
       {/* New session */}
       <div className="px-3 py-3 border-b border-line/60 shrink-0 space-y-2">
         <button
-          onClick={() => newChat(false)}
+          onClick={() => newChat(true)}
           className="btn-brand-glow w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[#111110] font-semibold text-sm transition-transform hover:-translate-y-0.5"
         >
-          <Plus size={15} /> Yeni Sohbet
+          <VenetianMask size={15} /> Gizli Sohbet
         </button>
         <button
           onClick={() => setDesignStudioOpen(true)}
@@ -561,7 +561,6 @@ export function Sidebar() {
             <ThemeToggle />
           </div>
           <AuthButton />
-          <ProUpgrade />
         </div>
         <DevCredit />
       </div>

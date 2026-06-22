@@ -27,6 +27,8 @@ import {
   Plug,
   Webhook,
   Blocks,
+  Crown,
+  Info,
   X,
   Zap,
 } from "lucide-react";
@@ -34,6 +36,7 @@ import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
 import { isAdminEmail } from "@/lib/admin";
 import { AccountSettings } from "@/components/AccountSettings";
 import { ExtensionsSettings } from "@/components/ExtensionsSettings";
+import { ProUpgrade } from "@/components/ProUpgrade";
 import { createClient } from "@/lib/supabase/client";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, ALL_TOOL_CATALOG } from "@/lib/constants";
 import { calculateCost, formatCost } from "@/lib/pricing";
@@ -85,7 +88,7 @@ export function SettingsModal() {
   const [hookCommand, setHookCommand] = useState("");
   const [hookEvent, setHookEvent] = useState<"afterEdit" | "onFinish" | "onError">("afterEdit");
 
-  const [tab, setTab] = useState<"model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions">("model");
+  const [tab, setTab] = useState<"model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda">("model");
   const [search, setSearch] = useState("");
   /* iOS tarzı mobil drill-down: mobilde önce kategori listesi gösterilir; bir
      satıra dokununca detay (mobileDetail=true) tam ekran açılır, geri ile listeye
@@ -129,8 +132,10 @@ export function SettingsModal() {
 
   /* Keyword index — typing in the search box jumps to whichever tab
      contains the matching keyword (first hit wins). */
-  const SEARCH_INDEX: Record<"model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions", string[]> = {
-    hesap:    ["hesap", "account", "e-posta", "email", "giriş", "çıkış", "oturum", "admin", "plan"],
+  const SEARCH_INDEX: Record<"model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda", string[]> = {
+    hesap:    ["hesap", "account", "e-posta", "email", "giriş", "çıkış", "oturum", "admin"],
+    plan:     ["plan", "pro", "abonelik", "yükselt", "upgrade", "ödeme", "fatura", "stripe", "premium"],
+    hakkinda: ["hakkında", "about", "sürüm", "version", "gizlilik", "şartlar", "lisans", "iletişim", "destek"],
     extensions: ["eklenti", "extension", "paket", "pack", "git", "ci", "cd", "kural", "web", "modül", "modular"],
     model:    ["model", "api", "anahtar", "key", "openai", "anthropic", "huggingface", "hf", "provider", "test"],
     github:   ["github", "gitlab", "token", "depo", "repo", "branch", "dal", "kullanıcı", "username"],
@@ -155,7 +160,7 @@ export function SettingsModal() {
     setPrevSearch(search);
     if (search.trim() && matchingTabs.size > 0) {
       const adminOnly = new Set(["advanced", "mcp", "hooks"]);
-      const first = (["model", "github", "extensions", "general", "advanced", "mcp", "hooks", "hesap"] as const)
+      const first = (["model", "github", "extensions", "general", "plan", "hakkinda", "advanced", "mcp", "hooks", "hesap"] as const)
         .find((k) => matchingTabs.has(k) && (isAdmin || !adminOnly.has(k)));
       if (first && first !== tab) setTab(first);
     }
@@ -480,9 +485,11 @@ export function SettingsModal() {
     { key: "github", label: "Git", icon: GitBranch, admin: false },
     { key: "extensions", label: "Eklentiler", icon: Blocks, admin: false },
     { key: "general", label: "Temel", icon: SlidersHorizontal, admin: false },
+    { key: "plan", label: "Plan", icon: Crown, admin: false },
     { key: "advanced", label: "Gelişmiş", icon: Wrench, admin: true },
     { key: "mcp", label: "MCP", icon: Plug, admin: true },
     { key: "hooks", label: "Kancalar", icon: Webhook, admin: true },
+    { key: "hakkinda", label: "Hakkında", icon: Info, admin: false },
   ] as const;
   const visibleTabs = ALL_TABS.filter((t) => isAdmin || !t.admin);
   /* Admin dışı kullanıcı gizli bir sekmedeyse (ör. arama/eski durum) Hesap'a düş. */
@@ -558,6 +565,58 @@ export function SettingsModal() {
         {tab === "hesap" && <AccountSettings />}
 
         {tab === "extensions" && <ExtensionsSettings />}
+
+        {tab === "plan" && (
+          <section className="space-y-4">
+            <div>
+              <h4 className="text-sm font-bold flex items-center gap-2"><Crown size={16} className="text-brand" /> Plan & Abonelik</h4>
+              <p className="text-xs text-muted/70 mt-1 leading-relaxed">
+                craft.ai BYOK ile her zaman ücretsizdir — kendi anahtarınla sınırsız kullanırsın. Pro yalnızca ek
+                kolaylıklar (hazır kullanım + bulut senkron) sağlar.
+              </p>
+            </div>
+            <ProUpgrade />
+            <div className="premium-card rounded-xl p-4 text-xs text-muted/70 leading-relaxed">
+              <div className="font-semibold text-ink mb-1">Ücretsiz katmanda neler var?</div>
+              Tüm sağlayıcılar (BYOK), çok-sağlayıcılı otomatik fallback, sohbet/coder/stüdyo, sandbox önizleme,
+              eklentiler, öğrenme modu — hepsi ücretsiz. Pro paketini yalnızca cihazlar arası bulut senkron ve hazır
+              kota istersen değerlendir.
+            </div>
+          </section>
+        )}
+
+        {tab === "hakkinda" && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="w-12 h-12 rounded-2xl bg-brand/12 border border-brand/20 grid place-items-center text-brand"><Info size={22} /></span>
+              <div>
+                <div className="text-base font-bold">craft.ai</div>
+                <div className="text-[11px] text-muted/60">Tarayıcıda çalışan Türkçe AI kodlama asistanı</div>
+              </div>
+            </div>
+            <div className="premium-card rounded-xl p-4 space-y-2 text-xs">
+              <div className="flex justify-between"><span className="text-muted/60">Sürüm</span><span className="font-mono">{process.env.NEXT_PUBLIC_APP_VERSION || "2026.06"}</span></div>
+              <div className="flex justify-between"><span className="text-muted/60">Model tabanı</span><span>Çok sağlayıcılı (BYOK)</span></div>
+              <div className="flex justify-between"><span className="text-muted/60">Gizlilik</span><span>Anahtarlar tarayıcında</span></div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { href: "/privacy", label: "Gizlilik" },
+                { href: "/terms", label: "Kullanım Şartları" },
+                { href: "/cookies", label: "Çerezler" },
+                { href: "/pricing", label: "Fiyatlandırma" },
+              ].map((l) => (
+                <a key={l.href} href={l.href} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between premium-card rounded-lg px-3 py-2 text-xs font-semibold hover:border-brand/40 transition-colors">
+                  {l.label} <ExternalLink size={12} className="text-muted/50" />
+                </a>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted/45 leading-relaxed">
+              API anahtarların asla sunucuya gönderilmez veya saklanmaz. Sohbet geçmişi yalnızca giriş yaptıysan ve
+              istersen Supabase üzerinde senkronlanır (RLS ile kişiye özel).
+            </p>
+          </section>
+        )}
 
         {tab === "model" && (
           <section>
