@@ -52,12 +52,14 @@ async function usableApiKey(model: { apiKey?: string; provider: string }): Promi
 }
 
 function imgUrl(prompt: string, model: string, w: number, h: number, seed: number) {
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&model=${encodeURIComponent(model)}&seed=${seed}&nologo=true`;
+  // enhance=true → Pollinations prompt'u zenginleştirir, daha kaliteli görsel verir.
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&model=${encodeURIComponent(model)}&seed=${seed}&nologo=true&enhance=true`;
 }
 
 export function ImageStudio() {
   const open = useStore((s) => s.imageStudioOpen);
   const setOpen = useStore((s) => s.setImageStudioOpen);
+  const setDesignStudioOpen = useStore((s) => s.setDesignStudioOpen);
   const addToast = useStore((s) => s.addToast);
   const config = useStore((s) => s.config);
 
@@ -84,6 +86,7 @@ export function ImageStudio() {
   const [count, setCount] = useState(1);
   const [msgs, setMsgs] = useState<ImgMsg[]>([]);
   const [enhancing, setEnhancing] = useState(false);
+  const [lightbox, setLightbox] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -225,12 +228,13 @@ export function ImageStudio() {
     <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg">
       {/* Üst bar */}
       <div className="brand-rule glass shrink-0 flex items-center gap-3 px-4 sm:px-6 py-3">
-        <span className="w-8 h-8 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand">
+        <span className="w-8 h-8 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0">
           <ImageIcon size={16} />
         </span>
-        <div className="min-w-0">
-          <div className="text-sm font-bold leading-tight">Görüntü Stüdyosu</div>
-          <div className="text-[11px] text-muted/60 leading-tight">Konuşarak üret · ücretsiz, anahtarsız (Pollinations)</div>
+        {/* Stüdyo modu — Tasarım | Görüntü (tek stüdyo) */}
+        <div className="flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
+          <button onClick={() => { setOpen(false); setDesignStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors">Tasarım</button>
+          <button className="px-2.5 py-1 rounded-md bg-brand/15 text-brand">Görüntü</button>
         </div>
         {msgs.length > 0 && (
           <button onClick={() => setMsgs([])} className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line hover:border-brand/40 text-xs font-semibold transition-colors">
@@ -279,7 +283,8 @@ export function ImageStudio() {
                           <img
                             src={it.url}
                             alt=""
-                            className={`w-full h-full object-cover transition-opacity ${it.loading ? "opacity-0" : "opacity-100"}`}
+                            onClick={() => { if (!it.loading) setLightbox(it.url); }}
+                            className={`w-full h-full object-cover cursor-zoom-in transition-opacity ${it.loading ? "opacity-0" : "opacity-100"}`}
                             onLoad={() => mark(it.id, { loading: false })}
                             onError={() => mark(it.id, { loading: false, error: true })}
                           />
@@ -364,6 +369,16 @@ export function ImageStudio() {
           </div>
         </div>
       </div>
+
+      {/* Lightbox — görsele tıklayınca tam ekran foto */}
+      {lightbox && (
+        <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-modal-bg" onClick={() => setLightbox(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={lightbox} alt="" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
+          <button onClick={() => setLightbox(null)} className="absolute top-4 right-4 w-9 h-9 grid place-items-center rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors"><X size={18} /></button>
+          <a href={lightbox} download={`craft-${Date.now()}.png`} onClick={(e) => e.stopPropagation()} className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/10 text-white text-sm font-semibold hover:bg-white/20 transition-colors"><Download size={15} /> İndir</a>
+        </div>
+      )}
     </div>
   );
 }

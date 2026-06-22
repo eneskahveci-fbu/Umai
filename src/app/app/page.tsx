@@ -137,7 +137,7 @@ export default function AppPage() {
   useEffect(() => {
     const anyOpen = () => {
       const s = useStore.getState();
-      return s.settingsOpen || s.imageStudioOpen || s.skillsOpen || s.libraryOpen;
+      return s.settingsOpen || s.imageStudioOpen || s.designStudioOpen || s.skillsOpen || s.libraryOpen;
     };
     let armed = false;
     const unsub = useStore.subscribe(() => {
@@ -149,6 +149,7 @@ export default function AppPage() {
       const s = useStore.getState();
       if (s.settingsOpen) s.setSettingsOpen(false);
       else if (s.imageStudioOpen) s.setImageStudioOpen(false);
+      else if (s.designStudioOpen) s.setDesignStudioOpen(false);
       else if (s.skillsOpen) s.setSkillsOpen(false);
       else if (s.libraryOpen) s.setLibraryOpen(false);
     };

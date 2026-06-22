@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import {
-  Download, FileCode, FileImage, FileText, Image as ImageIcon, LayoutGrid, Loader2,
+  Download, FileCode, FileImage, FileText, Image as ImageIcon, LayoutGrid, LayoutTemplate, Loader2,
   MessageSquare, Plus, Save, Send, Sliders, Sparkles, Trash2, Type, Upload, Wand2, X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -69,6 +69,49 @@ const PRESETS: { name: string; c1: string; c2: string; tc: string }[] = [
   { name: "Okyanus", c1: "#0ea5e9", c2: "#0c4a6e", tc: "#f0f9ff" },
   { name: "Orman", c1: "#16a34a", c2: "#14532d", tc: "#f0fdf4" },
   { name: "Krem", c1: "#f5efe2", c2: "#d8cdb4", tc: "#3a2f1d" },
+];
+
+/* Hazır şablonlar (Canva / OnlyOffice ilhamı) — slayt, afiş, sosyal, alıntı.
+   sizePct: yazıboyu/genişlik oranı (formata göre ölçeklenir). font: FONTS indeksi. */
+interface TplLayer { text: string; x: number; y: number; sizePct: number; color: string; weight: number; align: Align; font: number; }
+interface Template { name: string; cat: string; fmt: string; bgType: "gradient" | "color"; c1: string; c2: string; layers: TplLayer[]; }
+
+const TEMPLATES: Template[] = [
+  { name: "Sunum Kapağı", cat: "Sunum", fmt: "slide", bgType: "gradient", c1: "#1e293b", c2: "#0f172a", layers: [
+    { text: "SUNUM BAŞLIĞI", x: 0.5, y: 0.42, sizePct: 0.07, color: "#ffffff", weight: 800, align: "center", font: 5 },
+    { text: "Alt başlık · konuşmacı adı", x: 0.5, y: 0.56, sizePct: 0.028, color: "#94a3b8", weight: 400, align: "center", font: 5 },
+  ] },
+  { name: "Webinar", cat: "Sunum", fmt: "slide", bgType: "gradient", c1: "#0c4a6e", c2: "#0ea5e9", layers: [
+    { text: "Ücretsiz Webinar", x: 0.08, y: 0.34, sizePct: 0.06, color: "#f0f9ff", weight: 800, align: "left", font: 5 },
+    { text: "Modern Web Geliştirme", x: 0.08, y: 0.47, sizePct: 0.035, color: "#bae6fd", weight: 500, align: "left", font: 5 },
+    { text: "Kayıt: site.com/webinar", x: 0.08, y: 0.8, sizePct: 0.026, color: "#e0f2fe", weight: 400, align: "left", font: 4 },
+  ] },
+  { name: "Minimal Alıntı", cat: "Sosyal", fmt: "square", bgType: "gradient", c1: "#f5efe2", c2: "#d8cdb4", layers: [
+    { text: "Sadelik, nihai inceliktir.", x: 0.5, y: 0.46, sizePct: 0.058, color: "#3a2f1d", weight: 700, align: "center", font: 0 },
+    { text: "— Leonardo da Vinci", x: 0.5, y: 0.62, sizePct: 0.03, color: "#6b5d44", weight: 500, align: "center", font: 0 },
+  ] },
+  { name: "İndirim", cat: "Sosyal", fmt: "square", bgType: "gradient", c1: "#dc2626", c2: "#7f1d1d", layers: [
+    { text: "%50", x: 0.5, y: 0.4, sizePct: 0.2, color: "#ffffff", weight: 800, align: "center", font: 2 },
+    { text: "İNDİRİM", x: 0.5, y: 0.6, sizePct: 0.08, color: "#fee2e2", weight: 700, align: "center", font: 2 },
+    { text: "Sezon sonu fırsatları", x: 0.5, y: 0.74, sizePct: 0.032, color: "#fecaca", weight: 400, align: "center", font: 1 },
+  ] },
+  { name: "Ürün Tanıtımı", cat: "Sosyal", fmt: "square", bgType: "gradient", c1: "#16a34a", c2: "#14532d", layers: [
+    { text: "Yeni Ürün", x: 0.5, y: 0.4, sizePct: 0.07, color: "#f0fdf4", weight: 800, align: "center", font: 5 },
+    { text: "Şimdi satışta", x: 0.5, y: 0.54, sizePct: 0.035, color: "#bbf7d0", weight: 500, align: "center", font: 5 },
+  ] },
+  { name: "Etkinlik Afişi", cat: "Afiş", fmt: "poster", bgType: "gradient", c1: "#7c2d12", c2: "#f97316", layers: [
+    { text: "MÜZİK GECESİ", x: 0.5, y: 0.34, sizePct: 0.085, color: "#fff7ed", weight: 800, align: "center", font: 2 },
+    { text: "21 Haziran · 20:00", x: 0.5, y: 0.66, sizePct: 0.04, color: "#fff7ed", weight: 600, align: "center", font: 1 },
+    { text: "Açık Hava Sahnesi", x: 0.5, y: 0.74, sizePct: 0.03, color: "#ffedd5", weight: 400, align: "center", font: 1 },
+  ] },
+  { name: "Portfolyo", cat: "Afiş", fmt: "poster", bgType: "color", c1: "#111110", c2: "#111110", layers: [
+    { text: "PORTFOLYO", x: 0.5, y: 0.44, sizePct: 0.085, color: "#c8a87e", weight: 800, align: "center", font: 2 },
+    { text: "2025", x: 0.5, y: 0.56, sizePct: 0.04, color: "#a8a29e", weight: 400, align: "center", font: 0 },
+  ] },
+  { name: "Story Promo", cat: "Sosyal", fmt: "story", bgType: "gradient", c1: "#4c1d95", c2: "#db2777", layers: [
+    { text: "YENİ KOLEKSİYON", x: 0.5, y: 0.4, sizePct: 0.075, color: "#ffffff", weight: 800, align: "center", font: 5 },
+    { text: "Kaydır → keşfet", x: 0.5, y: 0.85, sizePct: 0.03, color: "#f5d0fe", weight: 500, align: "center", font: 5 },
+  ] },
 ];
 
 /* Hadi Prototip Yapalım — yeni proje başlatma sekmeleri (Claude Design'daki gibi). */
@@ -148,6 +191,7 @@ function applyView(d: Design, spacing: number, scale: number, hue: number): Desi
 export function DesignStudio() {
   const open = useStore((s) => s.designStudioOpen);
   const setOpen = useStore((s) => s.setDesignStudioOpen);
+  const setImageStudioOpen = useStore((s) => s.setImageStudioOpen);
   const config = useStore((s) => s.config);
   const saveConfig = useStore((s) => s.saveConfig);
   const addToast = useStore((s) => s.addToast);
@@ -155,7 +199,7 @@ export function DesignStudio() {
   const saved: SavedDesign[] = config.savedDesigns ?? [];
   const [d, setD] = useState<Design>(() => template(FORMATS[0]));
   const [sel, setSel] = useState(0);
-  const [view, setView] = useState<"design" | "gallery">("design");
+  const [view, setView] = useState<"design" | "gallery" | "templates">("design");
   const [genPrompt, setGenPrompt] = useState("");
   const [exporting, setExporting] = useState(false);
   const [title, setTitle] = useState("");
@@ -194,10 +238,19 @@ export function DesignStudio() {
   const setFormat = (f: typeof FORMATS[number]) => setD((p) => ({ ...p, fmt: f.id, w: f.w, h: f.h }));
 
   const startProject = (t: typeof START_TABS[number]) => {
+    if (t.id === "sablon") { setView("templates"); return; }
     const f = FORMATS.find((x) => x.id === t.fmt) ?? FORMATS[0];
     setD(template(f, t.id));
     setSel(0); setSpacing(1); setScale(1); setHue(0);
-    if (t.id === "sablon") setView("gallery");
+  };
+
+  const applyTemplate = (t: Template) => {
+    const f = FORMATS.find((x) => x.id === t.fmt) ?? FORMATS[0];
+    setD({
+      fmt: f.id, w: f.w, h: f.h, bgType: t.bgType, c1: t.c1, c2: t.c2, bgImage: "",
+      layers: t.layers.map((l) => ({ id: uid(), text: l.text, x: l.x, y: l.y, size: Math.round(f.w * l.sizePct), color: l.color, weight: l.weight, align: l.align, font: FONTS[l.font] ?? FONTS[0] })),
+    });
+    setSel(0); setSpacing(1); setScale(1); setHue(0); setView("design");
   };
 
   const genBg = () => {
@@ -416,10 +469,11 @@ KURALLAR:
     <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg">
       {/* Üst araç çubuğu */}
       <div className="brand-rule glass shrink-0 flex items-center gap-2 px-3 sm:px-5 py-2.5">
-        <span className="w-8 h-8 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand"><Sparkles size={16} /></span>
-        <div className="min-w-0 hidden sm:block">
-          <div className="text-sm font-bold leading-tight">Tasarım Stüdyosu</div>
-          <div className="text-[11px] text-muted/60 leading-tight">AI ile tasarla · ücretsiz</div>
+        <span className="w-8 h-8 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0"><Sparkles size={16} /></span>
+        {/* Stüdyo modu — Tasarım | Görüntü (tek stüdyo) */}
+        <div className="flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
+          <button className="px-2.5 py-1 rounded-md bg-brand/15 text-brand">Tasarım</button>
+          <button onClick={() => { setOpen(false); setImageStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors">Görüntü</button>
         </div>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tasarım adı…" className="hidden sm:block ml-2 w-40 bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50" />
 
@@ -453,13 +507,39 @@ KURALLAR:
           </div>
 
           <button onClick={save} className="btn-brand-glow flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-white text-xs font-bold"><Save size={13} /> <span className="hidden sm:inline">Kaydet</span></button>
-          <button onClick={() => setView((v) => (v === "gallery" ? "design" : "gallery"))} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${view === "gallery" ? "border-brand/50 text-brand" : "border-line hover:border-brand/40"}`}><LayoutGrid size={13} /> {saved.length}</button>
+          <button onClick={() => setView((v) => (v === "templates" ? "design" : "templates"))} title="Hazır şablonlar" className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${view === "templates" ? "border-brand/50 text-brand" : "border-line hover:border-brand/40"}`}><LayoutTemplate size={13} /> <span className="hidden sm:inline">Şablon</span></button>
+          <button onClick={() => setView((v) => (v === "gallery" ? "design" : "gallery"))} title="Kayıtlı tasarımlar" className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${view === "gallery" ? "border-brand/50 text-brand" : "border-line hover:border-brand/40"}`}><LayoutGrid size={13} /> {saved.length}</button>
           <button onClick={() => setOpen(false)} className="w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors"><X size={16} /></button>
         </div>
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col sm:flex-row overflow-hidden">
-        {view === "gallery" ? (
+        {view === "templates" ? (
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+            <div className="mb-3">
+              <div className="text-sm font-bold">Hazır şablonlar</div>
+              <div className="text-[11px] text-muted/60">Bir şablona dokun, hemen düzenlemeye başla. Sohbetten de değiştirebilirsin.</div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {TEMPLATES.map((t) => {
+                const f = FORMATS.find((x) => x.id === t.fmt) ?? FORMATS[0];
+                const bg = t.bgType === "color" ? { background: t.c1 } : { background: `linear-gradient(135deg, ${t.c1}, ${t.c2})` };
+                const top = t.layers[0];
+                return (
+                  <button key={t.name} onClick={() => applyTemplate(t)} className="premium-card rounded-2xl overflow-hidden group/t text-left hover:border-brand/40 transition-colors">
+                    <div className="relative grid place-items-center px-3 text-center overflow-hidden" style={{ ...bg, aspectRatio: `${f.w} / ${f.h}` }}>
+                      <span className="font-bold leading-tight text-[11px] sm:text-xs line-clamp-3" style={{ color: top.color, fontFamily: FONTS[top.font] }}>{top.text}</span>
+                    </div>
+                    <div className="px-3 py-2 flex items-center justify-between">
+                      <span className="text-[12px] font-semibold truncate">{t.name}</span>
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-brand/70 bg-brand/10 px-1.5 py-0.5 rounded shrink-0">{t.cat}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : view === "gallery" ? (
           <div className="flex-1 overflow-y-auto p-4 sm:p-6">
             {saved.length === 0 ? (
               <div className="h-full grid place-items-center text-sm text-muted/50">Henüz kayıtlı tasarım yok.</div>
