@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
+import { buildFallbackChain } from "@/lib/fallback";
 import {
   Activity,
   ArrowDown,
