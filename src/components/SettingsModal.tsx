@@ -27,6 +27,7 @@ import {
   Plug,
   Webhook,
   Blocks,
+  BarChart3,
   Crown,
   Info,
   X,
@@ -37,6 +38,7 @@ import { isAdminEmail } from "@/lib/admin";
 import { AccountSettings } from "@/components/AccountSettings";
 import { ExtensionsSettings } from "@/components/ExtensionsSettings";
 import { ProUpgrade } from "@/components/ProUpgrade";
+import { AnalyticsSettings } from "@/components/AnalyticsSettings";
 import { createClient } from "@/lib/supabase/client";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, ALL_TOOL_CATALOG } from "@/lib/constants";
 import { calculateCost, formatCost } from "@/lib/pricing";
@@ -88,7 +90,7 @@ export function SettingsModal() {
   const [hookCommand, setHookCommand] = useState("");
   const [hookEvent, setHookEvent] = useState<"afterEdit" | "onFinish" | "onError">("afterEdit");
 
-  const [tab, setTab] = useState<"model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda">("model");
+  const [tab, setTab] = useState<"model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim">("model");
   const [search, setSearch] = useState("");
   /* iOS tarzı mobil drill-down: mobilde önce kategori listesi gösterilir; bir
      satıra dokununca detay (mobileDetail=true) tam ekran açılır, geri ile listeye
@@ -132,8 +134,9 @@ export function SettingsModal() {
 
   /* Keyword index — typing in the search box jumps to whichever tab
      contains the matching keyword (first hit wins). */
-  const SEARCH_INDEX: Record<"model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda", string[]> = {
+  const SEARCH_INDEX: Record<"model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim", string[]> = {
     hesap:    ["hesap", "account", "e-posta", "email", "giriş", "çıkış", "oturum", "admin"],
+    kullanim: ["kullanım", "usage", "analitik", "analytics", "token", "maliyet", "cost", "istatistik", "grafik", "pano"],
     plan:     ["plan", "pro", "abonelik", "yükselt", "upgrade", "ödeme", "fatura", "stripe", "premium"],
     hakkinda: ["hakkında", "about", "sürüm", "version", "gizlilik", "şartlar", "lisans", "iletişim", "destek"],
     extensions: ["eklenti", "extension", "paket", "pack", "git", "ci", "cd", "kural", "web", "modül", "modular"],
@@ -160,7 +163,7 @@ export function SettingsModal() {
     setPrevSearch(search);
     if (search.trim() && matchingTabs.size > 0) {
       const adminOnly = new Set(["advanced", "mcp", "hooks"]);
-      const first = (["model", "github", "extensions", "general", "plan", "hakkinda", "advanced", "mcp", "hooks", "hesap"] as const)
+      const first = (["model", "github", "extensions", "general", "kullanim", "plan", "hakkinda", "advanced", "mcp", "hooks", "hesap"] as const)
         .find((k) => matchingTabs.has(k) && (isAdmin || !adminOnly.has(k)));
       if (first && first !== tab) setTab(first);
     }
@@ -485,6 +488,7 @@ export function SettingsModal() {
     { key: "github", label: "Git", icon: GitBranch, admin: false },
     { key: "extensions", label: "Eklentiler", icon: Blocks, admin: false },
     { key: "general", label: "Temel", icon: SlidersHorizontal, admin: false },
+    { key: "kullanim", label: "Kullanım", icon: BarChart3, admin: false },
     { key: "plan", label: "Plan", icon: Crown, admin: false },
     { key: "advanced", label: "Gelişmiş", icon: Wrench, admin: true },
     { key: "mcp", label: "MCP", icon: Plug, admin: true },
@@ -566,6 +570,8 @@ export function SettingsModal() {
         {tab === "hesap" && <AccountSettings />}
 
         {tab === "extensions" && <ExtensionsSettings />}
+
+        {tab === "kullanim" && <AnalyticsSettings />}
 
         {tab === "plan" && (
           <section className="space-y-4">
