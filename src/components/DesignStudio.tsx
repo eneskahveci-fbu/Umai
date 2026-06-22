@@ -19,7 +19,9 @@ import type { SavedDesign } from "@/lib/types";
 
 type Align = "left" | "center" | "right";
 interface Layer { id: string; text: string; x: number; y: number; size: number; color: string; weight: number; align: Align; font: string; }
-interface Design { fmt: string; w: number; h: number; bgType: "gradient" | "color" | "image"; c1: string; c2: string; bgImage: string; layers: Layer[]; }
+/* (c1) Görsel/logo katmanı — x,y: merkez (0-1), w: genişlik/tuval oranı (0-1). */
+interface ImgLayer { id: string; src: string; x: number; y: number; w: number; }
+interface Design { fmt: string; w: number; h: number; bgType: "gradient" | "color" | "image"; c1: string; c2: string; bgImage: string; layers: Layer[]; images?: ImgLayer[]; }
 
 const FORMATS: { id: string; label: string; w: number; h: number }[] = [
   { id: "slide", label: "Slayt 16:9", w: 1280, h: 720 },
@@ -224,6 +226,7 @@ export function DesignStudio() {
   const [busy, setBusy] = useState(false);
   const [pendingImgs, setPendingImgs] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const imgLayerRef = useRef<HTMLInputElement>(null);
 
   // Proje / kalite
   const [quality, setQuality] = useState<keyof typeof QUALITY>("medium");
@@ -243,6 +246,12 @@ export function DesignStudio() {
     setD((p) => ({ ...p, layers: [...p.layers, { id: uid(), text: "Yeni metin", x: 0.5, y: 0.75, size: Math.round(p.w * 0.03), color: "#ffffff", weight: 600, align: "center", font: FONTS[0] }] }));
   const delLayer = (i: number) => setD((p) => ({ ...p, layers: p.layers.filter((_, j) => j !== i) }));
   const setFormat = (f: typeof FORMATS[number]) => setD((p) => ({ ...p, fmt: f.id, w: f.w, h: f.h }));
+
+  /* (c1) Görsel/logo katmanı yardımcıları. */
+  const addImage = (src: string) => setD((p) => ({ ...p, images: [...(p.images ?? []), { id: uid(), src, x: 0.5, y: 0.5, w: 0.3 }] }));
+  const updImage = (id: string, patch: Partial<ImgLayer>) => setD((p) => ({ ...p, images: (p.images ?? []).map((im) => (im.id === id ? { ...im, ...patch } : im)) }));
+  const delImage = (id: string) => setD((p) => ({ ...p, images: (p.images ?? []).filter((im) => im.id !== id) }));
+  const pickImageLayer = (file: File) => { const r = new FileReader(); r.onload = () => addImage(String(r.result)); r.readAsDataURL(file); };
 
   const startProject = (t: typeof START_TABS[number]) => {
     if (t.id === "sablon") { setView("templates"); return; }
@@ -479,6 +488,14 @@ KURALLAR:
         const g = ctx.createLinearGradient(0, 0, vd.w, vd.h); g.addColorStop(0, vd.c1); g.addColorStop(1, vd.c2);
         ctx.fillStyle = g; ctx.fillRect(0, 0, vd.w, vd.h);
       }
+      /* (c1) Görsel/logo katmanları — arka plan üstüne, metnin altına. */
+      for (const im of vd.images ?? []) {
+        try {
+          const img = await loadImg(im.src);
+          const w = vd.w * im.w; const h = w * (img.height / Math.max(1, img.width));
+          ctx.drawImage(img, vd.w * im.x - w / 2, vd.h * im.y - h / 2, w, h);
+        } catch { /* görsel atla */ }
+      }
       for (const L of vd.layers) {
         ctx.fillStyle = L.color; ctx.textAlign = L.align; ctx.textBaseline = "middle";
         ctx.font = `${L.weight} ${L.size}px ${L.font}`;
@@ -505,13 +522,17 @@ KURALLAR:
     return `<div style="position:absolute;${pos}top:${l.y * 100}%;transform:${tf};color:${l.color};font-weight:${l.weight};font-family:${l.font};font-size:${(l.size / x.w * 100).toFixed(3)}cqw;line-height:1.18;text-align:${l.align};max-width:88%;${w}">${escapeHtml(l.text)}</div>`;
   }).join("");
 
+  const imagesHtml = (x: Design) => (x.images ?? []).map((im) =>
+    `<img src="${im.src}" alt="" style="position:absolute;left:${im.x * 100}%;top:${im.y * 100}%;width:${im.w * 100}%;transform:translate(-50%,-50%)" />`,
+  ).join("");
+
   const bgCss = (x: Design) => x.bgType === "image" && x.bgImage
     ? `background:url('${x.bgImage}') center/cover;`
     : x.bgType === "color" ? `background:${x.c1};` : `background:linear-gradient(135deg,${x.c1},${x.c2});`;
 
   const exportHtml = () => {
     setExportMenu(false);
-    const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title || "Tasarım")}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a0d;display:grid;place-items:center;min-height:100vh}.stage{container-type:inline-size;width:min(96vw,960px);aspect-ratio:${vd.w}/${vd.h};position:relative;overflow:hidden;border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,.5);${bgCss(vd)}}</style></head><body><div class="stage">${layersHtml(vd)}</div></body></html>`;
+    const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title || "Tasarım")}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a0d;display:grid;place-items:center;min-height:100vh}.stage{container-type:inline-size;width:min(96vw,960px);aspect-ratio:${vd.w}/${vd.h};position:relative;overflow:hidden;border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,.5);${bgCss(vd)}}</style></head><body><div class="stage">${imagesHtml(vd)}${layersHtml(vd)}</div></body></html>`;
     const blob = new Blob([html], { type: "text/html" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
     a.download = `${(title || "tasarim").replace(/\s+/g, "-")}.html`; a.click();
@@ -522,7 +543,7 @@ KURALLAR:
     setExportMenu(false);
     const w = window.open("", "_blank");
     if (!w) { addToast("Açılır pencere engellendi — PDF için açılır pencereye izin ver.", "error"); return; }
-    const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHtml(title || "Tasarım")}</title><style>@page{size:${vd.w > vd.h ? "landscape" : "portrait"};margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{height:100%}body{display:grid;place-items:center}.stage{container-type:inline-size;width:100vw;aspect-ratio:${vd.w}/${vd.h};position:relative;overflow:hidden;${bgCss(vd)}}@media print{.stage{width:100vw}}</style></head><body><div class="stage">${layersHtml(vd)}</div><script>window.onload=function(){setTimeout(function(){window.print()},350)}</script></body></html>`;
+    const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHtml(title || "Tasarım")}</title><style>@page{size:${vd.w > vd.h ? "landscape" : "portrait"};margin:0}*{margin:0;padding:0;box-sizing:border-box}html,body{height:100%}body{display:grid;place-items:center}.stage{container-type:inline-size;width:100vw;aspect-ratio:${vd.w}/${vd.h};position:relative;overflow:hidden;${bgCss(vd)}}@media print{.stage{width:100vw}}</style></head><body><div class="stage">${imagesHtml(vd)}${layersHtml(vd)}</div><script>window.onload=function(){setTimeout(function(){window.print()},350)}</script></body></html>`;
     w.document.open(); w.document.write(html); w.document.close();
   };
 
@@ -737,6 +758,10 @@ KURALLAR:
             ) : (
             <div className="flex-1 min-h-0 grid place-items-center p-4 sm:p-8 overflow-auto bg-[#0a0a0d]">
               <div ref={previewRef} className="relative shadow-2xl rounded-sm overflow-hidden" style={{ ...bgStyle, width: "min(100%, 640px)", aspectRatio: `${vd.w} / ${vd.h}` }}>
+                {(vd.images ?? []).map((im) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={im.id} src={im.src} alt="" className="absolute pointer-events-none" style={{ left: `${im.x * 100}%`, top: `${im.y * 100}%`, width: `${im.w * 100}%`, transform: "translate(-50%,-50%)" }} />
+                ))}
                 {vd.layers.map((ly, i) => (
                   <div
                     key={ly.id}
@@ -807,6 +832,28 @@ KURALLAR:
                   <div className="text-[10px] font-bold uppercase tracking-widest text-muted/45 mb-1.5 flex items-center gap-1"><ImageIcon size={11} /> AI arka plan (ücretsiz)</div>
                   <textarea value={genPrompt} onChange={(e) => setGenPrompt(e.target.value)} rows={2} placeholder="ör: minimal soyut amber dalgalar" className="w-full bg-bgsoft border border-line rounded-lg px-2.5 py-2 text-xs outline-none focus:border-brand/50 resize-none" />
                   <button onClick={genBg} className="mt-1.5 w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-line hover:border-brand/50 text-xs font-semibold transition-colors"><Wand2 size={13} className="text-brand" /> Arka plan üret</button>
+                </div>
+
+                {/* (c1) Görsel / Logo katmanları */}
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-muted/45 mb-1.5 flex items-center gap-1"><ImageIcon size={11} /> Görsel / Logo</div>
+                  <input ref={imgLayerRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) pickImageLayer(f); e.target.value = ""; }} />
+                  <button onClick={() => imgLayerRef.current?.click()} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-line hover:border-brand/50 text-xs font-semibold transition-colors"><Upload size={13} className="text-brand" /> Görsel/logo ekle</button>
+                  {(d.images ?? []).map((im) => (
+                    <div key={im.id} className="mt-2 border-t border-line/40 pt-2 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="block w-8 h-8 rounded border border-line bg-cover bg-center bg-no-repeat shrink-0" style={{ backgroundImage: `url(${im.src})` }} />
+                        <label className="flex-1 text-[11px] text-muted/70">Boyut
+                          <input type="range" min={0.05} max={1} step={0.01} value={im.w} onChange={(e) => updImage(im.id, { w: +e.target.value })} className="w-full accent-brand" />
+                        </label>
+                        <button onClick={() => delImage(im.id)} className="text-muted/50 hover:text-red shrink-0" title="Sil"><Trash2 size={13} /></button>
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-muted/60">
+                        <span>X</span><input type="range" min={0} max={1} step={0.01} value={im.x} onChange={(e) => updImage(im.id, { x: +e.target.value })} className="flex-1 accent-brand" />
+                        <span>Y</span><input type="range" min={0} max={1} step={0.01} value={im.y} onChange={(e) => updImage(im.id, { y: +e.target.value })} className="flex-1 accent-brand" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
                 {/* Katmanlar / doğrudan düzenleme */}
