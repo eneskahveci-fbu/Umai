@@ -468,7 +468,7 @@ KURALLAR:
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       {/* Üst araç çubuğu */}
-      <div className="brand-rule glass shrink-0 flex items-center gap-2 px-3 sm:px-5 py-2.5">
+      <div className="brand-rule glass shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5">
         <span className="w-8 h-8 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0"><Sparkles size={16} /></span>
         {/* Stüdyo modu — Tasarım | Görüntü (tek stüdyo) */}
         <div className="flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
@@ -483,7 +483,7 @@ KURALLAR:
           <button onClick={() => setTweaksOpen((v) => !v)} title="İyileştirmeler" className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${tweaksOpen ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`}><Sliders size={13} /> Tweaks</button>
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1 sm:gap-2">
           {/* Kalite */}
           <select value={quality} onChange={(e) => setQuality(e.target.value as keyof typeof QUALITY)} title="Çıktı kalitesi" className="hidden sm:block bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs outline-none focus:border-brand/50 cursor-pointer">
             {Object.entries(QUALITY).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}

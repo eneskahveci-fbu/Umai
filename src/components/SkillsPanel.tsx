@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useModalA11y } from "@/lib/useModalA11y";
 import {
-  BookMarked, Check, Download, FileText, FileUp, Folder, GitBranch,
+  BookMarked, Check, Download, FileText, FileUp, GitBranch,
   Pencil, Plus, RotateCcw, Search, Sparkles, Trash2, Upload, X, Zap,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -74,13 +74,11 @@ export function SkillsPanel() {
 
   if (!open) return null;
 
-  const fileSkills = skills.filter((s) => s.source === "file");
-  const manualSkills = skills.filter((s) => s.source === "manual");
   const totalUsage = skills.reduce((sum, s) => sum + s.usageCount, 0);
   const enabledCount = skills.filter((s) => s.enabled).length;
 
   const tabs: { id: Tab; label: string; icon: typeof Zap; count: number }[] = [
-    { id: "skills", label: "Skills & Dosyalar", icon: Zap, count: skills.length },
+    { id: "skills", label: "Skills", icon: Zap, count: skills.length },
     { id: "agents", label: "Agents", icon: Sparkles, count: ALL_AGENTS.length },
     { id: "progress", label: "İlerleme", icon: GitBranch, count: totalUsage },
   ];
@@ -152,26 +150,16 @@ export function SkillsPanel() {
         {/* Body */}
         <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
           {tab === "skills" && (
-            <>
-              <FilesTab
-                fileSkills={fileSkills}
-                addSkill={addSkill}
-                updateSkill={updateSkill}
-                removeSkill={removeSkill}
-                toggleSkill={toggleSkill}
-                addToast={addToast}
-              />
-              <SkillsTab
-                skills={manualSkills}
-                search={search}
-                setSearch={setSearch}
-                addSkill={addSkill}
-                updateSkill={updateSkill}
-                removeSkill={removeSkill}
-                toggleSkill={toggleSkill}
-                addToast={addToast}
-              />
-            </>
+            <SkillsTab
+              skills={skills}
+              search={search}
+              setSearch={setSearch}
+              addSkill={addSkill}
+              updateSkill={updateSkill}
+              removeSkill={removeSkill}
+              toggleSkill={toggleSkill}
+              addToast={addToast}
+            />
           )}
           {tab === "agents" && <AgentsTab />}
           {tab === "progress" && (
@@ -213,6 +201,18 @@ function SkillsTab({
   const [content, setContent] = useState("");
   const [tagsRaw, setTagsRaw] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  /* Dosya = skill (aynı amaç). Yüklenen dosya source:"file" skill olarak eklenir. */
+  const importFile = (file: File) => {
+    if (file.size > 200_000) { addToast("Dosya çok büyük (max 200 KB)", "error"); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      addSkill({ title: file.name, content: String(reader.result).slice(0, 8000), tags: [file.name.split(".").pop() || "file"], enabled: true, source: "file", fileName: file.name });
+      addToast(`${file.name} eklendi`, "success");
+    };
+    reader.readAsText(file);
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -270,6 +270,13 @@ function SkillsTab({
             <Plus size={15} />
           </button>
         </div>
+        {/* Dosya yükle — dosya da bir skill'dir (aynı amaç) */}
+        <div className="flex items-center gap-2">
+          <input ref={fileRef} type="file" multiple className="hidden" accept=".ts,.tsx,.js,.jsx,.py,.md,.json,.txt,.css,.html,.go,.rs,.java,.rb,.php,.yml,.yaml" onChange={(e) => { for (const f of Array.from(e.target.files ?? [])) importFile(f); e.target.value = ""; }} />
+          <button onClick={() => fileRef.current?.click()} className="flex items-center gap-1.5 text-[11px] font-semibold text-muted hover:text-brand transition-colors">
+            <FileUp size={13} /> Dosya yükle (dosya = skill)
+          </button>
+        </div>
       </div>
 
       <div className="px-5 py-2 border-b border-line/40 shrink-0">
@@ -293,98 +300,6 @@ function SkillsTab({
           />
         ) : (
           filtered.map((s) => (
-            <SkillCard
-              key={s.id}
-              skill={s}
-              editing={editingId === s.id}
-              onEdit={() => setEditingId(s.id)}
-              onCancelEdit={() => setEditingId(null)}
-              onSave={(patch) => { updateSkill(s.id, patch); setEditingId(null); }}
-              onToggle={() => toggleSkill(s.id)}
-              onRemove={() => removeSkill(s.id)}
-            />
-          ))
-        )}
-      </div>
-    </>
-  );
-}
-
-/* ───────── Files Tab ───────── */
-
-function FilesTab({
-  fileSkills, addSkill, updateSkill, removeSkill, toggleSkill, addToast,
-}: {
-  fileSkills: Skill[];
-  addSkill: ReturnType<typeof useStore.getState>["addSkill"];
-  updateSkill: ReturnType<typeof useStore.getState>["updateSkill"];
-  removeSkill: ReturnType<typeof useStore.getState>["removeSkill"];
-  toggleSkill: ReturnType<typeof useStore.getState>["toggleSkill"];
-  addToast: ReturnType<typeof useStore.getState>["addToast"];
-}) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-
-  const importFile = (file: File) => {
-    if (file.size > 200_000) {
-      addToast("Dosya çok büyük (max 200 KB)", "error");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = (reader.result as string).trim();
-      if (!text) { addToast("Dosya boş", "error"); return; }
-      addSkill({
-        title: file.name,
-        content: text.slice(0, 8000),
-        tags: [file.name.split(".").pop() || "file"],
-        enabled: true,
-        source: "file",
-        fileName: file.name,
-      });
-      addToast(`${file.name} eklendi`, "success");
-    };
-    reader.readAsText(file);
-  };
-
-  return (
-    <>
-      <div className="px-5 py-3 border-b border-line/40 shrink-0">
-        <div
-          className="border-2 border-dashed border-line rounded-xl px-4 py-6 text-center hover:border-amber-400/40 hover:bg-amber-400/5 transition-colors cursor-pointer"
-          onClick={() => fileRef.current?.click()}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            for (const f of Array.from(e.dataTransfer.files)) importFile(f);
-          }}
-        >
-          <FileUp size={22} className="mx-auto mb-2 text-muted/40" />
-          <p className="text-xs text-muted/70 font-medium">Dosya bırak veya tıkla</p>
-          <p className="text-[11px] text-muted/40 mt-0.5">.ts, .tsx, .js, .py, .md, .json, .txt (max 200 KB)</p>
-        </div>
-        <input
-          ref={fileRef}
-          type="file"
-          multiple
-          accept=".txt,.md,.ts,.tsx,.js,.jsx,.py,.json,.yaml,.yml,.html,.css,.go,.rs,.java,.kt,.swift,.rb,.php,.sh"
-          className="hidden"
-          onChange={(e) => {
-            for (const f of Array.from(e.target.files ?? [])) importFile(f);
-            e.target.value = "";
-          }}
-        />
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
-        {fileSkills.length === 0 ? (
-          <EmptyState
-            icon={Folder}
-            title="Henüz dosya yok"
-            hint="Yukarıdan dosya yükleyerek AI'ya eğitim verisi olarak verebilirsin."
-          />
-        ) : (
-          fileSkills.map((s) => (
             <SkillCard
               key={s.id}
               skill={s}
