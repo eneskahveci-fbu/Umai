@@ -1567,6 +1567,12 @@ export function CoderView() {
         "(4) Sonunda 'Sırada öğren' başlığıyla 2-3 ilgili kavram/kaynak öner. " +
         "Üstten bakmadan, anlaşılır ve cesaretlendirici bir dille yaz. Kod kalitesinden ödün verme.";
     }
+    /* Özel yazı stili: aktifse kullanıcı tanımlı talimatları ekle (yerleşik stilin
+       yerine geçer — UI seçimde ikisi karşılıklı dışlanır). */
+    if (store.config.activeCustomStyleId) {
+      const cs = (store.config.customStyles ?? []).find((s) => s.id === store.config.activeCustomStyleId);
+      if (cs?.instructions.trim()) finalSystemPrompt += `\n\n[Stil]: ${cs.instructions.trim()}`;
+    }
 
     const repo = store.repo;
     const activeGithub = store.activeGithub();

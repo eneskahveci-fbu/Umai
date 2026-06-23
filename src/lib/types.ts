@@ -153,6 +153,14 @@ export interface GitLabAccount {
 
 export type ResponseStyle = "normal" | "concise" | "detailed" | "code" | "formal";
 
+/** Kullanıcının kendi tanımladığı yazı stili (yerleşik 5 stile ek). Aktifken
+    talimatları sistem prompt'una eklenir. */
+export interface CustomStyle {
+  id: string;
+  name: string;
+  instructions: string;
+}
+
 /** Olay-tabanlı otomasyon: belirli bir olayda terminalde komut çalıştırır.
  *  afterWrite = ajan dosya yazınca, afterResponse = her yanıttan sonra. */
 export interface Automation {
@@ -250,6 +258,10 @@ export interface Config {
   systemPrompt: string;
   theme: "dark" | "light";
   style: ResponseStyle;
+  /** Kullanıcının kendi yazı stilleri (yerleşiklere ek). */
+  customStyles?: CustomStyle[];
+  /** Aktif özel stilin id'si — doluysa yerleşik stil yerine bu uygulanır. */
+  activeCustomStyleId?: string | null;
   memories: MemoryItem[];
   skills: Skill[];
   /** Kullanıcı tanımlı slash-ajanları — config'te saklanır (kalıcı + senkron +
