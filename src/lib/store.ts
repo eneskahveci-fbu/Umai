@@ -352,6 +352,9 @@ interface StoreState {
   /** Otomatik bellek: damıtılmış kalıcı bilgileri "auto_memory" skill'ine
       ekler (tekilleştirme + en eski kayıtları düşerek en çok 40 madde). */
   addAutoMemoryFacts: (facts: string[]) => void;
+  /** Otomatik bellek listesini tamamen değiştirir (düzenle/sil için). Boş liste
+      → "auto_memory" skill'i kaldırılır. */
+  setAutoMemoryFacts: (facts: string[]) => void;
   removeSkill: (id: string) => void;
   toggleSkill: (id: string) => void;
   incrementSkillUsage: (ids: string[]) => void;
@@ -861,6 +864,23 @@ export const useStore = create<StoreState>()((set, get) => ({
         usageCount: 0,
         createdAt: Date.now(),
       });
+    }
+    get().saveConfig({ ...config, skills });
+  },
+  setAutoMemoryFacts: (facts) => {
+    const config = get().config;
+    const skills = (config.skills ?? []).slice();
+    const idx = skills.findIndex((sk) => sk.id === "auto_memory");
+    if (idx < 0) return;
+    const clean = facts.map((f) => f.trim().replace(/^[-•*]\s*/, "")).filter((f) => f.length > 0);
+    if (clean.length === 0) {
+      /* Tümü silindi → otomatik bellek skill'ini kaldır. */
+      skills.splice(idx, 1);
+    } else {
+      const content =
+        "# Otomatik Bellek\n\nKonuşmalardan damıtılan kalıcı tercihler — her sohbete otomatik eklenir.\n\n" +
+        clean.map((l) => `- ${l}`).join("\n");
+      skills[idx] = { ...skills[idx], content };
     }
     get().saveConfig({ ...config, skills });
   },
