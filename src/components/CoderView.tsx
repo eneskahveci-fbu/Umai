@@ -27,6 +27,7 @@ import {
   MoreHorizontal,
   Image as ImageIcon,
   Loader2 as Loader2Icon,
+  MessageSquare,
   PanelLeft,
   Paperclip,
   Check,
@@ -398,6 +399,87 @@ function FileTreeNode({
 const RAG_TEXT_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|php|c|h|cpp|cs|css|scss|html|json|md|mdx|txt|yml|yaml|sh|sql)$/i;
 const RAG_MAX_FILES = 150;
 
+/* ── ask_user anket kartı ─────────────────────────────────────────────────────
+   Ajan kodlamadan önce tıklanabilir soru(lar) sorduğunda gösterilir. Her soru
+   için seçenek butonları + "Diğer" serbest metin; tüm sorular yanıtlanınca
+   "Yanıtla & Devam Et" etkinleşir → cevaplar formatlanıp ajana geri yollanır. */
+interface SurveyOption { label: string; description?: string; }
+interface SurveyQuestion { header: string; question: string; options: SurveyOption[]; }
+
+function SurveyCard({
+  questions,
+  onSubmit,
+}: {
+  questions: SurveyQuestion[];
+  onSubmit: (answers: string[], questions: SurveyQuestion[]) => void;
+}) {
+  const [selected, setSelected] = useState<(string | null)[]>(() => questions.map(() => null));
+  const [other, setOther] = useState<string[]>(() => questions.map(() => ""));
+
+  const pick = (qi: number, label: string) =>
+    setSelected((prev) => prev.map((v, i) => (i === qi ? (v === label ? null : label) : v)));
+
+  const ready = selected.every((v, i) => v !== null || other[i].trim().length > 0);
+
+  const submit = () => {
+    if (!ready) return;
+    onSubmit(selected.map((v, i) => v ?? other[i].trim()), questions);
+  };
+
+  return (
+    <div className="ml-11 max-w-2xl mt-3 rounded-xl border border-brand/30 bg-brand/5 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-brand/20 text-xs font-semibold text-brand">
+        <MessageSquare size={13} className="shrink-0" />
+        <span>Devam etmeden önce birkaç soru — tıkla veya yaz</span>
+      </div>
+      <div className="divide-y divide-line/30">
+        {questions.map((q, qi) => (
+          <div key={qi} className="px-3 py-3">
+            <p className="text-xs font-semibold text-ink mb-2">{q.question}</p>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {q.options.map((opt) => (
+                <button
+                  key={opt.label}
+                  title={opt.description}
+                  onClick={() => pick(qi, opt.label)}
+                  className={[
+                    "px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors text-left",
+                    selected[qi] === opt.label
+                      ? "bg-brand text-white border-brand"
+                      : "border-line bg-bgsoft text-muted hover:border-brand/50 hover:text-ink",
+                  ].join(" ")}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text"
+              placeholder="Diğer…"
+              value={other[qi]}
+              onChange={(e) => {
+                const v = e.target.value;
+                setOther((prev) => prev.map((x, i) => (i === qi ? v : x)));
+                if (v) setSelected((prev) => prev.map((x, i) => (i === qi ? null : x)));
+              }}
+              className="w-full text-xs px-2 py-1.5 rounded-lg border border-line bg-bg text-ink placeholder:text-muted focus:outline-none focus:border-brand/60"
+            />
+          </div>
+        ))}
+      </div>
+      <div className="px-3 py-2 border-t border-brand/20 flex justify-end">
+        <button
+          onClick={submit}
+          disabled={!ready}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand text-white disabled:opacity-40 hover:bg-branddim transition-colors"
+        >
+          Yanıtla &amp; Devam Et
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function CoderView() {
   const config = useStore((s) => s.config);
   const isAdmin = isAdminEmail(useStore((s) => s.userEmail));
@@ -537,6 +619,8 @@ export function CoderView() {
   /* Ajanın önerdiği YIKICI işlemler (sil/yeniden adlandır) — onay bekler. */
   const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
   const [resolvingAction, setResolvingAction] = useState<string | null>(null);
+  /* ask_user anketi: ajan soru sorduğunda gösterilir; cevaplanınca temizlenir. */
+  const [pendingSurvey, setPendingSurvey] = useState<SurveyQuestion[] | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   /* Çoklu dosya sekmeleri: editörde açık tutulan dosyalar + aktif olanın
      kaydedilmemiş durumu (sekme geçişinde veri kaybını önlemek için). */
@@ -1437,6 +1521,7 @@ export function CoderView() {
     const turnCheckpoints: { path: string; previous: string | null }[] =
       isContinuation ? [...(lastMsg?.checkpoints ?? [])] : []; // devamda önceki yazmalar korunur
     setPendingActions([]); // bekleyen yıkıcı işlem önerileri
+    setPendingSurvey(null); // önceki anketi temizle
     coderAbort = new AbortController();
     const abortCtl = coderAbort;
 
@@ -1826,6 +1911,11 @@ export function CoderView() {
               } else if (ev?.kind === "rename" && ev.path && ev.newPath) {
                 setPendingActions((prev) => addPendingAction(prev, { id: ev.id, kind: "rename", path: ev.path, newPath: ev.newPath, reason: ev.reason }));
               }
+              continue;
+            }
+            /* ask_user anketi: ajan tıklanabilir soru sordu → kart göster, yanıt bekle. */
+            if (parsed.ask_user_event?.questions) {
+              setPendingSurvey(parsed.ask_user_event.questions as SurveyQuestion[]);
               continue;
             }
             const delta = parsed.choices?.[0]?.delta?.content ?? "";
@@ -2594,6 +2684,17 @@ export function CoderView() {
                             ))}
                           </div>
                         </div>
+                      )}
+                      {isLastAssistant && !streaming && pendingSurvey && (
+                        <SurveyCard
+                          questions={pendingSurvey}
+                          onSubmit={(answers, surveyQuestions) => {
+                            setPendingSurvey(null);
+                            const lines = answers.map((a, i) => `**${surveyQuestions[i].header}:** ${a}`);
+                            useStore.getState().pushMessage({ role: "user", content: lines.join("\n") });
+                            void callApi();
+                          }}
+                        />
                       )}
                       {isLastAssistant && !streaming && checkpoints.length > 0 && repo && (
                         <div className="ml-11 max-w-2xl mt-2 flex items-center gap-2 px-3 py-2 rounded-xl border border-line bg-bgsoft/50 text-xs">
