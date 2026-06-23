@@ -42,6 +42,7 @@ import { AnalyticsSettings } from "@/components/AnalyticsSettings";
 import { createClient } from "@/lib/supabase/client";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, ALL_TOOL_CATALOG } from "@/lib/constants";
 import { calculateCost, formatCost } from "@/lib/pricing";
+import { quickComplete } from "@/lib/quickComplete";
 import { fetchUserRepos } from "@/lib/github";
 import { fetchGitLabUserRepos } from "@/lib/gitlab";
 import type { Provider, ResponseStyle } from "@/lib/types";
@@ -72,6 +73,7 @@ export function SettingsModal() {
   const chats = useStore((s) => s.chats);
   const addMemory = useStore((s) => s.addMemory);
   const removeMemory = useStore((s) => s.removeMemory);
+  const setAutoMemoryFacts = useStore((s) => s.setAutoMemoryFacts);
   const updateProject = useStore((s) => s.updateProject);
   const addMcpServer = useStore((s) => s.addMcpServer);
   const removeMcpServer = useStore((s) => s.removeMcpServer);
@@ -193,6 +195,12 @@ export function SettingsModal() {
   const [quickBusy, setQuickBusy] = useState(false);
   const [quickResult, setQuickResult] = useState<null | "ok" | string>(null);
   const [memInput, setMemInput] = useState("");
+  /* Özel yazı stili oluşturma formu. */
+  const [styleFormOpen, setStyleFormOpen] = useState(false);
+  const [styleName, setStyleName] = useState("");
+  const [styleInstr, setStyleInstr] = useState("");
+  const [styleSample, setStyleSample] = useState("");
+  const [deriving, setDeriving] = useState(false);
   /* Local drafts for large text fields — saved on blur to avoid calling
      saveConfig on every keystroke (which triggers re-renders and focus loss). */
   const [systemPromptDraft, setSystemPromptDraft] = useState(() => config.systemPrompt);
@@ -1076,9 +1084,71 @@ export function SettingsModal() {
               <h4 className="text-sm font-bold mb-2">Yanıt Stili</h4>
               <div className="grid grid-cols-3 gap-1.5">
                 {(Object.entries(STYLE_LABELS) as [ResponseStyle, typeof STYLE_LABELS.normal][]).map(([k, v]) => (
-                  <button key={k} onClick={() => saveConfig({ ...config, style: k })} className={`text-xs px-3 py-2 rounded-lg border ${config.style === k ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"}`}>{v.label}</button>
+                  <button key={k} onClick={() => saveConfig({ ...config, style: k, activeCustomStyleId: null })} className={`text-xs px-3 py-2 rounded-lg border ${config.style === k && !config.activeCustomStyleId ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"}`}>{v.label}</button>
                 ))}
               </div>
+              {/* Özel stiller */}
+              {(config.customStyles ?? []).length > 0 && (
+                <div className="grid grid-cols-3 gap-1.5 mt-1.5">
+                  {(config.customStyles ?? []).map((cs) => (
+                    <div key={cs.id} className={`group relative text-xs px-3 py-2 rounded-lg border cursor-pointer ${config.activeCustomStyleId === cs.id ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"}`}
+                      onClick={() => saveConfig({ ...config, activeCustomStyleId: cs.id, style: "normal" })} title={cs.instructions}>
+                      <span className="truncate block pr-3">{cs.name}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const next = (config.customStyles ?? []).filter((s) => s.id !== cs.id);
+                          saveConfig({ ...config, customStyles: next, activeCustomStyleId: config.activeCustomStyleId === cs.id ? null : config.activeCustomStyleId });
+                        }}
+                        className="absolute top-1 right-1 text-muted/50 hover:text-red opacity-0 group-hover:opacity-100" title="Stili sil"
+                      ><Trash2 size={11} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!styleFormOpen ? (
+                <button onClick={() => setStyleFormOpen(true)} className="text-xs text-brand hover:underline mt-2">+ Kendi stilini oluştur</button>
+              ) : (
+                <div className="mt-2 p-3 rounded-lg border border-line bg-bgsoft/50 flex flex-col gap-2">
+                  <input value={styleName} onChange={(e) => setStyleName(e.target.value)} placeholder="Stil adı (ör. 'Samimi & Kısa')" className="input-mono !py-1.5 text-xs" />
+                  <textarea value={styleInstr} onChange={(e) => setStyleInstr(e.target.value)} rows={3} placeholder="Stil talimatları (ör. 'Kısa cümleler, samimi ton, teknik jargondan kaçın, emoji kullan')" className="input-mono !text-xs" />
+                  <details className="text-[11px] text-muted">
+                    <summary className="cursor-pointer hover:text-ink">Örnek metinden AI ile türet</summary>
+                    <textarea value={styleSample} onChange={(e) => setStyleSample(e.target.value)} rows={3} placeholder="Kendi yazım tarzından bir örnek metin yapıştır…" className="input-mono !text-xs mt-1.5" />
+                    <button
+                      disabled={deriving || !styleSample.trim()}
+                      onClick={async () => {
+                        if (!styleSample.trim() || deriving) return;
+                        setDeriving(true);
+                        try {
+                          const out = await quickComplete(
+                            styleSample.slice(0, 4000),
+                            "Sen bir yazı stili analistisin. Kullanıcının örnek metnindeki yazım stilini (ton, cümle uzunluğu, biçimsellik, kelime seçimi, emoji/biçim kullanımı) çıkar ve bir AI'nın AYNI stilde yazması için KISA ve net maddeli TALİMATLAR yaz. Yalnızca talimatları döndür — başka açıklama yazma. Türkçe yaz.",
+                          );
+                          if (out.trim()) setStyleInstr(out.trim());
+                          else addToast("Stil türetilemedi — tekrar dene.", "error");
+                        } catch (e) { addToast(`Türetme hatası: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error"); }
+                        finally { setDeriving(false); }
+                      }}
+                      className="mt-1.5 text-xs px-3 py-1.5 rounded-lg border border-line text-muted hover:text-ink disabled:opacity-40 flex items-center gap-1.5"
+                    >{deriving ? <Loader2 size={12} className="animate-spin" /> : "✨"} Örnekten türet</button>
+                  </details>
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={() => { setStyleFormOpen(false); setStyleName(""); setStyleInstr(""); setStyleSample(""); }} className="text-xs px-3 py-1.5 rounded-lg text-muted hover:text-ink">İptal</button>
+                    <button
+                      onClick={() => {
+                        const name = styleName.trim(); const instr = styleInstr.trim();
+                        if (!name || !instr) { addToast("İsim ve talimat gerekli.", "error"); return; }
+                        const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+                        saveConfig({ ...config, customStyles: [...(config.customStyles ?? []), { id, name, instructions: instr }], activeCustomStyleId: id, style: "normal" });
+                        setStyleFormOpen(false); setStyleName(""); setStyleInstr(""); setStyleSample("");
+                        addToast("Özel stil kaydedildi ve etkinleştirildi.", "success");
+                      }}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-brand text-white font-semibold"
+                    >Kaydet</button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Bellek */}
@@ -1100,6 +1170,25 @@ export function SettingsModal() {
                 <input value={memInput} onChange={(e) => setMemInput(e.target.value)} placeholder="Örn: Python tercih ederim" className="input-mono !py-1.5 text-xs flex-1" onKeyDown={(e) => { if (e.key === "Enter") { if (memInput.trim()) { addMemory(memInput.trim()); setMemInput(""); } } }} />
                 <button onClick={() => { if (memInput.trim()) { addMemory(memInput.trim()); setMemInput(""); } }} className="text-xs px-3 py-1.5 rounded-lg bg-brand text-white font-semibold shrink-0">Ekle</button>
               </div>
+              {/* Otomatik hatırlananlar: ajanın konuşmalardan damıttığı kalıcı bilgiler (düzenle/sil). */}
+              {(() => {
+                const facts = ((config.skills ?? []).find((s) => s.id === "auto_memory")?.content ?? "")
+                  .split("\n").filter((l) => l.startsWith("- ")).map((l) => l.slice(2).trim()).filter(Boolean);
+                if (facts.length === 0) return null;
+                return (
+                  <div className="mt-3">
+                    <p className="text-[11px] font-semibold text-muted/80 mb-1.5 flex items-center gap-1"><Brain size={11} className="text-brand" /> Otomatik hatırlananlar ({facts.length})</p>
+                    <div className="flex flex-col gap-1">
+                      {facts.map((f, i) => (
+                        <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-bgsoft/60 border border-line/60 text-xs">
+                          <span className="flex-1 truncate" title={f}>{f}</span>
+                          <button onClick={() => setAutoMemoryFacts(facts.filter((_, j) => j !== i))} className="text-muted hover:text-red shrink-0" title="Sil"><Trash2 size={12} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Proje promptu */}
