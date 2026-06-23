@@ -175,6 +175,18 @@ export const AGENTS: Agent[] = [
       "5) Doğrulama adımlarını (derleme/test) belirt ve mümkünse çalıştır. " +
       "Riskli noktaları işaretle; büyük göçü küçük güvenli adımlara böl. Türkçe yanıt ver.",
   },
+  {
+    id: "research",
+    command: "/research",
+    label: "Derin Araştırma",
+    icon: "🔬",
+    description: "Çok-kaynaklı web araması yapar ve atıflı bir araştırma raporu yazar",
+    placeholder: "Araştırılacak konu/soru… (ör. 'RAG mimarileri 2026 karşılaştırması')",
+    systemPrompt:
+      "Sen titiz bir araştırma analistisin. Konuyu çok-kaynaklı web araştırmasıyla incele; " +
+      "bulguları kaynak numaralarıyla atıfla ([1], [2]) ve sonda 'Kaynaklar' bölümü ekle. " +
+      "Yalnızca kaynaklardaki bilgiyi kullan, emin olmadığını belirt. Türkçe yanıt ver.",
+  },
 ];
 
 import { EXTENSION_AGENTS } from "@/lib/extensions/registry";
