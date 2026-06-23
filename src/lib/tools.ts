@@ -1,3 +1,10 @@
+/* Araç parametre şeması. İç-içe array/object alanları (ör. ask_user soruları)
+   desteklemek için basit string alanların yanında genişletilmiş biçimleri de kabul eder. */
+export type ToolPropertySchema =
+  | { type: string; description: string; enum?: string[] }
+  | { type: "array"; description: string; items?: object }
+  | { type: "object"; description: string; properties?: Record<string, unknown>; required?: string[] };
+
 export interface ToolDefinition {
   type: "function";
   function: {
@@ -5,7 +12,7 @@ export interface ToolDefinition {
     description: string;
     parameters: {
       type: "object";
-      properties: Record<string, { type: string; description: string; enum?: string[] }>;
+      properties: Record<string, ToolPropertySchema>;
       required: string[];
     };
   };
@@ -276,6 +283,44 @@ export const CODER_TOOLS: ToolDefinition[] = [
           path: { type: "string", description: "Sadece belirli dosyayı etkileyen commit'ler (opsiyonel)" },
         },
         required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "ask_user",
+      description:
+        "Kullanıcıya tıklanabilir seçenekli yapılandırılmış soru(lar) sor. KOD YAZMADAN ÖNCE belirsizlikleri netleştirmek; yaklaşım, kütüphane, kapsam, tasarım veya YAYIN ortamı gibi sana bırakılan önemli kararları sormak için kullan. Kullanıcı bir veya birden çok seçeneği tıklar ya da 'Diğer' alanına serbest metin yazar. Cevabı aldıktan SONRA elde edilen bilgiyle görevi tamamla. Tahmin etmek yerine SOR — ama yalnızca gerçekten gerektiğinde (1-2 net karar).",
+      parameters: {
+        type: "object",
+        properties: {
+          questions: {
+            type: "array",
+            description: "1–4 adet soru. Her soru: kısa başlık (header), tam soru metni (question), 2–4 seçenek (options).",
+            items: {
+              type: "object",
+              properties: {
+                header: { type: "string", description: "Kısa başlık (≤12 karakter). Örn: 'Kütüphane', 'Yaklaşım', 'Yayın'" },
+                question: { type: "string", description: "Tam soru metni. Soru işaretiyle bit." },
+                options: {
+                  type: "array",
+                  description: "2–4 seçenek. Her biri: label (kısa etiket) + description (ne zaman tercih edilir).",
+                  items: {
+                    type: "object",
+                    properties: {
+                      label: { type: "string", description: "Seçenek etiketi (1–5 kelime)" },
+                      description: { type: "string", description: "Seçeneği açıklayan kısa not / takas" },
+                    },
+                    required: ["label"],
+                  },
+                },
+              },
+              required: ["header", "question", "options"],
+            },
+          },
+        },
+        required: ["questions"],
       },
     },
   },

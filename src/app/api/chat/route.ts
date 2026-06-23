@@ -1368,6 +1368,8 @@ export async function POST(req: Request) {
          döndürebilir (stream_options.include_usage). Tüm turlar boyunca topla. */
       const supportsUsageStream = !["pollinations", "ollama"].includes(provider);
       const realUsage = { prompt: 0, completion: 0 };
+      /* ask_user çağrıldığında tool-loop kırılır → kullanıcı yanıtı beklenir. */
+      let askUserCalled = false;
       for (let round = 0; round < MAX_ROUNDS; round++) {
         let upstream: Response;
 
@@ -1504,6 +1506,20 @@ export async function POST(req: Request) {
             resultById.set(tc.id, note);
             return;
           }
+          /* ask_user: kullanıcıya tıklanabilir soru gönder, döngüyü kır.
+             İstemci anketi gösterir; kullanıcı yanıtlar, yanıt yeni bir mesaj
+             olarak gelir ve ajan oradan devam eder. */
+          if (tc.name === "ask_user") {
+            const questions = args.questions;
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ ask_user_event: { questions } })}\n\n`));
+            const note = "⏳ Kullanıcıya soru(lar) soruldu — yanıt geldiğinde devam edilecek.";
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: note } })}\n\n`),
+            );
+            resultById.set(tc.id, note);
+            askUserCalled = true;
+            return;
+          }
           /* update_plan: ağ/repo işi yok — planı istemciye ayrı olay olarak yolla. */
           if (tc.name === "update_plan") {
             const plan = String(args.plan ?? "");
@@ -1570,6 +1586,8 @@ export async function POST(req: Request) {
         for (const tc of toolCalls) {
           convo.push({ role: "tool", tool_call_id: tc.id, content: resultById.get(tc.id) ?? "" });
         }
+        /* ask_user çağrıldıysa kullanıcı yanıtını bekle — döngüyü kır. */
+        if (askUserCalled) break;
       }
       controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
       controller.close();
