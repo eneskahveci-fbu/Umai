@@ -585,10 +585,14 @@ export function CoderView() {
   /* Çoklu-ajan ("Ajan Ekibi" / Swarm) modu: planlayıcı → paralel uzman işçiler
      → birleştirici (/api/orchestrate). Tek mesajda bir ajan ekibi çalışır. */
   const [swarmMode, setSwarmMode] = useState(false);
+  /* Derin Araştırma modu: çok-kaynaklı web araması → atıflı rapor (/api/research). */
+  const [researchMode, setResearchMode] = useState(false);
   /* ⋯ menüsü sekme durumu: Çalışma Alanı · Modlar · Araçlar. */
   const [moreTab, setMoreTab] = useState<"workspace" | "modes" | "tools">("workspace");
   const swarmModeRef = useRef(false);
   useEffect(() => { swarmModeRef.current = swarmMode; }, [swarmMode]);
+  const researchModeRef = useRef(false);
+  useEffect(() => { researchModeRef.current = researchMode; }, [researchMode]);
   /* Plan onayı: bir sonraki istekte plan-modu kapısını geçici aşar. */
   const planApprovedRef = useRef(false);
   /* afterEdit kancası geri-besleme döngü sayacı (her kullanıcı mesajında sıfırlanır,
@@ -1393,11 +1397,14 @@ export function CoderView() {
        ağır istek) tetiklendiyse devreye girer. Devam turlarında otomatik açılmaz. */
     const useSwarm = swarmModeRef.current
       || (store.config.autoSwarm !== false && !opts?.continuation && autoSwarm(_lastUserText));
-    /* Ajan Ekibi turunda otomatik EN GÜÇLÜ modeli kullan (ayar açıksa) → ekip en
-       yetenekli modelle çalışır. Hata olursa (kredi/anahtar yok) aşağıdaki catch
-       bloğu sessizce AKTİF modele döner ve tekrar dener. */
+    /* Derin Araştırma: kullanıcı modu açtıysa veya /research ajanı seçiliyse
+       (devam turlarında değil). */
+    const useResearch = (researchModeRef.current || overrideAgent?.id === "research") && !opts?.continuation;
+    /* Ajan Ekibi / Araştırma turunda otomatik EN GÜÇLÜ modeli kullan (ayar açıksa)
+       → en yetenekli modelle çalışır. Hata olursa (kredi/anahtar yok) aşağıdaki
+       catch bloğu sessizce AKTİF modele döner ve tekrar dener. */
     let usedStrongest = false;
-    if (useSwarm && !opts?.noStrongest && useStore.getState().config.agentsUseStrongestModel !== false) {
+    if ((useSwarm || useResearch) && !opts?.noStrongest && useStore.getState().config.agentsUseStrongestModel !== false) {
       const strong = store.strongestModel();
       if (strong && strong.id !== active.id) { active = strong; usedStrongest = true; }
     }
@@ -1624,7 +1631,9 @@ export function CoderView() {
          Sunucu Pollinations'ı anahtarsız destekler). */
       /* Ajan Ekibi modunda orkestrasyon endpoint'ine git (planlayıcı → paralel
          işçiler → birleştirici). Aynı gövdeyi alır, aynı OpenAI-uyumlu SSE'yi döner. */
-      const endpoint = useSwarm && !isContinuation ? "/api/orchestrate" : "/api/chat";
+      const endpoint = useResearch
+        ? "/api/research"
+        : useSwarm && !isContinuation ? "/api/orchestrate" : "/api/chat";
       const callViaServer = () => fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2211,7 +2220,7 @@ export function CoderView() {
             </span>
           )}
           {/* Birleşik ⋯ menüsü — gruplu: Hızlı eylemler · Çalışma Alanı · Modlar · Araçlar */}
-          <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen || toolsEnabled || !!config.safeMode || swarmMode}>
+          <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen || toolsEnabled || !!config.safeMode || swarmMode || researchMode}>
             <EffortMenuControl />
             <div className="h-px bg-line my-1" />
 
@@ -2271,6 +2280,7 @@ export function CoderView() {
                 <ModeChip icon={<GraduationCap size={12} />} label="Öğrenme" active={!!config.learningMode} onClick={() => useStore.getState().saveConfig({ ...config, learningMode: !config.learningMode })} />
                 <ModeChip icon={<Sparkles size={12} />} label="Kalite" active={!!config.qualityMode} onClick={() => useStore.getState().saveConfig({ ...config, qualityMode: !config.qualityMode })} />
                 <ModeChip icon={<Users size={12} />} label="Ekip" active={swarmMode} onClick={() => setSwarmMode((v) => !v)} />
+                <ModeChip icon={<Search size={12} />} label="Araştırma" active={researchMode} onClick={() => setResearchMode((v) => !v)} />
               </div>
             )}
             {moreTab === "modes" && (
@@ -2943,6 +2953,7 @@ export function CoderView() {
                     </span>
                   )}
                   {swarmMode && <span className="flex items-center gap-1 text-brand font-medium" title="Ajan Ekibi: planlayıcı → paralel uzman işçiler → birleştirici"><Users size={12} /> Ekip</span>}
+                  {researchMode && <span className="flex items-center gap-1 text-brand font-medium" title="Derin Araştırma: çok-kaynaklı web araması → atıflı rapor"><Search size={12} /> Araştırma</span>}
                   {toolsEnabled && <span className="text-green/80 font-medium">Tools</span>}
                   {config.learningMode && <span className="flex items-center gap-1 text-brand font-medium" title="Öğrenme Modu: adım adım eğitsel açıklama"><GraduationCap size={12} /> Öğrenme</span>}
                   {activeAgent && <span className="text-brand font-medium">{activeAgent.command}</span>}
