@@ -57,6 +57,8 @@ export interface SwarmAgentState {
 export interface SwarmState {
   phase: "planning" | "working" | "synthesizing" | "done";
   agents: SwarmAgentState[];
+  /** Panel görünümü: "swarm" = Ajan Ekibi (varsayılan), "research" = Derin Araştırma. */
+  kind?: "swarm" | "research";
 }
 
 /** Ajanın terminalde çalıştırdığı bir komut — sohbette "todo" kutusunda canlı

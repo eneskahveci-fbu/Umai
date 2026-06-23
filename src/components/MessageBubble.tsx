@@ -276,16 +276,26 @@ const SWARM_PHASE_LABEL: Record<SwarmState["phase"], string> = {
   done: "Ajan ekibi tamamlandı",
 };
 
+/* Derin Araştırma için araştırma-odaklı faz etiketleri (aynı panel, farklı dil). */
+const RESEARCH_PHASE_LABEL: Record<SwarmState["phase"], string> = {
+  planning: "Alt sorgular hazırlanıyor…",
+  working: "Kaynaklar taranıyor…",
+  synthesizing: "Rapor yazılıyor…",
+  done: "Araştırma tamamlandı",
+};
+
 function SwarmPanel({ swarm }: { swarm: SwarmState }) {
   const { phase, agents } = swarm;
+  const isResearch = swarm.kind === "research";
   const done = agents.filter((a) => a.status === "done").length;
   const active = phase !== "done";
+  const HeaderIcon = isResearch ? Search : Users;
   return (
     <div className="mb-3 border border-line/50 rounded-xl overflow-hidden bg-bgsoft/30">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-line/30 text-xs">
-        <Users size={12} className={active ? "text-brand animate-pulse" : "text-green"} />
-        <span className="font-semibold">Ajan Ekibi</span>
-        <span className="text-muted/60">· {SWARM_PHASE_LABEL[phase]}</span>
+        <HeaderIcon size={12} className={active ? "text-brand animate-pulse" : "text-green"} />
+        <span className="font-semibold">{isResearch ? "Derin Araştırma" : "Ajan Ekibi"}</span>
+        <span className="text-muted/60">· {(isResearch ? RESEARCH_PHASE_LABEL : SWARM_PHASE_LABEL)[phase]}</span>
         {agents.length > 0 && (
           <span className="text-muted/50 font-mono ml-auto tabular-nums">{done}/{agents.length}</span>
         )}
@@ -293,7 +303,7 @@ function SwarmPanel({ swarm }: { swarm: SwarmState }) {
       {phase === "planning" && agents.length === 0 ? (
         <div className="px-3 py-2.5 flex items-center gap-2 text-xs text-muted/70">
           <Loader2 size={12} className="animate-spin text-brand" />
-          <span>Görevler belirleniyor…</span>
+          <span>{isResearch ? "Alt sorgular belirleniyor…" : "Görevler belirleniyor…"}</span>
         </div>
       ) : (
         <div className="px-3 py-2.5 space-y-1.5">
