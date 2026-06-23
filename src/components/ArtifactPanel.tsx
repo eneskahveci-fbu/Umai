@@ -1,9 +1,10 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, Eye, Maximize2, Minimize2, RotateCw, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, Eye, Link2, Loader2, Maximize2, Minimize2, RotateCw, X } from "lucide-react";
 import { useState } from "react";
 import { useStore } from "@/lib/store";
 import type { Artifact } from "@/lib/types";
+import { buildArtifactSrcDoc, artifactDownload } from "@/lib/artifactDoc";
 
 export function ArtifactPanel() {
   const artifact = useStore((s) => s.artifact);
@@ -12,6 +13,10 @@ export function ArtifactPanel() {
   const [reloadKey, setReloadKey] = useState(0);
   const [view, setView] = useState<"preview" | "code">("preview");
   const [copied, setCopied] = useState(false);
+  /* Yayınlama: artifact'ı bağımsız paylaşılabilir bir sayfaya (/a/<id>) çevirir. */
+  const [publishing, setPublishing] = useState(false);
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   /* Sürüm geçmişi — aynı panel güncellendikçe son 5 sürümü tut, ‹ › ile gezin.
      Render-anı türetme (effect yok): içerik değişince geçmişe ekle, son sürümü göster. */
@@ -21,6 +26,7 @@ export function ArtifactPanel() {
   const curKey = artifact ? `${artifact.type}|${artifact.content}` : "";
   if (curKey !== prevKey) {
     setPrevKey(curKey);
+    setPublishedUrl(null); // içerik değişti → eski yayın bağlantısını temizle
     if (!artifact) { setVersions([]); }
     else {
       setVersions((prev) => {
@@ -36,17 +42,8 @@ export function ArtifactPanel() {
   const vIndex = Math.min(vIndexRaw, Math.max(0, versions.length - 1));
   const shown = versions[vIndex] ?? artifact;
 
-  const srcdoc =
-    shown.type === "mermaid"
-      ? `<!DOCTYPE html><html><head><meta charset="UTF-8"><script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"><\/script><style>body{margin:1.5rem;background:#fff;font-family:system-ui,sans-serif;}</style></head><body><div class="mermaid">${shown.content}</div><script>mermaid.initialize({startOnLoad:true,theme:'default'});<\/script></body></html>`
-      : shown.type === "svg"
-        ? `<!DOCTYPE html><html><head><style>body{margin:0;display:grid;place-items:center;min-height:100vh;background:#111110;}</style></head><body>${shown.content}</body></html>`
-        : shown.content.includes("<html")
-          ? shown.content
-          : `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;margin:1rem;}</style></head><body>${shown.content}</body></html>`;
-
-  const ext = shown.type === "svg" ? "svg" : shown.type === "mermaid" ? "mmd" : "html";
-  const downloadBody = shown.type === "html" ? srcdoc : shown.content;
+  const srcdoc = buildArtifactSrcDoc(shown.type, shown.content);
+  const { ext, body: downloadBody } = artifactDownload(shown.type, shown.content);
 
   const copySource = async () => {
     try { await navigator.clipboard.writeText(shown.content); setCopied(true); setTimeout(() => setCopied(false), 1500); }
@@ -59,6 +56,30 @@ export function ArtifactPanel() {
     const a = document.createElement("a");
     a.href = url; a.download = `${(shown.title || "artifact").replace(/\s+/g, "-").toLowerCase()}.${ext}`; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
+  };
+  const publish = async () => {
+    if (publishing) return;
+    setPublishing(true);
+    try {
+      const res = await fetch("/api/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: shown.title, type: shown.type, content: shown.content }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.id) {
+        useStore.getState().addToast(data.error || "Yayınlama başarısız.", "error");
+        return;
+      }
+      const url = `${window.location.origin}/a/${data.id}`;
+      setPublishedUrl(url);
+      try { await navigator.clipboard.writeText(url); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); } catch { /* yok say */ }
+      useStore.getState().addToast("Yayınlandı — bağlantı kopyalandı.", "success");
+    } catch (e) {
+      useStore.getState().addToast((e as Error).message || "Yayınlama başarısız.", "error");
+    } finally {
+      setPublishing(false);
+    }
   };
 
   const iconBtn = "text-muted hover:text-ink p-1 rounded hover:bg-bgsoft transition-colors";
@@ -93,6 +114,9 @@ export function ArtifactPanel() {
 
           <button onClick={copySource} className={iconBtn} title="Kaynağı kopyala">{copied ? <Check size={15} className="text-brand" /> : <Copy size={15} />}</button>
           <button onClick={download} className={iconBtn} title="İndir"><Download size={15} /></button>
+          <button onClick={publish} disabled={publishing} className={iconBtn} title="Yayınla (paylaşılabilir bağlantı)">
+            {publishing ? <Loader2 size={15} className="animate-spin" /> : <Link2 size={15} />}
+          </button>
           {view === "preview" && (
             <>
               <button onClick={() => setReloadKey((k) => k + 1)} className={iconBtn} title="Yenile"><RotateCw size={15} /></button>
@@ -111,6 +135,17 @@ export function ArtifactPanel() {
           <button onClick={() => { setArtifact(null); setExpanded(false); }} className={iconBtn} title="Kapat"><X size={15} /></button>
         </div>
       </div>
+
+      {publishedUrl && (
+        <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-line bg-brand/5 text-[11px]">
+          <Link2 size={12} className="text-brand shrink-0" />
+          <a href={publishedUrl} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline truncate min-w-0 flex-1">{publishedUrl}</a>
+          <button
+            onClick={async () => { try { await navigator.clipboard.writeText(publishedUrl); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); } catch { /* yok say */ } }}
+            className="shrink-0 text-muted hover:text-ink font-semibold"
+          >{linkCopied ? "Kopyalandı ✓" : "Kopyala"}</button>
+        </div>
+      )}
 
       <div className="flex-1 min-h-0 bg-white">
         {view === "preview" ? (

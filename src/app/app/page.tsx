@@ -45,6 +45,30 @@ export default function AppPage() {
     return watchConnection();
   }, [setSidebarOpen]);
 
+  /* Remix: /a/<id> sayfasından "Remix Et" ile gelince (?remix=<id>) yayınlanan
+     artifact'ı getirip önizleme paneline yükle → kullanıcı ajandan uyarlamasını
+     isteyebilir. URL temizlenir (yenilemede tekrar tetiklenmesin). */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const remixId = params.get("remix");
+    if (!remixId) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/publish?id=${encodeURIComponent(remixId)}`);
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.content && ["html", "svg", "mermaid"].includes(data.type)) {
+          useStore.getState().setArtifact({ type: data.type, content: data.content, title: data.title || "Remix" });
+          useStore.getState().addToast("Artifact yüklendi — ajandan uyarlamasını isteyebilirsin.", "success");
+        } else {
+          useStore.getState().addToast("Remix edilecek artifact bulunamadı.", "error");
+        }
+      } catch { useStore.getState().addToast("Remix yüklenemedi.", "error"); }
+      finally {
+        router.replace("/app");
+      }
+    })();
+  }, [router]);
+
   /* Sistem teması: autoTheme açıksa OS'i izle ve değiştikçe uygula. */
   useEffect(() => {
     const mql = window.matchMedia("(prefers-color-scheme: dark)");
