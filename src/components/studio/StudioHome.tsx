@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { ArrowUp, LayoutGrid, Loader2 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { STUDIO_SKILLS, STUDIO_DIRECTIONS } from "@/lib/studioConstants";
+import { skillsByCategory, STUDIO_DIRECTIONS } from "@/lib/studioConstants";
 import { allDesignSystems } from "@/lib/designSystems";
 
 /* Stüdyo giriş ekranı (Open Design home) — brief + çıktı türü (skill) + tasarım
@@ -25,6 +26,11 @@ export function StudioHome({
 }) {
   const config = useStore((s) => s.config);
   const systems = allDesignSystems(config);
+  const [skillQuery, setSkillQuery] = useState("");
+  const q = skillQuery.trim().toLowerCase();
+  const groups = skillsByCategory()
+    .map((g) => ({ category: g.category, skills: q ? g.skills.filter((s) => `${s.name} ${s.desc}`.toLowerCase().includes(q)) : g.skills }))
+    .filter((g) => g.skills.length > 0);
   return (
     <div className="flex-1 min-h-0 overflow-auto">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-14 flex flex-col gap-7">
@@ -55,23 +61,39 @@ export function StudioHome({
           </div>
         </div>
 
-        {/* Çıktı türü (skill) */}
+        {/* Çıktı türü (skill) — kategorili + aranabilir */}
         <div>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-muted/70 mb-2">Çıktı türü</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {STUDIO_SKILLS.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setSkillId(s.id)}
-                className={`text-left p-3 rounded-xl border transition-colors ${skillId === s.id ? "border-brand bg-brand/10" : "border-line bg-surface hover:border-brand/40"}`}
-              >
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-base leading-none">{s.icon}</span>
-                  <span className={`text-sm font-semibold ${skillId === s.id ? "text-brand" : "text-ink"}`}>{s.name}</span>
+          <div className="flex items-center justify-between mb-2 gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted/70">Çıktı türü</h3>
+            <input
+              value={skillQuery}
+              onChange={(e) => setSkillQuery(e.target.value)}
+              placeholder="Ara…"
+              className="w-28 sm:w-40 bg-bgsoft border border-line rounded-lg px-2 py-1 text-xs outline-none focus:border-brand/60"
+            />
+          </div>
+          <div className="space-y-3">
+            {groups.map((g) => (
+              <div key={g.category}>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted/50 mb-1.5">{g.category}</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {g.skills.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => setSkillId(s.id)}
+                      className={`text-left p-3 rounded-xl border transition-colors ${skillId === s.id ? "border-brand bg-brand/10" : "border-line bg-surface hover:border-brand/40"}`}
+                    >
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-base leading-none">{s.icon}</span>
+                        <span className={`text-sm font-semibold ${skillId === s.id ? "text-brand" : "text-ink"}`}>{s.name}</span>
+                      </div>
+                      <p className="text-[11px] text-muted/80 leading-snug">{s.desc}</p>
+                    </button>
+                  ))}
                 </div>
-                <p className="text-[11px] text-muted/80 leading-snug">{s.desc}</p>
-              </button>
+              </div>
             ))}
+            {groups.length === 0 && <p className="text-xs text-muted/60">Eşleşen çıktı türü yok.</p>}
           </div>
         </div>
 
