@@ -246,6 +246,21 @@ export interface DesignSystem {
   tokensCss: string;
 }
 
+/** Stüdyo projesi — kaydedilen bir tasarım (üretilen HTML + meta). user_config ile
+    senkronlanır. `versions`: aynı projenin son birkaç üretimi (geri dönüş için). */
+export interface StudioProject {
+  id: string;
+  name: string;
+  brief: string;
+  html: string;
+  designSystemId: string;
+  skillId: string | null;
+  directionId: string | null;
+  versions?: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 /** Tasarım Stüdyosu'nda kaydedilen tek bir tasarım (HTML/CSS/JS). */
 export interface SavedDesign {
   id: string;
@@ -348,6 +363,8 @@ export interface Config {
   savedDesigns?: SavedDesign[];
   /** Stüdyo: kullanıcının eklediği özel tasarım sistemleri (bundled'a ek). */
   customDesignSystems?: DesignSystem[];
+  /** Stüdyo: kaydedilen projeler (çok-proje çalışma alanı). */
+  studioProjects?: StudioProject[];
   mcpServers?: McpServer[];
   /** Yerel Mod: kullanıcının makinesindeki Local Bridge adresi (ör. http://localhost:4319).
       Doluysa ve localMode açıksa ajan GitHub/GitLab API yerine gerçek dosya

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, ExternalLink, FileText, Loader2, Send, SlidersHorizontal, Sparkles, Square, User } from "lucide-react";
+import { Download, ExternalLink, FileText, FolderOpen, Loader2, Save, Send, SlidersHorizontal, Sparkles, Square, User } from "lucide-react";
 import { STUDIO_DEVICES, type StudioDevice, type DeviceId } from "@/lib/studioConstants";
 import type { StudioPhase } from "@/lib/studioGen";
 import { downloadHtml, openInTab, printPdf } from "@/lib/studioExport";
@@ -27,7 +27,7 @@ const FONT_OPTIONS: { label: string; value: string }[] = [
 
 export function StudioWorkspace({
   messages, busy, phase, artifact, effectiveSrc, device, setDevice, reloadKey,
-  tweaks, setTweaks, resetTweaks, title, onFollowup, onStop,
+  tweaks, setTweaks, resetTweaks, title, onFollowup, onStop, onSave, onOpenProjects,
 }: {
   messages: StudioMsg[];
   busy: boolean;
@@ -43,6 +43,8 @@ export function StudioWorkspace({
   title: string;
   onFollowup: (t: string) => void;
   onStop: () => void;
+  onSave: () => void;
+  onOpenProjects: () => void;
 }) {
   const addToast = useStore((s) => s.addToast);
   const [input, setInput] = useState("");
@@ -109,6 +111,8 @@ export function StudioWorkspace({
             ))}
           </div>
           <div className="ml-auto flex items-center gap-1">
+            <button onClick={onOpenProjects} className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-bgsoft transition-colors" title="Projelerim"><FolderOpen size={15} /></button>
+            <button onClick={onSave} disabled={!artifact} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-line text-muted hover:text-ink disabled:opacity-40" title="Projeyi kaydet"><Save size={13} /> Kaydet</button>
             <button onClick={() => setTweaksOpen((v) => !v)} className={`p-1.5 rounded-lg transition-colors ${tweaksOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`} title="İnce ayar"><SlidersHorizontal size={15} /></button>
             <div className="relative">
               <button onClick={() => setExportOpen((v) => !v)} disabled={!artifact} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-line text-muted hover:text-ink disabled:opacity-40" title="Dışa aktar"><Download size={13} /> Dışa aktar</button>
