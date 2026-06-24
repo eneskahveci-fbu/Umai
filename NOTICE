@@ -1,0 +1,20 @@
+craft.ai — Üçüncü Taraf Atıfları (Stüdyo)
+
+Bu projenin "Stüdyo" bölümü, açık kaynak projelerden ilham alınarak özgün biçimde
+geliştirilmiştir. İlgili lisanslar ve atıflar aşağıdadır.
+
+────────────────────────────────────────────────────────────────────────────
+Open Design (nexu-io/open-design)
+  Lisans: Apache-2.0
+  https://github.com/nexu-io/open-design
+  Not: Stüdyonun deneyim/akış tasarımı (brief→önizleme, cihaz çerçeveleri, tasarım
+  sistemleri, tweaks) bu projeden İLHAM alınarak Craft mimarisine (Next.js + Supabase,
+  tarayıcı) ve Craft temasına özgün olarak uyarlanmıştır. Kod birebir kopyalanmamıştır.
+
+Tasarım sistemleri (marka sözleşmeleri)
+  İlham: getdesign (MIT) ve ilgili markaların kamuya açık tasarım dilleri.
+  Not: src/lib/designSystems.ts içindeki marka prozaları, kamuya açık tasarım
+  dillerinin KISA, ÖZGÜN özetleridir. Hiçbir marka logosu, tescilli görsel varlık veya
+  telifli içerik dahil edilmemiştir. Marka adları yalnızca o markanın estetik yönünü
+  tarif etmek için kullanılır; bu bir onay/ortaklık ima etmez.
+────────────────────────────────────────────────────────────────────────────

@@ -6,25 +6,31 @@ import { useStore } from "@/lib/store";
 import type { Artifact } from "@/lib/types";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
 import { deviceById, type DeviceId } from "@/lib/studioConstants";
+import { designSystemById, designSystemPromptText } from "@/lib/designSystems";
 import { StudioHome } from "./StudioHome";
 import { StudioWorkspace } from "./StudioWorkspace";
+import { DesignSystemModal } from "./DesignSystemModal";
 
 export interface StudioMsg { role: "user" | "assistant"; text: string; }
 export interface StudioTweaks { fontScale: number; fontFamily: string; accent: string; }
 
 const DEFAULT_TWEAKS: StudioTweaks = { fontScale: 1, fontFamily: "", accent: "" };
 
-/* Üretilen HTML'e canlı ince-ayar (tweak) <style> bloğu enjekte eder.
-   Yaklaşık: yazı ölçeği + yazı tipi güvenilir; vurgu rengi CSS değişkenleri
-   kullanan tasarımlarda etkilidir (best-effort). */
+/* Üretilen HTML'in <head>'ine bir <style> bloğu enjekte eder (yoksa başa ekler). */
+function injectHeadStyle(html: string, css: string, id: string): string {
+  if (!css) return html;
+  const style = `<style id="${id}">${css}</style>`;
+  return html.includes("</head>") ? html.replace("</head>", `${style}</head>`) : style + html;
+}
+
+/* Canlı ince-ayar (tweak): yazı ölçeği + yazı tipi güvenilir; vurgu rengi CSS
+   değişkenleri kullanan tasarımlarda etkilidir (best-effort). */
 function applyTweaks(html: string, t: StudioTweaks): string {
   const rules: string[] = [];
   if (t.fontScale !== 1) rules.push(`html{font-size:${(16 * t.fontScale).toFixed(1)}px}`);
   if (t.fontFamily) rules.push(`body,body *{font-family:${t.fontFamily} !important}`);
   if (t.accent) rules.push(`:root{--accent:${t.accent};--brand:${t.accent};--primary:${t.accent};--color-brand:${t.accent};--color-primary:${t.accent}}`);
-  if (rules.length === 0) return html;
-  const style = `<style id="craft-tweaks">${rules.join("")}</style>`;
-  return html.includes("</head>") ? html.replace("</head>", `${style}</head>`) : style + html;
+  return injectHeadStyle(html, rules.join(""), "craft-tweaks");
 }
 
 export function StudioView() {
@@ -32,12 +38,15 @@ export function StudioView() {
   const setOpen = useStore((s) => s.setStudioOpen);
   const setImageStudioOpen = useStore((s) => s.setImageStudioOpen);
   const setDesignStudioOpen = useStore((s) => s.setDesignStudioOpen);
+  const config = useStore((s) => s.config);
   const addToast = useStore((s) => s.addToast);
 
   const [view, setView] = useState<"home" | "workspace">("home");
   const [brief, setBrief] = useState("");
   const [skillId, setSkillId] = useState<string | null>("landing");
   const [directionId, setDirectionId] = useState<string | null>("minimal");
+  const [designSystemId, setDesignSystemId] = useState<string>("craft");
+  const [dsModalOpen, setDsModalOpen] = useState(false);
   const [device, setDevice] = useState<DeviceId>("web");
   const [artifact, setArtifact] = useState<Artifact | null>(null);
   const [messages, setMessages] = useState<StudioMsg[]>([]);
@@ -50,7 +59,11 @@ export function StudioView() {
 
   if (!open) return null;
 
-  const effectiveSrc = artifact ? applyTweaks(artifact.content, tweaks) : "";
+  const ds = designSystemById(config, designSystemId);
+  /* Önce marka token'larını (base), sonra kullanıcı tweak'lerini (override) enjekte et. */
+  const effectiveSrc = artifact
+    ? applyTweaks(ds ? injectHeadStyle(artifact.content, ds.tokensCss, "craft-ds-tokens") : artifact.content, tweaks)
+    : "";
 
   const run = async (text: string, followup: boolean) => {
     const b = text.trim();
@@ -64,6 +77,7 @@ export function StudioView() {
       const result = await generateArtifact({
         brief: b,
         skillId, directionId,
+        designSystemPrompt: ds ? designSystemPromptText(ds) : undefined,
         prevHtml: followup && artifact ? artifact.content : undefined,
         onDelta: (txt) => setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: txt || "Tasarım üretiliyor…" }; return c; }),
         onPhase: setPhase,
@@ -118,6 +132,8 @@ export function StudioView() {
           brief={brief} setBrief={setBrief}
           skillId={skillId} setSkillId={setSkillId}
           directionId={directionId} setDirectionId={setDirectionId}
+          designSystemId={designSystemId} setDesignSystemId={setDesignSystemId}
+          onBrowseSystems={() => setDsModalOpen(true)}
           busy={busy}
           onGenerate={() => run(brief, false)}
         />
@@ -137,6 +153,14 @@ export function StudioView() {
           title={title}
           onFollowup={(t) => run(t, true)}
           onStop={stop}
+        />
+      )}
+
+      {dsModalOpen && (
+        <DesignSystemModal
+          activeId={designSystemId}
+          onSelect={(id) => { setDesignSystemId(id); setDsModalOpen(false); }}
+          onClose={() => setDsModalOpen(false)}
         />
       )}
     </div>
