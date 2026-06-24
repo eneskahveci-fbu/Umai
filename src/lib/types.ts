@@ -235,6 +235,17 @@ export interface PromptTemplate {
   prompt: string;
 }
 
+/** Stüdyo tasarım sistemi (marka sözleşmesi). Üretimde designMd promptuna,
+    tokensCss üretilen tasarımın <head>'ine enjekte edilir. */
+export interface DesignSystem {
+  id: string;
+  name: string;
+  category: string;
+  accent: string;
+  designMd: string;
+  tokensCss: string;
+}
+
 /** Tasarım Stüdyosu'nda kaydedilen tek bir tasarım (HTML/CSS/JS). */
 export interface SavedDesign {
   id: string;
@@ -335,6 +346,8 @@ export interface Config {
   automations?: Automation[];
   /** Tasarım Stüdyosu'nda kaydedilen tasarımlar (kişiye özel; user_config ile senkron). */
   savedDesigns?: SavedDesign[];
+  /** Stüdyo: kullanıcının eklediği özel tasarım sistemleri (bundled'a ek). */
+  customDesignSystems?: DesignSystem[];
   mcpServers?: McpServer[];
   /** Yerel Mod: kullanıcının makinesindeki Local Bridge adresi (ör. http://localhost:4319).
       Doluysa ve localMode açıksa ajan GitHub/GitLab API yerine gerçek dosya
