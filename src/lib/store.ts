@@ -370,6 +370,10 @@ interface StoreState {
   setImageStudioOpen: (b: boolean) => void;
   designStudioOpen: boolean;
   setDesignStudioOpen: (b: boolean) => void;
+  /** Yeni Stüdyo (Open Design tarzı brief→önizleme deneyimi). Klasik DesignStudio
+      "Gelişmiş tuval" olarak erişilebilir kalır. */
+  studioOpen: boolean;
+  setStudioOpen: (b: boolean) => void;
   streaming: boolean;
   setStreaming: (b: boolean) => void;
 
@@ -933,6 +937,8 @@ export const useStore = create<StoreState>()((set, get) => ({
   setImageStudioOpen: (b) => set({ imageStudioOpen: b }),
   designStudioOpen: false,
   setDesignStudioOpen: (b) => set({ designStudioOpen: b }),
+  studioOpen: false,
+  setStudioOpen: (b) => set({ studioOpen: b }),
   streaming: false,
   setStreaming: (b) => set({ streaming: b }),
 
