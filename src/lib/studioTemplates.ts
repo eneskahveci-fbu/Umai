@@ -70,6 +70,17 @@ export const STUDIO_TEMPLATES: StudioTemplate[] = [
     brief: "Bir ürün tasarımcısı için portfolyo: sade kişisel hero (isim + ne yaptığı), proje ızgarası (görselli kartlar), hakkında ve iletişim.",
     skillId: "portfolio", designSystemId: "notion", directionId: "editorial" },
 
+  // ── Sunum (çok slayt) ────────────────────────────────────────────────
+  { id: "pitch-deck", name: "Yatırımcı Sunumu", category: "Sunum", accent: "#635bff",
+    brief: "Bir startup için yatırımcı sunumu (çok slaytlı): kapak, problem, çözüm, pazar, ürün, iş modeli, ekip ve kapanış/CTA slaytları. Ok tuşlarıyla gezinilebilir.",
+    skillId: "deck", designSystemId: "stripe", directionId: "corporate" },
+  { id: "product-launch-deck", name: "Ürün Lansman Sunumu", category: "Sunum", accent: "#10a37f",
+    brief: "Bir ürün lansmanı sunumu (çok slaytlı): etkileyici kapak, vizyon, özellikler, demo, fiyatlandırma ve teşekkür slaytları. Büyük tipografi, animasyonlu geçiş hissi.",
+    skillId: "deck", designSystemId: "openai", directionId: "minimal" },
+  { id: "webinar-deck", name: "Eğitim/Webinar Sunumu", category: "Sunum", accent: "#a259ff",
+    brief: "Bir online eğitim/webinar sunumu (çok slaytlı): kapak, ajanda, 4 konu slaytı (başlık + maddeler), özet ve soru-cevap slaytı. Okunaklı, projeksiyon dostu.",
+    skillId: "deck", designSystemId: "figma", directionId: "editorial" },
+
   // ── Uygulama ekranları ───────────────────────────────────────────────
   { id: "login-screen", name: "Giriş Ekranı", category: "Uygulama", accent: "#6c8eef",
     brief: "Modern bir giriş ekranı: marka başlığı, e-posta/şifre alanları, 'Beni hatırla', birincil giriş butonu, Google/GitHub ile giriş ve kayıt linki. Ortalanmış kart.",
