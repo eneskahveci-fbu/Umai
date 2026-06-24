@@ -105,9 +105,9 @@ export const STUDIO_SKILLS: StudioSkill[] = [
   },
   // ── İçerik ───────────────────────────────────────────────────────────
   {
-    id: "deck", name: "Sunum Slaytı", icon: "🖼️", category: "İçerik",
-    desc: "Tek slayt — başlık/içerik düzeni",
-    instructions: "Tek bir SUNUM SLAYTI üret (16:9): güçlü başlık, destekleyici madde/görsel düzeni, marka renkleriyle tutarlı. Büyük tipografi, nefes alan boşluk; projeksiyon için yüksek kontrast.",
+    id: "deck", name: "Sunum (çok slayt)", icon: "🖼️", category: "İçerik",
+    desc: "Çok slaytlı, gezinilebilir sunum",
+    instructions: "Çok slaytlı bir SUNUM üret: güçlü kapak + içerik slaytları + kapanış. Büyük tipografi, nefes alan boşluk, marka renkleriyle tutarlı; projeksiyon için yüksek kontrast. (Slayt yapısı/gezinme ayrıca belirtilecek.)",
     defaultDevice: "web",
   },
   {

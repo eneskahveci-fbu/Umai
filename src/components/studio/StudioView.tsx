@@ -60,6 +60,7 @@ export function StudioView() {
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState<StudioPhase | null>(null);
   const [tweaks, setTweaks] = useState<StudioTweaks>(DEFAULT_TWEAKS);
+  const [animate, setAnimate] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [title, setTitle] = useState("");
   const abortRef = useRef<AbortController | null>(null);
@@ -92,7 +93,7 @@ export function StudioView() {
     try {
       const result = await generateArtifact({
         brief: b,
-        skillId: sk, directionId: dirId,
+        skillId: sk, directionId: dirId, animate,
         designSystemPrompt: dsObj ? designSystemPromptText(dsObj) : undefined,
         prevHtml: followup && artifact ? artifact.content : undefined,
         onDelta: (txt) => setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: txt || "Tasarım üretiliyor…" }; return c; }),
@@ -209,6 +210,8 @@ export function StudioView() {
           onStop={stop}
           onSave={saveProject}
           onOpenProjects={() => setProjectsOpen(true)}
+          animate={animate}
+          setAnimate={setAnimate}
         />
       )}
 

@@ -27,7 +27,7 @@ const FONT_OPTIONS: { label: string; value: string }[] = [
 
 export function StudioWorkspace({
   messages, busy, phase, artifact, effectiveSrc, device, setDevice, reloadKey,
-  tweaks, setTweaks, resetTweaks, title, onFollowup, onStop, onSave, onOpenProjects,
+  tweaks, setTweaks, resetTweaks, title, onFollowup, onStop, onSave, onOpenProjects, animate, setAnimate,
 }: {
   messages: StudioMsg[];
   busy: boolean;
@@ -45,6 +45,8 @@ export function StudioWorkspace({
   onStop: () => void;
   onSave: () => void;
   onOpenProjects: () => void;
+  animate: boolean;
+  setAnimate: (b: boolean) => void;
 }) {
   const addToast = useStore((s) => s.addToast);
   const [input, setInput] = useState("");
@@ -110,6 +112,11 @@ export function StudioWorkspace({
               <button key={d.id} onClick={() => setDevice(d.id)} className={`px-2.5 py-1 rounded-md transition-colors ${device.id === d.id ? "bg-brand/15 text-brand font-semibold" : "text-muted hover:text-ink"}`}>{d.name}</button>
             ))}
           </div>
+          <button
+            onClick={() => setAnimate(!animate)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${animate ? "border-brand bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"}`}
+            title="Animasyon: sonraki üretimde CSS animasyonları ekle"
+          ><Sparkles size={12} /> Animasyon</button>
           <div className="ml-auto flex items-center gap-1">
             <button onClick={onOpenProjects} className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-bgsoft transition-colors" title="Projelerim"><FolderOpen size={15} /></button>
             <button onClick={onSave} disabled={!artifact} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-line text-muted hover:text-ink disabled:opacity-40" title="Projeyi kaydet"><Save size={13} /> Kaydet</button>
