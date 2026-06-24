@@ -21,6 +21,8 @@ export interface GenerateOptions {
   prevHtml?: string;
   /** Yorum-modu: önizlemede seçilen öğeye dair hedefli düzenleme notu. */
   comment?: string;
+  /** Hareketli/animasyonlu çıktı (CSS animasyonları). */
+  animate?: boolean;
   onDelta?: (text: string) => void;
   onPhase?: (p: StudioPhase) => void;
   signal?: AbortSignal;
@@ -36,8 +38,21 @@ const STUDIO_SYSTEM_BASE =
   "Kullanıcının brief'ine göre TEK, kendi kendine yeten, üretim kalitesinde, modern, estetik ve responsive bir tasarım üret. " +
   "Çıktı: TEK bir ```html bloğu — inline CSS (gerekirse vanilla JS). " +
   "İlkeler: net görsel hiyerarşi, dengeli boşluk ritmi, tutarlı tipografik ölçek, erişilebilir kontrast, ince mikro-etkileşimler (hover/transition). " +
-  "Lorem ipsum yerine konuya uygun gerçekçi içerik yaz. Harici görsel gerekiyorsa CSS gradient/SVG veya picsum.photos kullan. " +
+  "Lorem ipsum yerine konuya uygun gerçekçi içerik yaz. " +
+  "Görsel gerekiyorsa: CSS gradient/SVG; FOTOĞRAF için picsum.photos; KONUYA ÖZEL AI görseli için " +
+  "https://image.pollinations.ai/prompt/<URL-encoded%20İngilizce%20açıklama>?width=800&height=600&nologo=true (anahtarsız) kullan. " +
   "SADECE kod bloğunu döndür, açıklama yazma. (Özellikle React istenirse ```jsx ve bir App bileşeni kullan.)";
+
+/* Sunum (deck) için çok-slaytlı, kendi kendine gezinen HTML talimatı. */
+const DECK_INSTRUCTION =
+  "\n\n[SUNUM MODU]: Çok-slaytlı bir SUNUM üret — her slayt tam ekran bir <section class=\"slide\"> (100vw×100vh, grid ortalı). " +
+  "5-8 slayt: kapak, ajanda, 3-5 içerik slaytı, kapanış. Slaytlar arası ok tuşları + ekrana tıkla ile gezinme için kısa vanilla JS ekle " +
+  "(geçerli slaytı göster/gizle veya yumuşak kaydır); altta küçük slayt göstergesi (• • •). Büyük tipografi, projeksiyon kontrastı.";
+
+/* Hareket/animasyon talimatı (tarayıcı-uyarlı 'video/motion'). */
+const ANIMATE_INSTRUCTION =
+  "\n\n[ANİMASYON]: Zarif CSS animasyonları ekle — öğeler için yumuşak giriş (fade/slide-up, kademeli gecikme), " +
+  "hover mikro-etkileşimleri ve sürekli ince hareketler (arka plan gradyan kayması vb.). Abartma; akıcı ve profesyonel olsun.";
 
 /* JSON/kod blokları dışındaki metni göster (akışta 'üretiliyor' hissi). */
 function stripCode(s: string): string {
@@ -56,10 +71,12 @@ async function resolveKey(): Promise<{ baseUrl: string; model: string; apiKey: s
   return { baseUrl: active.baseUrl, model: active.model, apiKey, provider: active.provider };
 }
 
-export function buildStudioSystem(opts: Pick<GenerateOptions, "skillId" | "directionId" | "designSystemPrompt" | "prevHtml" | "comment">): string {
+export function buildStudioSystem(opts: Pick<GenerateOptions, "skillId" | "directionId" | "designSystemPrompt" | "prevHtml" | "comment" | "animate">): string {
   let sys = STUDIO_SYSTEM_BASE;
   const skill = skillById(opts.skillId);
   if (skill) sys += `\n\n[Çıktı türü — ${skill.name}]: ${skill.instructions}`;
+  if (opts.skillId === "deck") sys += DECK_INSTRUCTION;
+  if (opts.animate) sys += ANIMATE_INSTRUCTION;
   const dir = directionById(opts.directionId);
   if (dir) sys += `\n\n[Tasarım yönü — ${dir.name}]: ${dir.hint}`;
   if (opts.designSystemPrompt?.trim()) sys += `\n\n[Marka tasarım sistemi — bu sözleşmeye UY]:\n${opts.designSystemPrompt.trim()}`;
