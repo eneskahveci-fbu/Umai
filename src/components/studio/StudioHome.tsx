@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowUp, LayoutGrid, Loader2, Sparkles } from "lucide-react";
+import { ArrowUp, FolderOpen, LayoutGrid, Loader2, Sparkles } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { skillsByCategory, STUDIO_DIRECTIONS } from "@/lib/studioConstants";
 import { allDesignSystems } from "@/lib/designSystems";
@@ -13,7 +13,7 @@ export function StudioHome({
   skillId, setSkillId,
   directionId, setDirectionId,
   designSystemId, setDesignSystemId,
-  onBrowseSystems, onOpenTemplates,
+  onBrowseSystems, onOpenTemplates, onOpenProjects, projectCount,
   busy, onGenerate,
 }: {
   brief: string; setBrief: (s: string) => void;
@@ -22,6 +22,8 @@ export function StudioHome({
   designSystemId: string; setDesignSystemId: (s: string) => void;
   onBrowseSystems: () => void;
   onOpenTemplates: () => void;
+  onOpenProjects: () => void;
+  projectCount: number;
   busy: boolean;
   onGenerate: () => void;
 }) {
@@ -38,9 +40,16 @@ export function StudioHome({
         <div className="text-center">
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Ne tasarlayalım?</h1>
           <p className="text-muted text-sm mt-1.5">Bir brief yaz, çıktı türünü ve yönünü seç — gerisini stüdyo halletsin.</p>
-          <button onClick={onOpenTemplates} className="mt-3 inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-line bg-surface text-muted hover:text-ink hover:border-brand/40 transition-colors">
-            <Sparkles size={13} className="text-brand" /> Hazır şablonlardan başla
-          </button>
+          <div className="mt-3 flex items-center justify-center gap-2">
+            <button onClick={onOpenTemplates} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-line bg-surface text-muted hover:text-ink hover:border-brand/40 transition-colors">
+              <Sparkles size={13} className="text-brand" /> Hazır şablonlardan başla
+            </button>
+            {projectCount > 0 && (
+              <button onClick={onOpenProjects} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-line bg-surface text-muted hover:text-ink hover:border-brand/40 transition-colors">
+                <FolderOpen size={13} className="text-brand" /> Projelerim ({projectCount})
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Brief composer */}
