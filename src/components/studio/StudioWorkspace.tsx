@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, ExternalLink, FileText, FolderOpen, Loader2, Save, Send, SlidersHorizontal, Sparkles, Square, User } from "lucide-react";
+import { Download, ExternalLink, FileText, FolderOpen, Link2, Loader2, Save, Send, Shuffle, SlidersHorizontal, Sparkles, Square, User } from "lucide-react";
 import { STUDIO_DEVICES, type StudioDevice, type DeviceId } from "@/lib/studioConstants";
 import type { StudioPhase } from "@/lib/studioGen";
 import { downloadHtml, openInTab, printPdf } from "@/lib/studioExport";
@@ -27,7 +27,7 @@ const FONT_OPTIONS: { label: string; value: string }[] = [
 
 export function StudioWorkspace({
   messages, busy, phase, artifact, effectiveSrc, device, setDevice, reloadKey,
-  tweaks, setTweaks, resetTweaks, title, onFollowup, onStop, onSave, onOpenProjects, animate, setAnimate,
+  tweaks, setTweaks, resetTweaks, title, onFollowup, onStop, onSave, onOpenProjects, animate, setAnimate, onVariations, onPublish,
 }: {
   messages: StudioMsg[];
   busy: boolean;
@@ -47,6 +47,8 @@ export function StudioWorkspace({
   onOpenProjects: () => void;
   animate: boolean;
   setAnimate: (b: boolean) => void;
+  onVariations: () => void;
+  onPublish: () => void;
 }) {
   const addToast = useStore((s) => s.addToast);
   const [input, setInput] = useState("");
@@ -118,6 +120,7 @@ export function StudioWorkspace({
             title="Animasyon: sonraki üretimde CSS animasyonları ekle"
           ><Sparkles size={12} /> Animasyon</button>
           <div className="ml-auto flex items-center gap-1">
+            <button onClick={onVariations} disabled={!artifact} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-line text-muted hover:text-ink disabled:opacity-40" title="Farklı yönlerde varyasyon üret"><Shuffle size={13} /> Varyant</button>
             <button onClick={onOpenProjects} className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-bgsoft transition-colors" title="Projelerim"><FolderOpen size={15} /></button>
             <button onClick={onSave} disabled={!artifact} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-line text-muted hover:text-ink disabled:opacity-40" title="Projeyi kaydet"><Save size={13} /> Kaydet</button>
             <button onClick={() => setTweaksOpen((v) => !v)} className={`p-1.5 rounded-lg transition-colors ${tweaksOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`} title="İnce ayar"><SlidersHorizontal size={15} /></button>
@@ -128,6 +131,8 @@ export function StudioWorkspace({
                   <button onClick={() => exportAs(() => downloadHtml(effectiveSrc, title))} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft text-left"><Download size={14} className="text-brand" /> HTML indir</button>
                   <button onClick={() => exportAs(() => printPdf(effectiveSrc))} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft text-left"><FileText size={14} className="text-brand" /> PDF (yazdır)</button>
                   <button onClick={() => exportAs(() => openInTab(effectiveSrc))} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft text-left"><ExternalLink size={14} className="text-brand" /> Yeni sekmede aç</button>
+                  <div className="h-px bg-line my-1" />
+                  <button onClick={() => { setExportOpen(false); onPublish(); }} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft text-left"><Link2 size={14} className="text-brand" /> Yayınla (link)</button>
                 </div>
               )}
             </div>
