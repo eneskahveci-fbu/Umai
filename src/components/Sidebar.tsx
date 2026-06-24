@@ -76,7 +76,7 @@ export function Sidebar() {
   const tagChat = useStore((s) => s.tagChat);
   const pinChat = useStore((s) => s.pinChat);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
-  const setDesignStudioOpen = useStore((s) => s.setDesignStudioOpen);
+  const setStudioOpen = useStore((s) => s.setStudioOpen);
   const sidebarOpen = useStore((s) => s.sidebarOpen);
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
   const addProject = useStore((s) => s.addProject);
@@ -333,7 +333,7 @@ export function Sidebar() {
           <Plus size={15} /> Yeni Sohbet
         </button>
         <button
-          onClick={() => setDesignStudioOpen(true)}
+          onClick={() => setStudioOpen(true)}
           className="premium-card w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-ink/80 hover:text-ink hover:border-brand/40 transition-all hover:-translate-y-0.5"
         >
           <Sparkles size={15} className="text-brand" /> Stüdyo
