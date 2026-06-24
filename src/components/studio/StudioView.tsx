@@ -7,9 +7,11 @@ import type { Artifact } from "@/lib/types";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
 import { deviceById, skillById, type DeviceId } from "@/lib/studioConstants";
 import { designSystemById, designSystemPromptText } from "@/lib/designSystems";
+import type { StudioTemplate } from "@/lib/studioTemplates";
 import { StudioHome } from "./StudioHome";
 import { StudioWorkspace } from "./StudioWorkspace";
 import { DesignSystemModal } from "./DesignSystemModal";
+import { TemplateGallery } from "./TemplateGallery";
 
 export interface StudioMsg { role: "user" | "assistant"; text: string; }
 export interface StudioTweaks { fontScale: number; fontFamily: string; accent: string; }
@@ -47,6 +49,7 @@ export function StudioView() {
   const [directionId, setDirectionId] = useState<string | null>("minimal");
   const [designSystemId, setDesignSystemId] = useState<string>("craft");
   const [dsModalOpen, setDsModalOpen] = useState(false);
+  const [tplOpen, setTplOpen] = useState(false);
   const [device, setDevice] = useState<DeviceId>("web");
   const [artifact, setArtifact] = useState<Artifact | null>(null);
   const [messages, setMessages] = useState<StudioMsg[]>([]);
@@ -65,14 +68,19 @@ export function StudioView() {
     ? applyTweaks(ds ? injectHeadStyle(artifact.content, ds.tokensCss, "craft-ds-tokens") : artifact.content, tweaks)
     : "";
 
-  const run = async (text: string, followup: boolean) => {
+  const run = async (text: string, followup: boolean, ov?: { skillId?: string; designSystemId?: string; directionId?: string }) => {
     const b = text.trim();
     if (!b || busy) return;
+    /* Şablon uygulanırken state güncellemesi async olduğundan, üretim için
+       değerleri doğrudan override'dan al (bayat closure önlenir). */
+    const sk = ov?.skillId ?? skillId;
+    const dirId = ov?.directionId ?? directionId;
+    const dsObj = designSystemById(config, ov?.designSystemId ?? designSystemId);
     setBusy(true); setPhase("planning");
     if (!followup) {
       setMessages([{ role: "user", text: b }, { role: "assistant", text: "" }]); setView("workspace");
       /* Cihazı seçilen skill'in varsayılanına ayarla (mobil skiller → telefon). */
-      const sk = skillById(skillId); if (sk) setDevice(sk.defaultDevice);
+      const skObj = skillById(sk); if (skObj) setDevice(skObj.defaultDevice);
     }
     else setMessages((m) => [...m, { role: "user", text: b }, { role: "assistant", text: "" }]);
     if (!title) setTitle(b.slice(0, 40));
@@ -80,8 +88,8 @@ export function StudioView() {
     try {
       const result = await generateArtifact({
         brief: b,
-        skillId, directionId,
-        designSystemPrompt: ds ? designSystemPromptText(ds) : undefined,
+        skillId: sk, directionId: dirId,
+        designSystemPrompt: dsObj ? designSystemPromptText(dsObj) : undefined,
         prevHtml: followup && artifact ? artifact.content : undefined,
         onDelta: (txt) => setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: txt || "Tasarım üretiliyor…" }; return c; }),
         onPhase: setPhase,
@@ -101,6 +109,14 @@ export function StudioView() {
   };
 
   const stop = () => { abortRef.current?.abort(); };
+
+  const applyTemplate = (t: StudioTemplate) => {
+    setBrief(t.brief); setSkillId(t.skillId);
+    if (t.designSystemId) setDesignSystemId(t.designSystemId);
+    if (t.directionId) setDirectionId(t.directionId);
+    setTplOpen(false);
+    void run(t.brief, false, { skillId: t.skillId, designSystemId: t.designSystemId ?? designSystemId, directionId: t.directionId ?? directionId ?? undefined });
+  };
 
   const newDesign = () => {
     stop();
@@ -138,6 +154,7 @@ export function StudioView() {
           directionId={directionId} setDirectionId={setDirectionId}
           designSystemId={designSystemId} setDesignSystemId={setDesignSystemId}
           onBrowseSystems={() => setDsModalOpen(true)}
+          onOpenTemplates={() => setTplOpen(true)}
           busy={busy}
           onGenerate={() => run(brief, false)}
         />
@@ -167,6 +184,7 @@ export function StudioView() {
           onClose={() => setDsModalOpen(false)}
         />
       )}
+      {tplOpen && <TemplateGallery onApply={applyTemplate} onClose={() => setTplOpen(false)} />}
     </div>
   );
 }
