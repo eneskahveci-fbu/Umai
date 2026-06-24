@@ -5,7 +5,7 @@ import { Image as ImageIcon, LayoutTemplate, Sparkles, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { Artifact } from "@/lib/types";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
-import { deviceById, type DeviceId } from "@/lib/studioConstants";
+import { deviceById, skillById, type DeviceId } from "@/lib/studioConstants";
 import { designSystemById, designSystemPromptText } from "@/lib/designSystems";
 import { StudioHome } from "./StudioHome";
 import { StudioWorkspace } from "./StudioWorkspace";
@@ -69,7 +69,11 @@ export function StudioView() {
     const b = text.trim();
     if (!b || busy) return;
     setBusy(true); setPhase("planning");
-    if (!followup) { setMessages([{ role: "user", text: b }, { role: "assistant", text: "" }]); setView("workspace"); }
+    if (!followup) {
+      setMessages([{ role: "user", text: b }, { role: "assistant", text: "" }]); setView("workspace");
+      /* Cihazı seçilen skill'in varsayılanına ayarla (mobil skiller → telefon). */
+      const sk = skillById(skillId); if (sk) setDevice(sk.defaultDevice);
+    }
     else setMessages((m) => [...m, { role: "user", text: b }, { role: "assistant", text: "" }]);
     if (!title) setTitle(b.slice(0, 40));
     const ac = new AbortController(); abortRef.current = ac;
