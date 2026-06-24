@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Image as ImageIcon, LayoutTemplate, Sparkles, X } from "lucide-react";
 import { useStore } from "@/lib/store";
-import type { Artifact } from "@/lib/types";
+import type { Artifact, StudioProject } from "@/lib/types";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
 import { deviceById, skillById, type DeviceId } from "@/lib/studioConstants";
 import { designSystemById, designSystemPromptText } from "@/lib/designSystems";
@@ -12,6 +12,7 @@ import { StudioHome } from "./StudioHome";
 import { StudioWorkspace } from "./StudioWorkspace";
 import { DesignSystemModal } from "./DesignSystemModal";
 import { TemplateGallery } from "./TemplateGallery";
+import { ProjectsModal } from "./ProjectsModal";
 
 export interface StudioMsg { role: "user" | "assistant"; text: string; }
 export interface StudioTweaks { fontScale: number; fontFamily: string; accent: string; }
@@ -41,6 +42,7 @@ export function StudioView() {
   const setImageStudioOpen = useStore((s) => s.setImageStudioOpen);
   const setDesignStudioOpen = useStore((s) => s.setDesignStudioOpen);
   const config = useStore((s) => s.config);
+  const saveConfig = useStore((s) => s.saveConfig);
   const addToast = useStore((s) => s.addToast);
 
   const [view, setView] = useState<"home" | "workspace">("home");
@@ -50,6 +52,8 @@ export function StudioView() {
   const [designSystemId, setDesignSystemId] = useState<string>("craft");
   const [dsModalOpen, setDsModalOpen] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
+  const [projectsOpen, setProjectsOpen] = useState(false);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [device, setDevice] = useState<DeviceId>("web");
   const [artifact, setArtifact] = useState<Artifact | null>(null);
   const [messages, setMessages] = useState<StudioMsg[]>([]);
@@ -110,16 +114,43 @@ export function StudioView() {
 
   const stop = () => { abortRef.current?.abort(); };
 
+  const saveProject = () => {
+    if (!artifact) { addToast("Önce bir tasarım üret.", "error"); return; }
+    const name = title.trim() || brief.slice(0, 40) || "Tasarım";
+    const now = Date.now();
+    const existing = config.studioProjects ?? [];
+    const prev = currentProjectId ? existing.find((p) => p.id === currentProjectId) : undefined;
+    const id = currentProjectId ?? `sp_${now.toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const versions = prev ? [prev.html, ...(prev.versions ?? [])].slice(0, 5) : [];
+    const proj: StudioProject = {
+      id, name, brief, html: artifact.content, designSystemId, skillId, directionId, versions,
+      createdAt: prev?.createdAt ?? now, updatedAt: now,
+    };
+    saveConfig({ ...config, studioProjects: [proj, ...existing.filter((p) => p.id !== id)].slice(0, 40) });
+    setCurrentProjectId(id);
+    addToast(prev ? "Proje güncellendi." : "Proje kaydedildi.", "success");
+  };
+
+  const openProject = (p: StudioProject) => {
+    stop();
+    setBrief(p.brief); setSkillId(p.skillId ?? "landing"); setDesignSystemId(p.designSystemId || "craft");
+    setDirectionId(p.directionId ?? "minimal"); setTitle(p.name);
+    setArtifact({ type: "html", content: p.html, title: p.name }); setReloadKey((k) => k + 1);
+    setCurrentProjectId(p.id); setTweaks(DEFAULT_TWEAKS);
+    setMessages([{ role: "assistant", text: "Proje yüklendi — değişiklik isteyebilirsin." }]);
+    setView("workspace"); setProjectsOpen(false);
+  };
+
   const applyTemplate = (t: StudioTemplate) => {
     setBrief(t.brief); setSkillId(t.skillId);
     if (t.designSystemId) setDesignSystemId(t.designSystemId);
     if (t.directionId) setDirectionId(t.directionId);
-    setTplOpen(false);
+    setTplOpen(false); setCurrentProjectId(null);
     void run(t.brief, false, { skillId: t.skillId, designSystemId: t.designSystemId ?? designSystemId, directionId: t.directionId ?? directionId ?? undefined });
   };
 
   const newDesign = () => {
-    stop();
+    stop(); setCurrentProjectId(null);
     setView("home"); setArtifact(null); setMessages([]); setTweaks(DEFAULT_TWEAKS); setBrief(""); setTitle("");
   };
 
@@ -155,6 +186,8 @@ export function StudioView() {
           designSystemId={designSystemId} setDesignSystemId={setDesignSystemId}
           onBrowseSystems={() => setDsModalOpen(true)}
           onOpenTemplates={() => setTplOpen(true)}
+          onOpenProjects={() => setProjectsOpen(true)}
+          projectCount={(config.studioProjects ?? []).length}
           busy={busy}
           onGenerate={() => run(brief, false)}
         />
@@ -174,6 +207,8 @@ export function StudioView() {
           title={title}
           onFollowup={(t) => run(t, true)}
           onStop={stop}
+          onSave={saveProject}
+          onOpenProjects={() => setProjectsOpen(true)}
         />
       )}
 
@@ -185,6 +220,7 @@ export function StudioView() {
         />
       )}
       {tplOpen && <TemplateGallery onApply={applyTemplate} onClose={() => setTplOpen(false)} />}
+      {projectsOpen && <ProjectsModal onOpen={openProject} onClose={() => setProjectsOpen(false)} />}
     </div>
   );
 }
