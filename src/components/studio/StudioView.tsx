@@ -5,7 +5,7 @@ import { Image as ImageIcon, LayoutTemplate, Sparkles, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { Artifact, StudioProject } from "@/lib/types";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
-import { deviceById, skillById, type DeviceId } from "@/lib/studioConstants";
+import { deviceById, skillById, STUDIO_DIRECTIONS, type DeviceId } from "@/lib/studioConstants";
 import { designSystemById, designSystemPromptText } from "@/lib/designSystems";
 import type { StudioTemplate } from "@/lib/studioTemplates";
 import { StudioHome } from "./StudioHome";
@@ -13,6 +13,7 @@ import { StudioWorkspace } from "./StudioWorkspace";
 import { DesignSystemModal } from "./DesignSystemModal";
 import { TemplateGallery } from "./TemplateGallery";
 import { ProjectsModal } from "./ProjectsModal";
+import { VariationPicker, type Variation } from "./VariationPicker";
 
 export interface StudioMsg { role: "user" | "assistant"; text: string; }
 export interface StudioTweaks { fontScale: number; fontFamily: string; accent: string; }
@@ -61,6 +62,8 @@ export function StudioView() {
   const [phase, setPhase] = useState<StudioPhase | null>(null);
   const [tweaks, setTweaks] = useState<StudioTweaks>(DEFAULT_TWEAKS);
   const [animate, setAnimate] = useState(false);
+  const [variations, setVariations] = useState<Variation[] | null>(null);
+  const [varBusy, setVarBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [title, setTitle] = useState("");
   const abortRef = useRef<AbortController | null>(null);
@@ -130,6 +133,42 @@ export function StudioView() {
     saveConfig({ ...config, studioProjects: [proj, ...existing.filter((p) => p.id !== id)].slice(0, 40) });
     setCurrentProjectId(id);
     addToast(prev ? "Proje güncellendi." : "Proje kaydedildi.", "success");
+  };
+
+  /* Otomasyon: aynı brief'i farklı 3 tasarım yönünde PARALEL üret (five-direction). */
+  const runVariations = async () => {
+    const base = (messages.find((m) => m.role === "user")?.text || brief).trim();
+    if (!base || varBusy) { addToast("Önce bir tasarım üret.", "error"); return; }
+    const dirs = STUDIO_DIRECTIONS.filter((d) => d.id !== directionId).slice(0, 3);
+    setVarBusy(true);
+    setVariations(dirs.map((d) => ({ label: d.name, art: null })));
+    const dsObj = designSystemById(config, designSystemId);
+    const results = await Promise.all(dirs.map((d) =>
+      generateArtifact({ brief: base, skillId, directionId: d.id, animate, designSystemPrompt: dsObj ? designSystemPromptText(dsObj) : undefined })
+        .then((r) => r.artifact).catch(() => null),
+    ));
+    setVariations(dirs.map((d, i) => ({ label: d.name, art: results[i] })));
+    setVarBusy(false);
+  };
+  const applyVariation = (a: Artifact) => {
+    setArtifact(a); setReloadKey((k) => k + 1); setVariations(null);
+    setMessages((m) => [...m, { role: "assistant", text: "Seçilen varyasyon uygulandı." }]);
+  };
+
+  /* Entegrasyon: tasarımı /api/publish ile bağımsız paylaşılabilir sayfaya çevir. */
+  const publishDesign = async () => {
+    if (!artifact) { addToast("Önce bir tasarım üret.", "error"); return; }
+    try {
+      const res = await fetch("/api/publish", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: title || "Stüdyo tasarımı", type: "html", content: effectiveSrc }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.id) { addToast(data.error || "Yayınlama başarısız.", "error"); return; }
+      const url = `${window.location.origin}/a/${data.id}`;
+      try { await navigator.clipboard.writeText(url); } catch { /* yok say */ }
+      addToast("Yayınlandı — bağlantı kopyalandı.", "success");
+    } catch (e) { addToast((e as Error).message || "Yayınlama başarısız.", "error"); }
   };
 
   const openProject = (p: StudioProject) => {
@@ -212,6 +251,8 @@ export function StudioView() {
           onOpenProjects={() => setProjectsOpen(true)}
           animate={animate}
           setAnimate={setAnimate}
+          onVariations={runVariations}
+          onPublish={publishDesign}
         />
       )}
 
@@ -224,6 +265,7 @@ export function StudioView() {
       )}
       {tplOpen && <TemplateGallery onApply={applyTemplate} onClose={() => setTplOpen(false)} />}
       {projectsOpen && <ProjectsModal onOpen={openProject} onClose={() => setProjectsOpen(false)} />}
+      {variations && <VariationPicker variations={variations} busy={varBusy} onPick={applyVariation} onClose={() => setVariations(null)} />}
     </div>
   );
 }
