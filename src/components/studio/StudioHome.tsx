@@ -1,0 +1,89 @@
+"use client";
+
+import { ArrowUp, Loader2 } from "lucide-react";
+import { STUDIO_SKILLS, STUDIO_DIRECTIONS } from "@/lib/studioConstants";
+
+/* Stüdyo giriş ekranı (Open Design home) — brief + çıktı türü (skill) + tasarım
+   yönü seçimi → tek tık üret. Craft teması. */
+export function StudioHome({
+  brief, setBrief,
+  skillId, setSkillId,
+  directionId, setDirectionId,
+  busy, onGenerate,
+}: {
+  brief: string; setBrief: (s: string) => void;
+  skillId: string | null; setSkillId: (s: string) => void;
+  directionId: string | null; setDirectionId: (s: string) => void;
+  busy: boolean;
+  onGenerate: () => void;
+}) {
+  return (
+    <div className="flex-1 min-h-0 overflow-auto">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-14 flex flex-col gap-7">
+        <div className="text-center">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Ne tasarlayalım?</h1>
+          <p className="text-muted text-sm mt-1.5">Bir brief yaz, çıktı türünü ve yönünü seç — gerisini stüdyo halletsin.</p>
+        </div>
+
+        {/* Brief composer */}
+        <div className="rounded-2xl border border-line bg-surface shadow-sm focus-within:border-brand/50 transition-colors">
+          <textarea
+            value={brief}
+            onChange={(e) => setBrief(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onGenerate(); } }}
+            rows={3}
+            placeholder="Örn: SaaS analitik aracı için modern bir landing sayfası — koyu tema, mor vurgu, fiyatlandırma bölümü…"
+            className="w-full bg-transparent resize-none outline-none px-4 pt-3.5 text-sm placeholder:text-muted/70 min-h-[88px]"
+          />
+          <div className="flex items-center justify-between px-3 pb-3 pt-1">
+            <span className="text-[11px] text-muted/60">⌘/Ctrl + Enter ile üret</span>
+            <button
+              onClick={onGenerate}
+              disabled={busy || !brief.trim()}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand text-[#111110] font-semibold text-sm disabled:opacity-40 hover:bg-branddim transition-colors"
+            >
+              {busy ? <Loader2 size={15} className="animate-spin" /> : <ArrowUp size={15} />} Üret
+            </button>
+          </div>
+        </div>
+
+        {/* Çıktı türü (skill) */}
+        <div>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-muted/70 mb-2">Çıktı türü</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {STUDIO_SKILLS.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setSkillId(s.id)}
+                className={`text-left p-3 rounded-xl border transition-colors ${skillId === s.id ? "border-brand bg-brand/10" : "border-line bg-surface hover:border-brand/40"}`}
+              >
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-base leading-none">{s.icon}</span>
+                  <span className={`text-sm font-semibold ${skillId === s.id ? "text-brand" : "text-ink"}`}>{s.name}</span>
+                </div>
+                <p className="text-[11px] text-muted/80 leading-snug">{s.desc}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Tasarım yönü */}
+        <div>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-muted/70 mb-2">Tasarım yönü</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {STUDIO_DIRECTIONS.map((d) => (
+              <button
+                key={d.id}
+                onClick={() => setDirectionId(d.id)}
+                title={d.hint}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${directionId === d.id ? "border-brand bg-brand/10 text-brand" : "border-line bg-surface text-muted hover:text-ink"}`}
+              >
+                {d.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
