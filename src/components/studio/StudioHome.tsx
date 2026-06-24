@@ -1,22 +1,30 @@
 "use client";
 
-import { ArrowUp, Loader2 } from "lucide-react";
+import { ArrowUp, LayoutGrid, Loader2 } from "lucide-react";
+import { useStore } from "@/lib/store";
 import { STUDIO_SKILLS, STUDIO_DIRECTIONS } from "@/lib/studioConstants";
+import { allDesignSystems } from "@/lib/designSystems";
 
 /* Stüdyo giriş ekranı (Open Design home) — brief + çıktı türü (skill) + tasarım
-   yönü seçimi → tek tık üret. Craft teması. */
+   sistemi (marka) + tasarım yönü seçimi → tek tık üret. Craft teması. */
 export function StudioHome({
   brief, setBrief,
   skillId, setSkillId,
   directionId, setDirectionId,
+  designSystemId, setDesignSystemId,
+  onBrowseSystems,
   busy, onGenerate,
 }: {
   brief: string; setBrief: (s: string) => void;
   skillId: string | null; setSkillId: (s: string) => void;
   directionId: string | null; setDirectionId: (s: string) => void;
+  designSystemId: string; setDesignSystemId: (s: string) => void;
+  onBrowseSystems: () => void;
   busy: boolean;
   onGenerate: () => void;
 }) {
+  const config = useStore((s) => s.config);
+  const systems = allDesignSystems(config);
   return (
     <div className="flex-1 min-h-0 overflow-auto">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-14 flex flex-col gap-7">
@@ -62,6 +70,27 @@ export function StudioHome({
                   <span className={`text-sm font-semibold ${skillId === s.id ? "text-brand" : "text-ink"}`}>{s.name}</span>
                 </div>
                 <p className="text-[11px] text-muted/80 leading-snug">{s.desc}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Tasarım sistemi (marka) */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted/70">Tasarım sistemi</h3>
+            <button onClick={onBrowseSystems} className="flex items-center gap-1 text-xs text-brand hover:underline"><LayoutGrid size={12} /> Göz at</button>
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+            {systems.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setDesignSystemId(s.id)}
+                title={s.category}
+                className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${designSystemId === s.id ? "border-brand bg-brand/10 text-brand" : "border-line bg-surface text-muted hover:text-ink"}`}
+              >
+                <span className="w-3 h-3 rounded-full border border-line/50 shrink-0" style={{ background: s.accent }} />
+                {s.name}
               </button>
             ))}
           </div>
