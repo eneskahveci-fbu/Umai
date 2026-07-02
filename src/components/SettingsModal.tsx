@@ -753,6 +753,16 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               )}
             </div>
 
+            {/* Güven kartı — anahtarın nerede yaşadığını sade dille anlatır. */}
+            <div className="mb-4 rounded-xl border border-line/60 bg-bgsoft/40 p-3 text-[11px] text-muted leading-relaxed">
+              <div className="font-bold text-ink/80 mb-1">🔒 Anahtarın nerede saklanır?</div>
+              <ul className="list-disc pl-4 space-y-0.5">
+                <li>Yalnızca <strong>bu tarayıcıda</strong>, şifrelenmiş olarak saklanır — sunucuya kaydedilmez.</li>
+                <li>İstekler doğrudan senin anahtarınla sağlayıcıya gider; craft aracıdır, içerik saklamaz.</li>
+                <li>Modeli silince ya da tarayıcı verisini temizleyince anahtar da gider.</li>
+              </ul>
+            </div>
+
             {config.models.length > 0 && (
               <div className="flex flex-col gap-2 mb-4">
                 {config.models.map((m) => {

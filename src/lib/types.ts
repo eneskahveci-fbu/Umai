@@ -408,4 +408,8 @@ export interface Toast {
   id: string;
   message: string;
   type: "success" | "error" | "info";
+  /** Opsiyonel eylem butonu (ör. silmede "Geri al"). */
+  action?: { label: string; fn: () => void };
+  /** Özel görünme süresi (ms). */
+  duration?: number;
 }
