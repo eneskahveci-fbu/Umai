@@ -303,11 +303,10 @@ export function Sidebar() {
   /* ── Expanded ── */
   return (
     <aside
-      className="fixed top-0 left-0 z-40 h-full w-full md:w-64 flex flex-col bg-surface border-r border-line/60"
+      className="fixed top-0 left-0 z-40 h-full w-full md:w-64 flex flex-col bg-surface border-r border-line/60 pb-[max(env(safe-area-inset-bottom),var(--surface-pb,0px))] md:pb-[env(safe-area-inset-bottom)]"
       style={{
         paddingTop: "env(safe-area-inset-top)",
         paddingLeft: "env(safe-area-inset-left)",
-        paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
       {/* Header */}
