@@ -201,10 +201,11 @@ export function StudioView() {
         <div className="flex items-center gap-1.5 text-sm font-bold">
           <Sparkles size={15} className="text-brand" /> Stüdyo
         </div>
+        {/* Tek stüdyo, üç mod: Stüdyo (brief→AI) · Tuval (katman editörü) · Görüntü. */}
         <div className="flex items-center bg-bgsoft border border-line/60 rounded-lg p-0.5 text-xs ml-1">
-          <button className="px-2.5 py-1 rounded-md bg-brand/15 text-brand font-semibold">Tasarım</button>
-          <button onClick={() => { setOpen(false); setImageStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink flex items-center gap-1"><ImageIcon size={12} /> Görüntü</button>
-          <button onClick={() => { setOpen(false); setDesignStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink flex items-center gap-1" title="Klasik katman/tuval editörü"><LayoutTemplate size={12} /> Gelişmiş tuval</button>
+          <button className="px-2.5 py-1 rounded-md bg-brand/15 text-brand font-semibold">Stüdyo</button>
+          <button onClick={() => { setOpen(false); setDesignStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink flex items-center gap-1" title="Katman/tuval editörü (slayt · afiş · sosyal)"><LayoutTemplate size={12} /> Tuval</button>
+          <button onClick={() => { setOpen(false); setImageStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink flex items-center gap-1" title="AI görsel üretimi"><ImageIcon size={12} /> Görüntü</button>
         </div>
         {view === "workspace" && (
           <button onClick={newDesign} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink ml-1">+ Yeni</button>

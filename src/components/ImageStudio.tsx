@@ -60,6 +60,7 @@ export function ImageStudio() {
   const open = useStore((s) => s.imageStudioOpen);
   const setOpen = useStore((s) => s.setImageStudioOpen);
   const setDesignStudioOpen = useStore((s) => s.setDesignStudioOpen);
+  const setStudioOpen = useStore((s) => s.setStudioOpen);
   const addToast = useStore((s) => s.addToast);
   const config = useStore((s) => s.config);
 
@@ -232,9 +233,10 @@ export function ImageStudio() {
         <span className="w-8 h-8 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0">
           <ImageIcon size={16} />
         </span>
-        {/* Stüdyo modu — Tasarım | Görüntü (tek stüdyo) */}
+        {/* Tek stüdyo, üç mod: Stüdyo (brief→AI) · Tuval · Görüntü (bu). */}
         <div className="flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
-          <button onClick={() => { setOpen(false); setDesignStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors">Tasarım</button>
+          <button onClick={() => { setOpen(false); setStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Brief ile AI tasarım (web · sunum · yayınla)">Stüdyo</button>
+          <button onClick={() => { setOpen(false); setDesignStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Katman/tuval editörü (slayt · afiş · sosyal)">Tuval</button>
           <button className="px-2.5 py-1 rounded-md bg-brand/15 text-brand">Görüntü</button>
         </div>
         {msgs.length > 0 && (
