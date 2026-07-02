@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { checkLimit } from "@/lib/rate-limit";
+import { readJson, asContent, isValidationError } from "@/lib/validate";
 
 export const runtime = "nodejs";
 
 const VALID_TYPES = new Set(["html", "svg", "mermaid"]);
-const MAX_CONTENT = 200_000; // ~200KB tek artifact üst sınırı
+const MAX_CONTENT_BYTES = 300_000; // ~300KB (bayt bazlı — asContent 413 döner)
 
 /* Artifact yayınlama: bir artifact'ı (html/svg/mermaid) bağımsız, paylaşılabilir
    bir sayfaya (/a/<id>) çevirir. /api/share deseninin aynısı. */
@@ -13,13 +14,11 @@ export async function POST(req: NextRequest) {
   const limited = checkLimit(req, "publish", 10, 60_000);
   if (limited) return NextResponse.json(limited.body, { status: limited.status, headers: { "Retry-After": String(limited.retryAfter) } });
   try {
-    const { title, type, content } = await req.json();
-    if (!type || !VALID_TYPES.has(type) || typeof content !== "string" || !content.trim()) {
-      return NextResponse.json({ error: "Geçersiz artifact" }, { status: 400 });
+    const { title, type, content: rawContent } = await readJson(req) as { title?: unknown; type?: unknown; content?: unknown };
+    if (typeof type !== "string" || !VALID_TYPES.has(type)) {
+      return NextResponse.json({ error: "Geçersiz artifact türü" }, { status: 400 });
     }
-    if (content.length > MAX_CONTENT) {
-      return NextResponse.json({ error: "Artifact çok büyük (max ~200KB)" }, { status: 400 });
-    }
+    const content = asContent(rawContent, MAX_CONTENT_BYTES);
 
     const sb = await createClient();
     if (!sb) return NextResponse.json({ error: "Veritabanı bağlantısı yok" }, { status: 503 });
@@ -39,6 +38,7 @@ export async function POST(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ id });
   } catch (e) {
+    if (isValidationError(e)) return NextResponse.json({ error: e.message }, { status: e.status });
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }

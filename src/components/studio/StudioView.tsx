@@ -170,6 +170,17 @@ export function StudioView() {
     } catch (e) { addToast((e as Error).message || "Yayınlama başarısız.", "error"); }
   };
 
+  /* Sürüm geçmişi: kaydedilen önceki üretime dön (Kaydet ile kalıcı olur). */
+  const currentVersions = currentProjectId
+    ? (config.studioProjects ?? []).find((p) => p.id === currentProjectId)?.versions ?? []
+    : [];
+  const restoreVersion = (html: string) => {
+    setArtifact({ type: "html", content: html, title: title || "Tasarım" });
+    setReloadKey((k) => k + 1);
+    setMessages((m) => [...m, { role: "assistant", text: "Önceki sürüme dönüldü — Kaydet ile kalıcı olur." }]);
+    addToast("Önceki sürüme dönüldü.", "success");
+  };
+
   const openProject = (p: StudioProject) => {
     stop();
     setBrief(p.brief); setSkillId(p.skillId ?? "landing"); setDesignSystemId(p.designSystemId || "craft");
@@ -253,6 +264,8 @@ export function StudioView() {
           setAnimate={setAnimate}
           onVariations={runVariations}
           onPublish={publishDesign}
+          versions={currentVersions}
+          onRestoreVersion={restoreVersion}
         />
       )}
 

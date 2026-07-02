@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, ExternalLink, FileText, FolderOpen, Link2, Loader2, Save, Send, Shuffle, SlidersHorizontal, Sparkles, Square, User } from "lucide-react";
+import { Download, ExternalLink, FileText, FolderOpen, History, Link2, Loader2, Save, Send, Shuffle, SlidersHorizontal, Sparkles, Square, User } from "lucide-react";
 import { STUDIO_DEVICES, type StudioDevice, type DeviceId } from "@/lib/studioConstants";
 import type { StudioPhase } from "@/lib/studioGen";
 import { downloadHtml, openInTab, printPdf } from "@/lib/studioExport";
@@ -28,6 +28,7 @@ const FONT_OPTIONS: { label: string; value: string }[] = [
 export function StudioWorkspace({
   messages, busy, phase, artifact, effectiveSrc, device, setDevice, reloadKey,
   tweaks, setTweaks, resetTweaks, title, onFollowup, onStop, onSave, onOpenProjects, animate, setAnimate, onVariations, onPublish,
+  versions, onRestoreVersion,
 }: {
   messages: StudioMsg[];
   busy: boolean;
@@ -49,10 +50,14 @@ export function StudioWorkspace({
   setAnimate: (b: boolean) => void;
   onVariations: () => void;
   onPublish: () => void;
+  /** Kaydedilmiş önceki üretimler (yeniden eskiye) — "Geçmiş" menüsü. */
+  versions?: string[];
+  onRestoreVersion?: (html: string) => void;
 }) {
   const addToast = useStore((s) => s.addToast);
   const [input, setInput] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [tweaksOpen, setTweaksOpen] = useState(true);
 
   const submit = () => { const t = input.trim(); if (!t || busy) return; setInput(""); onFollowup(t); };
@@ -124,6 +129,28 @@ export function StudioWorkspace({
             title="Animasyon: sonraki üretimde CSS animasyonları ekle"
           ><Sparkles size={12} /> Animasyon</button>
           <div className="ml-auto flex items-center gap-1">
+            {/* Sürüm geçmişi — kaydedilen önceki üretimlere dönüş */}
+            {(versions?.length ?? 0) > 0 && (
+              <div className="relative">
+                <button onClick={() => setHistoryOpen((v) => !v)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${historyOpen ? "border-brand/50 text-brand" : "border-line text-muted hover:text-ink"}`} title="Sürüm geçmişi — önceki üretimlere dön">
+                  <History size={13} /> Geçmiş
+                </button>
+                {historyOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setHistoryOpen(false)} />
+                    <div className="absolute right-0 mt-1.5 z-20 w-56 bg-surface border border-line rounded-xl shadow-2xl p-1 text-xs">
+                      {(versions ?? []).map((h, i) => (
+                        <button key={i} onClick={() => { setHistoryOpen(false); onRestoreVersion?.(h); }} className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left">
+                          <span>{i + 1} önceki sürüm</span>
+                          <span className="text-[10px] font-mono text-muted/50">{Math.max(1, Math.round(h.length / 1024))} KB</span>
+                        </button>
+                      ))}
+                      <p className="px-2.5 pt-1 pb-0.5 text-[10px] text-muted/50">Dönüş, Kaydet ile kalıcı olur.</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             <button onClick={onVariations} disabled={!artifact} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-line text-muted hover:text-ink disabled:opacity-40" title="Farklı yönlerde varyasyon üret"><Shuffle size={13} /> Varyant</button>
             <button onClick={onOpenProjects} className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-bgsoft transition-colors" title="Projelerim"><FolderOpen size={15} /></button>
             <button onClick={onSave} disabled={!artifact} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-line text-muted hover:text-ink disabled:opacity-40" title="Projeyi kaydet"><Save size={13} /> Kaydet</button>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BookmarkPlus, Check, ChevronDown, ChevronUp, Copy, Eye, GitCompareArrows, Loader2, Play, Terminal } from "lucide-react";
+import { BookmarkPlus, Check, ChevronDown, ChevronUp, Copy, Download, Eye, GitCompareArrows, Loader2, Play, Terminal } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { buildSingleBlockPreview } from "@/lib/preview";
 import { runPython } from "@/lib/python";
@@ -59,6 +59,25 @@ export function CodeBlock({
   const preview = () => {
     const art = buildSingleBlockPreview(lang, getText());
     if (art) useStore.getState().setArtifact(art);
+  };
+
+  /* Kod bloğunu dosya olarak indir — fence'te dosya yolu varsa adıyla,
+     yoksa dile uygun uzantıyla. */
+  const EXT: Record<string, string> = {
+    ts: "ts", tsx: "tsx", js: "js", javascript: "js", mjs: "mjs", jsx: "jsx",
+    python: "py", py: "py", html: "html", htm: "html", css: "css", json: "json",
+    md: "md", markdown: "md", bash: "sh", sh: "sh", shell: "sh", zsh: "sh",
+    sql: "sql", yaml: "yml", yml: "yml", svg: "svg", mermaid: "mmd", react: "tsx",
+  };
+  const download = () => {
+    const code = getText();
+    if (!code.trim()) return;
+    const name = filePath ? filePath.split("/").pop()! : `kod.${EXT[lang] ?? "txt"}`;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([code], { type: "text/plain;charset=utf-8" }));
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   };
 
   const saveSnippet = () => {
@@ -148,6 +167,9 @@ export function CodeBlock({
           </button>
           <button onClick={saveSnippet} className="flex items-center gap-1 hover:text-brand transition-colors" title="Snippet kütüphanesine kaydet">
             {saved ? <><Check size={12} /> Kaydedildi</> : <><BookmarkPlus size={12} /> Kaydet</>}
+          </button>
+          <button onClick={download} className="flex items-center gap-1 hover:text-ink transition-colors" title="Dosya olarak indir">
+            <Download size={12} /> İndir
           </button>
           <button onClick={copy} className="flex items-center gap-1 hover:text-ink transition-colors">
             {copied ? <><Check size={12} /> Kopyalandı</> : <><Copy size={12} /> Kopyala</>}

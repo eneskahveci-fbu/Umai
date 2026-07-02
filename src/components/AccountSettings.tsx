@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KeyRound, Loader2, LogOut, Mail, MessageSquare, Image as ImageIcon, Palette, ShieldAlert, UserCircle } from "lucide-react";
+import { Database, KeyRound, Loader2, LogOut, Mail, MessageSquare, Image as ImageIcon, Palette, ShieldAlert, UserCircle } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 import { isAdminEmail } from "@/lib/admin";
@@ -14,6 +14,8 @@ export function AccountSettings() {
   const userEmail = useStore((s) => s.userEmail);
   const plan = useStore((s) => s.plan);
   const config = useStore((s) => s.config);
+  const snippets = useStore((s) => s.snippets);
+  const storeUserId = useStore((s) => s.userId);
   const chats = useStore((s) => s.chats);
   const addToast = useStore((s) => s.addToast);
   const isAdmin = isAdminEmail(userEmail);
@@ -169,6 +171,32 @@ export function AccountSettings() {
           ))}
         </div>
         <p className="text-[10px] text-muted/45 mt-1.5">Toplam {msgCount} mesaj.</p>
+      </div>
+
+      {/* Verilerim — neyin nerede saklandığı tek bakışta (şeffaflık). */}
+      <div>
+        <div className="text-[10px] font-bold uppercase tracking-widest text-muted/45 mb-1.5 flex items-center gap-1"><Database size={11} /> Verilerim</div>
+        <div className="premium-card rounded-xl divide-y divide-line/40 text-xs">
+          {(() => {
+            const signedIn = !!storeUserId;
+            const synced = signedIn ? "Cihaz + hesap senkron" : "Yalnız bu cihaz";
+            const rows: { l: string; n: number; loc: string; cloud: boolean }[] = [
+              { l: "Sohbetler", n: chats.length, loc: synced, cloud: signedIn },
+              { l: "Stüdyo projeleri", n: config.studioProjects?.length ?? 0, loc: synced, cloud: signedIn },
+              { l: "Kayıtlı tasarımlar", n: config.savedDesigns?.length ?? 0, loc: synced, cloud: signedIn },
+              { l: "Snippet'ler", n: snippets.length, loc: "Yalnız bu cihaz", cloud: false },
+              { l: "API anahtarları", n: config.models.length, loc: "Bu cihazda şifreli", cloud: false },
+            ];
+            return rows.map((r) => (
+              <div key={r.l} className="flex items-center gap-2 px-3 py-2">
+                <span className="flex-1 min-w-0 truncate text-ink/85 font-medium">{r.l}</span>
+                <span className="text-muted/60 font-mono">{r.n}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-md border shrink-0 ${r.cloud ? "border-brand/30 bg-brand/10 text-brand/90" : "border-line/60 text-muted/60"}`}>{r.loc}</span>
+              </div>
+            ));
+          })()}
+        </div>
+        <p className="text-[10px] text-muted/45 mt-1.5">Tam yedek indirmek/geri yüklemek için: Ayarlar → Temel → Yedek.</p>
       </div>
 
       {/* Görünen ad */}
