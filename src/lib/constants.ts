@@ -129,6 +129,12 @@ export const PRESETS: Record<Provider, Preset> = {
     model: "gpt-4o-mini",
     keyHint: "GitHub token (models:read izinli — github.com/settings/tokens)",
   },
+  nvidia: {
+    label: "🟩 NVIDIA NIM (Ücretsiz)",
+    baseUrl: "https://integrate.api.nvidia.com/v1",
+    model: "meta/llama-3.3-70b-instruct",
+    keyHint: "nvapi-… (build.nvidia.com — ücretsiz anahtar)",
+  },
   ollama: {
     label: "💻 Ollama (Yerel / Ücretsiz)",
     baseUrl: "http://localhost:11434/v1",
@@ -232,6 +238,14 @@ export const PROVIDER_MODELS: Record<Provider, string[]> = {
     "DeepSeek-R1",
     "Meta-Llama-3.1-70B-Instruct",
     "Mistral-large-2407",
+  ],
+  nvidia: [
+    "meta/llama-3.3-70b-instruct",
+    "qwen/qwen2.5-coder-32b-instruct",
+    "deepseek-ai/deepseek-r1",
+    "deepseek-ai/deepseek-v3.1",
+    "moonshotai/kimi-k2-instruct",
+    "nvidia/llama-3.1-nemotron-70b-instruct",
   ],
   ollama: [
     "qwen2.5-coder:7b",
