@@ -522,10 +522,46 @@ export function DesignStudio() {
     else setPages(snap);
   };
 
+  /* "Sunum" → GERÇEK 4 slaytlık iskelet (kapak · ajanda · içerik · teşekkür).
+     Tek sayfalık default template açılış dokümanıyla aynı olduğundan eskiden
+     tıklamanın görünür etkisi yoktu ("çalışmıyor" hissi). */
+  const deckPages = (f: typeof FORMATS[number]): Design[] => {
+    const base = (c1: string, c2: string): Design =>
+      ({ fmt: f.id, w: f.w, h: f.h, bgType: "gradient", c1, c2, bgImage: "", layers: [] });
+    const L = (text: string, x: number, y: number, pct: number, color: string, weight: number, align: Align, font: number): Layer =>
+      ({ id: uid(), text, x, y, size: Math.round(f.w * pct), color, weight, align, font: FONTS[font] ?? FONTS[0] });
+    return [
+      { ...base("#1e293b", "#0f172a"), layers: [
+        L("SUNUM BAŞLIĞI", 0.5, 0.42, 0.07, "#ffffff", 800, "center", 5),
+        L("Alt başlık · konuşmacı adı", 0.5, 0.56, 0.028, "#94a3b8", 400, "center", 5),
+      ] },
+      { ...base("#0f172a", "#334155"), layers: [
+        L("Ajanda", 0.08, 0.2, 0.06, "#f1f5f9", 800, "left", 5),
+        L("1 · Giriş", 0.1, 0.42, 0.034, "#cbd5e1", 600, "left", 5),
+        L("2 · Ana konu", 0.1, 0.54, 0.034, "#cbd5e1", 600, "left", 5),
+        L("3 · Sonuç", 0.1, 0.66, 0.034, "#cbd5e1", 600, "left", 5),
+      ] },
+      { ...base("#0f172a", "#334155"), layers: [
+        L("01", 0.08, 0.3, 0.12, "#38bdf8", 800, "left", 5),
+        L("Bölüm Başlığı", 0.08, 0.5, 0.06, "#f1f5f9", 800, "left", 5),
+        L("kısa açıklama satırı — çift tıkla düzenle", 0.08, 0.62, 0.026, "#94a3b8", 400, "left", 5),
+      ] },
+      { ...base("#1e293b", "#0f172a"), layers: [
+        L("Teşekkürler", 0.5, 0.44, 0.085, "#ffffff", 800, "center", 5),
+        L("sorular & iletişim", 0.5, 0.6, 0.028, "#94a3b8", 400, "center", 5),
+      ] },
+    ];
+  };
+
   const startProject = (t: typeof START_TABS[number]) => {
     if (t.id === "sablon") { setView("templates"); return; }
     const f = FORMATS.find((x) => x.id === t.fmt) ?? FORMATS[0];
-    resetDoc([template(f, t.id)]);
+    if (t.id === "sunum") {
+      resetDoc(deckPages(f));
+      addToast("4 slaytlık sunum iskeleti hazır — alttaki şeritten sayfalar arasında geç.", "success");
+    } else {
+      resetDoc([template(f, t.id)]);
+    }
     clearSel(); setSpacing(1); setScale(1); setHue(0);
   };
 
@@ -883,14 +919,14 @@ KURALLAR:
           <button className="px-2.5 py-1 rounded-md bg-brand/15 text-brand">Tuval</button>
           <button onClick={() => nav.go("image")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="AI görsel üretimi">Görüntü</button>
         </div>
-        {/* (a) Alt mod — Tuval (katman) | Kod (HTML/React) */}
-        <div className="flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
+        {/* (a) Alt mod — Tuval (katman) | Kod (HTML/React). Mobilde ⋯ menüde. */}
+        <div className="hidden sm:flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
           <button onClick={() => setDmode("canvas")} className={`px-2 py-1 rounded-md transition-colors ${dmode === "canvas" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`}>Tuval</button>
           <button onClick={() => setDmode("code")} className={`px-2 py-1 rounded-md transition-colors ${dmode === "code" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`}>Kod</button>
         </div>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tasarım adı…" className="hidden md:block ml-2 w-40 bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50" />
         {dmode === "canvas" && (
-          <div className="flex items-center gap-0.5 ml-1 shrink-0">
+          <div className="hidden sm:flex items-center gap-0.5 ml-1 shrink-0">
             <button onClick={doUndo} disabled={!hist.past.length} title="Geri al (Ctrl+Z)" className="w-8 h-8 grid place-items-center rounded-lg border border-line text-muted hover:text-ink disabled:opacity-30 transition-colors"><Undo2 size={14} /></button>
             <button onClick={doRedo} disabled={!hist.future.length} title="Yinele (Ctrl+Y)" className="w-8 h-8 grid place-items-center rounded-lg border border-line text-muted hover:text-ink disabled:opacity-30 transition-colors"><Redo2 size={14} /></button>
           </div>
@@ -923,6 +959,17 @@ KURALLAR:
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setStudioMenu(false)} />
                 <div className="absolute right-0 mt-1.5 z-20 w-52 bg-surface border border-line rounded-xl shadow-2xl p-1 text-sm">
+                  {/* Mobilde üst bardan kaldırılanlar (⋯'den erişilir) */}
+                  <div className="sm:hidden">
+                    <button onClick={() => { setDmode((m) => (m === "code" ? "canvas" : "code")); setStudioMenu(false); }} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><FileCode size={14} className={dmode === "code" ? "text-brand" : "text-muted/60"} /> Kod modu {dmode === "code" ? "✓" : ""}</button>
+                    {dmode === "canvas" && (
+                      <div className="flex gap-1 px-2 pb-1">
+                        <button onClick={doUndo} disabled={!hist.past.length} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-line text-xs text-muted hover:text-ink disabled:opacity-30"><Undo2 size={13} /> Geri al</button>
+                        <button onClick={doRedo} disabled={!hist.future.length} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-line text-xs text-muted hover:text-ink disabled:opacity-30"><Redo2 size={13} /> Yinele</button>
+                      </div>
+                    )}
+                    <div className="h-px bg-line/60 my-1" />
+                  </div>
                   <button onClick={() => { setView((v) => (v === "templates" ? "design" : "templates")); setStudioMenu(false); }} className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left ${view === "templates" ? "text-brand" : ""}`}><LayoutTemplate size={14} className="text-brand" /> Hazır şablonlar</button>
                   <button onClick={() => { setView((v) => (v === "gallery" ? "design" : "gallery")); setStudioMenu(false); }} className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left ${view === "gallery" ? "text-brand" : ""}`}><span className="flex items-center gap-2"><LayoutGrid size={14} className="text-brand" /> Kayıtlı tasarımlar</span><span className="text-[10px] font-mono text-muted/60">{saved.length}</span></button>
                   <div className="h-px bg-line/60 my-1" />
@@ -1019,7 +1066,7 @@ KURALLAR:
                 <div className="flex-1 overflow-y-auto p-3 space-y-3">
                   {msgs.length === 0 ? (
                     <div className="space-y-2">
-                      <div className="text-xs text-muted/60 leading-relaxed">Ne tasarlamak istediğini yaz — başlık, düzen, renk, hedef kitle ne kadar net olursa o kadar iyi. İstersen görsel de ekle.</div>
+                      <div className="text-xs text-muted/60 leading-relaxed">Ne tasarlamak istediğini yaz — istersen görsel de ekle.</div>
                       {SUGGESTIONS.map((s) => (
                         <button key={s} onClick={() => setInput(s)} className="w-full text-left text-[12px] leading-snug px-2.5 py-2 rounded-xl border border-line/60 hover:border-brand/50 hover:bg-bgsoft/60 text-muted hover:text-ink transition-colors">{s}</button>
                       ))}

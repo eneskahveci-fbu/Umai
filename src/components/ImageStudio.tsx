@@ -325,7 +325,7 @@ export function ImageStudio() {
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-              placeholder="Bir görsel tarifle… (Enter ile üret, Shift+Enter satır)"
+              placeholder="Bir görsel tarifle… (Enter = üret)"
               rows={1}
               className="flex-1 bg-transparent text-sm outline-none resize-none max-h-32 py-1.5"
             />
@@ -349,7 +349,7 @@ export function ImageStudio() {
 
           {/* Seçenekler: model · format · adet */}
           <div className="flex items-center gap-2 mt-2 flex-wrap">
-            <select value={model} onChange={(e) => setModel(e.target.value)} className="bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs outline-none focus:border-brand/50 cursor-pointer">
+            <select value={model} onChange={(e) => setModel(e.target.value)} className="flex-1 min-w-[130px] max-w-[220px] bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs outline-none focus:border-brand/50 cursor-pointer">
               <optgroup label="Ücretsiz (Pollinations)">
                 {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
               </optgroup>
@@ -359,7 +359,7 @@ export function ImageStudio() {
                 </optgroup>
               )}
             </select>
-            <select value={format} onChange={(e) => setFormat(e.target.value)} className="bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs outline-none focus:border-brand/50 cursor-pointer">
+            <select value={format} onChange={(e) => setFormat(e.target.value)} className="flex-1 min-w-[100px] max-w-[160px] bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs outline-none focus:border-brand/50 cursor-pointer">
               {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
             </select>
             <div className="flex items-center gap-0.5 bg-bgsoft border border-line rounded-lg p-0.5">

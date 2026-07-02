@@ -115,7 +115,11 @@ export function StudioWorkspace({
             ))}
           </div>
           <button
-            onClick={() => setAnimate(!animate)}
+            onClick={() => {
+              const next = !animate;
+              setAnimate(next);
+              addToast(next ? "Animasyon açık — bir sonraki üretimde/değişiklikte uygulanır." : "Animasyon kapalı.", "info");
+            }}
             className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium border transition-colors ${animate ? "border-brand bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"}`}
             title="Animasyon: sonraki üretimde CSS animasyonları ekle"
           ><Sparkles size={12} /> Animasyon</button>

@@ -5,6 +5,7 @@ import { ArrowUp, Check, FolderOpen, LayoutGrid, Loader2, Sparkles } from "lucid
 import { useStore } from "@/lib/store";
 import { skillsByCategory, STUDIO_DIRECTIONS } from "@/lib/studioConstants";
 import { allDesignSystems } from "@/lib/designSystems";
+import { AccordionSection } from "@/components/Accordion";
 
 /* Kategoriye göre ikon karosu gradyanı — görsel varlıksız (saf CSS) "önizleme"
    hissi. Bilinmeyen kategori marka tonuna düşer. */
@@ -124,43 +125,55 @@ export function StudioHome({
           </div>
         </div>
 
-        {/* Tasarım sistemi (marka) */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted/70">Tasarım sistemi</h3>
-            <button onClick={onBrowseSystems} className="flex items-center gap-1 text-xs text-brand hover:underline"><LayoutGrid size={12} /> Göz at</button>
+        {/* Ayrıntılar — Claude-minimal: tasarım sistemi + yön varsayılanla çalışır,
+            isteyen tek katlanır bölümden değiştirir (seçim rozette görünür). */}
+        <AccordionSection
+          id="studio-detay"
+          title="Ayrıntılar"
+          defaultOpen={false}
+          badge={
+            <span className="text-[10px] text-muted/60 font-medium truncate max-w-[180px]">
+              {(systems.find((s) => s.id === designSystemId)?.name ?? "Craft")} · {(STUDIO_DIRECTIONS.find((d) => d.id === directionId)?.name ?? "Minimal")}
+            </span>
+          }
+        >
+          <div className="space-y-4 pt-1">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted/70">Tasarım sistemi</h3>
+                <button onClick={onBrowseSystems} className="flex items-center gap-1 text-xs text-brand hover:underline"><LayoutGrid size={12} /> Göz at</button>
+              </div>
+              <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+                {systems.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setDesignSystemId(s.id)}
+                    title={s.category}
+                    className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${designSystemId === s.id ? "border-brand bg-brand/10 text-brand" : "border-line bg-surface text-muted hover:text-ink"}`}
+                  >
+                    <span className="w-3 h-3 rounded-full border border-line/50 shrink-0" style={{ background: s.accent }} />
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted/70 mb-2">Tasarım yönü</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {STUDIO_DIRECTIONS.map((d) => (
+                  <button
+                    key={d.id}
+                    onClick={() => setDirectionId(d.id)}
+                    title={d.hint}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${directionId === d.id ? "border-brand bg-brand/10 text-brand" : "border-line bg-surface text-muted hover:text-ink"}`}
+                  >
+                    {d.name}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
-            {systems.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setDesignSystemId(s.id)}
-                title={s.category}
-                className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${designSystemId === s.id ? "border-brand bg-brand/10 text-brand" : "border-line bg-surface text-muted hover:text-ink"}`}
-              >
-                <span className="w-3 h-3 rounded-full border border-line/50 shrink-0" style={{ background: s.accent }} />
-                {s.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Tasarım yönü */}
-        <div>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-muted/70 mb-2">Tasarım yönü</h3>
-          <div className="flex flex-wrap gap-1.5">
-            {STUDIO_DIRECTIONS.map((d) => (
-              <button
-                key={d.id}
-                onClick={() => setDirectionId(d.id)}
-                title={d.hint}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${directionId === d.id ? "border-brand bg-brand/10 text-brand" : "border-line bg-surface text-muted hover:text-ink"}`}
-              >
-                {d.name}
-              </button>
-            ))}
-          </div>
-        </div>
+        </AccordionSection>
       </div>
     </div>
   );
