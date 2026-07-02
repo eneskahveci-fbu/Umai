@@ -128,6 +128,7 @@ export type Provider =
   | "openai"
   | "pollinations"
   | "github"
+  | "nvidia"
   | "custom";
 
 export interface ModelProfile {

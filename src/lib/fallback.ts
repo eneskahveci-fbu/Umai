@@ -34,6 +34,7 @@ const PROVIDER_RANK: Partial<Record<Provider, number>> = {
   gemini: 0, // Sonnet seviyesi, çok cömert ücretsiz kota
   groq: 1, // çok hızlı, ücretsiz
   cerebras: 2, // hızlı, ücretsiz
+  nvidia: 2.5, // NVIDIA NIM — ücretsiz, geniş açık model kataloğu
   github: 3, // GitHub Models — ücretsiz
   openrouter: 4, // birçok ücretsiz model
   pollinations: 5, // anahtarsız taban

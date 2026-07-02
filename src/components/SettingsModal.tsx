@@ -70,7 +70,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   /* Admin kapısı: hassas sunucu/terminal ayarları yalnız admin e-postasına açık.
      Liste boşken (kurulum öncesi) herkese açık — kimse kilitlenmez. */
   const isAdmin = isAdminEmail(useStore((s) => s.userEmail));
-  const addModel = useStore((s) => s.addModel);
   const updateModel = useStore((s) => s.updateModel);
   const removeModel = useStore((s) => s.removeModel);
   const setActiveModel = useStore((s) => s.setActiveModel);
@@ -172,7 +171,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     plan:     ["plan", "pro", "abonelik", "yükselt", "upgrade", "ödeme", "fatura", "stripe", "premium"],
     hakkinda: ["hakkında", "about", "sürüm", "version", "gizlilik", "şartlar", "lisans", "iletişim", "destek"],
     extensions: ["eklenti", "extension", "paket", "pack", "git", "ci", "cd", "kural", "web", "modül", "modular"],
-    model:    ["model", "api", "anahtar", "key", "openai", "anthropic", "huggingface", "hf", "provider", "test"],
+    model:    ["model", "api", "anahtar", "key", "openai", "anthropic", "huggingface", "hf", "nvidia", "nim", "provider", "test"],
     github:   ["github", "gitlab", "token", "depo", "repo", "branch", "dal", "kullanıcı", "username"],
     general:  ["sistem", "prompt", "stil", "style", "tema", "theme", "renk", "color", "accent", "font", "yazı", "ses", "sound", "skill", "memori", "ayar"],
     advanced: ["webcontainer", "key", "context", "max", "guest", "misafir", "kural", "rules", "rulesfile", "gelişmiş"],
@@ -219,11 +218,10 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   const [accountRepos, setAccountRepos] = useState<string[]>([]);
   const [loadingAccountRepos, setLoadingAccountRepos] = useState(false);
   const [testing, setTesting] = useState(false);
-  /* Hızlı kurulum: herhangi bir sağlayıcı için anahtar ekle + test et */
-  const [quickProvider, setQuickProvider] = useState<Provider>("gemini");
-  const [quickKey, setQuickKey] = useState("");
+  /* Birleşik model ekleme: ekle + aktif yap + test durumu ve Gelişmiş bölümü. */
   const [quickBusy, setQuickBusy] = useState(false);
   const [quickResult, setQuickResult] = useState<null | "ok" | string>(null);
+  const [advOpen, setAdvOpen] = useState(false);
   const [memInput, setMemInput] = useState("");
   /* Özel yazı stili oluşturma formu. */
   const [styleFormOpen, setStyleFormOpen] = useState(false);
@@ -356,19 +354,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     }
   };
 
-  const submitModel = () => {
-    if (!baseUrl.trim() || !model.trim()) { addToast("Base URL ve model gerekli.", "error"); return; }
-    /* Anahtar boşsa sağlayıcı için kayıtlı anahtarı kullan; doluysa onu hem
-       modele yaz hem de sağlayıcı hafızasına kaydet (ömür boyu hatırlanır). */
-    const key = apiKey.trim() || config.providerKeys?.[provider] || "";
-    if (apiKey.trim()) {
-      saveConfig({ ...config, providerKeys: { ...config.providerKeys, [provider]: apiKey.trim() } });
-    }
-    addModel({ label: label.trim() || model.trim(), provider, baseUrl: baseUrl.trim(), model: model.trim(), apiKey: key });
-    addToast("Model eklendi.", "success");
-    setLabel("");
-  };
-
   const submitGithub = async () => {
     if (!ghToken.trim()) { addToast("GitHub token gerekli (ghp_...).", "error"); return; }
     setVerifyingGithub(true);
@@ -462,46 +447,41 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     xai: "https://console.x.ai",
     hf: "https://huggingface.co/settings/tokens",
     github: "https://github.com/settings/tokens",
+    nvidia: "https://build.nvidia.com",
   };
-  /* Hızlı kurulumda sunulan sağlayıcılar (anahtar gerektirenler; pollinations
-     anahtarsız çalışır, ollama yereldir, custom manuel → alttaki formdan eklenir). */
-  const QUICK_PROVIDERS: Provider[] = ["gemini", "groq", "github", "openrouter", "deepseek", "anthropic", "mistral", "cerebras", "together", "xai", "hf"];
+  /* Anahtarsız çalışabilen sağlayıcılar (anahtar alanı opsiyonel). */
+  const KEY_OPTIONAL: Provider[] = ["pollinations", "ollama", "custom"];
   /* PRESET etiketinden kısa, temiz ad (emoji + parantez kırpılır). */
   const cleanLabel = (p: Provider) => PRESETS[p].label.replace(/\s*\([^)]*\)\s*$/, "").replace(/^[^\p{L}]*/u, "").trim();
 
-  /* Ücretsiz modeli ekle, aktif yap ve canlı test et. */
-  const quickSetup = async () => {
-    const key = quickKey.trim();
-    if (!key) { addToast("Önce ücretsiz anahtarı yapıştır.", "error"); return; }
-    const preset = PRESETS[quickProvider];
+  /* Birleşik ekleme: preset (veya Gelişmiş'teki override'lar) ile modeli ekle,
+     AKTİF yap, anahtarı sağlayıcı hafızasına yaz ve canlı test et. */
+  const addAndTest = async () => {
+    const key = apiKey.trim() || config.providerKeys?.[provider] || "";
+    if (!key && !KEY_OPTIONAL.includes(provider)) { addToast("Önce API anahtarını yapıştır.", "error"); return; }
+    const bu = baseUrl.trim() || PRESETS[provider].baseUrl;
+    const mdl = model.trim() || PRESETS[provider].model;
+    if (!bu || !mdl) { addToast("Base URL ve model gerekli (Gelişmiş bölümünden gir).", "error"); return; }
     const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `m_${Date.now()}`;
-    const newModel = {
-      id,
-      label: cleanLabel(quickProvider),
-      provider: quickProvider as Provider,
-      baseUrl: preset.baseUrl,
-      model: preset.model,
-      apiKey: key,
-    };
-    /* addModel mevcut aktif modeli korur; burada yeni modeli aktif yapıyoruz.
-       Anahtar sağlayıcı hafızasına da kaydedilir → ömür boyu hatırlanır. */
+    const newModel = { id, label: label.trim() || cleanLabel(provider), provider, baseUrl: bu, model: mdl, apiKey: key };
+    /* addModel mevcut aktif modeli korur; burada yeni model aktif yapılır. */
     saveConfig({
       ...config,
       models: [...config.models, newModel],
       activeModelId: id,
-      providerKeys: { ...config.providerKeys, [quickProvider]: key },
+      providerKeys: key ? { ...config.providerKeys, [provider]: key } : config.providerKeys,
     });
+    setLabel("");
     setQuickBusy(true);
     setQuickResult(null);
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [{ role: "user", content: "Merhaba" }], baseUrl: preset.baseUrl, model: preset.model, apiKey: key, provider: quickProvider }),
+        body: JSON.stringify({ messages: [{ role: "user", content: "Merhaba" }], baseUrl: bu, model: mdl, apiKey: key, provider }),
       });
       if (res.ok) {
         setQuickResult("ok");
-        setQuickKey("");
         addToast("Model eklendi ve çalışıyor — artık aktif.", "success");
       } else {
         const t = (await res.text()).slice(0, 140);
@@ -667,58 +647,60 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
           <section>
             <p className="text-xs text-muted mb-3">Birden fazla model ekleyebilirsin. Anahtarlar yalnızca bu tarayıcıda saklanır.</p>
             
-            {/* Hızlı kurulum: ücretsiz, güvenilir model */}
+            {/* Birleşik model ekleme — hızlı kurulum + gelişmiş TEK alanda.
+               Varsayılan akış: sağlayıcı seç → anahtarı yapıştır → Ekle ve test et
+               (eklenir, aktif olur, canlı test edilir). Gelişmiş: ad/BaseURL/model. */}
             <div className="mb-4 rounded-xl border border-brand/30 bg-brand/8 p-3.5">
               <div className="flex items-center gap-1.5 text-xs font-bold text-brand mb-1.5">
-                <Zap size={14} /> Hızlı kurulum — bir sağlayıcı seç, anahtarı yapıştır
+                <Zap size={14} /> Model ekle — sağlayıcı seç, anahtarı yapıştır
               </div>
               <p className="text-[11px] text-muted leading-relaxed mb-2">
-                Sağlayıcıyı seç, anahtarını yapıştır — base URL ve varsayılan model otomatik
-                ayarlanır, eklenip test edilir ve aktif olur. Anahtar yalnızca tarayıcında kalır.
+                Base URL ve varsayılan model otomatik ayarlanır; model eklenir, test edilir
+                ve aktif olur. Anahtar yalnızca tarayıcında kalır.
               </p>
-              {/* Önerilen ücretsiz açık-kaynak modeller — tek tıkla seç (ücretsiz anahtar) */}
+              {/* Önerilen ücretsiz sağlayıcılar — tek tıkla seç */}
               <div className="flex flex-wrap gap-1.5 mb-2.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted/45 w-full">Önerilen ücretsiz · açık kaynak</span>
-                {(["gemini", "groq", "cerebras", "openrouter"] as Provider[]).map((p) => (
+                {(["gemini", "groq", "nvidia", "cerebras", "openrouter"] as Provider[]).map((p) => (
                   <button
                     key={p}
-                    onClick={() => { setQuickProvider(p); setQuickResult(null); setQuickKey(config.providerKeys?.[p] ?? ""); }}
-                    className={`px-2.5 py-1 rounded-full border text-[11px] font-semibold transition-colors ${quickProvider === p ? "border-brand/50 bg-brand/12 text-brand" : "border-line/60 text-muted hover:text-ink hover:border-brand/30"}`}
+                    onClick={() => { onProvider(p); setQuickResult(null); }}
+                    className={`px-2.5 py-1 rounded-full border text-[11px] font-semibold transition-colors ${provider === p ? "border-brand/50 bg-brand/12 text-brand" : "border-line/60 text-muted hover:text-ink hover:border-brand/30"}`}
                   >
                     {cleanLabel(p)}
                   </button>
                 ))}
               </div>
               <select
-                value={quickProvider}
-                onChange={(e) => { const p = e.target.value as Provider; setQuickProvider(p); setQuickResult(null); setQuickKey(config.providerKeys?.[p] ?? ""); }}
+                value={provider}
+                onChange={(e) => { onProvider(e.target.value as Provider); setQuickResult(null); }}
                 className="input-mono w-full mb-2.5"
               >
-                {QUICK_PROVIDERS.map((p) => (
+                {(Object.keys(PRESETS) as Provider[]).map((p) => (
                   <option key={p} value={p}>{PRESETS[p].label}</option>
                 ))}
               </select>
-              {QUICK_KEY_URL[quickProvider] && (
+              {QUICK_KEY_URL[provider] && (
                 <a
-                  href={QUICK_KEY_URL[quickProvider]}
+                  href={QUICK_KEY_URL[provider]}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-[11px] text-brand hover:text-branddim underline mb-2"
                 >
-                  {cleanLabel(quickProvider)} anahtarı al <ExternalLink size={11} />
+                  {cleanLabel(provider)} anahtarı al <ExternalLink size={11} />
                 </a>
               )}
               <div className="flex gap-1.5">
                 <input
-                  value={quickKey}
-                  onChange={(e) => { setQuickKey(e.target.value); setQuickResult(null); }}
-                  placeholder={PRESETS[quickProvider].keyHint}
+                  value={apiKey}
+                  onChange={(e) => { setApiKey(e.target.value); setQuickResult(null); }}
+                  placeholder={PRESETS[provider].keyHint}
                   className="input-mono flex-1"
-                  onKeyDown={(e) => { if (e.key === "Enter" && !quickBusy) quickSetup(); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !quickBusy) addAndTest(); }}
                 />
                 <button
-                  onClick={quickSetup}
-                  disabled={quickBusy || !quickKey.trim()}
+                  onClick={addAndTest}
+                  disabled={quickBusy || (!apiKey.trim() && !config.providerKeys?.[provider] && !KEY_OPTIONAL.includes(provider))}
                   className="px-3 py-2 rounded-lg bg-brand hover:bg-branddim text-white text-xs font-semibold disabled:opacity-40 flex items-center gap-1.5 shrink-0"
                 >
                   {quickBusy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Ekle ve test et
@@ -731,6 +713,43 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               )}
               {quickResult && quickResult !== "ok" && (
                 <div className="mt-2 text-[11px] text-red break-words">Test başarısız: {quickResult}</div>
+              )}
+
+              {/* Gelişmiş — ad · Base URL · model (custom seçilince otomatik açık) */}
+              <button
+                type="button"
+                onClick={() => setAdvOpen((v) => !v)}
+                className="mt-2.5 flex items-center gap-1 text-[11px] font-semibold text-muted hover:text-ink transition-colors"
+              >
+                <ChevronRight size={12} className={`transition-transform ${advOpen || provider === "custom" ? "rotate-90" : ""}`} />
+                Gelişmiş — görünen ad · Base URL · model seçimi
+              </button>
+              {(advOpen || provider === "custom") && (
+                <div className="grid gap-2 mt-2">
+                  <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Görünen ad (opsiyonel)" className="input-mono" />
+                  <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="Base URL" className="input-mono" />
+                  {fetchedModels.length > 0 ? (
+                    <select value={model} onChange={(e) => setModel(e.target.value)} className="input-mono">
+                      {!fetchedModels.includes(model) && model && <option value={model}>{model}</option>}
+                      {fetchedModels.map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  ) : (
+                    <>
+                      <input value={model} onChange={(e) => setModel(e.target.value)} list="model-suggestions" placeholder="Model adı — anahtar girince otomatik dolar" className="input-mono" />
+                      <datalist id="model-suggestions">
+                        {(PROVIDER_MODELS[provider] ?? []).map((m) => <option key={m} value={m} />)}
+                      </datalist>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => loadModels()}
+                    disabled={loadingModels}
+                    className="flex items-center justify-center gap-1.5 py-2 rounded-xl border border-line hover:border-brand text-xs font-semibold text-muted hover:text-ink transition-colors disabled:opacity-50"
+                  >
+                    {loadingModels ? "Modeller yükleniyor…" : fetchedModels.length > 0 ? `↻ Modelleri yenile (${fetchedModels.length})` : "↻ Anahtarla modelleri getir"}
+                  </button>
+                </div>
               )}
             </div>
 
@@ -805,37 +824,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 </div>
               );
             })()}
-            <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50">
-              <div className="text-xs font-bold text-muted uppercase tracking-wide mb-3">+ Yeni Model Ekle</div>
-              <div className="grid gap-2.5">
-                <select value={provider} onChange={(e) => onProvider(e.target.value as Provider)} className="input-mono">{(Object.keys(PRESETS) as Provider[]).map((p) => <option key={p} value={p}>{PRESETS[p].label}</option>)}</select>
-                <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Görünen ad (opsiyonel)" className="input-mono" />
-                <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="Base URL" className="input-mono" />
-                <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={`API anahtarı — ${PRESETS[provider].keyHint}`} className="input-mono" />
-                {fetchedModels.length > 0 ? (
-                  <select value={model} onChange={(e) => setModel(e.target.value)} className="input-mono">
-                    {!fetchedModels.includes(model) && model && <option value={model}>{model}</option>}
-                    {fetchedModels.map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                ) : (
-                  <>
-                    <input value={model} onChange={(e) => setModel(e.target.value)} list="model-suggestions" placeholder="Model adı — anahtar girince otomatik dolar" className="input-mono" />
-                    <datalist id="model-suggestions">
-                      {(PROVIDER_MODELS[provider] ?? []).map((m) => <option key={m} value={m} />)}
-                    </datalist>
-                  </>
-                )}
-                <button
-                  type="button"
-                  onClick={() => loadModels()}
-                  disabled={loadingModels}
-                  className="flex items-center justify-center gap-1.5 py-2 rounded-xl border border-line hover:border-brand text-xs font-semibold text-muted hover:text-ink transition-colors disabled:opacity-50"
-                >
-                  {loadingModels ? "Modeller yükleniyor…" : fetchedModels.length > 0 ? `↻ Modelleri yenile (${fetchedModels.length})` : "↻ Anahtarla modelleri getir"}
-                </button>
-                <button onClick={submitModel} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-brand hover:bg-branddim text-white text-sm font-semibold"><Plus size={15} /> Model Ekle</button>
-              </div>
-            </div>
           </section>
         )}
 
