@@ -6,6 +6,7 @@ import {
   MessageSquare, MoreHorizontal, Plus, Redo2, RotateCw, Save, Send, Sliders, Sparkles, Trash2, Type, Undo2, Upload, Wand2, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { useSurfaceNav } from "@/lib/surfaceNav";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import { buildFallbackChain } from "@/lib/fallback";
 import { buildSingleBlockPreview, parseBlocks } from "@/lib/preview";
@@ -311,9 +312,7 @@ function applyView(d: Design, spacing: number, scale: number, hue: number): Desi
 
 export function DesignStudio() {
   const open = useStore((s) => s.designStudioOpen);
-  const setOpen = useStore((s) => s.setDesignStudioOpen);
-  const setImageStudioOpen = useStore((s) => s.setImageStudioOpen);
-  const setStudioOpen = useStore((s) => s.setStudioOpen);
+  const nav = useSurfaceNav();
   const config = useStore((s) => s.config);
   const saveConfig = useStore((s) => s.saveConfig);
   const addToast = useStore((s) => s.addToast);
@@ -874,15 +873,15 @@ KURALLAR:
         : { background: `linear-gradient(135deg, ${p.c1}, ${p.c2})` };
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+    <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       {/* Üst araç çubuğu */}
       <div className="brand-rule glass shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5">
         <span className="w-8 h-8 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0"><Sparkles size={16} /></span>
         {/* Tek stüdyo, üç mod: Stüdyo (brief→AI) · Tuval (bu) · Görüntü. */}
         <div className="flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
-          <button onClick={() => { setOpen(false); setStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Brief ile AI tasarım (web · sunum · yayınla)">Stüdyo</button>
+          <button onClick={() => nav.go("studio")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Brief ile AI tasarım (web · sunum · yayınla)">Stüdyo</button>
           <button className="px-2.5 py-1 rounded-md bg-brand/15 text-brand">Tuval</button>
-          <button onClick={() => { setOpen(false); setImageStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="AI görsel üretimi">Görüntü</button>
+          <button onClick={() => nav.go("image")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="AI görsel üretimi">Görüntü</button>
         </div>
         {/* (a) Alt mod — Tuval (katman) | Kod (HTML/React) */}
         <div className="flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
@@ -941,7 +940,7 @@ KURALLAR:
             )}
           </div>
 
-          <button onClick={() => setOpen(false)} className="w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors"><X size={16} /></button>
+          <button onClick={() => nav.close()} className="w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors"><X size={16} /></button>
         </div>
       </div>
 

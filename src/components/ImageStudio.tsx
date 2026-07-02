@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, ImageIcon, Loader2, Send, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { useSurfaceNav } from "@/lib/surfaceNav";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import { buildFallbackChain } from "@/lib/fallback";
 
@@ -58,9 +59,7 @@ function imgUrl(prompt: string, model: string, w: number, h: number, seed: numbe
 
 export function ImageStudio() {
   const open = useStore((s) => s.imageStudioOpen);
-  const setOpen = useStore((s) => s.setImageStudioOpen);
-  const setDesignStudioOpen = useStore((s) => s.setDesignStudioOpen);
-  const setStudioOpen = useStore((s) => s.setStudioOpen);
+  const nav = useSurfaceNav();
   const addToast = useStore((s) => s.addToast);
   const config = useStore((s) => s.config);
 
@@ -227,7 +226,7 @@ export function ImageStudio() {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+    <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       {/* Üst bar */}
       <div className="brand-rule glass shrink-0 flex items-center gap-3 px-4 sm:px-6 py-3">
         <span className="w-8 h-8 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0">
@@ -235,8 +234,8 @@ export function ImageStudio() {
         </span>
         {/* Tek stüdyo, üç mod: Stüdyo (brief→AI) · Tuval · Görüntü (bu). */}
         <div className="flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
-          <button onClick={() => { setOpen(false); setStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Brief ile AI tasarım (web · sunum · yayınla)">Stüdyo</button>
-          <button onClick={() => { setOpen(false); setDesignStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Katman/tuval editörü (slayt · afiş · sosyal)">Tuval</button>
+          <button onClick={() => nav.go("studio")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Brief ile AI tasarım (web · sunum · yayınla)">Stüdyo</button>
+          <button onClick={() => nav.go("canvas")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Katman/tuval editörü (slayt · afiş · sosyal)">Tuval</button>
           <button className="px-2.5 py-1 rounded-md bg-brand/15 text-brand">Görüntü</button>
         </div>
         {msgs.length > 0 && (
@@ -245,7 +244,7 @@ export function ImageStudio() {
           </button>
         )}
         <button
-          onClick={() => setOpen(false)}
+          onClick={() => nav.close()}
           className={`${msgs.length > 0 ? "" : "ml-auto"} w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors`}
           title="Kapat"
         >

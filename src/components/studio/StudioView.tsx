@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Image as ImageIcon, LayoutTemplate, Sparkles, X } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { useSurfaceNav } from "@/lib/surfaceNav";
 import type { Artifact, StudioProject } from "@/lib/types";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
 import { deviceById, skillById, STUDIO_DIRECTIONS, type DeviceId } from "@/lib/studioConstants";
@@ -39,9 +40,7 @@ function applyTweaks(html: string, t: StudioTweaks): string {
 
 export function StudioView() {
   const open = useStore((s) => s.studioOpen);
-  const setOpen = useStore((s) => s.setStudioOpen);
-  const setImageStudioOpen = useStore((s) => s.setImageStudioOpen);
-  const setDesignStudioOpen = useStore((s) => s.setDesignStudioOpen);
+  const nav = useSurfaceNav();
   const config = useStore((s) => s.config);
   const saveConfig = useStore((s) => s.saveConfig);
   const addToast = useStore((s) => s.addToast);
@@ -195,7 +194,7 @@ export function StudioView() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col">
+    <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0">
       {/* Üst bar — mod seçici + başlık + kapat */}
       <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line">
         <div className="flex items-center gap-1.5 text-sm font-bold">
@@ -204,8 +203,8 @@ export function StudioView() {
         {/* Tek stüdyo, üç mod: Stüdyo (brief→AI) · Tuval (katman editörü) · Görüntü. */}
         <div className="flex items-center bg-bgsoft border border-line/60 rounded-lg p-0.5 text-xs ml-1">
           <button className="px-2.5 py-1 rounded-md bg-brand/15 text-brand font-semibold">Stüdyo</button>
-          <button onClick={() => { setOpen(false); setDesignStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink flex items-center gap-1" title="Katman/tuval editörü (slayt · afiş · sosyal)"><LayoutTemplate size={12} /> Tuval</button>
-          <button onClick={() => { setOpen(false); setImageStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink flex items-center gap-1" title="AI görsel üretimi"><ImageIcon size={12} /> Görüntü</button>
+          <button onClick={() => nav.go("canvas")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink flex items-center gap-1" title="Katman/tuval editörü (slayt · afiş · sosyal)"><LayoutTemplate size={12} /> Tuval</button>
+          <button onClick={() => nav.go("image")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink flex items-center gap-1" title="AI görsel üretimi"><ImageIcon size={12} /> Görüntü</button>
         </div>
         {view === "workspace" && (
           <button onClick={newDesign} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink ml-1">+ Yeni</button>
@@ -216,7 +215,7 @@ export function StudioView() {
           placeholder="Tasarım adı"
           className="ml-auto hidden sm:block w-44 bg-transparent text-xs text-muted focus:text-ink border-b border-transparent focus:border-line outline-none px-1 py-0.5"
         />
-        <button onClick={() => setOpen(false)} className="text-muted hover:text-ink p-1 rounded hover:bg-bgsoft sm:ml-1" title="Kapat"><X size={16} /></button>
+        <button onClick={() => nav.close()} className="text-muted hover:text-ink p-1 rounded hover:bg-bgsoft sm:ml-1" title="Kapat"><X size={16} /></button>
       </div>
 
       {view === "home" ? (
