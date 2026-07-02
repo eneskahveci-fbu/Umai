@@ -313,6 +313,7 @@ export function DesignStudio() {
   const open = useStore((s) => s.designStudioOpen);
   const setOpen = useStore((s) => s.setDesignStudioOpen);
   const setImageStudioOpen = useStore((s) => s.setImageStudioOpen);
+  const setStudioOpen = useStore((s) => s.setStudioOpen);
   const config = useStore((s) => s.config);
   const saveConfig = useStore((s) => s.saveConfig);
   const addToast = useStore((s) => s.addToast);
@@ -877,10 +878,11 @@ KURALLAR:
       {/* Üst araç çubuğu */}
       <div className="brand-rule glass shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5">
         <span className="w-8 h-8 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0"><Sparkles size={16} /></span>
-        {/* Stüdyo modu — Tasarım | Görüntü (tek stüdyo) */}
+        {/* Tek stüdyo, üç mod: Stüdyo (brief→AI) · Tuval (bu) · Görüntü. */}
         <div className="flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
-          <button className="px-2.5 py-1 rounded-md bg-brand/15 text-brand">Tasarım</button>
-          <button onClick={() => { setOpen(false); setImageStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors">Görüntü</button>
+          <button onClick={() => { setOpen(false); setStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Brief ile AI tasarım (web · sunum · yayınla)">Stüdyo</button>
+          <button className="px-2.5 py-1 rounded-md bg-brand/15 text-brand">Tuval</button>
+          <button onClick={() => { setOpen(false); setImageStudioOpen(true); }} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="AI görsel üretimi">Görüntü</button>
         </div>
         {/* (a) Alt mod — Tuval (katman) | Kod (HTML/React) */}
         <div className="flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">

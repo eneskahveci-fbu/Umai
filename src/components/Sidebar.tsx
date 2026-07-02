@@ -337,7 +337,7 @@ export function Sidebar() {
           className="premium-card w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-ink/80 hover:text-ink hover:border-brand/40 transition-all hover:-translate-y-0.5"
         >
           <Sparkles size={15} className="text-brand" /> Stüdyo
-          <span className="ml-auto text-[9px] font-bold uppercase tracking-wider text-brand/70 bg-brand/10 px-1.5 py-0.5 rounded">Tasarım · Görüntü</span>
+          <span className="ml-auto text-[9px] font-bold uppercase tracking-wider text-brand/70 bg-brand/10 px-1.5 py-0.5 rounded">Tasarım · Tuval · Görsel</span>
         </button>
       </div>
 
