@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   MessageSquare,
   VenetianMask,
@@ -48,6 +49,7 @@ export function CommandPalette() {
   const setOpen = useStore((s) => s.setCommandPaletteOpen);
   const theme = useStore((s) => s.config.theme);
   const tree = useStore((s) => s.tree);
+  const router = useRouter();
 
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -103,7 +105,7 @@ export function CommandPalette() {
       label: "Stüdyo'yu aç (brief → AI tasarım)",
       icon: <Sparkles size={16} />,
       action: () => {
-        useStore.getState().setStudioOpen(true);
+        router.push("/studio");
         setOpen(false);
       },
       keywords: ["studyo", "stüdyo", "studio", "tasarim", "design", "web", "sunum"],
@@ -113,7 +115,7 @@ export function CommandPalette() {
       label: "Tuval'i aç (slayt · afiş · sosyal)",
       icon: <LayoutTemplate size={16} />,
       action: () => {
-        useStore.getState().setDesignStudioOpen(true);
+        router.push("/studio/tuval");
         setOpen(false);
       },
       keywords: ["tuval", "canvas", "slayt", "afis", "poster", "katman"],
@@ -123,7 +125,7 @@ export function CommandPalette() {
       label: "Görüntü Stüdyosu'nu aç (AI görsel)",
       icon: <ImageIcon size={16} />,
       action: () => {
-        useStore.getState().setImageStudioOpen(true);
+        router.push("/studio/gorsel");
         setOpen(false);
       },
       keywords: ["goruntu", "görüntü", "image", "gorsel", "görsel", "resim"],
