@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useModalA11y } from "@/lib/useModalA11y";
 import {
   Brain,
   Check,
   ChevronRight,
   ChevronLeft,
+  Layers,
   ExternalLink,
   Download,
   FolderGit2,
@@ -41,6 +42,7 @@ import { ProUpgrade } from "@/components/ProUpgrade";
 import { AnalyticsSettings } from "@/components/AnalyticsSettings";
 import { createClient } from "@/lib/supabase/client";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, ALL_TOOL_CATALOG } from "@/lib/constants";
+import { buildFallbackChain } from "@/lib/fallback";
 import { calculateCost, formatCost } from "@/lib/pricing";
 import { quickComplete } from "@/lib/quickComplete";
 import { fetchUserRepos } from "@/lib/github";
@@ -733,6 +735,48 @@ export function SettingsModal() {
                 })}
               </div>
             )}
+            {config.activeModelId && (() => {
+              /* Otomatik ücretsiz yedek zinciri: aktif model hata verirse sunucu
+                 sırayla bu adayları dener. İstemcinin yolladığı zincirle birebir
+                 aynı mantık (buildFallbackChain) → kullanıcı ne denenecek görür. */
+              const activeM = config.models.find((m) => m.id === config.activeModelId);
+              if (!activeM) return null;
+              const chain = buildFallbackChain(config.models, config.activeModelId);
+              return (
+                <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50 mb-4">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <Layers size={13} className="text-amber-400 shrink-0" />
+                    <span className="text-xs font-bold text-muted uppercase tracking-wide">Otomatik ücretsiz yedek zinciri</span>
+                  </div>
+                  <p className="text-xs text-muted leading-relaxed mb-2.5">
+                    Aktif model kota/erişim hatası verirse istek düşmez; soldan sağa sırayla denenir.
+                    Her ücretsiz katmanın ayrı kotası birleşince kesintisiz kullanım sağlar.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                    <span className="px-2 py-1 rounded-lg border border-branddim bg-brand/10 text-brand font-semibold font-mono" title={cleanLabel(activeM.provider)}>
+                      {activeM.model}
+                    </span>
+                    {chain.map((c, i) => (
+                      <Fragment key={`${c.provider}-${c.model}-${i}`}>
+                        <ChevronRight size={12} className="text-muted shrink-0" />
+                        <span
+                          className="px-2 py-1 rounded-lg border border-line bg-bgsoft text-muted font-mono"
+                          title={`${cleanLabel(c.provider)}${c.apiKey === "" ? " · anahtarsız" : ""}`}
+                        >
+                          {c.model}{c.apiKey === "" ? " 🆓" : ""}
+                        </span>
+                      </Fragment>
+                    ))}
+                  </div>
+                  {chain.length === 0 && (
+                    <p className="text-xs text-amber-400/90 mt-2 leading-relaxed">
+                      Henüz yedek yok. Ücretsiz bir sağlayıcı (Google Gemini / Groq / OpenRouter) eklersen
+                      otomatik olarak bu zincire katılır.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
             <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50">
               <div className="text-xs font-bold text-muted uppercase tracking-wide mb-3">+ Yeni Model Ekle</div>
               <div className="grid gap-2.5">

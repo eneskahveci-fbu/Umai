@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Sidebar } from "@/components/Sidebar";
 import { CoderView } from "@/components/CoderView";
-import { StudioView } from "@/components/studio/StudioView";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -26,6 +25,7 @@ import { registerServiceWorker, watchConnection } from "@/lib/sw-register";
 const SettingsModal = dynamic(() => import("@/components/SettingsModal").then((m) => m.SettingsModal), { ssr: false });
 const ImageStudio = dynamic(() => import("@/components/ImageStudio").then((m) => m.ImageStudio), { ssr: false });
 const DesignStudio = dynamic(() => import("@/components/DesignStudio").then((m) => m.DesignStudio), { ssr: false });
+const StudioView = dynamic(() => import("@/components/studio/StudioView").then((m) => m.StudioView), { ssr: false });
 const SkillsPanel = dynamic(() => import("@/components/SkillsPanel").then((m) => m.SkillsPanel), { ssr: false });
 const LibraryModal = dynamic(() => import("@/components/LibraryModal").then((m) => m.LibraryModal), { ssr: false });
 
@@ -45,6 +45,7 @@ export default function AppPage() {
   const everSettings = useEverOpened(useStore((s) => s.settingsOpen));
   const everImage = useEverOpened(useStore((s) => s.imageStudioOpen));
   const everDesign = useEverOpened(useStore((s) => s.designStudioOpen));
+  const everStudio = useEverOpened(useStore((s) => s.studioOpen));
   const everSkills = useEverOpened(useStore((s) => s.skillsOpen));
   const everLibrary = useEverOpened(useStore((s) => s.libraryOpen));
   const router = useRouter();
@@ -268,7 +269,7 @@ export default function AppPage() {
         {everSettings && <SettingsModal />}
         {everImage && <ImageStudio />}
         {everDesign && <DesignStudio />}
-        <StudioView />
+        {everStudio && <StudioView />}
         {everLibrary && <LibraryModal />}
         <CommandPalette />
         <KeyboardShortcuts />

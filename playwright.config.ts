@@ -18,7 +18,18 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        /* Ortamda hazır bir Chromium varsa (CI/sandbox — Playwright indirme
+           erişimi yoksa) PW_EXECUTABLE_PATH ile o binary kullanılır. Boşsa
+           Playwright kendi indirdiği tarayıcıyı kullanır (yerel/normal). */
+        ...(process.env.PW_EXECUTABLE_PATH
+          ? { launchOptions: { executablePath: process.env.PW_EXECUTABLE_PATH, args: ["--no-sandbox"] } }
+          : {}),
+      },
+    },
   ],
   webServer: process.env.E2E_BASE_URL
     ? undefined

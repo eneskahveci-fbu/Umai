@@ -1224,6 +1224,11 @@ export function CoderView() {
       return;
     }
     if (f.size > 512_000) { addToast("Dosya 512KB'den büyük.", "error"); return; }
+    /* Office dosyaları (zip-tabanlı) düz metin olarak okunamaz → net yönlendirme. */
+    if (/\.(docx?|pptx?|xlsx?)$/i.test(f.name)) {
+      addToast("Word/PowerPoint/Excel doğrudan okunamıyor — PDF'e çevirip sürükle.", "info");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       setAttachedFiles((prev) => [...prev, { path: f.name, content: reader.result as string }]);
@@ -1648,6 +1653,9 @@ export function CoderView() {
           messages: apiMessages,
           baseUrl: active.baseUrl, model: active.model, apiKey: reqKey,
           provider: active.provider, systemPrompt: finalSystemPrompt,
+          /* Çok-sağlayıcılı otomatik fallback: aktif model hata verirse sunucu
+             sırayla bu ücretsiz adayları dener (kullanıcı duvara çarpmaz). */
+          fallbacks: buildFallbackChain(store.config.models, active.id),
           style: store.config.style,
           memories: store.config.memories,
           skills: activeSkills.map((s) => ({
@@ -1852,6 +1860,14 @@ export function CoderView() {
             /* ajan plan (update_plan) olayı */
             if (parsed.plan_event) {
               useStore.getState().setPlanOnLast(String(parsed.plan_event.plan ?? ""));
+              continue;
+            }
+            /* Otomatik fallback: birincil model hata verdi, sunucu ücretsiz bir
+               alternatife geçti → kullanıcıyı şeffaflık için bilgilendir. */
+            if (parsed.fallback_event) {
+              const fp = String(parsed.fallback_event.provider ?? "");
+              const fm = String(parsed.fallback_event.model ?? "");
+              addToast(`Aktif model yanıt vermedi; ücretsiz alternatife geçildi: ${fp} / ${fm}`, "info");
               continue;
             }
             /* Ajan Ekibi (Swarm) ilerleme olayı → todo paneli canlı güncelle */
@@ -2162,7 +2178,7 @@ export function CoderView() {
               ↓
             </div>
             <p className="text-sm font-extrabold text-ink">Dosyaları buraya bırak</p>
-            <p className="text-xs text-muted/60 mt-1">Birden çok dosya destekli · görseller de olur</p>
+            <p className="text-xs text-muted/60 mt-1">PDF · görsel · kod · metin · notebook — çoklu dosya</p>
           </div>
         </div>
       )}

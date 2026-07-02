@@ -58,9 +58,44 @@ async function bootWsTerminal(
   term.open(containerEl);
   fit.fit();
 
-  const ws = new WebSocket(wsUrl);
+  /* URL'i normalize et + yaygın hataları yakala:
+     - http(s):// yanlışlıkla yapıştırılmışsa ws(s)://'e çevir (Oracle "Yerel Mod"
+       https adresi de buraya konabilir → wss'e döner).
+     - HTTPS bir sayfada (vercel.app) güvensiz ws:// tarayıcı tarafından SESSİZCE
+       engellenir (mixed content) → otomatik wss'e yükselt; bu, "Sunucuya
+       bağlanılamadı" hatasının en yaygın gizli sebebidir.
+     - Şema hâlâ ws/wss değilse net, eyleme dönük hata ver. */
+  let url = wsUrl.trim();
+  if (/^https:\/\//i.test(url)) url = url.replace(/^https:/i, "wss:");
+  else if (/^http:\/\//i.test(url)) url = url.replace(/^http:/i, "ws:");
+  const pageIsHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+  if (pageIsHttps && /^ws:\/\//i.test(url)) url = url.replace(/^ws:/i, "wss:");
+  if (!/^wss?:\/\//i.test(url)) {
+    onError("Geçersiz terminal adresi. wss://sunucu/?token=… biçiminde olmalı (Oracle kurulumunun verdiği adresi yapıştır).");
+    return () => { term.dispose(); };
+  }
+
+  let ws: WebSocket;
+  try {
+    ws = new WebSocket(url);
+  } catch (e) {
+    onError(`Terminal adresi açılamadı: ${(e as Error).message}`);
+    return () => { term.dispose(); };
+  }
+
+  /* Bağlantı zaman aşımı: WS açılmazsa onerror bazen hiç ateşlemez (özellikle
+     mobil Safari). 12 sn içinde açılmazsa net teşhis ver. */
+  let opened = false;
+  let connectTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+    if (!opened && ws.readyState !== WebSocket.OPEN) {
+      try { ws.close(); } catch { /* yoksay */ }
+      onError("Sunucu yanıt vermiyor (12s). Oracle sunucusu çalışıyor mu, TLS/port (443) açık mı ve adres+token doğru mu kontrol et.");
+    }
+  }, 12000);
+  const clearConnectTimer = () => { if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; } };
 
   ws.onopen = () => {
+    opened = true; clearConnectTimer();
     ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
     onReady();
     /* Otomasyon: bağlanınca kurulum komutunu bir kez çalıştır (SessionStart). */
@@ -71,9 +106,21 @@ async function bootWsTerminal(
       }, 300);
     }
   };
-  ws.onerror = () => onError("Sunucuya bağlanılamadı. URL'i ve token'ı kontrol et.");
+  ws.onerror = () => {
+    clearConnectTimer();
+    onError(
+      pageIsHttps
+        ? "Sunucuya bağlanılamadı. HTTPS sitede yalnızca wss:// (TLS'li) çalışır — Oracle sunucusunun çalıştığını ve sertifikasının geçerli olduğunu doğrula; adres+token'ı kontrol et."
+        : "Sunucuya bağlanılamadı. URL'i ve token'ı kontrol et (sunucu çalışıyor ve port açık olmalı).",
+    );
+  };
   ws.onclose = (ev) => {
+    clearConnectTimer();
     if (ev.code === 4403) { onError("Erişim reddedildi — token geçersiz."); return; }
+    if (!opened) {
+      onError("Bağlantı kurulamadan kapandı. Sunucu adresi/port erişilebilir mi ve token doğru mu kontrol et.");
+      return;
+    }
     term.writeln("\r\n\x1b[33m[Bağlantı kapandı]\x1b[0m");
   };
   ws.onmessage = (ev) => {
@@ -144,6 +191,7 @@ async function bootWsTerminal(
   window.addEventListener("craftai:terminal-run", handleRunCmd);
 
   return () => {
+    clearConnectTimer();
     window.removeEventListener("craftai:terminal-run", handleRunCmd);
     window.removeEventListener("resize", resize);
     ro.disconnect();
