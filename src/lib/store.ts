@@ -421,7 +421,7 @@ interface StoreState {
 
   // toast
   toasts: Toast[];
-  addToast: (message: string, type?: Toast["type"]) => void;
+  addToast: (message: string, type?: Toast["type"], opts?: { action?: Toast["action"]; duration?: number }) => void;
   removeToast: (id: string) => void;
 
   // coder
@@ -1020,6 +1020,7 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   deleteChat: async (id) => {
     const { userId } = get();
+    const deleted = get().chats.find((c) => c.id === id);
     set((state) => ({
       chats: state.chats.filter((c) => c.id !== id),
       currentId: state.currentId === id ? null : state.currentId,
@@ -1029,6 +1030,29 @@ export const useStore = create<StoreState>()((set, get) => ({
       if (sb) await sb.from("chats").delete().eq("id", id);
     } else {
       saveLocalChats(get().chats);
+    }
+    /* Yanlışlıkla silmeye karşı 6 sn "Geri al" — sohbet ve senkron geri gelir. */
+    if (deleted && !deleted.incognito) {
+      get().addToast("Sohbet silindi.", "info", {
+        duration: 6000,
+        action: {
+          label: "Geri al",
+          fn: () => {
+            set((s) => ({ chats: [deleted, ...s.chats.filter((c) => c.id !== deleted.id)] }));
+            if (userId) {
+              const sb = createClient();
+              if (sb) void sb.from("chats").upsert({
+                id: deleted.id, user_id: userId, title: deleted.title, messages: deleted.messages,
+                project_id: deleted.projectId ?? null,
+                created_at: new Date(deleted.created_at).toISOString(),
+                updated_at: new Date().toISOString(),
+              });
+            } else {
+              saveLocalChats(get().chats);
+            }
+          },
+        },
+      });
     }
   },
 
@@ -1323,10 +1347,10 @@ export const useStore = create<StoreState>()((set, get) => ({
   setArtifact: (a) => set({ artifact: a }),
 
   toasts: [],
-  addToast: (message, type = "info") => {
-    const toast: Toast = { id: uid(), message, type };
+  addToast: (message, type = "info", opts) => {
+    const toast: Toast = { id: uid(), message, type, action: opts?.action, duration: opts?.duration };
     set((s) => ({ toasts: [...s.toasts, toast] }));
-    setTimeout(() => get().removeToast(toast.id), 3500);
+    setTimeout(() => get().removeToast(toast.id), opts?.duration ?? 3500);
   },
   removeToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 

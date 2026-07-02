@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Code2, GitBranch, History, MessageCircle, Settings, Sparkles } from "lucide-react";
+import { ArrowRight, Check, Code2, GitBranch, History, MessageCircle, Settings, Sparkles } from "lucide-react";
 import { useStore } from "@/lib/store";
 
 interface EmptyChatProps {
@@ -26,11 +26,35 @@ function greeting(): string {
   return "İyi akşamlar";
 }
 
+/* İlk kullanım kontrol listesi adımı. */
+function Step({ done, label, hint, onClick }: { done: boolean; label: string; hint?: string; onClick?: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={done || !onClick}
+      className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-left transition-colors ${done ? "opacity-60" : onClick ? "hover:bg-bgsoft" : ""}`}
+    >
+      <span className={`w-5 h-5 rounded-full grid place-items-center border shrink-0 ${done ? "bg-brand border-brand text-white" : "border-line text-transparent"}`}>
+        <Check size={11} />
+      </span>
+      <span className="min-w-0">
+        <span className={`block text-[13px] font-semibold ${done ? "line-through text-muted" : "text-ink/85"}`}>{label}</span>
+        {hint && !done && <span className="block text-[11px] text-muted/55">{hint}</span>}
+      </span>
+      {!done && onClick && <ArrowRight size={13} className="ml-auto text-muted/40 shrink-0" />}
+    </button>
+  );
+}
+
 export function EmptyChat({ hasModel, hasRepo, onAddModel, onPrompt }: EmptyChatProps) {
   /* Son (gizli olmayan) sohbet — "kaldığın yerden devam" kartı için. */
   const chats = useStore((s) => s.chats);
   const selectChat = useStore((s) => s.selectChat);
+  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const lastChat = chats.find((c) => !c.incognito && c.messages.length > 0);
+  const hasChatted = chats.some((c) => c.messages.length > 0);
+  /* Karşılama: 3 adımdan en az biri eksikse göster (hepsi tamamsa gizlenir). */
+  const showChecklist = !hasModel || !hasChatted || !hasRepo;
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 py-10 select-none">
@@ -55,16 +79,24 @@ export function EmptyChat({ hasModel, hasRepo, onAddModel, onPrompt }: EmptyChat
       </p>
 
       {!hasModel ? (
-        <button
-          onClick={onAddModel}
-          className="btn-brand-glow flex items-center gap-2 px-5 py-3 rounded-2xl text-white text-sm font-bold transition-transform hover:-translate-y-0.5"
-        >
-          <Settings size={15} />
-          İlk olarak bir model ekle
-          <ArrowRight size={15} />
-        </button>
+        <div className="w-full max-w-md premium-card rounded-2xl p-3">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-brand/70 font-bold px-3 pt-1 pb-1.5 flex items-center gap-1.5">
+            <Settings size={11} /> Başlarken — 3 adım
+          </div>
+          <Step done={hasModel} label="Ücretsiz bir model bağla" hint="60 saniye: Gemini · Groq · NVIDIA anahtarı yapıştır" onClick={onAddModel} />
+          <Step done={hasChatted} label="İlk sorunu sor" hint="kod yapıştır ya da bir şey üretmesini iste" />
+          <Step done={hasRepo} label="Deponu bağla (opsiyonel)" hint="kod tabanına özel yanıtlar için GitHub/GitLab" onClick={() => setSettingsOpen(true)} />
+        </div>
       ) : (
         <div className="w-full max-w-xl">
+          {/* Kurulum bitmediyse kompakt kontrol listesi */}
+          {showChecklist && (
+            <div className="premium-card rounded-2xl p-2 mb-4">
+              <Step done={hasModel} label="Model bağlandı" onClick={onAddModel} />
+              <Step done={hasChatted} label="İlk sorunu sor" hint="aşağıdaki hızlı başlangıçlardan birini dene" />
+              <Step done={hasRepo} label="Deponu bağla (opsiyonel)" hint="kod tabanına özel yanıtlar" onClick={() => setSettingsOpen(true)} />
+            </div>
+          )}
           {/* Kaldığın yerden devam — son sohbet */}
           {lastChat && (
             <button

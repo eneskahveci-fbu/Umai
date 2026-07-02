@@ -10,19 +10,27 @@ const ICONS = {
   info: <Info size={16} className="text-blue" />,
 };
 
-function ToastItem({ id, type, message }: { id: string; type: "success" | "error" | "info"; message: string }) {
+function ToastItem({ id, type, message, action, duration }: { id: string; type: "success" | "error" | "info"; message: string; action?: { label: string; fn: () => void }; duration?: number }) {
   const removeToast = useStore((s) => s.removeToast);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
-    timer.current = setTimeout(() => removeToast(id), type === "error" ? 5000 : 3000);
+    timer.current = setTimeout(() => removeToast(id), duration ?? (type === "error" ? 5000 : 3000));
     return () => clearTimeout(timer.current);
-  }, [id, type, removeToast]);
+  }, [id, type, duration, removeToast]);
 
   return (
     <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl border border-line bg-surface/95 backdrop-blur-sm shadow-xl toast-enter">
       <span className="shrink-0 mt-0.5">{ICONS[type]}</span>
       <p className="flex-1 text-sm leading-relaxed">{message}</p>
+      {action && (
+        <button
+          onClick={() => { action.fn(); removeToast(id); }}
+          className="shrink-0 text-xs font-bold text-brand hover:text-branddim px-2 py-0.5 rounded-lg bg-brand/10 hover:bg-brand/20 transition-colors"
+        >
+          {action.label}
+        </button>
+      )}
       <button
         onClick={() => removeToast(id)}
         className="shrink-0 text-muted hover:text-ink"
@@ -47,7 +55,7 @@ export function ToastContainer() {
       }}
     >
       {toasts.map((t) => (
-        <ToastItem key={t.id} id={t.id} type={t.type} message={t.message} />
+        <ToastItem key={t.id} id={t.id} type={t.type} message={t.message} action={t.action} duration={t.duration} />
       ))}
     </div>
   );

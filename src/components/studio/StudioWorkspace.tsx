@@ -146,12 +146,29 @@ export function StudioWorkspace({
         <div className="flex-1 min-h-0">
           {artifact ? (
             <DeviceFrame srcDoc={effectiveSrc} device={device} reloadKey={reloadKey} />
+          ) : busy ? (
+            /* İskelet önizleme — boş spinner yerine "sayfa doluyor" hissi. */
+            <div className="h-full p-6 sm:p-10 overflow-hidden">
+              <div className="max-w-2xl mx-auto h-full rounded-2xl border border-line bg-surface p-6 sm:p-8 animate-pulse space-y-5">
+                <div className="h-3 w-24 rounded bg-line/70" />
+                <div className="h-8 w-3/4 rounded-lg bg-line/80" />
+                <div className="h-3.5 w-1/2 rounded bg-line/60" />
+                <div className="h-9 w-32 rounded-xl bg-brand/25" />
+                <div className="grid grid-cols-3 gap-3 pt-3">
+                  <div className="h-20 rounded-xl bg-line/50" />
+                  <div className="h-20 rounded-xl bg-line/50" />
+                  <div className="h-20 rounded-xl bg-line/50" />
+                </div>
+                <div className="h-3 w-full rounded bg-line/50" />
+                <div className="h-3 w-5/6 rounded bg-line/50" />
+                <p className="text-xs text-muted/60 flex items-center gap-1.5 pt-1">
+                  <Loader2 size={12} className="animate-spin text-brand" /> Tasarım üretiliyor…
+                </p>
+              </div>
+            </div>
           ) : (
             <div className="h-full grid place-items-center text-center px-6">
-              <div className="text-muted">
-                <Loader2 size={22} className={`mx-auto mb-2 ${busy ? "animate-spin text-brand" : "opacity-0"}`} />
-                <p className="text-sm">{busy ? "İlk tasarım üretiliyor…" : "Henüz önizleme yok."}</p>
-              </div>
+              <p className="text-sm text-muted">Henüz önizleme yok.</p>
             </div>
           )}
         </div>

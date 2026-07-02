@@ -96,6 +96,7 @@ import { ALL_AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
 import { buildContextSections } from "@/lib/prompt";
 import { detectSensitive } from "@/lib/pii";
+import { friendlyError } from "@/lib/friendlyError";
 import { retrieve } from "@/lib/retrieval";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { CRAFT_OPERATING_MANUAL } from "@/lib/constants";
@@ -382,22 +383,6 @@ async function usableApiKey(model: { apiKey?: string; provider: string }): Promi
   return k;
 }
 
-function friendlyError(raw: string): string {
-  const m = (raw || "").toLowerCase();
-  if (/(401|403|unauthorized|invalid api key|invalid_api_key|authentication)/.test(m))
-    return "Geçersiz veya eksik API anahtarı. Ayarlar → Modeller'den anahtarını kontrol et.";
-  if (/(429|rate limit|too many requests|quota|insufficient_quota)/.test(m))
-    return "İstek sınırına (rate limit) takıldın veya kotan bitti. Biraz bekle ya da başka bir model/sağlayıcı dene.";
-  if (/(timeout|timed out|etimedout|deadline)/.test(m))
-    return "İstek zaman aşımına uğradı. Bağlantını kontrol et ve tekrar dene; istek çok uzunsa kısaltmayı dene.";
-  if (/(failed to fetch|network|networkerror|err_network|connection|econnrefused|fetch failed)/.test(m))
-    return "Ağ/bağlantı sorunu. İnternetini kontrol et; sağlayıcı erişilemiyor olabilir.";
-  if (/(404|not found|model.*(not found|does not exist)|unknown model)/.test(m))
-    return "Model bulunamadı. Ayarlar'dan model adının doğru yazıldığından emin ol.";
-  if (/(500|502|503|529|overloaded|service unavailable|server error)/.test(m))
-    return "Sağlayıcı şu an yoğun veya geçici olarak yanıt vermiyor. Birkaç saniye sonra tekrar dene.";
-  return raw;
-}
 
 
 let coderAbort: AbortController | null = null;
@@ -592,7 +577,20 @@ export function CoderView() {
   const [mentionQuery, setMentionQuery] = useState("");
 
 
-  const [input, setInput] = useState("");
+  /* Taslak koruması: yazılan mesaj yenileme/kapanmada kaybolmaz. */
+  const [input, setInput] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try { return localStorage.getItem("craftai_draft") ?? ""; } catch { return ""; }
+  });
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        if (input) localStorage.setItem("craftai_draft", input);
+        else localStorage.removeItem("craftai_draft");
+      } catch { /* yok say */ }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [input]);
   const [improvingPrompt, setImprovingPrompt] = useState(false);
 
   /* Prompt geliştirici — composer'daki taslağı ücretsiz LLM ile daha net/etkili
@@ -2980,6 +2978,17 @@ export function CoderView() {
                   onKeyDown={(e) => {
                     if (slashOpen || mentionOpen) return;
                     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+                  }}
+                  onPaste={(e) => {
+                    /* Claude tarzı: çok uzun yapıştırma composer'ı şişirmesin —
+                       otomatik metin eki olur (bağlama aynı şekilde girer). */
+                    const text = e.clipboardData.getData("text");
+                    if (text.length > 4000) {
+                      e.preventDefault();
+                      const name = `yapistirilan-${attachedFiles.length + 1}.txt`;
+                      setAttachedFiles((prev) => [...prev, { path: name, content: text }]);
+                      addToast(`Uzun metin "${name}" olarak eklendi 📎`, "success");
+                    }
                   }}
                   rows={1}
                   placeholder={
