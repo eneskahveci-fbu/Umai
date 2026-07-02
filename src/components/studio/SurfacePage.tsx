@@ -10,7 +10,7 @@ import { useStore } from "@/lib/store";
 import { useAuthGate, useThemeClasses } from "@/lib/authGate";
 import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { MobileTabBar } from "@/components/MobileTabBar";
+import { MobileTabBar, useKeyboardOpen } from "@/components/MobileTabBar";
 
 export function SurfacePage({ flag, children }: {
   flag: "studioOpen" | "designStudioOpen" | "imageStudioOpen";
@@ -18,6 +18,7 @@ export function SurfacePage({ flag, children }: {
 }) {
   const auth = useAuthGate();
   useThemeClasses();
+  const kbOpen = useKeyboardOpen();
 
   useEffect(() => {
     const s = useStore.getState();
@@ -33,7 +34,7 @@ export function SurfacePage({ flag, children }: {
   }
   return (
     <ErrorBoundary>
-      <div style={{ "--surface-pb": "calc(56px + env(safe-area-inset-bottom))" } as React.CSSProperties}>
+      <div style={{ "--surface-pb": kbOpen ? "0px" : "calc(52px + env(safe-area-inset-bottom))" } as React.CSSProperties}>
         {children}
         <MobileTabBar />
         <ToastContainer />

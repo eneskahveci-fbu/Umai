@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useModalA11y } from "@/lib/useModalA11y";
 import {
   Brain,
@@ -49,9 +50,22 @@ import { fetchUserRepos } from "@/lib/github";
 import { fetchGitLabUserRepos } from "@/lib/gitlab";
 import type { Provider, ResponseStyle } from "@/lib/types";
 
-export function SettingsModal() {
-  const open = useStore((s) => s.settingsOpen);
+export type SettingsTab = "model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim";
+
+export const SETTINGS_TAB_KEYS: SettingsTab[] = ["model", "github", "general", "advanced", "mcp", "hooks", "hesap", "extensions", "plan", "hakkinda", "kullanim"];
+
+/* routeMode: /settings gerçek rotası olarak render — store bayrağı yok sayılır,
+   kapatma /app'e döner, sekme değişimi onTabChange ile URL'e yansır.
+   Prop'suz kullanım = /app içi hızlı modal (eski davranış aynen). */
+export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
+  routeMode?: boolean;
+  initialTab?: SettingsTab;
+  onTabChange?: (t: SettingsTab) => void;
+} = {}) {
+  const storeOpen = useStore((s) => s.settingsOpen);
+  const open = routeMode || storeOpen;
   const setOpen = useStore((s) => s.setSettingsOpen);
+  const router = useRouter();
   const config = useStore((s) => s.config);
   /* Admin kapısı: hassas sunucu/terminal ayarları yalnız admin e-postasına açık.
      Liste boşken (kurulum öncesi) herkese açık — kimse kilitlenmez. */
@@ -94,7 +108,15 @@ export function SettingsModal() {
   const [hookCommand, setHookCommand] = useState("");
   const [hookEvent, setHookEvent] = useState<"afterEdit" | "onFinish" | "onError">("afterEdit");
 
-  const [tab, setTab] = useState<"model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim">("model");
+  const [tab, setTab] = useState<SettingsTab>(initialTab ?? "model");
+  /* Sekme değişimini tek noktadan geçir: routeMode'da URL de güncellenir. */
+  const changeTab = (t: SettingsTab) => { setTab(t); onTabChange?.(t); };
+  /* URL'den gelen sekme (geri/ileri) — render sırasında önceki-değer deseni. */
+  const [prevInitialTab, setPrevInitialTab] = useState(initialTab);
+  if (initialTab !== prevInitialTab) {
+    setPrevInitialTab(initialTab);
+    if (initialTab) setTab(initialTab);
+  }
   const [search, setSearch] = useState("");
   /* iOS tarzı mobil drill-down: mobilde önce kategori listesi gösterilir; bir
      satıra dokununca detay (mobileDetail=true) tam ekran açılır, geri ile listeye
@@ -131,7 +153,13 @@ export function SettingsModal() {
     }
   };
   const modalRef = useRef<HTMLDivElement>(null);
-  useModalA11y(modalRef, open, () => setOpen(false));
+  /* Kapatma: modalda bayrak kapanır; rotada /app'e dönülür. */
+  const close = () => {
+    setMobileDetail(false);
+    if (routeMode) router.push("/app");
+    else setOpen(false);
+  };
+  useModalA11y(modalRef, open, close);
   const [guestMode, setGuestModeState] = useState(() =>
     typeof window === "undefined" ? false : isGuestMode(),
   );
@@ -169,7 +197,7 @@ export function SettingsModal() {
       const adminOnly = new Set(["advanced", "mcp", "hooks"]);
       const first = (["model", "github", "extensions", "general", "kullanim", "plan", "hakkinda", "advanced", "mcp", "hooks", "hesap"] as const)
         .find((k) => matchingTabs.has(k) && (isAdmin || !adminOnly.has(k)));
-      if (first && first !== tab) setTab(first);
+      if (first && first !== tab) changeTab(first);
     }
   }
   const [provider, setProvider] = useState<Provider>("hf");
@@ -512,7 +540,7 @@ export function SettingsModal() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-0 sm:p-4" onClick={() => { setOpen(false); setMobileDetail(false); }}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-0 sm:p-4" onClick={close}>
       <div
         ref={modalRef}
         role="dialog"
@@ -526,7 +554,7 @@ export function SettingsModal() {
         <aside className={`${mobileDetail ? "hidden sm:flex" : "flex"} w-full sm:w-56 shrink-0 border-r border-line/60 bg-bgsoft/40 flex-col min-h-0`}>
           <div className="flex items-center justify-between gap-1 px-4 sm:px-4 pt-4 pb-2">
             <h3 id="settings-title" className="text-xl sm:text-lg font-bold">Ayarlar</h3>
-            <button onClick={() => { setOpen(false); setMobileDetail(false); }} className="shrink-0 text-muted hover:text-ink p-1 rounded-lg hover:bg-bgsoft" title="Kapat"><X size={18} /></button>
+            <button onClick={close} className="shrink-0 text-muted hover:text-ink p-1 rounded-lg hover:bg-bgsoft" title="Kapat"><X size={18} /></button>
           </div>
           <div className="px-3 sm:px-2.5 pb-2">
             <div className="relative">
@@ -550,7 +578,7 @@ export function SettingsModal() {
               return (
                 <button
                   key={key}
-                  onClick={() => { setTab(key); setMobileDetail(true); }}
+                  onClick={() => { changeTab(key); setMobileDetail(true); }}
                   className={`relative w-full flex items-center gap-3 sm:gap-2.5 px-3 py-3 sm:py-2 rounded-xl sm:rounded-lg text-[15px] sm:text-sm font-medium transition-colors text-left ${
                     active ? "sm:bg-brand/12 sm:text-brand bg-bgsoft text-ink" : "text-ink sm:text-muted hover:text-ink hover:bg-bgsoft sm:hover:bg-surface"
                   }`}

@@ -115,6 +115,17 @@ export function RightPanel(props: RightPanelProps) {
     try { localStorage.setItem("craftai_rightpanel_w", String(width)); } catch { /* ignore */ }
   }, [width]);
 
+  /* Split görünümde önizleme yüksekliği (%) — sürüklenebilir dikey ayraç. */
+  const [previewH, setPreviewH] = useState<number>(() => {
+    if (typeof window === "undefined") return 45;
+    const saved = Number(localStorage.getItem("craftai_rightpanel_split"));
+    return saved >= 20 && saved <= 75 ? saved : 45;
+  });
+  useEffect(() => {
+    try { localStorage.setItem("craftai_rightpanel_split", String(previewH)); } catch { /* ignore */ }
+  }, [previewH]);
+  const splitRef = useRef<HTMLDivElement>(null);
+
   if (!firstAvailable) return null;
 
   /* Split view: show editor + preview side-by-side unless user switched to Git */
@@ -144,6 +155,25 @@ export function RightPanel(props: RightPanelProps) {
     document.addEventListener("mouseup", onUp);
   };
 
+  /* Editör↔önizleme dikey ayracı — split kabının yüksekliğine göre % hesaplar. */
+  const startSplitResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const rect = splitRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const onMove = (me: MouseEvent) => {
+      const pct = ((rect.bottom - me.clientY) / rect.height) * 100;
+      setPreviewH(Math.min(75, Math.max(20, Math.round(pct))));
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.userSelect = "";
+    };
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
+
   return (
     <div
       className="
@@ -158,7 +188,8 @@ export function RightPanel(props: RightPanelProps) {
       {/* Sürükleme tutamacı (masaüstü) — sol kenardan genişlik ayarla */}
       <div
         onMouseDown={startResize}
-        title="Sürükleyerek genişliği ayarla"
+        onDoubleClick={() => setWidth(540)}
+        title="Sürükle: genişlik · Çift tık: sıfırla"
         className="hidden md:block absolute left-0 inset-y-0 w-1.5 -ml-0.5 cursor-col-resize hover:bg-brand/40 active:bg-brand/60 transition-colors z-20"
       />
       {/* Tab strip */}
@@ -200,9 +231,9 @@ export function RightPanel(props: RightPanelProps) {
 
       {/* Content */}
       {splitView ? (
-        /* Split: editor top (flex-1) + preview bottom (45%) */
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          <div className="flex-1 min-h-0 flex flex-col overflow-hidden border-b border-line/60">
+        /* Split: editör üst (esnek) + sürüklenebilir ayraç + önizleme alt (%) */
+        <div ref={splitRef} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <FileTabsBar
               tabs={props.openTabs ?? []}
               activePath={props.editorFile?.path ?? null}
@@ -220,7 +251,13 @@ export function RightPanel(props: RightPanelProps) {
               </ErrorBoundary>
             </div>
           </div>
-          <div className="h-[45%] shrink-0 overflow-hidden">
+          <div
+            onMouseDown={startSplitResize}
+            onDoubleClick={() => setPreviewH(45)}
+            title="Sürükle: önizleme yüksekliği · Çift tık: sıfırla"
+            className="h-1.5 shrink-0 cursor-row-resize bg-line/40 hover:bg-brand/40 active:bg-brand/60 transition-colors"
+          />
+          <div className="shrink-0 overflow-hidden" style={{ height: `${previewH}%` }}>
             <ErrorBoundary variant="inline" label="Önizleme çöktü">
               <ArtifactPanel />
             </ErrorBoundary>

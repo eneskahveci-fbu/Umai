@@ -17,7 +17,9 @@
     "cap:ios": "cap open ios",
     "cap:android": "cap open android",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "assets:gen": "node scripts/gen-app-assets.mjs",
+    "cap:assets": "npx @capacitor/assets generate --iconBackgroundColor \"#111110\" --splashBackgroundColor \"#111110\""
   },
   "dependencies": {
     "@capacitor/app": "^8.1.0",
