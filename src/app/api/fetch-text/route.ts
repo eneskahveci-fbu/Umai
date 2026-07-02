@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isSafeRemoteUrl } from "@/lib/urlSafety";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,6 +9,8 @@ export const dynamic = "force-dynamic";
    (GitHub raw, gist, herhangi bir public URL) düz metin çeker. Skill/ajan içe
    aktarmada kullanılır. SSRF koruması: yalnız genel (public) http(s) adresler. */
 export async function GET(req: Request) {
+  const limited = rateLimit(req, "fetch-text", 30, 60_000);
+  if (limited) return limited;
   const u = new URL(req.url).searchParams.get("url") || "";
   if (!/^https?:\/\//i.test(u)) {
     return NextResponse.json({ error: "Geçerli bir http(s) URL gerekli." }, { status: 400 });

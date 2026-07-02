@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { rateLimit } from "@/lib/rate-limit";
+import { readJson, asString, isValidationError } from "@/lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,13 +27,19 @@ const OPENAI_COMPAT: Record<string, { base: string; model: string; size: boolean
 };
 
 export async function POST(req: Request) {
-  let body: Body;
-  try { body = await req.json() as Body; } catch { return NextResponse.json({ error: "Geçersiz istek." }, { status: 400 }); }
-  const provider = (body.provider || "").trim();
-  const apiKey = (body.apiKey || "").trim();
-  const prompt = (body.prompt || "").trim();
-  const size = body.size || "1024x1024";
-  if (!prompt) return NextResponse.json({ error: "Prompt boş." }, { status: 400 });
+  const limited = rateLimit(req, "image", 20, 60_000);
+  if (limited) return limited;
+  let provider: string, apiKey: string, prompt: string, size: string;
+  try {
+    const body = await readJson(req) as Body;
+    provider = (body.provider || "").trim();
+    apiKey = (body.apiKey || "").trim();
+    prompt = asString(body.prompt, "prompt", { max: 4000 }).trim();
+    size = body.size || "1024x1024";
+  } catch (e) {
+    if (isValidationError(e)) return NextResponse.json({ error: e.message }, { status: e.status });
+    return NextResponse.json({ error: "Geçersiz istek." }, { status: 400 });
+  }
   if (!apiKey) return NextResponse.json({ error: "Bu sağlayıcı için API anahtarı gerekli (Ayarlar → Modeller)." }, { status: 400 });
 
   try {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { checkLimit } from "@/lib/rate-limit";
+import { readJson, isValidationError } from "@/lib/validate";
 
 export const runtime = "nodejs";
 
@@ -9,7 +10,7 @@ export async function POST(req: NextRequest) {
   const limited = checkLimit(req, "share", 10, 60_000);
   if (limited) return NextResponse.json(limited.body, { status: limited.status, headers: { "Retry-After": String(limited.retryAfter) } });
   try {
-    const { id, title, messages } = await req.json();
+    const { id, title, messages } = await readJson(req) as { id?: string; title?: string; messages?: { role: string; content: string }[] };
     if (!id || !title || !Array.isArray(messages)) {
       return NextResponse.json({ error: "Geçersiz istek" }, { status: 400 });
     }
@@ -40,6 +41,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ shareId });
   } catch (e) {
+    if (isValidationError(e)) return NextResponse.json({ error: e.message }, { status: e.status });
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }
