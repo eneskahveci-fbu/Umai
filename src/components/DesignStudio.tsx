@@ -1,27 +1,24 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Download, ExternalLink, FileCode, FileImage, FileText, Image as ImageIcon, LayoutGrid, LayoutTemplate, Loader2,
-  MessageSquare, MoreHorizontal, Plus, RotateCw, Save, Send, Sliders, Sparkles, Trash2, Type, Upload, Wand2, X,
+  MessageSquare, MoreHorizontal, Plus, Redo2, RotateCw, Save, Send, Sliders, Sparkles, Trash2, Type, Undo2, Upload, Wand2, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import { buildFallbackChain } from "@/lib/fallback";
 import { buildSingleBlockPreview, parseBlocks } from "@/lib/preview";
+import { clamp01, clonePages, emptyHist, nudge, pushHist, redoHist, undoHist } from "@/lib/design";
+import type { Align, Design, HistState, ImgLayer, Layer } from "@/lib/design";
 import type { SavedDesign } from "@/lib/types";
 
-/* Tasarım Stüdyosu — Claude Design benzeri AI tasarım alanı (craft teması).
+/* Tasarım Stüdyosu — Claude Design + Canva hibrit editör (craft teması).
    Sol: doğal dille sohbet (ÜCRETSİZ LLM ile tasarım üret/değiştir + görsel bağlam).
-   Orta: canlı tuval (öğe seç → doğrudan düzenle). Sağ: Tweaks (boyut/arka plan/
-   katman) + AI slider'lar (boşluk/ölçek/renk tonu). Dışa aktarma: PNG · HTML · PDF.
+   Orta: canlı tuval — eleman sürükle/boyutlandır, çift-tık ile yerinde metin
+   düzenleme, seçili elemanı AI ile değiştirme, undo/redo + kısayollar, zoom.
+   Sağ: Tweaks (boyut/arka plan/katman) + AI slider'lar. Dışa aktarma: PNG·HTML·PDF.
    Tüm AI çağrıları anahtarsız Pollinations tabanına düşer → maliyetsiz. */
-
-type Align = "left" | "center" | "right";
-interface Layer { id: string; text: string; x: number; y: number; size: number; color: string; weight: number; align: Align; font: string; }
-/* (c1) Görsel/logo katmanı — x,y: merkez (0-1), w: genişlik/tuval oranı (0-1). */
-interface ImgLayer { id: string; src: string; x: number; y: number; w: number; }
-interface Design { fmt: string; w: number; h: number; bgType: "gradient" | "color" | "image"; c1: string; c2: string; bgImage: string; layers: Layer[]; images?: ImgLayer[]; }
 
 const FORMATS: { id: string; label: string; w: number; h: number }[] = [
   { id: "slide", label: "Slayt 16:9", w: 1280, h: 720 },
@@ -41,7 +38,6 @@ const QUALITY: Record<string, { label: string; mult: number }> = {
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
-const clamp01 = (n: number) => Math.max(0, Math.min(1, Number.isFinite(n) ? n : 0.5));
 
 function template(fmt: typeof FORMATS[number], kind: "sunum" | "prototip" | "sablon" | "bos" = "sunum"): Design {
   const base: Design = { fmt: fmt.id, w: fmt.w, h: fmt.h, bgType: "gradient", c1: "#c8a87e", c2: "#1b1a17", bgImage: "", layers: [] };
@@ -242,6 +238,30 @@ function pollUrl(prompt: string, w: number, h: number) {
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&model=flux&nologo=true&seed=${Math.floor(Math.random() * 1e6)}`;
 }
 
+/* /api/chat SSE akışını okur; her delta'da birikmiş TAM metni bildirir. */
+async function readSse(res: Response, onFull?: (full: string) => void): Promise<string> {
+  const reader = res.body!.getReader(); const dec = new TextDecoder();
+  let buf = ""; let full = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split("\n"); buf = lines.pop() || "";
+    for (const ln of lines) {
+      const t = ln.trim();
+      if (!t.startsWith("data:")) continue;
+      const payload = t.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      try {
+        const j = JSON.parse(payload) as { choices?: { delta?: { content?: string } }[] };
+        const delta = j.choices?.[0]?.delta?.content ?? "";
+        if (delta) { full += delta; onFull?.(full); }
+      } catch { /* parça parça JSON; yoksay */ }
+    }
+  }
+  return full;
+}
+
 function extractJson(s: string): Record<string, unknown> | null {
   const fence = s.match(/```json\s*([\s\S]*?)```/i) || s.match(/```\s*([\s\S]*?)```/);
   let raw: string | null = fence ? fence[1] : null;
@@ -302,22 +322,30 @@ export function DesignStudio() {
      sayfayı günceller → mevcut tüm kullanımlar değişmeden çalışır. */
   const [pages, setPages] = useState<Design[]>(() => [template(FORMATS[0])]);
   const [pageIndexRaw, setPageIndexRaw] = useState(0);
+  /* Geçmiş (undo/redo) — commit() değişiklik ÖNCESİ durumu kaydeder. */
+  const [hist, setHist] = useState<HistState>(emptyHist());
+  const commit = () => setHist((h) => pushHist(h, pages));
   const pageIdx = Math.min(pageIndexRaw, pages.length - 1);
   const d = pages[pageIdx];
   const setD = (u: Design | ((p: Design) => Design)) =>
     setPages((ps) => ps.map((p, i) => (i === pageIdx ? (typeof u === "function" ? (u as (p: Design) => Design)(p) : u) : p)));
   const setPageIndex = (i: number) => setPageIndexRaw(Math.max(0, Math.min(pages.length - 1, i)));
-  const resetDoc = (designs: Design[]) => { setPages(designs.length ? designs : [template(FORMATS[0])]); setPageIndexRaw(0); };
-  const addPage = () => { const f = FORMATS.find((x) => x.id === d.fmt) ?? FORMATS[0]; setPages((ps) => [...ps, { ...template(f, "bos"), c1: d.c1, c2: d.c2, bgType: d.bgType }]); setPageIndexRaw(pages.length); };
+  const resetDoc = (designs: Design[]) => { setPages(designs.length ? designs : [template(FORMATS[0])]); setPageIndexRaw(0); setHist(emptyHist()); };
+  const addPage = () => { commit(); const f = FORMATS.find((x) => x.id === d.fmt) ?? FORMATS[0]; setPages((ps) => [...ps, { ...template(f, "bos"), c1: d.c1, c2: d.c2, bgType: d.bgType }]); setPageIndexRaw(pages.length); };
   const dupPage = () => {
+    commit();
     const copy = JSON.parse(JSON.stringify(d)) as Design;
     copy.layers = copy.layers.map((l) => ({ ...l, id: uid() }));
     if (copy.images) copy.images = copy.images.map((im) => ({ ...im, id: uid() }));
     setPages((ps) => { const n = [...ps]; n.splice(pageIdx + 1, 0, copy); return n; });
     setPageIndexRaw(pageIdx + 1);
   };
-  const delPage = () => { if (pages.length <= 1) return; setPages((ps) => ps.filter((_, i) => i !== pageIdx)); setPageIndexRaw(Math.max(0, pageIdx - 1)); };
-  const [sel, setSel] = useState(0);
+  const delPage = () => { if (pages.length <= 1) return; commit(); setPages((ps) => ps.filter((_, i) => i !== pageIdx)); setPageIndexRaw(Math.max(0, pageIdx - 1)); };
+  /* Seçim: -1 = seçim yok. Metin (indeks) ve görsel (id) seçimi birbirini dışlar. */
+  const [sel, setSel] = useState(-1);
+  const [selImg, setSelImg] = useState<string | null>(null);
+  const [editing, setEditing] = useState(-1); // çift-tık yerinde metin düzenleme
+  const [zoom, setZoom] = useState(0); // 0 = sığdır, aksi ölçek çarpanı
   const [view, setView] = useState<"design" | "gallery" | "templates">("design");
   const [tplCat, setTplCat] = useState<"Hepsi" | "Sunum" | "Afiş" | "Sosyal">("Hepsi");
   const [genPrompt, setGenPrompt] = useState("");
@@ -354,42 +382,167 @@ export function DesignStudio() {
   const [scale, setScale] = useState(1);
   const [hue, setHue] = useState(0);
 
+  // Seçili elemanı AI ile düzenleme (yüzen araç çubuğu)
+  const [aiSelOpen, setAiSelOpen] = useState(false);
+  const [aiSelText, setAiSelText] = useState("");
+  const [aiSelBusy, setAiSelBusy] = useState(false);
+
+  /* Sürükleme/boyutlandırma durumu — render tetiklemez, pointer olayları arası taşınır. */
+  const dragRef = useRef<null | {
+    kind: "text" | "tsize" | "img" | "isize"; i: number; id: string;
+    sx: number; sy: number; ox: number; oy: number; osize: number; ow: number;
+    rw: number; rh: number; moved: boolean; snap: Design[];
+  }>(null);
+  const editSnapRef = useRef<Design[] | null>(null); // yerinde düzenleme başlangıç anlık görüntüsü
+  const editCancelRef = useRef(false);
+  const stageWrapRef = useRef<HTMLDivElement>(null);
+
   const vd = useMemo(() => applyView(d, spacing, scale, hue), [d, spacing, scale, hue]);
+
+  const clearSel = () => { setSel(-1); setSelImg(null); setEditing(-1); setAiSelOpen(false); };
+  const doUndo = () => { const r = undoHist(hist, pages); if (!r) return; setHist(r.hist); setPages(r.pages); setPageIndexRaw((i) => Math.min(i, r.pages.length - 1)); clearSel(); };
+  const doRedo = () => { const r = redoHist(hist, pages); if (!r) return; setHist(r.hist); setPages(r.pages); setPageIndexRaw((i) => Math.min(i, r.pages.length - 1)); clearSel(); };
+
+  /* Klavye kısayolları (tuval modunda): Ctrl+Z/Y geri al-yinele, Delete sil,
+     oklar taşı (Shift=5x), Ctrl+D çoğalt, Escape seçim bırak. */
+  useEffect(() => {
+    if (!open || view !== "design" || dmode !== "canvas") return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) doRedo(); else doUndo(); return; }
+      if (mod && e.key.toLowerCase() === "y") { e.preventDefault(); doRedo(); return; }
+      if (e.key === "Escape") { clearSel(); return; }
+      if (mod && e.key.toLowerCase() === "d" && sel >= 0 && d.layers[sel]) {
+        e.preventDefault(); commit();
+        const src = d.layers[sel];
+        setD((p) => ({ ...p, layers: [...p.layers, { ...src, id: uid(), x: clamp01(src.x + 0.03), y: clamp01(src.y + 0.03) }] }));
+        setSel(d.layers.length); return;
+      }
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (selImg) { e.preventDefault(); delImage(selImg); setSelImg(null); }
+        else if (sel >= 0 && d.layers[sel]) { e.preventDefault(); delLayer(sel); setSel(-1); }
+        return;
+      }
+      const step = e.shiftKey ? 0.05 : 0.01;
+      const arrows: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+      const mv = arrows[e.key];
+      if (mv) {
+        e.preventDefault(); commit();
+        if (selImg) { const im = (d.images ?? []).find((x) => x.id === selImg); if (im) updImage(selImg, nudge(im, mv[0], mv[1])); }
+        else if (sel >= 0 && d.layers[sel]) upLayerAt(sel, nudge(d.layers[sel], mv[0], mv[1]));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  /* Ctrl+tekerlek ile zoom — pasif olmayan dinleyici gerekir (preventDefault). */
+  useEffect(() => {
+    const el = stageWrapRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setZoom((z) => Math.max(0.5, Math.min(3, +((z || 1) + (e.deltaY < 0 ? 0.1 : -0.1)).toFixed(2))));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  });
 
   if (!open) return null;
 
-  const upLayer = (patch: Partial<Layer>) =>
-    setD((p) => ({ ...p, layers: p.layers.map((l, i) => (i === sel ? { ...l, ...patch } : l)) }));
-  const addLayer = () =>
-    setD((p) => ({ ...p, layers: [...p.layers, { id: uid(), text: "Yeni metin", x: 0.5, y: 0.75, size: Math.round(p.w * 0.03), color: "#ffffff", weight: 600, align: "center", font: FONTS[0] }] }));
-  const delLayer = (i: number) => setD((p) => ({ ...p, layers: p.layers.filter((_, j) => j !== i) }));
-  const setFormat = (f: typeof FORMATS[number]) => setD((p) => ({ ...p, fmt: f.id, w: f.w, h: f.h }));
+  const upLayerAt = (i: number, patch: Partial<Layer>) =>
+    setD((p) => ({ ...p, layers: p.layers.map((l, j) => (j === i ? { ...l, ...patch } : l)) }));
+  const upLayer = (patch: Partial<Layer>) => upLayerAt(sel, patch);
+  const addLayer = (x = 0.5, y = 0.75) => {
+    commit();
+    setD((p) => ({ ...p, layers: [...p.layers, { id: uid(), text: "Yeni metin", x, y, size: Math.round(p.w * 0.03), color: "#ffffff", weight: 600, align: "center", font: FONTS[0] }] }));
+    setSel(d.layers.length); setSelImg(null);
+  };
+  const delLayer = (i: number) => { commit(); setD((p) => ({ ...p, layers: p.layers.filter((_, j) => j !== i) })); };
+  const setFormat = (f: typeof FORMATS[number]) => { commit(); setD((p) => ({ ...p, fmt: f.id, w: f.w, h: f.h })); };
 
   /* (c1) Görsel/logo katmanı yardımcıları. */
-  const addImage = (src: string) => setD((p) => ({ ...p, images: [...(p.images ?? []), { id: uid(), src, x: 0.5, y: 0.5, w: 0.3 }] }));
+  const addImage = (src: string) => { commit(); setD((p) => ({ ...p, images: [...(p.images ?? []), { id: uid(), src, x: 0.5, y: 0.5, w: 0.3 }] })); };
   const updImage = (id: string, patch: Partial<ImgLayer>) => setD((p) => ({ ...p, images: (p.images ?? []).map((im) => (im.id === id ? { ...im, ...patch } : im)) }));
-  const delImage = (id: string) => setD((p) => ({ ...p, images: (p.images ?? []).filter((im) => im.id !== id) }));
+  const delImage = (id: string) => { commit(); setD((p) => ({ ...p, images: (p.images ?? []).filter((im) => im.id !== id) })); };
   const pickImageLayer = (file: File) => { const r = new FileReader(); r.onload = () => addImage(String(r.result)); r.readAsDataURL(file); };
+
+  /* ---- Tuvalde doğrudan manipülasyon: sürükle / boyutlandır ---- */
+  const startDrag = (e: React.PointerEvent, t: { kind: "text" | "tsize"; i: number } | { kind: "img" | "isize"; id: string }) => {
+    e.stopPropagation();
+    const rect = previewRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    let ox = 0, oy = 0, osize = 0, ow = 0, i = -1, id = "";
+    if ("i" in t) {
+      const ly = d.layers[t.i]; if (!ly) return;
+      i = t.i; ox = ly.x; oy = ly.y; osize = ly.size;
+      setSel(t.i); setSelImg(null);
+    } else {
+      const im = (d.images ?? []).find((x) => x.id === t.id); if (!im) return;
+      id = t.id; ox = im.x; oy = im.y; ow = im.w;
+      setSelImg(t.id); setSel(-1);
+    }
+    setAiSelOpen(false);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    dragRef.current = { kind: t.kind, i, id, sx: e.clientX, sy: e.clientY, ox, oy, osize, ow, rw: rect.width, rh: rect.height, moved: false, snap: clonePages(pages) };
+  };
+  const onDragMove = (e: React.PointerEvent) => {
+    const g = dragRef.current;
+    if (!g) return;
+    const dx = (e.clientX - g.sx) / g.rw, dy = (e.clientY - g.sy) / g.rh;
+    if (!g.moved && Math.abs(dx) + Math.abs(dy) < 0.004) return;
+    g.moved = true;
+    /* Boşluk slider'ı görünümde y'yi 0.5 merkezli ölçekler → taban delta = dy/spacing. */
+    if (g.kind === "text") upLayerAt(g.i, { x: clamp01(g.ox + dx), y: clamp01(g.oy + dy / (spacing || 1)) });
+    else if (g.kind === "tsize") upLayerAt(g.i, { size: Math.max(10, Math.round(g.osize * Math.max(0.2, 1 + dx * 2))) });
+    else if (g.kind === "img") updImage(g.id, { x: clamp01(g.ox + dx), y: clamp01(g.oy + dy) });
+    else updImage(g.id, { w: Math.max(0.05, Math.min(1, g.ow + dx * 2)) });
+  };
+  const endDrag = () => {
+    const g = dragRef.current;
+    dragRef.current = null;
+    if (g?.moved) setHist((h) => pushHist(h, g.snap));
+  };
+
+  /* ---- Çift-tık yerinde metin düzenleme ---- */
+  const startEdit = (i: number) => {
+    editSnapRef.current = clonePages(pages); editCancelRef.current = false;
+    setEditing(i); setSel(i); setSelImg(null); setAiSelOpen(false);
+  };
+  const endEdit = (keep: boolean) => {
+    const snap = editSnapRef.current;
+    editSnapRef.current = null; editCancelRef.current = false;
+    if (editing < 0) return;
+    setEditing(-1);
+    if (!snap) return;
+    if (keep) { if (JSON.stringify(snap) !== JSON.stringify(pages)) setHist((h) => pushHist(h, snap)); }
+    else setPages(snap);
+  };
 
   const startProject = (t: typeof START_TABS[number]) => {
     if (t.id === "sablon") { setView("templates"); return; }
     const f = FORMATS.find((x) => x.id === t.fmt) ?? FORMATS[0];
     resetDoc([template(f, t.id)]);
-    setSel(0); setSpacing(1); setScale(1); setHue(0);
+    clearSel(); setSpacing(1); setScale(1); setHue(0);
   };
 
   const applyTemplate = (t: Template) => {
+    commit();
     const f = FORMATS.find((x) => x.id === t.fmt) ?? FORMATS[0];
     setD({
       fmt: f.id, w: f.w, h: f.h, bgType: t.bgType, c1: t.c1, c2: t.c2, bgImage: "",
       layers: t.layers.map((l) => ({ id: uid(), text: l.text, x: l.x, y: l.y, size: Math.round(f.w * l.sizePct), color: l.color, weight: l.weight, align: l.align, font: FONTS[l.font] ?? FONTS[0] })),
     });
-    setSel(0); setSpacing(1); setScale(1); setHue(0); setView("design");
+    clearSel(); setSpacing(1); setScale(1); setHue(0); setView("design");
   };
 
   const genBg = () => {
     const p = genPrompt.trim();
     if (!p) return;
+    commit();
     setD((prev) => ({ ...prev, bgType: "image", bgImage: pollUrl(p, prev.w, prev.h) }));
   };
 
@@ -457,7 +610,10 @@ KURALLAR:
       const active = useStore.getState().strongestModel() ?? useStore.getState().activeModel();
       if (!active) throw new Error("Önce Ayarlar → Modeller'den bir model seç.");
       const apiKey = await usableApiKey(active);
-      const sys = `${DESIGN_SYSTEM}\n\nMevcut tuval: ${d.w}x${d.h} (${d.fmt}). Mevcut tasarım (değişiklik isteniyorsa bunu TEMEL al): ${JSON.stringify(toPartial(d))}`;
+      const selCtx = sel >= 0 && d.layers[sel]
+        ? `\nŞu an SEÇİLİ katman (kullanıcı "bu/şu/seçili" derse bunu kastediyor; layers[${sel}]): ${JSON.stringify(toPartial(d).layers[sel])}`
+        : "";
+      const sys = `${DESIGN_SYSTEM}\n\nMevcut tuval: ${d.w}x${d.h} (${d.fmt}). Mevcut tasarım (değişiklik isteniyorsa bunu TEMEL al): ${JSON.stringify(toPartial(d))}${selCtx}`;
       const apiMsgs = next.slice(-6).map((m) => {
         if (m.images?.length) {
           return { role: m.role, content: [{ type: "text", text: m.text }, ...m.images.map((u) => ({ type: "image_url", image_url: { url: u } }))] };
@@ -476,27 +632,12 @@ KURALLAR:
         }),
       });
       if (!res.ok || !res.body) throw new Error(`LLM ${res.status}`);
-      const reader = res.body.getReader(); const dec = new TextDecoder();
-      let buf = ""; let full = "";
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        const lines = buf.split("\n"); buf = lines.pop() || "";
-        for (const ln of lines) {
-          const t = ln.trim();
-          if (!t.startsWith("data:")) continue;
-          const payload = t.slice(5).trim();
-          if (!payload || payload === "[DONE]") continue;
-          try {
-            const j = JSON.parse(payload) as { choices?: { delta?: { content?: string } }[] };
-            const delta = j.choices?.[0]?.delta?.content ?? "";
-            if (delta) { full += delta; const shown = stripJson(full); setMsgs((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: shown }; return c; }); }
-          } catch { /* parça parça JSON; yoksay */ }
-        }
-      }
+      const full = await readSse(res, (f) => {
+        const shown = stripJson(f);
+        setMsgs((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: shown }; return c; });
+      });
       const partial = extractJson(full);
-      if (partial) applyPartial(partial);
+      if (partial) { commit(); applyPartial(partial); }
       const shown = stripJson(full) || (partial ? "Tasarımı güncelledim." : "Yanıt alındı.");
       setMsgs((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: shown }; return c; });
       if (!partial) addToast("AI tasarım üretemedi — isteğini biraz daha açık yaz.", "error");
@@ -530,25 +671,10 @@ KURALLAR:
         }),
       });
       if (!res.ok || !res.body) throw new Error(`LLM ${res.status}`);
-      const reader = res.body.getReader(); const dec = new TextDecoder();
-      let buf = ""; let full = "";
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        const lines = buf.split("\n"); buf = lines.pop() || "";
-        for (const ln of lines) {
-          const t = ln.trim();
-          if (!t.startsWith("data:")) continue;
-          const payload = t.slice(5).trim();
-          if (!payload || payload === "[DONE]") continue;
-          try {
-            const j = JSON.parse(payload) as { choices?: { delta?: { content?: string } }[] };
-            const delta = j.choices?.[0]?.delta?.content ?? "";
-            if (delta) { full += delta; const shown = stripJson(full) || "Kod üretiliyor…"; setMsgs((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: shown }; return c; }); }
-          } catch { /* yoksay */ }
-        }
-      }
+      const full = await readSse(res, (f) => {
+        const shown = stripJson(f) || "Kod üretiliyor…";
+        setMsgs((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: shown }; return c; });
+      });
       const blocks = parseBlocks(full);
       const block = blocks.find((b) => ["html", "htm", "jsx", "tsx", "react", "js", "javascript", "svg"].includes(b.lang)) || blocks[0];
       let ok = false;
@@ -568,6 +694,51 @@ KURALLAR:
 
   /* Aktif moda göre gönder (Tuval = tasarım JSON; Kod = HTML/React). */
   const onSend = () => { if (dmode === "code") void sendCode(); else void send(); };
+
+  /* ---- Seçili elemanı AI ile düzenle (yüzen araç çubuğu) — Claude Design imzası.
+     Yalnız seçili katman JSON'u gönderilir; AI değişen alanları döndürür. ---- */
+  const aiEditLayer = async () => {
+    const instruction = aiSelText.trim();
+    const ly = d.layers[sel];
+    if (!instruction || !ly || aiSelBusy) return;
+    setAiSelBusy(true);
+    try {
+      const cfg = useStore.getState().config;
+      const active = useStore.getState().strongestModel() ?? useStore.getState().activeModel();
+      if (!active) throw new Error("Önce Ayarlar → Modeller'den bir model seç.");
+      const apiKey = await usableApiKey(active);
+      const lyJson = { text: ly.text, x: +ly.x.toFixed(2), y: +ly.y.toFixed(2), sizePct: +(ly.size / d.w).toFixed(3), color: ly.color, weight: ly.weight, align: ly.align, font: Math.max(0, FONTS.indexOf(ly.font)) };
+      const sys = `Bir tasarım metin katmanını düzenliyorsun. Mevcut katman: ${JSON.stringify(lyJson)}\nKullanıcının isteğine göre SADECE değişen alanları içeren tek bir \`\`\`json bloğu döndür. Alanlar: text, x (0-1), y (0-1), sizePct (yazıboyu/genişlik, ör. 0.04), color (#hex), weight (100-900), align (left|center|right), font (0-5). Açıklama yazma.`;
+      const res = await fetch("/api/chat", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: instruction }],
+          baseUrl: active.baseUrl, model: active.model, apiKey, provider: active.provider,
+          systemPrompt: sys, fallbacks: buildFallbackChain(cfg.models, cfg.activeModelId),
+          tools: false, webSearch: false, temperature: 0.4,
+        }),
+      });
+      if (!res.ok || !res.body) throw new Error(`LLM ${res.status}`);
+      const full = await readSse(res);
+      const p = extractJson(full);
+      if (!p) throw new Error("AI yanıtı çözümlenemedi — tekrar dene");
+      commit();
+      const patch: Partial<Layer> = {};
+      if (typeof p.text === "string") patch.text = p.text;
+      if (p.x !== undefined) patch.x = clamp01(Number(p.x));
+      if (p.y !== undefined) patch.y = clamp01(Number(p.y));
+      if (p.sizePct !== undefined && Number(p.sizePct) > 0) patch.size = Math.max(10, Math.round(d.w * Number(p.sizePct)));
+      if (typeof p.color === "string") patch.color = p.color;
+      if (p.weight !== undefined && Number(p.weight)) patch.weight = Number(p.weight);
+      if (["left", "center", "right"].includes(String(p.align))) patch.align = p.align as Align;
+      if (p.font !== undefined && FONTS[Number(p.font)]) patch.font = FONTS[Number(p.font)];
+      upLayer(patch);
+      setAiSelText(""); setAiSelOpen(false);
+      addToast("Katman güncellendi ✓", "success");
+    } catch (e) {
+      addToast(`AI düzenleme: ${e instanceof Error ? e.message : "bilinmeyen hata"}`, "error");
+    } finally { setAiSelBusy(false); }
+  };
 
   const downloadCode = () => {
     if (!codeArt) return;
@@ -686,12 +857,12 @@ KURALLAR:
     try {
       const parsed = JSON.parse(sd.code) as Design | { pages: Design[] };
       const ps = "pages" in parsed && Array.isArray(parsed.pages) ? parsed.pages : [parsed as Design];
-      resetDoc(ps); setTitle(sd.title); setSel(0); setSpacing(1); setScale(1); setHue(0); setView("design");
+      resetDoc(ps); setTitle(sd.title); clearSel(); setSpacing(1); setScale(1); setHue(0); setView("design");
     } catch { /* eski format */ }
   };
   const del = (id: string) => saveConfig({ ...config, savedDesigns: saved.filter((x) => x.id !== id) });
 
-  const L = d.layers[sel] ?? d.layers[0];
+  const L = sel >= 0 ? d.layers[sel] : undefined;
   const bgStyle: React.CSSProperties =
     vd.bgType === "image" && vd.bgImage ? { backgroundImage: `url(${vd.bgImage})`, backgroundSize: "cover", backgroundPosition: "center" }
       : vd.bgType === "color" ? { background: vd.c1 }
@@ -717,6 +888,12 @@ KURALLAR:
           <button onClick={() => setDmode("code")} className={`px-2 py-1 rounded-md transition-colors ${dmode === "code" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`}>Kod</button>
         </div>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tasarım adı…" className="hidden md:block ml-2 w-40 bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50" />
+        {dmode === "canvas" && (
+          <div className="flex items-center gap-0.5 ml-1 shrink-0">
+            <button onClick={doUndo} disabled={!hist.past.length} title="Geri al (Ctrl+Z)" className="w-8 h-8 grid place-items-center rounded-lg border border-line text-muted hover:text-ink disabled:opacity-30 transition-colors"><Undo2 size={14} /></button>
+            <button onClick={doRedo} disabled={!hist.future.length} title="Yinele (Ctrl+Y)" className="w-8 h-8 grid place-items-center rounded-lg border border-line text-muted hover:text-ink disabled:opacity-30 transition-colors"><Redo2 size={14} /></button>
+          </div>
+        )}
 
         <div className="ml-auto flex items-center gap-1 sm:gap-1.5">
           {/* Dışa aktar */}
@@ -914,31 +1091,123 @@ KURALLAR:
               </div>
             ) : (
             <div className="flex-1 min-h-0 flex flex-col bg-[#0a0a0d]">
-              <div className="flex-1 min-h-0 grid place-items-center p-4 sm:p-8 overflow-auto">
-              <div ref={previewRef} className="relative shadow-2xl rounded-sm overflow-hidden" style={{ ...bgStyle, width: "min(100%, 640px)", aspectRatio: `${vd.w} / ${vd.h}` }}>
+              <div ref={stageWrapRef} className="flex-1 min-h-0 grid place-items-center p-4 sm:p-8 overflow-auto">
+              <div
+                ref={previewRef}
+                onPointerDown={(e) => { if (e.target === e.currentTarget) clearSel(); }}
+                onDoubleClick={(e) => {
+                  /* Boş tuvale çift tık → o noktaya yeni metin. */
+                  if (e.target !== e.currentTarget) return;
+                  const r = e.currentTarget.getBoundingClientRect();
+                  addLayer(clamp01((e.clientX - r.left) / r.width), clamp01((e.clientY - r.top) / r.height));
+                }}
+                className="relative shadow-2xl rounded-sm overflow-hidden"
+                style={{ ...bgStyle, containerType: "inline-size", width: zoom === 0 ? "min(100%, 640px)" : `${Math.round(640 * zoom)}px`, aspectRatio: `${vd.w} / ${vd.h}` }}
+              >
                 {(vd.images ?? []).map((im) => (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img key={im.id} src={im.src} alt="" className="absolute pointer-events-none" style={{ left: `${im.x * 100}%`, top: `${im.y * 100}%`, width: `${im.w * 100}%`, transform: "translate(-50%,-50%)" }} />
+                  <img
+                    key={im.id} src={im.src} alt="" draggable={false}
+                    onPointerDown={(e) => startDrag(e, { kind: "img", id: im.id })}
+                    onPointerMove={onDragMove} onPointerUp={endDrag}
+                    className={`absolute touch-none select-none cursor-grab active:cursor-grabbing ${selImg === im.id ? "outline outline-2 outline-brand" : "hover:outline hover:outline-1 hover:outline-brand/40"}`}
+                    style={{ left: `${im.x * 100}%`, top: `${im.y * 100}%`, width: `${im.w * 100}%`, transform: "translate(-50%,-50%)" }}
+                  />
                 ))}
-                {vd.layers.map((ly, i) => (
-                  <div
-                    key={ly.id}
-                    onClick={() => setSel(i)}
-                    className={`absolute cursor-pointer px-2 transition-[outline] ${i === sel ? "outline outline-1 outline-brand/60" : "hover:outline hover:outline-1 hover:outline-brand/30"}`}
-                    style={{
-                      left: ly.align === "left" ? `${ly.x * 100}%` : ly.align === "right" ? undefined : "50%",
-                      right: ly.align === "right" ? `${(1 - ly.x) * 100}%` : undefined,
-                      top: `${ly.y * 100}%`,
-                      transform: ly.align === "center" ? "translate(-50%,-50%)" : "translateY(-50%)",
-                      color: ly.color,
-                      fontSize: `calc(${ly.size} / ${vd.w} * min(100%, 640px))`,
-                      fontWeight: ly.weight, fontFamily: ly.font, textAlign: ly.align,
-                      width: ly.align === "center" ? "88%" : "auto", maxWidth: "88%", lineHeight: 1.18,
-                    }}
-                  >
-                    {ly.text}
-                  </div>
-                ))}
+                {vd.layers.map((ly, i) => {
+                  const baseLy = d.layers[i];
+                  const isSel = i === sel, isEdit = i === editing;
+                  return (
+                    <div
+                      key={ly.id}
+                      onPointerDown={(e) => { if (!isEdit) startDrag(e, { kind: "text", i }); }}
+                      onPointerMove={onDragMove} onPointerUp={endDrag}
+                      onDoubleClick={(e) => { e.stopPropagation(); if (!isEdit) startEdit(i); }}
+                      className={`absolute px-2 touch-none ${isEdit ? "" : "cursor-grab active:cursor-grabbing select-none"} ${isSel && !isEdit ? "outline outline-1 outline-brand" : !isEdit ? "hover:outline hover:outline-1 hover:outline-brand/30" : ""}`}
+                      style={{
+                        left: ly.align === "left" ? `${ly.x * 100}%` : ly.align === "right" ? undefined : "50%",
+                        right: ly.align === "right" ? `${(1 - ly.x) * 100}%` : undefined,
+                        top: `${ly.y * 100}%`,
+                        transform: ly.align === "center" ? "translate(-50%,-50%)" : "translateY(-50%)",
+                        color: ly.color,
+                        fontSize: `${(ly.size / vd.w * 100).toFixed(3)}cqw`,
+                        fontWeight: ly.weight, fontFamily: ly.font, textAlign: ly.align,
+                        width: ly.align === "center" || isEdit ? "88%" : "auto", maxWidth: "88%", lineHeight: 1.18,
+                      }}
+                    >
+                      {isEdit && baseLy ? (
+                        <textarea
+                          autoFocus
+                          value={baseLy.text}
+                          onChange={(e) => upLayerAt(i, { text: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); }
+                            if (e.key === "Escape") { editCancelRef.current = true; (e.target as HTMLTextAreaElement).blur(); }
+                          }}
+                          onBlur={() => endEdit(!editCancelRef.current)}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          rows={Math.max(1, baseLy.text.split("\n").length)}
+                          className="w-full bg-transparent outline-dashed outline-1 outline-brand/70 resize-none overflow-hidden p-0 border-0"
+                          style={{ fontSize: "inherit", fontWeight: "inherit", fontFamily: "inherit", color: "inherit", textAlign: ly.align, lineHeight: "inherit" }}
+                        />
+                      ) : ly.text}
+                      {isSel && !isEdit && (
+                        <span
+                          onPointerDown={(e) => startDrag(e, { kind: "tsize", i })}
+                          onPointerMove={onDragMove} onPointerUp={endDrag}
+                          title="Boyutlandır"
+                          className="absolute -right-1.5 -bottom-1.5 w-3 h-3 rounded-sm bg-brand border border-white/70 cursor-nwse-resize touch-none"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+                {/* Seçili görselin boyutlandırma tutamacı (sağ kenar ortası) */}
+                {selImg && (() => {
+                  const im = (vd.images ?? []).find((x) => x.id === selImg);
+                  if (!im) return null;
+                  return (
+                    <span
+                      onPointerDown={(e) => startDrag(e, { kind: "isize", id: im.id })}
+                      onPointerMove={onDragMove} onPointerUp={endDrag}
+                      title="Boyutlandır"
+                      className="absolute z-10 w-3 h-3 rounded-sm bg-brand border border-white/70 cursor-ew-resize touch-none"
+                      style={{ left: `${(im.x + im.w / 2) * 100}%`, top: `${im.y * 100}%`, transform: "translate(-50%,-50%)" }}
+                    />
+                  );
+                })()}
+                {/* Yüzen araç çubuğu — seçili metin katmanı (renk · boyut · hizalama · AI · sil) */}
+                {sel >= 0 && d.layers[sel] && editing < 0 && (() => {
+                  const ly = vd.layers[sel];
+                  const above = ly.y > 0.16;
+                  return (
+                    <div
+                      onPointerDown={(e) => e.stopPropagation()}
+                      className="absolute z-20 flex items-center gap-1 px-1.5 py-1 rounded-lg bg-surface/95 border border-line shadow-xl text-ink"
+                      style={{ left: `${clamp01(ly.x) * 100}%`, top: `${ly.y * 100}%`, transform: above ? "translate(-50%, calc(-100% - 14px))" : "translate(-50%, 22px)", fontSize: 12 }}
+                    >
+                      <input type="color" value={d.layers[sel].color} onFocus={commit} onChange={(e) => upLayer({ color: e.target.value })} title="Renk" className="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0 shrink-0" />
+                      <button onClick={() => { commit(); upLayer({ size: Math.max(10, Math.round(d.layers[sel].size * 0.9)) }); }} title="Küçült" className="w-6 h-6 grid place-items-center rounded hover:bg-bgsoft text-[10px] font-bold shrink-0">A−</button>
+                      <button onClick={() => { commit(); upLayer({ size: Math.round(d.layers[sel].size * 1.1) }); }} title="Büyüt" className="w-6 h-6 grid place-items-center rounded hover:bg-bgsoft text-[12px] font-bold shrink-0">A+</button>
+                      <button onClick={() => { commit(); const order: Align[] = ["left", "center", "right"]; upLayer({ align: order[(order.indexOf(d.layers[sel].align) + 1) % 3] }); }} title="Hizalama" className="w-6 h-6 grid place-items-center rounded hover:bg-bgsoft shrink-0">{d.layers[sel].align === "left" ? "⇤" : d.layers[sel].align === "center" ? "↔" : "⇥"}</button>
+                      <button onClick={() => setAiSelOpen((v) => !v)} title="AI ile düzenle" className={`w-6 h-6 grid place-items-center rounded shrink-0 ${aiSelOpen ? "bg-brand/20 text-brand" : "hover:bg-bgsoft text-brand"}`}><Sparkles size={12} /></button>
+                      <button onClick={() => { delLayer(sel); setSel(-1); }} title="Sil (Delete)" className="w-6 h-6 grid place-items-center rounded hover:bg-bgsoft text-muted hover:text-red shrink-0"><Trash2 size={12} /></button>
+                      {aiSelOpen && (
+                        <div className="flex items-center gap-1 pl-1.5 ml-0.5 border-l border-line/60">
+                          <input
+                            autoFocus value={aiSelText} onChange={(e) => setAiSelText(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") void aiEditLayer(); if (e.key === "Escape") setAiSelOpen(false); }}
+                            placeholder="bunu kırmızı yap…"
+                            className="w-36 bg-bgsoft border border-line rounded px-1.5 py-0.5 text-[11px] outline-none focus:border-brand/50"
+                          />
+                          <button onClick={() => void aiEditLayer()} disabled={aiSelBusy} title="Uygula" className="w-6 h-6 grid place-items-center rounded bg-brand text-white disabled:opacity-50 shrink-0">
+                            {aiSelBusy ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
               </div>
               {/* Sayfa şeridi (çok-sayfalı belge — Canva tarzı) */}
@@ -952,6 +1221,12 @@ KURALLAR:
                 <button onClick={addPage} title="Yeni sayfa" className="shrink-0 w-9 h-10 grid place-items-center rounded-md border border-dashed border-line/60 text-muted hover:text-brand hover:border-brand/50 transition-colors"><Plus size={15} /></button>
                 <button onClick={dupPage} title="Sayfayı çoğalt" className="shrink-0 px-2 py-1 rounded-lg border border-line text-[11px] font-semibold text-muted hover:text-ink transition-colors">Çoğalt</button>
                 {pages.length > 1 && <button onClick={delPage} title="Sayfayı sil" className="shrink-0 px-2 py-1 rounded-lg border border-line text-[11px] font-semibold text-muted hover:text-red transition-colors">Sil</button>}
+                {/* Zoom — Sığdır / % (Ctrl+tekerlek de çalışır) */}
+                <div className="ml-auto shrink-0 flex items-center gap-0.5">
+                  <button onClick={() => setZoom((z) => Math.max(0.5, +((z || 1) - 0.25).toFixed(2)))} title="Uzaklaş" className="w-7 h-7 grid place-items-center rounded-lg text-muted hover:text-ink hover:bg-bgsoft transition-colors"><ZoomOut size={13} /></button>
+                  <button onClick={() => setZoom(0)} title="Sığdır" className={`px-1.5 h-7 rounded-lg text-[11px] font-semibold transition-colors ${zoom === 0 ? "text-brand" : "text-muted hover:text-ink hover:bg-bgsoft"}`}>{zoom === 0 ? "Sığdır" : `${Math.round(zoom * 100)}%`}</button>
+                  <button onClick={() => setZoom((z) => Math.min(3, +((z || 1) + 0.25).toFixed(2)))} title="Yakınlaş" className="w-7 h-7 grid place-items-center rounded-lg text-muted hover:text-ink hover:bg-bgsoft transition-colors"><ZoomIn size={13} /></button>
+                </div>
               </div>
             </div>
             )}
@@ -989,13 +1264,13 @@ KURALLAR:
                   <div className="text-[10px] font-bold uppercase tracking-widest text-muted/45 mb-1.5">Arka plan teması</div>
                   <div className="grid grid-cols-3 gap-1.5">
                     {PRESETS.map((p) => (
-                      <button key={p.name} onClick={() => setD((prev) => ({ ...prev, bgType: "gradient", c1: p.c1, c2: p.c2 }))} title={p.name} className="h-8 rounded-lg border border-line/60 hover:border-brand transition-colors" style={{ background: `linear-gradient(135deg, ${p.c1}, ${p.c2})` }} />
+                      <button key={p.name} onClick={() => { commit(); setD((prev) => ({ ...prev, bgType: "gradient", c1: p.c1, c2: p.c2 })); }} title={p.name} className="h-8 rounded-lg border border-line/60 hover:border-brand transition-colors" style={{ background: `linear-gradient(135deg, ${p.c1}, ${p.c2})` }} />
                     ))}
                   </div>
                   <div className="flex items-center gap-2 mt-2">
-                    <input type="color" value={d.c1} onChange={(e) => setD((p) => ({ ...p, c1: e.target.value }))} className="w-8 h-8 rounded cursor-pointer bg-transparent" title="Renk 1" />
-                    <input type="color" value={d.c2} onChange={(e) => setD((p) => ({ ...p, c2: e.target.value }))} className="w-8 h-8 rounded cursor-pointer bg-transparent" title="Renk 2" />
-                    <button onClick={() => setD((p) => ({ ...p, bgType: p.bgType === "color" ? "gradient" : "color" }))} className="text-[11px] px-2 py-1 rounded border border-line text-muted hover:text-ink">{d.bgType === "color" ? "Düz" : "Gradyan"}</button>
+                    <input type="color" value={d.c1} onFocus={commit} onChange={(e) => setD((p) => ({ ...p, c1: e.target.value }))} className="w-8 h-8 rounded cursor-pointer bg-transparent" title="Renk 1" />
+                    <input type="color" value={d.c2} onFocus={commit} onChange={(e) => setD((p) => ({ ...p, c2: e.target.value }))} className="w-8 h-8 rounded cursor-pointer bg-transparent" title="Renk 2" />
+                    <button onClick={() => { commit(); setD((p) => ({ ...p, bgType: p.bgType === "color" ? "gradient" : "color" })); }} className="text-[11px] px-2 py-1 rounded border border-line text-muted hover:text-ink">{d.bgType === "color" ? "Düz" : "Gradyan"}</button>
                   </div>
                 </div>
 
@@ -1011,18 +1286,15 @@ KURALLAR:
                   <input ref={imgLayerRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) pickImageLayer(f); e.target.value = ""; }} />
                   <button onClick={() => imgLayerRef.current?.click()} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-line hover:border-brand/50 text-xs font-semibold transition-colors"><Upload size={13} className="text-brand" /> Görsel/logo ekle</button>
                   {(d.images ?? []).map((im) => (
-                    <div key={im.id} className="mt-2 border-t border-line/40 pt-2 space-y-1.5">
+                    <div key={im.id} className="mt-2 border-t border-line/40 pt-2">
                       <div className="flex items-center gap-2">
-                        <span className="block w-8 h-8 rounded border border-line bg-cover bg-center bg-no-repeat shrink-0" style={{ backgroundImage: `url(${im.src})` }} />
+                        <button onClick={() => { setSelImg(im.id); setSel(-1); }} title="Tuvalde seç" className={`block w-8 h-8 rounded border bg-cover bg-center bg-no-repeat shrink-0 ${selImg === im.id ? "border-brand" : "border-line"}`} style={{ backgroundImage: `url(${im.src})` }} />
                         <label className="flex-1 text-[11px] text-muted/70">Boyut
-                          <input type="range" min={0.05} max={1} step={0.01} value={im.w} onChange={(e) => updImage(im.id, { w: +e.target.value })} className="w-full accent-brand" />
+                          <input type="range" min={0.05} max={1} step={0.01} value={im.w} onPointerDown={commit} onChange={(e) => updImage(im.id, { w: +e.target.value })} className="w-full accent-brand" />
                         </label>
-                        <button onClick={() => delImage(im.id)} className="text-muted/50 hover:text-red shrink-0" title="Sil"><Trash2 size={13} /></button>
+                        <button onClick={() => { delImage(im.id); if (selImg === im.id) setSelImg(null); }} className="text-muted/50 hover:text-red shrink-0" title="Sil"><Trash2 size={13} /></button>
                       </div>
-                      <div className="flex items-center gap-2 text-[11px] text-muted/60">
-                        <span>X</span><input type="range" min={0} max={1} step={0.01} value={im.x} onChange={(e) => updImage(im.id, { x: +e.target.value })} className="flex-1 accent-brand" />
-                        <span>Y</span><input type="range" min={0} max={1} step={0.01} value={im.y} onChange={(e) => updImage(im.id, { y: +e.target.value })} className="flex-1 accent-brand" />
-                      </div>
+                      <div className="text-[10px] text-muted/50 mt-1">Konum için tuvalde sürükle.</div>
                     </div>
                   ))}
                 </div>
@@ -1031,36 +1303,33 @@ KURALLAR:
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-widest text-muted/45 mb-1.5 flex items-center justify-between">
                     <span className="flex items-center gap-1"><Type size={11} /> Metin katmanları</span>
-                    <button onClick={addLayer} className="text-brand hover:text-branddim"><Plus size={13} /></button>
+                    <button onClick={() => addLayer()} className="text-brand hover:text-branddim"><Plus size={13} /></button>
                   </div>
                   <div className="space-y-1 mb-2">
                     {d.layers.map((ly, i) => (
-                      <div key={ly.id} className={`flex items-center gap-1.5 px-2 py-1 rounded-lg cursor-pointer text-xs ${i === sel ? "bg-brand/10 text-brand" : "text-muted hover:bg-bgsoft/60"}`} onClick={() => setSel(i)}>
+                      <div key={ly.id} className={`flex items-center gap-1.5 px-2 py-1 rounded-lg cursor-pointer text-xs ${i === sel ? "bg-brand/10 text-brand" : "text-muted hover:bg-bgsoft/60"}`} onClick={() => { setSel(i); setSelImg(null); }}>
                         <span className="flex-1 truncate">{ly.text || "(boş)"}</span>
-                        {d.layers.length > 1 && <button onClick={(e) => { e.stopPropagation(); delLayer(i); setSel(0); }} className="text-muted/50 hover:text-red"><Trash2 size={11} /></button>}
+                        {d.layers.length > 1 && <button onClick={(e) => { e.stopPropagation(); delLayer(i); setSel(-1); }} className="text-muted/50 hover:text-red"><Trash2 size={11} /></button>}
                       </div>
                     ))}
-                    {d.layers.length === 0 && <div className="text-[11px] text-muted/50 px-2 py-1">Katman yok — sohbetten üret ya da + ile ekle.</div>}
+                    {d.layers.length === 0 && <div className="text-[11px] text-muted/50 px-2 py-1">Katman yok — sohbetten üret, + ile ya da tuvale çift tıkla ekle.</div>}
                   </div>
                   {L && (
                     <div className="space-y-2 border-t border-line/40 pt-2">
-                      <textarea value={L.text} onChange={(e) => upLayer({ text: e.target.value })} rows={2} className="w-full bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-sm outline-none focus:border-brand/50 resize-none" />
+                      <textarea value={L.text} onFocus={commit} onChange={(e) => upLayer({ text: e.target.value })} rows={2} className="w-full bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-sm outline-none focus:border-brand/50 resize-none" />
                       <div className="flex items-center gap-2">
-                        <input type="color" value={L.color} onChange={(e) => upLayer({ color: e.target.value })} className="w-8 h-8 rounded cursor-pointer bg-transparent" />
-                        <input type="range" min={16} max={Math.round(d.w * 0.14)} value={L.size} onChange={(e) => upLayer({ size: +e.target.value })} className="flex-1 accent-brand" />
+                        <input type="color" value={L.color} onFocus={commit} onChange={(e) => upLayer({ color: e.target.value })} className="w-8 h-8 rounded cursor-pointer bg-transparent" />
+                        <input type="range" min={16} max={Math.round(d.w * 0.14)} value={L.size} onPointerDown={commit} onChange={(e) => upLayer({ size: +e.target.value })} className="flex-1 accent-brand" />
                       </div>
-                      <select value={L.font} onChange={(e) => upLayer({ font: e.target.value })} className="w-full bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs outline-none cursor-pointer">
+                      <select value={L.font} onChange={(e) => { commit(); upLayer({ font: e.target.value }); }} className="w-full bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs outline-none cursor-pointer">
                         {FONTS.map((f) => <option key={f} value={f}>{f.split(",")[0].replace(/'/g, "")}</option>)}
                       </select>
                       <div className="flex gap-1">
                         {(["left", "center", "right"] as Align[]).map((a) => (
-                          <button key={a} onClick={() => upLayer({ align: a })} className={`flex-1 py-1 rounded text-[11px] border ${L.align === a ? "border-brand text-brand" : "border-line text-muted"}`}>{a === "left" ? "Sol" : a === "center" ? "Orta" : "Sağ"}</button>
+                          <button key={a} onClick={() => { commit(); upLayer({ align: a }); }} className={`flex-1 py-1 rounded text-[11px] border ${L.align === a ? "border-brand text-brand" : "border-line text-muted"}`}>{a === "left" ? "Sol" : a === "center" ? "Orta" : "Sağ"}</button>
                         ))}
                       </div>
-                      <div className="flex items-center gap-2 text-[11px] text-muted/60">
-                        <span>Y:</span>
-                        <input type="range" min={0} max={1} step={0.01} value={L.y} onChange={(e) => upLayer({ y: +e.target.value })} className="flex-1 accent-brand" />
-                      </div>
+                      <div className="text-[10px] text-muted/50">Konum: tuvalde sürükle · ok tuşlarıyla taşı · köşe tutamacıyla boyutlandır · çift-tık ile yaz.</div>
                     </div>
                   )}
                 </div>
