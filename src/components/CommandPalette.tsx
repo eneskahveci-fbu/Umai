@@ -11,6 +11,10 @@ import {
   Search,
   FileText,
   Activity,
+  Sparkles,
+  LayoutTemplate,
+  Image as ImageIcon,
+  Zap,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { TreeNode } from "@/lib/types";
@@ -93,6 +97,46 @@ export function CommandPalette() {
         setOpen(false);
       },
       keywords: ["tema", "theme", "dark", "light", "koyu", "acik", "degistir"],
+    },
+    {
+      id: "open-studio",
+      label: "Stüdyo'yu aç (brief → AI tasarım)",
+      icon: <Sparkles size={16} />,
+      action: () => {
+        useStore.getState().setStudioOpen(true);
+        setOpen(false);
+      },
+      keywords: ["studyo", "stüdyo", "studio", "tasarim", "design", "web", "sunum"],
+    },
+    {
+      id: "open-canvas",
+      label: "Tuval'i aç (slayt · afiş · sosyal)",
+      icon: <LayoutTemplate size={16} />,
+      action: () => {
+        useStore.getState().setDesignStudioOpen(true);
+        setOpen(false);
+      },
+      keywords: ["tuval", "canvas", "slayt", "afis", "poster", "katman"],
+    },
+    {
+      id: "open-image",
+      label: "Görüntü Stüdyosu'nu aç (AI görsel)",
+      icon: <ImageIcon size={16} />,
+      action: () => {
+        useStore.getState().setImageStudioOpen(true);
+        setOpen(false);
+      },
+      keywords: ["goruntu", "görüntü", "image", "gorsel", "görsel", "resim"],
+    },
+    {
+      id: "open-skills",
+      label: "Skills (eğitim seti)",
+      icon: <Zap size={16} />,
+      action: () => {
+        useStore.getState().setSkillsOpen(true);
+        setOpen(false);
+      },
+      keywords: ["skills", "skill", "egitim", "eğitim", "kural", "agent"],
     },
     {
       id: "activity-log",

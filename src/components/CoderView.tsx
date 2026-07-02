@@ -122,9 +122,13 @@ function MoreMenu({ active, children, placement = "top", icon }: { active?: bool
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
+  /* Mobilde (sm altı) menü, dropdown yerine alttan açılan tam genişlik SHEET olur
+     (iOS hissi: backdrop + tutamaç + safe-area). Masaüstünde konumlu dropdown. */
+  const [sheet, setSheet] = useState(false);
   useEffect(() => {
     if (!open) return;
     const update = () => {
+      setSheet(window.matchMedia("(max-width: 639px)").matches);
       const r = btnRef.current?.getBoundingClientRect();
       if (!r) return;
       setPos(placement === "bottom"
@@ -157,12 +161,27 @@ function MoreMenu({ active, children, placement = "top", icon }: { active?: bool
       >
         {icon ?? <MoreHorizontal size={13} />}
       </button>
-      {open && pos && createPortal(
+      {open && sheet && createPortal(
+        <>
+          <div className="fixed inset-0 z-[79] bg-black/40 animate-modal-bg" onClick={() => setOpen(false)} />
+          <div
+            ref={menuRef}
+            onClick={() => setOpen(false)}
+            className="fixed inset-x-0 bottom-0 z-[80] bg-surface border-t border-line rounded-t-2xl shadow-2xl shadow-black/40 p-2 pt-1.5 flex flex-col gap-0.5 max-h-[75dvh] overflow-y-auto animate-modal-bg"
+            style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+          >
+            <div className="mx-auto w-10 h-1 rounded-full bg-line/80 mb-1.5 shrink-0" />
+            {children}
+          </div>
+        </>,
+        document.body,
+      )}
+      {open && !sheet && pos && createPortal(
         <div
           ref={menuRef}
           onClick={() => setOpen(false)}
           style={{ position: "fixed", left: pos.left, top: pos.top, bottom: pos.bottom, transform: "translateX(-100%)" }}
-          className="min-w-[190px] bg-surface border border-line rounded-xl shadow-2xl shadow-black/40 p-1 z-[80] flex flex-col gap-0.5 animate-modal-bg"
+          className="min-w-[230px] max-h-[70vh] overflow-y-auto bg-surface border border-line rounded-xl shadow-2xl shadow-black/40 p-1 z-[80] flex flex-col gap-0.5 animate-modal-bg"
         >
           {children}
         </div>,
@@ -172,7 +191,7 @@ function MoreMenu({ active, children, placement = "top", icon }: { active?: bool
   );
 }
 
-function MoreItem({ onClick, icon, label, active }: { onClick: () => void; icon: React.ReactNode; label: string; active?: boolean }) {
+function MoreItem({ onClick, icon, label, desc, active }: { onClick: () => void; icon: React.ReactNode; label: string; desc?: string; active?: boolean }) {
   return (
     <button
       onClick={onClick}
@@ -180,9 +199,55 @@ function MoreItem({ onClick, icon, label, active }: { onClick: () => void; icon:
         active ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
       }`}
     >
-      {icon}
-      <span>{label}</span>
+      <span className="shrink-0">{icon}</span>
+      <span className="min-w-0">
+        <span className="block truncate">{label}</span>
+        {desc && <span className="block text-[10px] text-muted/50 truncate">{desc}</span>}
+      </span>
     </button>
+  );
+}
+
+/* Hızlı model değiştirici — header'daki model adına tıkla → listeden anında geç
+   (Ayarlar'a girmeden). Copilot'un model picker'ı gibi. */
+function ModelSwitcher() {
+  const config = useStore((s) => s.config);
+  const saveConfig = useStore((s) => s.saveConfig);
+  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
+  const active = config.models.find((m) => m.id === config.activeModelId);
+  if (config.models.length === 0) {
+    return (
+      <button onClick={() => setSettingsOpen(true)} className="text-xs px-2 py-1 rounded-lg border border-brand/40 text-brand hover:bg-brand/10 transition-colors">
+        + Model
+      </button>
+    );
+  }
+  return (
+    <MoreMenu
+      placement="bottom"
+      icon={
+        <span className="flex items-center gap-1.5 text-xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-green shrink-0" />
+          <span className="truncate max-w-[140px] font-medium">{active?.label || active?.model || "Model seç"}</span>
+        </span>
+      }
+    >
+      <div className="px-2.5 pt-1.5 pb-1 text-[9px] font-bold uppercase tracking-widest text-muted/50" onClick={(e) => e.stopPropagation()}>
+        Aktif model
+      </div>
+      {config.models.map((m) => (
+        <MoreItem
+          key={m.id}
+          icon={m.id === config.activeModelId ? <Check size={13} className="text-brand" /> : <span className="w-[13px] grid place-items-center"><span className="w-1.5 h-1.5 rounded-full bg-muted/40" /></span>}
+          label={m.label || m.model}
+          desc={m.provider}
+          active={m.id === config.activeModelId}
+          onClick={() => saveConfig({ ...config, activeModelId: m.id })}
+        />
+      ))}
+      <div className="h-px bg-line/60 my-0.5" />
+      <MoreItem icon={<Wrench size={13} />} label="Model ekle / yönet…" onClick={() => setSettingsOpen(true)} />
+    </MoreMenu>
   );
 }
 
@@ -201,11 +266,11 @@ function ModeChip({ icon, label, active, onClick }: { icon: React.ReactNode; lab
 }
 
 const THINKING_LEVELS = [
-  { key: "auto",   label: "Oto",    short: "A" },
-  { key: "low",    label: "Düşük",  short: "D" },
-  { key: "medium", label: "Orta",   short: "O" },
-  { key: "high",   label: "Yüksek", short: "Y" },
-  { key: "max",    label: "Max",    short: "M" },
+  { key: "auto",   label: "Oto",    short: "Oto" },
+  { key: "low",    label: "Düşük",  short: "Düşük" },
+  { key: "medium", label: "Orta",   short: "Orta" },
+  { key: "high",   label: "Yüksek", short: "Yüksek" },
+  { key: "max",    label: "Max",    short: "Max" },
 ] as const;
 
 /* Otomatik düşünme eforu: kullanıcı mesajının karmaşıklığına göre efor seçer.
@@ -2223,19 +2288,7 @@ export function CoderView() {
         )}
 
         <div className="flex items-center gap-1 shrink-0">
-          {config.models.length > 0 ? (
-            <button onClick={() => setSettingsOpen(true)} className="flex items-center gap-1.5 text-xs text-muted hover:text-ink transition-colors px-2 py-1 rounded-lg hover:bg-bgsoft" title="Model seç">
-              <span className="w-1.5 h-1.5 rounded-full bg-green shrink-0" />
-              <span className="truncate max-w-[140px] font-medium">
-                {config.models.find((m) => m.id === config.activeModelId)?.label ||
-                  config.models.find((m) => m.id === config.activeModelId)?.model || "Model seç"}
-              </span>
-            </button>
-          ) : (
-            <button onClick={() => setSettingsOpen(true)} className="text-xs px-2 py-1 rounded-lg border border-brand/40 text-brand hover:bg-brand/10 transition-colors">
-              + Model
-            </button>
-          )}
+          <ModelSwitcher />
           {incognito && (
             <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-brand/10 text-brand border border-brand/30">
               <VenetianMask size={9} /> Gizli
@@ -2270,12 +2323,13 @@ export function CoderView() {
                 {isAdmin && (
                   <MoreItem
                     icon={<Terminal size={14} />}
-                    label={terminalSupported ? (terminalOpen ? "Terminal'i kapat" : "Terminal") : "Terminal (masaüstü Chrome/Edge)"}
+                    label={terminalOpen ? "Terminal'i kapat" : "Terminal"}
+                    desc={terminalSupported ? undefined : "masaüstü Chrome/Edge gerekir"}
                     active={terminalOpen}
                     onClick={() => { setTerminalMounted(true); setTerminalOpen((v) => !v); }}
                   />
                 )}
-                <MoreItem icon={<GitBranch size={14} />} label="Git & PR (dal, PR/MR, incele)" active={gitPanelOpen} onClick={() => setGitPanelOpen((v) => !v)} />
+                <MoreItem icon={<GitBranch size={14} />} label="Git & PR" desc="dal, PR/MR, incele" active={gitPanelOpen} onClick={() => setGitPanelOpen((v) => !v)} />
                 <MoreItem icon={<FolderOpen size={14} />} label="Dosyalar (depo)" active={filesOpen} onClick={() => setFilesOpen((v) => !v)} />
                 {localActive && (
                   <MoreItem
@@ -2308,7 +2362,8 @@ export function CoderView() {
             {moreTab === "modes" && (
               <MoreItem
                 icon={improvingPrompt ? <Loader2Icon size={14} className="animate-spin" /> : <Wand2 size={14} />}
-                label="Prompt geliştir (yazdığın istemi iyileştir)"
+                label="Prompt geliştir"
+                desc="yazdığın istemi iyileştirir"
                 onClick={() => void improvePrompt()}
               />
             )}
