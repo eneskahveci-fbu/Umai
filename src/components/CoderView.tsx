@@ -739,6 +739,14 @@ export function CoderView() {
   const [prLoading, setPrLoading] = useState(false);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
+  /* Composer auto-grow: içerik değiştikçe yükseklik içeriğe uyar (≤240px);
+     gönderimde input boşalınca tek satıra döner. */
+  useEffect(() => {
+    const t = taRef.current;
+    if (!t) return;
+    t.style.height = "auto";
+    t.style.height = `${Math.min(t.scrollHeight, 240)}px`;
+  }, [input]);
   const endRef = useRef<HTMLDivElement>(null);
   /* Akıllı oto-kaydırma: kullanıcı yukarı kaydırırsa yapışmayı bırak (Claude gibi). */
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -2264,7 +2272,7 @@ export function CoderView() {
           <div className="w-6 h-6 rounded-md bg-brand/15 border border-brand/25 grid place-items-center">
             <Code2 size={13} className="text-brand" />
           </div>
-          <span className="text-sm font-semibold text-ink">Craft<span className="brand-text">.Coder</span></span>
+          <span className="text-sm font-semibold text-ink">Craft<span className="brand-text hidden min-[420px]:inline">.Coder</span></span>
           {repo && (
             <span className="hidden sm:flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-bgsoft border border-line/60 text-muted/70 font-mono">
               {repo.owner}/{repo.repo}
@@ -2276,15 +2284,17 @@ export function CoderView() {
 
         <div className="flex-1 min-w-0" />
 
-        {/* Token + maliyet — her zaman görünür; göndermeden önce yazılan metnin
-           ve eklenen dosyaların yaklaşık token tahminini canlı gösterir. */}
+        {/* Token + maliyet — masaüstünde görünür (mobil header sade kalır;
+           ayrıntı ⋯ menü ve Ayarlar → Kullanım'da). */}
         {config.models.length > 0 && (
-          <UsageBadge
-            chat={current ?? {}}
-            pendingTokens={
-              estimateTokens(input) + attachedFiles.reduce((a, f) => a + estimateTokens(f.content), 0)
-            }
-          />
+          <div className="hidden sm:block shrink-0">
+            <UsageBadge
+              chat={current ?? {}}
+              pendingTokens={
+                estimateTokens(input) + attachedFiles.reduce((a, f) => a + estimateTokens(f.content), 0)
+              }
+            />
+          </div>
         )}
 
         <div className="flex items-center gap-1 shrink-0">
@@ -3015,7 +3025,7 @@ export function CoderView() {
               </div>
 
               {/* Alt durum çubuğu */}
-              <div className="flex items-center justify-end mt-2 px-0.5">
+              <div className="flex flex-wrap items-center justify-end gap-y-1 mt-2 px-0.5">
 
                 <div className="flex items-center gap-1.5 text-[11px] text-muted/50 shrink-0">
                   {config.safeMode && (

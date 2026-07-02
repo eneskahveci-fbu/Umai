@@ -553,7 +553,7 @@ export function Sidebar() {
         <div className="px-3 pt-3 pb-2 space-y-1">
           <div className="flex gap-1.5">
             <button
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => router.push("/settings")}
               className="flex-1 flex items-center gap-2.5 px-3 py-2 rounded-xl border border-line/60 hover:border-brand/40 hover:bg-bgsoft text-sm text-muted hover:text-ink transition-colors"
             >
               <Settings size={14} /> Ayarlar

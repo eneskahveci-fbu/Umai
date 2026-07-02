@@ -3,8 +3,24 @@
 /* Mobil alt gezinme çubuğu (yalnız sm altı) — stüdyo rotalarında başparmak
    erişimli yüzey geçişi: Sohbet · Stüdyo · Tuval · Görsel. Aktif sekme
    marka renginde; safe-area alt boşluğu korunur. */
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Image as ImageIcon, LayoutTemplate, MessageSquare, Sparkles } from "lucide-react";
+
+/* Sanal klavye açık mı? (mobil) — visualViewport küçülmesiyle algılanır.
+   Alt bar klavye açıkken gizlenir; sayfalar alt boşluğu buna göre sıfırlar. */
+export function useKeyboardOpen(): boolean {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const check = () => setOpen(window.innerHeight - vv.height > 150);
+    check();
+    vv.addEventListener("resize", check);
+    return () => vv.removeEventListener("resize", check);
+  }, []);
+  return open;
+}
 
 const TABS = [
   { href: "/app", label: "Sohbet", icon: MessageSquare },
@@ -16,6 +32,8 @@ const TABS = [
 export function MobileTabBar() {
   const router = useRouter();
   const pathname = usePathname() ?? "";
+  const kbOpen = useKeyboardOpen();
+  if (kbOpen) return null;
   return (
     <nav
       className="sm:hidden fixed inset-x-0 bottom-0 z-[70] glass border-t border-line flex items-stretch"

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Sidebar } from "@/components/Sidebar";
 import { CoderView } from "@/components/CoderView";
+import { MobileTabBar, useKeyboardOpen } from "@/components/MobileTabBar";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -48,6 +49,7 @@ export default function AppPage() {
   const everStudio = useEverOpened(useStore((s) => s.studioOpen));
   const everSkills = useEverOpened(useStore((s) => s.skillsOpen));
   const everLibrary = useEverOpened(useStore((s) => s.libraryOpen));
+  const kbOpen = useKeyboardOpen();
   const router = useRouter();
   /* Giriş zorunlu: Supabase yapılandırılmışsa oturumsuz kullanıcı uygulamayı
      açamaz, login/kayıt ekranına gider. Supabase yoksa (yerel mod) serbest. */
@@ -239,7 +241,11 @@ export default function AppPage() {
 
   return (
     <ErrorBoundary>
-      <div className="flex h-screen overflow-hidden bg-bg">
+      {/* Mobil alt gezinme: klavye açıkken bar gizlenir + alt boşluk sıfırlanır. */}
+      <div
+        className="flex h-screen overflow-hidden bg-bg"
+        style={{ "--surface-pb": kbOpen ? "0px" : "calc(52px + env(safe-area-inset-bottom))" } as React.CSSProperties}
+      >
         {/* Erişilebilirlik: klavyeyle ilk Tab'da görünen "içeriğe atla" bağlantısı. */}
         <a
           href="#main-content"
@@ -259,12 +265,13 @@ export default function AppPage() {
         <main
           id="main-content"
           tabIndex={-1}
-          className={`flex-1 min-w-0 flex flex-col transition-[margin] duration-300 ease-in-out ${
+          className={`flex-1 min-w-0 flex flex-col transition-[margin] duration-300 ease-in-out pb-[var(--surface-pb,0px)] sm:pb-0 ${
             sidebarOpen ? "md:ml-64" : "md:ml-14"
           }`}
         >
           <CoderView />
         </main>
+        <MobileTabBar />
 
         {everSettings && <SettingsModal />}
         {everImage && <ImageStudio />}
