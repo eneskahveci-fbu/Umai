@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, FileText, FolderOpen, GitCommit, Loader2, Terminal, X } from "lucide-react";
+import { Check, FileText, FolderOpen, GitCommit, Loader2, Sparkles, Terminal, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { EditorFile } from "@/lib/editor";
+import { quickComplete } from "@/lib/quickComplete";
+import { cleanCommitMessage, COMMIT_MSG_SYSTEM } from "@/lib/commitMsg";
 import { getMountedHandle, getMountedName, writeBackToDir } from "@/lib/localfs";
 import { getWebContainer, isSupported as wcSupported, needsApiKey, writeFile as wcWriteFile } from "@/lib/webcontainer";
 import { isGitLabRepo } from "@/lib/gitlab";
@@ -26,7 +28,26 @@ export function MultiCommitBar({
   const [writingLocal, setWritingLocal] = useState(false);
   const [writingSandbox, setWritingSandbox] = useState(false);
   const [done, setDone] = useState(false);
+  const [genMsg, setGenMsg] = useState(false); // AI commit mesajı üretimi
   const [mountedName, setMountedName] = useState<string | null>(getMountedName());
+
+  /* AI commit mesajı — eski içerik yok; dosya listesi + içerik başlarından üret. */
+  const aiCommitMsg = async () => {
+    if (genMsg) return;
+    setGenMsg(true);
+    try {
+      const picked = files.filter((f) => selected.has(f.path));
+      const ctx = picked.map((f) => `--- ${f.path} (yeni içerik, ilk kısım)\n${f.content.slice(0, 500)}`).join("\n\n").slice(0, 8000);
+      const raw = await quickComplete(`Şu dosyalar tek commit'te yazılacak. Uygun bir commit mesajı üret:\n\n${ctx}`, COMMIT_MSG_SYSTEM);
+      const msg = cleanCommitMessage(raw);
+      if (!msg) throw new Error("boş yanıt");
+      setMessage(msg);
+    } catch (e) {
+      addToast(`Mesaj üretilemedi: ${(e as Error).message}`, "error");
+    } finally {
+      setGenMsg(false);
+    }
+  };
 
   useEffect(() => {
     const fn = () => setMountedName(getMountedName());
@@ -193,6 +214,15 @@ export function MultiCommitBar({
           onKeyDown={(e) => { if (e.key === "Enter") commit(); }}
           className="flex-1 bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50 disabled:opacity-50"
         />
+
+        <button
+          onClick={() => void aiCommitMsg()}
+          disabled={genMsg || toCommit.length === 0}
+          title="AI ile commit mesajı üret"
+          className="flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg bg-brand/10 text-brand hover:bg-brand/20 font-semibold disabled:opacity-50 transition-colors"
+        >
+          {genMsg ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+        </button>
 
         {mountedName && (
           <button

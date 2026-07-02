@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Copy, X } from "lucide-react";
+import { Check, Copy, Loader2, Sparkles, X } from "lucide-react";
 import { diffLines } from "diff";
 import { useStore } from "@/lib/store";
 import { highlightLines, type Token } from "@/lib/highlight";
+import { quickComplete } from "@/lib/quickComplete";
+import { buildUnifiedDiff, DIFF_SUMMARY_SYSTEM } from "@/lib/commitMsg";
 
 interface DiffLine {
   type: "ctx" | "add" | "del";
@@ -42,6 +44,29 @@ export function DiffModal() {
   const setDiff = useStore((s) => s.setDiffModal);
   const addToast = useStore((s) => s.addToast);
   const [copied, setCopied] = useState(false);
+  /* AI özet: diff'in ne yaptığını maddelerle anlatır (Copilot PR-özeti benzeri). */
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summarizing, setSummarizing] = useState(false);
+
+  /* Yeni diff gelince eski özeti temizle (render sırasında önceki-değer deseni). */
+  const diffKey = diff ? `${diff.path}|${diff.newCode.length}|${diff.original.length}` : "";
+  const [prevDiffKey, setPrevDiffKey] = useState(diffKey);
+  if (diffKey !== prevDiffKey) { setPrevDiffKey(diffKey); setSummary(null); }
+
+  const summarize = async () => {
+    if (!diff || summarizing) return;
+    setSummarizing(true);
+    try {
+      const ud = buildUnifiedDiff(diff.path || "dosya", diff.original, diff.newCode, 16000);
+      const out = await quickComplete(`Diff:\n\n${ud}`, DIFF_SUMMARY_SYSTEM);
+      if (!out.trim()) throw new Error("boş yanıt");
+      setSummary(out.trim());
+    } catch (e) {
+      addToast(`Özet üretilemedi: ${(e as Error).message}`, "error");
+    } finally {
+      setSummarizing(false);
+    }
+  };
 
   const lines = useMemo(
     () => (diff ? computeDiff(diff.original, diff.newCode) : []),
@@ -106,6 +131,15 @@ export function DiffModal() {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => void summarize()}
+              disabled={summarizing}
+              title="Değişikliği AI ile özetle"
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-brand/10 text-brand hover:bg-brand/20 font-semibold disabled:opacity-50 transition-colors"
+            >
+              {summarizing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+              AI özet
+            </button>
+            <button
               onClick={copyNew}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-brand hover:bg-branddim text-white font-semibold transition-colors"
             >
@@ -120,6 +154,14 @@ export function DiffModal() {
             </button>
           </div>
         </div>
+
+        {/* AI özet paneli */}
+        {summary && (
+          <div className="px-5 py-3 border-b border-line/60 bg-brand/5 shrink-0 max-h-40 overflow-y-auto">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-brand/70 mb-1 flex items-center gap-1"><Sparkles size={10} /> AI özet</div>
+            <div className="text-xs leading-relaxed whitespace-pre-wrap text-ink/85">{summary}</div>
+          </div>
+        )}
 
         {/* Diff body */}
         <div className="flex-1 overflow-auto bg-[#0a0a0d] font-mono text-[12px] leading-relaxed">
