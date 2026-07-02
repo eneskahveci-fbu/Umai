@@ -746,6 +746,30 @@ export function CoderView() {
     t.style.height = `${Math.min(t.scrollHeight, 240)}px`;
   }, [input]);
   const endRef = useRef<HTMLDivElement>(null);
+  /* Sayfa gizlenirken (uygulama/sekme değişimi) akan kısmi yanıtı kalıcılaştır —
+     tarayıcı sekmeyi dondurup yeniden yüklerse bile o ana kadarki yanıt durur. */
+  useEffect(() => {
+    const onVis = () => {
+      if (document.hidden && useStore.getState().streaming) void useStore.getState().persistCurrent();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+  /* Sekme başlığında canlı durum: yanıt yazılırken ● göstergesi (Claude gibi). */
+  useEffect(() => {
+    if (!streaming) return;
+    const prev = document.title;
+    document.title = "● Yanıt yazılıyor… — Craft Coder";
+    return () => { document.title = prev; };
+  }, [streaming]);
+  /* Escape → akışı durdur (Claude davranışı; menüler açıkken onlara öncelik). */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && useStore.getState().streaming && !slashOpen && !mentionOpen) stop();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
   /* Akıllı oto-kaydırma: kullanıcı yukarı kaydırırsa yapışmayı bırak (Claude gibi). */
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
@@ -2120,6 +2144,26 @@ export function CoderView() {
       coderAbort = null;
       useStore.getState().setStreaming(false);
       await useStore.getState().persistCurrent();
+      /* Claude tarzı otomatik başlık: ilk tur bitince kısa AI başlığı üret
+         (sessiz; yalnız başlık hâlâ varsayılan kırpma ise, sohbet başına 1 kez). */
+      void (async () => {
+        try {
+          const st = useStore.getState();
+          const chat = st.current();
+          if (!chat || chat.incognito || chat.messages.length > 2) return;
+          const firstUser = chat.messages.find((m) => m.role === "user");
+          const raw = typeof firstUser?.content === "string" ? firstUser.content : "";
+          const isDefault = chat.title === "Yeni sohbet" || (!!raw && chat.title === raw.slice(0, 48));
+          if (!isDefault) return;
+          const last = chat.messages[chat.messages.length - 1];
+          const { quickComplete } = await import("@/lib/quickComplete");
+          const t = (await quickComplete(
+            `Konuşma:\nKullanıcı: ${raw.slice(0, 500)}\nAsistan: ${String(last?.content ?? "").slice(0, 500)}`,
+            "Bu konuşma için 3-5 kelimelik, kısa ve net bir Türkçe başlık üret. SADECE başlığı döndür — tırnak, nokta, açıklama yok.",
+          )).replace(/^["'«]+|["'»]+$/g, "").split("\n")[0].trim();
+          if (t && t.length <= 60) st.renameChat(chat.id, t);
+        } catch { /* sessiz — mevcut başlık kalır */ }
+      })();
       if (useStore.getState().config.soundEnabled) {
         const { playReady, notifyReady } = await import("@/lib/sounds");
         playReady();
@@ -2177,6 +2221,9 @@ export function CoderView() {
       agentId: agent?.id,
     });
     store.maybeSetTitle(userText || attachedFiles[0]?.path || agent?.label || "Kod analizi");
+    /* Erken kayıt: soru, akış tamamlanmadan da kalıcı olsun — sekme dondurulup
+       yeniden yüklense bile kaybolmaz. */
+    void store.persistCurrent();
     setInput("");
     setPendingImages([]);
     setAttachedFiles([]);

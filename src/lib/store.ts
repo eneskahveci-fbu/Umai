@@ -381,6 +381,8 @@ interface StoreState {
   currentId: string | null;
   incognito: boolean;
   loadChats: (userId: string | null) => Promise<void>;
+  /** Oturum içinde sohbetlerin hangi kullanıcı için yüklendiği (tek-yükleme koruması). */
+  chatsLoadedFor?: string | null;
   importBackup: (data: { config?: Config; chats?: Chat[] }) => void;
   newChat: (incognito?: boolean) => void;
   selectChat: (id: string) => void;
@@ -943,10 +945,21 @@ export const useStore = create<StoreState>()((set, get) => ({
   setStreaming: (b) => set({ streaming: b }),
 
   chats: [],
+  chatsLoadedFor: undefined,
   currentId: null,
   incognito: false,
 
   loadChats: async (userId) => {
+    /* KORUMA 1: Akış sürerken bellek ASLA ezilmez — akan (henüz persist
+       edilmemiş) asistan/user mesajı kaybolmasın. Akış bitince persistCurrent
+       zaten kalıcılaştırır. */
+    if (get().streaming) return;
+    /* KORUMA 2: Aynı kullanıcı için oturumda bir kez yükle — /app her remount
+       olduğunda (ör. /studio'dan dönüş) bellekteki taze durum bayat
+       localStorage+cloud birleşimiyle ezilmesin. Login/logout (farklı değer)
+       normal yükler. */
+    if (get().chatsLoadedFor === (userId ?? null)) return;
+    set({ chatsLoadedFor: userId ?? null });
     if (userId) {
       const sb = createClient();
       if (sb) {
