@@ -21,7 +21,16 @@ export function VoiceButton({ onTranscript, lang = "tr-TR" }: VoiceButtonProps) 
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<SR | null>(null);
-  const Ctor = getSpeechCtor();
+  /* SpeechRecognition yalnızca tarayıcıda var; tespiti mount sonrasına ertele ki
+     ilk istemci render'ı sunucuyla (buton yok) eşleşsin → hidrasyon uyumsuzluğu olmaz. */
+  const [mounted, setMounted] = useState(false);
+  /* setState'i efekt gövdesinde DOĞRUDAN çağırmak yerine bir tık ertele
+     (proje lint kuralı: set-state-in-effect). Davranış aynı: mount sonrası true. */
+  useEffect(() => {
+    const id = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(id);
+  }, []);
+  const Ctor = mounted ? getSpeechCtor() : null;
   const supported = !!Ctor;
 
   /* track latest callback without re-creating recognition */

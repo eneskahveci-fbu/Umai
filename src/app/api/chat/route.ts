@@ -93,6 +93,42 @@ interface ChatRequest {
   terminalAvailable?: boolean;
   repoCtx?: RepoCtx;
   mcpServers?: McpServerConfig[];
+  /** Çok-sağlayıcılı otomatik fallback: birincil model hata verirse sırayla
+      bu adaylar denenir. İstemci ücretsiz/güvenilir sağlayıcılardan kurar. */
+  fallbacks?: { provider?: Provider; baseUrl?: string; model?: string; apiKey?: string }[];
+}
+
+/** Tek bir LLM ucu (birincil veya fallback). */
+interface Candidate {
+  provider: string;
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+}
+
+const KEYLESS_CHAT_PROVIDERS = new Set<string>(["pollinations", "ollama", "local", "custom"]);
+
+/** Sağlayıcıya göre upstream istek başlıklarını kurar. */
+function buildCandidateHeaders(c: Candidate, req: Request): Record<string, string> {
+  const h: Record<string, string> = { "Content-Type": "application/json" };
+  if (c.provider === "anthropic") {
+    h["anthropic-version"] = "2023-06-01";
+    if (c.apiKey) h["x-api-key"] = c.apiKey;
+  } else if (c.apiKey) {
+    h["Authorization"] = `Bearer ${c.apiKey}`;
+  }
+  if (c.provider === "openrouter") {
+    h["HTTP-Referer"] = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://craft-ai-web.vercel.app";
+    h["X-Title"] = "Craft Coder";
+  }
+  return h;
+}
+
+/** Aday için chat/completions URL'i (Pollinations anahtarı varsa query-param token). */
+function candidateUrl(c: Candidate): string {
+  return c.provider === "pollinations" && c.apiKey
+    ? `${c.baseUrl}/chat/completions?token=${encodeURIComponent(c.apiKey)}`
+    : `${c.baseUrl}/chat/completions`;
 }
 
 const rl = new Map<string, { count: number; reset: number }>();
@@ -1126,18 +1162,45 @@ export async function POST(req: Request) {
        max_tokens ölçeklemesi + sistem-prompt efor yönergesi yeterli etki sağlar. */
   }
 
-  const upstreamHeaders: Record<string, string> = { "Content-Type": "application/json" };
-  if (provider === "anthropic") {
-    upstreamHeaders["anthropic-version"] = "2023-06-01";
-    upstreamHeaders["x-api-key"] = apiKey;
-  } else if (apiKey) {
-    upstreamHeaders["Authorization"] = `Bearer ${apiKey}`;
+  /* Aday zinciri: birincil model + istemcinin yolladığı ücretsiz fallback'ler.
+     Birincil bir hata verirse (kota/erişim/5xx/bağlantı) sıradaki aday denenir →
+     kullanıcı duvara çarpmaz. Geçersiz adaylar (model yok ya da anahtar gereken
+     sağlayıcıda anahtar yok) elenir; aynı uç teklerleştirilir. */
+  const primary: Candidate = { provider, baseUrl, model, apiKey };
+  const seenCand = new Set<string>([`${provider}|${baseUrl}|${model}`]);
+  const candidates: Candidate[] = [primary];
+  for (const f of body.fallbacks ?? []) {
+    const cp = f.provider ?? "custom";
+    const cb = (f.baseUrl ?? "").replace(/\/$/, "");
+    const cm = f.model ?? "";
+    const ck = f.apiKey ?? "";
+    if (!cb || !cm) continue;
+    if (!KEYLESS_CHAT_PROVIDERS.has(cp) && !ck) continue;
+    const key = `${cp}|${cb}|${cm}`;
+    if (seenCand.has(key)) continue;
+    seenCand.add(key);
+    candidates.push({ provider: cp, baseUrl: cb, model: cm, apiKey: ck });
   }
 
-  if (provider === "openrouter") {
-    upstreamHeaders["HTTP-Referer"] = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://craft-ai-web.vercel.app";
-    upstreamHeaders["X-Title"] = "Craft Coder";
+  /* SSRF: aday baseUrl'leri istemciden gelir. Canlıda (Vercel) iç ağ/loopback/
+     bulut-metadata adreslerini reddet; yerelde localhost LLM uçları meşrudur.
+     (OpenRouter HTTP-Referer/X-Title başlıkları buildCandidateHeaders'ta.) */
+  if (process.env.NODE_ENV === "production") {
+    for (const c of candidates) {
+      if (!isSafeRemoteUrl(c.baseUrl)) {
+        return new Response("Güvensiz baseUrl — yalnızca genel (public) adresler kabul edilir.", { status: 400 });
+      }
+    }
   }
+
+  /* Bir adayı çağırır (Anthropic native ucu ayrı; diğerleri OpenAI-uyumlu fetch).
+     Pollinations anonim istekleri için `referrer` ekler. */
+  const openCandidate = (c: Candidate, messages: unknown, extra: Record<string, unknown> = {}): Promise<Response> => {
+    const b: Record<string, unknown> = { model: c.model, messages, stream: true, ...sampling, ...extra };
+    if (c.provider === "pollinations") b.referrer = "craft-coder";
+    if (c.provider === "anthropic") return anthropicUpstream(c.baseUrl, c.apiKey, b as unknown as OpenAIChatBody);
+    return fetch(candidateUrl(c), { method: "POST", headers: buildCandidateHeaders(c, req), body: JSON.stringify(b) });
+  };
 
   let sysPrompt = body.systemPrompt || DEFAULT_SYSTEM_PROMPT;
   /* Eklenen her model, içinde çalıştığı platformun tüm özelliklerini bilsin. */
@@ -1250,37 +1313,29 @@ export async function POST(req: Request) {
       `Bilgi gerektiren sorularda önce web_search ile ara, sonra ilgili sayfaları read_url ile oku.`;
   }
 
-  /* Tool-use disabled: simple passthrough */
+  /* Tool-use disabled: simple passthrough — adayları sırayla dene, ilk başarılı
+     olanın gövdesini stream et. Hiçbiri başarmazsa son hatayı dön. */
   if (!body.tools && !body.webSearch) {
     const messages = [{ role: "system", content: sysPrompt }, ...body.messages];
-    let upstream: Response;
-    /* Pollinations token'ı klasik olarak `?token=` query param ile doğrulanır;
-       yalnızca Bearer header çoğu durumda yok sayılıp istek anonim sayılır →
-       rate-limit/hata. Token varsa query param olarak da geçir. */
-    const url = provider === "pollinations" && apiKey
-      ? `${baseUrl}/chat/completions?token=${encodeURIComponent(apiKey)}`
-      : `${baseUrl}/chat/completions`;
-    /* Pollinations için referrer ekle (anonim isteklerin agresif kısıtlanmasını azaltır). */
-    const upstreamBody: Record<string, unknown> = { model, messages, stream: true, ...sampling };
-    if (provider === "pollinations") upstreamBody.referrer = "craft-coder";
-
-    try {
-      upstream = provider === "anthropic"
-        ? await anthropicUpstream(baseUrl, apiKey, upstreamBody as unknown as OpenAIChatBody)
-        : await fetch(url, {
-            method: "POST", headers: upstreamHeaders,
-            body: JSON.stringify(upstreamBody),
-          });
-    } catch (err) {
-      return new Response(`Sağlayıcıya bağlanılamadı: ${(err as Error).message}`, { status: 502 });
+    let lastStatus = 502, lastDetail = "", lastCand: Candidate = primary;
+    for (const c of candidates) {
+      let upstream: Response;
+      try {
+        upstream = await openCandidate(c, messages);
+      } catch (err) {
+        lastStatus = 502; lastDetail = (err as Error).message; lastCand = c;
+        continue; // bağlantı hatası → sıradaki aday
+      }
+      if (upstream.ok && upstream.body) {
+        return new Response(upstream.body, {
+          headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" },
+        });
+      }
+      lastStatus = upstream.status || 500;
+      lastDetail = await upstream.text().catch(() => "");
+      lastCand = c;
     }
-    if (!upstream.ok || !upstream.body) {
-      const detail = await upstream.text().catch(() => "");
-      return new Response(friendlyApiError(upstream.status, detail, { model, provider: body.provider }), { status: upstream.status || 500 });
-    }
-    return new Response(upstream.body, {
-      headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" },
-    });
+    return new Response(friendlyApiError(lastStatus, lastDetail, { model: lastCand.model, provider: lastCand.provider as Provider }), { status: lastStatus });
   }
 
   /* Tool-use loop */
@@ -1356,48 +1411,64 @@ export async function POST(req: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       const MAX_ROUNDS = 25;
-      /* Pollinations token'ı klasik olarak `?token=` query param ile doğrulanır;
-       yalnızca Bearer header çoğu durumda yok sayılıp istek anonim sayılır →
-       rate-limit/hata. Token varsa query param olarak da geçir. */
-    const url = provider === "pollinations" && apiKey
-      ? `${baseUrl}/chat/completions?token=${encodeURIComponent(apiKey)}`
-      : `${baseUrl}/chat/completions`;
       /* İstek başına dosya-okuma önbelleği: aynı dosya tekrar çekilmez. */
       const readCache = new Map<string, string>();
-      /* Gerçek token kullanımı: OpenAI-uyumlu sağlayıcılar son chunk'ta usage
-         döndürebilir (stream_options.include_usage). Tüm turlar boyunca topla. */
-      const supportsUsageStream = !["pollinations", "ollama"].includes(provider);
       const realUsage = { prompt: 0, completion: 0 };
+      /* Seçili aday: ilk turda fallback adayları sırayla denenir; ilki başarılı
+         olunca tüm sohbet o sağlayıcıya sabitlenir (tutarlı tool-call durumu). */
+      let chosen: Candidate | null = null;
+      const toolBodyFor = (c: Candidate, lastRound: boolean) => ({
+        /* Bağlam yönetimi: eski/büyük tool çıktılarını kırp (yapı korunur). */
+        messages: pruneMessages(convo, { keepRecent: 16, maxContentChars: 12000 }),
+        extra: {
+          tools: allTools,
+          tool_choice: lastRound ? "none" : "auto",
+          ...(!KEYLESS_CHAT_PROVIDERS.has(c.provider) ? { stream_options: { include_usage: true } } : {}),
+        },
+      });
       /* ask_user çağrıldığında tool-loop kırılır → kullanıcı yanıtı beklenir. */
       let askUserCalled = false;
       for (let round = 0; round < MAX_ROUNDS; round++) {
-        let upstream: Response;
+        const lastRound = round === MAX_ROUNDS - 1;
+        let upstream: Response | null = null;
 
-        try {
-          const toolBody = {
-            model,
-            /* Bağlam yönetimi: eski/büyük tool çıktılarını kırp (yapı korunur). */
-            messages: pruneMessages(convo, { keepRecent: 16, maxContentChars: 12000 }),
-            stream: true,
-            tools: allTools,
-            tool_choice: round === MAX_ROUNDS - 1 ? "none" : "auto",
-            ...(supportsUsageStream ? { stream_options: { include_usage: true } } : {}),
-            ...sampling,
-          };
-          upstream = provider === "anthropic"
-            ? await anthropicUpstream(baseUrl, apiKey, toolBody as unknown as OpenAIChatBody)
-            : await fetch(url, {
-                method: "POST", headers: upstreamHeaders,
-                body: JSON.stringify(toolBody),
-              });
-        } catch (err) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**Bağlantı hatası:** ${(err as Error).message}` } }] })}\n\n`));
-          break;
-        }
-        if (!upstream.ok || !upstream.body) {
-          const detail = await upstream.text().catch(() => "");
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**${friendlyApiError(upstream.status, detail, { model, provider: body.provider })}**` } }] })}\n\n`));
-          break;
+        if (chosen) {
+          /* Sonraki turlar: yalnızca seçili adayı kullan (sohbet ortasında
+             sağlayıcı değiştirmek tool-call durumunu bozabilir). */
+          try {
+            const { messages: msgs, extra } = toolBodyFor(chosen, lastRound);
+            upstream = await openCandidate(chosen, msgs, extra);
+          } catch (err) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**Bağlantı hatası:** ${(err as Error).message}` } }] })}\n\n`));
+            break;
+          }
+          if (!upstream.ok || !upstream.body) {
+            const detail = await upstream.text().catch(() => "");
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**${friendlyApiError(upstream.status, detail, { model: chosen.model, provider: chosen.provider as Provider })}**` } }] })}\n\n`));
+            break;
+          }
+        } else {
+          /* İlk tur: henüz hiç byte yazılmadı → adayları sırayla güvenle dene. */
+          let lastStatus = 502, lastDetail = "", lastCand = primary;
+          for (const c of candidates) {
+            let r: Response;
+            try {
+              const { messages: msgs, extra } = toolBodyFor(c, lastRound);
+              r = await openCandidate(c, msgs, extra);
+            } catch (err) {
+              lastStatus = 502; lastDetail = (err as Error).message; lastCand = c; continue;
+            }
+            if (r.ok && r.body) { chosen = c; upstream = r; break; }
+            lastStatus = r.status || 500; lastDetail = await r.text().catch(() => ""); lastCand = c;
+          }
+          if (!upstream) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**${friendlyApiError(lastStatus, lastDetail, { model: lastCand.model, provider: lastCand.provider as Provider })}**` } }] })}\n\n`));
+            break;
+          }
+          if (chosen !== primary) {
+            /* Bir fallback'e geçildi → kullanıcı şeffaflık için bilgilendirilir. */
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ fallback_event: { provider: chosen!.provider, model: chosen!.model } })}\n\n`));
+          }
         }
 
         const { content, toolCalls, finishReason, usage } = await streamRound(upstream, controller, encoder);
@@ -1459,7 +1530,9 @@ export async function POST(req: Request) {
             };
             if (!repoCtx) { fail("Hata: repo bağlı değil"); return; }
             if (tasks.length === 0) { fail("Hata: en az 1 alt görev (tasks) gerekli"); return; }
-            const subCfg = { baseUrl, model, provider: (body.provider || "hf") as Provider, headers: upstreamHeaders };
+            /* Alt-ajanlar seçili adayın (fallback'e geçilmişse onun) ucunu kullanır. */
+            const sc = chosen ?? primary;
+            const subCfg = { baseUrl: sc.baseUrl, model: sc.model, provider: sc.provider as Provider, headers: buildCandidateHeaders(sc, req) };
             const results = await Promise.all(tasks.map(async (t) => {
               try {
                 return await runReadOnlyAgent(subCfg, [
