@@ -2728,7 +2728,10 @@ export function CoderView() {
           })()}
 
           {/* Messages */}
-          <div ref={scrollRef} onScroll={onMessagesScroll} className="flex-1 overflow-y-auto">
+          {/* overscroll-contain: sayfa geri-çekme zinciri kesilir; overflow-anchor
+             kapalı: tarayıcının kaydırma-çapası akışta zıplama yapmasın (yapışma
+             mantığı stickRef ile bizde). */}
+          <div ref={scrollRef} onScroll={onMessagesScroll} className="flex-1 overflow-y-auto overscroll-contain" style={{ overflowAnchor: "none" }}>
             {messages.length === 0 ? (
               <EmptyChat
                 hasModel={config.models.length > 0}

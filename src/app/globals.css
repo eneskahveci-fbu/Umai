@@ -57,6 +57,7 @@ html.light {
   --color-yellow: #a07828;
   --color-green: #2a8040;
   --color-red: #c04040;
+  --color-blue: #3860b8;
 }
 
 /* ─── Gradyanlar ─── */
@@ -294,6 +295,24 @@ html.light .prose-chat pre {
   background: var(--color-bgsoft);
   font-weight: 600;
 }
+
+
+/* ─── Sözdizimi teması (hljs) — marka paletine ve iki temaya bağlı ───
+   atom-one-dark import'u kaldırıldı; renkler --color-* değişkenlerinden
+   gelir → açık temada otomatik okunaklı, aksan değişiminde uyumlu. */
+.hljs { color: var(--color-ink); background: transparent; }
+.hljs-comment, .hljs-quote { color: var(--color-muted); font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-doctag, .hljs-tag { color: var(--color-brand); }
+.hljs-string, .hljs-regexp, .hljs-addition { color: var(--color-green); }
+.hljs-number, .hljs-literal { color: var(--color-accent); }
+.hljs-title, .hljs-title.function_, .hljs-section, .hljs-name { color: var(--color-yellow); }
+.hljs-title.class_, .hljs-type, .hljs-built_in, .hljs-selector-class, .hljs-selector-pseudo { color: var(--color-cyan); }
+.hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable, .hljs-property,
+.hljs-selector-attr, .hljs-symbol, .hljs-bullet, .hljs-meta, .hljs-params { color: var(--color-blue); }
+.hljs-deletion { color: var(--color-red); }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 700; }
+.hljs-link { color: var(--color-brand); text-decoration: underline; }
 
 /* ─── Form elemanları ─── */
 .bare-select {

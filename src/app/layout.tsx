@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Noto_Emoji } from "next/font/google";
 import "./globals.css";
 import { NativeInit } from "@/components/NativeInit";
-import "highlight.js/styles/atom-one-dark.css";
 
 const inter = Inter({
   variable: "--font-inter",

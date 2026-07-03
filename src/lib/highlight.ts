@@ -13,7 +13,12 @@ export interface Token {
 
 let hlPromise: Promise<Highlighter> | null = null;
 const loadedLangs = new Set<string>();
-const THEME = "github-dark";
+const THEMES = ["github-dark", "github-light"] as const;
+/* Aktif UI temasına göre Shiki teması — açık temada okunaklı tokenlar. */
+function activeTheme(): (typeof THEMES)[number] {
+  if (typeof document !== "undefined" && document.documentElement.classList.contains("light")) return "github-light";
+  return "github-dark";
+}
 
 /* Monaco/dosya dil kimliğini Shiki dil kimliğine eşler. */
 function shikiLang(language: string): string {
@@ -29,7 +34,7 @@ async function getHighlighter(lang: string): Promise<Highlighter | null> {
   try {
     if (!hlPromise) {
       const { createHighlighter } = await import("shiki");
-      hlPromise = createHighlighter({ themes: [THEME], langs: [] });
+      hlPromise = createHighlighter({ themes: [...THEMES], langs: [] });
     }
     const hl = await hlPromise;
     const target = shikiLang(lang);
@@ -56,7 +61,7 @@ export async function highlightLines(code: string, language: string): Promise<To
   try {
     const { tokens } = hl.codeToTokens(code, {
       lang: shikiLang(language) as Parameters<typeof hl.codeToTokens>[1]["lang"],
-      theme: THEME,
+      theme: activeTheme(),
     });
     return tokens.map((line) => line.map((t) => ({ content: t.content, color: t.color })));
   } catch {
