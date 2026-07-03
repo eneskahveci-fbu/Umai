@@ -77,7 +77,7 @@ export function EmptyChat({ hasModel, hasRepo, onAddModel, onPrompt }: EmptyChat
       <p className="text-sm text-muted/70 max-w-md text-center leading-relaxed mb-7">
         Dosya ekle, kod yapıştır veya bir soru sor.
         <br />
-        <span className="text-muted/45 text-xs">/ ile agent seç · @ ile dosya mention</span>
+        <span className="text-muted/45 text-xs">/ ile agent seç · @ ile dosya mention · &quot;skill indir &lt;url&gt;&quot; ile eğitim seti yükle</span>
       </p>
 
       {!hasModel ? (
