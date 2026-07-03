@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { parseDesignMd } from "@/lib/odFormat";
 import { Check, Plus, Trash2, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { allDesignSystems, bundledDesignSystems } from "@/lib/designSystems";
@@ -24,6 +25,27 @@ export function DesignSystemModal({
   const [detailId, setDetailId] = useState<string>(activeId);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ name: "", category: "Özel", accent: "#c8a87e", designMd: "", tokensCss: "" });
+  const [importUrl, setImportUrl] = useState("");
+  const [importing, setImporting] = useState(false);
+
+  /* Open Design DESIGN.md içe aktarma: URL'den (güvenli proxy) çek, ayrıştır,
+     formu doldur — kullanıcı gözden geçirip kaydeder. 150+ hazır sistemle
+     (github.com/nexu-io/open-design/design-systems) doğrudan uyumlu. */
+  const importFromUrl = async () => {
+    const u = importUrl.trim();
+    if (!/^https?:\/\//i.test(u)) { addToast("Geçerli bir DESIGN.md URL'si gir (Raw link).", "error"); return; }
+    setImporting(true);
+    try {
+      const res = await fetch(`/api/fetch-text?url=${encodeURIComponent(u)}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || typeof data.text !== "string") throw new Error(data.error || `HTTP ${res.status}`);
+      const parsed = parseDesignMd(data.text);
+      setForm({ name: parsed.name, category: parsed.category, accent: parsed.accent, designMd: parsed.designMd, tokensCss: "" });
+      addToast(`"${parsed.name}" ayrıştırıldı — gözden geçirip kaydet.`, "success");
+    } catch (e) {
+      addToast(`İçe aktarılamadı: ${(e as Error).message}`, "error");
+    } finally { setImporting(false); }
+  };
 
   const detail = systems.find((s) => s.id === detailId) ?? systems[0];
   const isCustom = (id: string) => !bundledDesignSystems.some((b) => b.id === id);
@@ -83,6 +105,19 @@ export function DesignSystemModal({
             {creating ? (
               <div className="space-y-3 max-w-lg">
                 <h3 className="text-sm font-bold">Özel tasarım sistemi</h3>
+                {/* Open Design DESIGN.md içe aktarma */}
+                <div className="flex gap-1.5">
+                  <input
+                    value={importUrl}
+                    onChange={(e) => setImportUrl(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") void importFromUrl(); }}
+                    placeholder="Open Design DESIGN.md URL'si (Raw) — otomatik doldurur"
+                    className="input-mono !py-1.5 text-xs flex-1"
+                  />
+                  <button onClick={() => void importFromUrl()} disabled={importing} className="text-xs px-2.5 py-1.5 rounded-lg border border-brand/40 text-brand hover:bg-brand/10 disabled:opacity-50 shrink-0">
+                    {importing ? "…" : "İçe aktar"}
+                  </button>
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ad (ör. Marka X)" className="input-mono !py-1.5 text-xs" />
                   <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Kategori" className="input-mono !py-1.5 text-xs" />
