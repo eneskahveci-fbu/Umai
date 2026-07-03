@@ -318,6 +318,9 @@ export interface Config {
   /** Otomatik Ajan Ekibi: açıkça çok-parçalı/çok-adımlı ağır isteklerde swarm
       kendiliğinden devreye girer. Tanımsız = açık. */
   autoSwarm?: boolean;
+  /** Otomatik Pilot: eforu, web aramayı, araştırmayı, kaliteyi ve ajan
+      ekibini mesaja göre platform seçer (tanımsız = açık). */
+  autoPilot?: boolean;
   /** Otonom Doğrula-Düzelt: ajan dosya yazınca arka plandaki terminalde otomatik
       lint/tip/derleme çalışır, hata varsa ajana beslenir → hata kalmayana kadar
       düzeltir (en çok 5 tur). Tanımsız = açık. */
