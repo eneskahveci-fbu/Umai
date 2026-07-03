@@ -131,17 +131,6 @@ function candidateUrl(c: Candidate): string {
     : `${c.baseUrl}/chat/completions`;
 }
 
-const rl = new Map<string, { count: number; reset: number }>();
-
-function checkRate(ip: string): boolean {
-  if (ip === "unknown" || ip === "::1" || ip === "127.0.0.1") return true;
-  const now = Date.now();
-  const e = rl.get(ip);
-  if (!e || now > e.reset) { rl.set(ip, { count: 1, reset: now + 60_000 }); return true; }
-  if (e.count >= 120) return false;
-  e.count++;
-  return true;
-}
 
 function checkOrigin(req: Request): boolean {
   const origin = req.headers.get("origin");
@@ -1088,12 +1077,7 @@ export async function POST(req: Request) {
   if (__rl) return __rl;
   if (!checkOrigin(req)) return new Response("Geçersiz origin.", { status: 403 });
 
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    || req.headers.get("x-real-ip")?.trim()
-    || req.headers.get("cf-connecting-ip")?.trim()
-    || "unknown";
 
-  if (!checkRate(ip)) return new Response("İstek limiti aşıldı (120 req/min). Lütfen biraz bekle.", { status: 429 });
 
   let body: ChatRequest;
   try { body = await req.json(); } catch { return new Response("Geçersiz istek gövdesi", { status: 400 }); }

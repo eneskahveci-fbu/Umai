@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test.describe("Landing", () => {
   test("açılış sayfası yüklenir ve başlık doğru", async ({ page }) => {
     await page.goto("/");
-    await expect(page).toHaveTitle(/Craft\.Coder/i);
+    await expect(page).toHaveTitle(/Craft.?Coder/i);
     await expect(page.getByRole("heading", { name: /AI asistanın/i })).toBeVisible();
   });
 
