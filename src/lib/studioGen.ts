@@ -2,6 +2,7 @@ import { useStore } from "./store";
 import { buildFallbackChain } from "./fallback";
 import { decryptField, isEncrypted } from "./secureKeys";
 import { buildSingleBlockPreview, parseBlocks } from "./preview";
+import { CRAFT_RULES, lintArtifact } from "./studioCraft";
 import { skillById, directionById } from "./studioConstants";
 import type { Artifact } from "./types";
 
@@ -72,14 +73,17 @@ async function resolveKey(): Promise<{ baseUrl: string; model: string; apiKey: s
 }
 
 export function buildStudioSystem(opts: Pick<GenerateOptions, "skillId" | "directionId" | "designSystemPrompt" | "prevHtml" | "comment" | "animate">): string {
+  /* Kompozisyon sırası (Open Design dersi): marka sözleşmesi ÖNCE ve otoriter,
+     zanaat kuralları sonra (çakışmada marka kazanır), tür talimatı en sonda. */
   let sys = STUDIO_SYSTEM_BASE;
+  if (opts.designSystemPrompt?.trim()) sys += `\n\n[Marka tasarım sistemi — renk/tipografi/boşlukta OTORİTER, buna UY]:\n${opts.designSystemPrompt.trim()}`;
+  sys += CRAFT_RULES;
   const skill = skillById(opts.skillId);
   if (skill) sys += `\n\n[Çıktı türü — ${skill.name}]: ${skill.instructions}`;
   if (opts.skillId === "deck") sys += DECK_INSTRUCTION;
   if (opts.animate) sys += ANIMATE_INSTRUCTION;
   const dir = directionById(opts.directionId);
   if (dir) sys += `\n\n[Tasarım yönü — ${dir.name}]: ${dir.hint}`;
-  if (opts.designSystemPrompt?.trim()) sys += `\n\n[Marka tasarım sistemi — bu sözleşmeye UY]:\n${opts.designSystemPrompt.trim()}`;
   if (opts.prevHtml?.trim()) sys += `\n\n[Mevcut tasarım — değişiklik isteniyorsa bunu TEMEL al]:\n${opts.prevHtml.slice(0, 9000)}`;
   if (opts.comment?.trim()) sys += `\n\n[Hedefli düzenleme — kullanıcı önizlemede şu öğeyi işaretledi]: ${opts.comment.trim()}`;
   return sys;
@@ -137,5 +141,8 @@ export async function generateArtifact(opts: GenerateOptions): Promise<GenerateR
   if (!artifact) { opts.onPhase?.("error"); throw new Error("Üretim ayrıştırılamadı — brief'i biraz daha açık yaz."); }
 
   opts.onPhase?.("done");
-  return { artifact, text: stripCode(full) || "Tasarımı oluşturdum." };
+  /* Kalite denetimi (danışma niteliğinde): bulgular yanıt notu olarak eklenir. */
+  const warnings = lintArtifact(artifact.content);
+  const note = warnings.length ? `\n\n🧹 Kalite notu: ${warnings.join(" · ")}. İstersen "düzelt" de, gidereyim.` : "";
+  return { artifact, text: (stripCode(full) || "Tasarımı oluşturdum.") + note };
 }
