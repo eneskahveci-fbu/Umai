@@ -704,7 +704,15 @@ function MessageBubbleImpl({
             <ReactMarkdown
               remarkPlugins={[remarkGfm, remarkMath, remarkSplitFileLang]}
               rehypePlugins={[rehypeHighlight, rehypeKatex]}
-              components={{ pre: CodeBlock }}
+              components={{
+                pre: CodeBlock,
+                /* Geniş tablolar taşmasın — yatay kaydırmalı sarmalayıcı. */
+                table: (props) => (
+                  <div className="table-wrap">
+                    <table {...props} />
+                  </div>
+                ),
+              }}
             >
               {message.content}
             </ReactMarkdown>
