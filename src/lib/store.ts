@@ -383,6 +383,8 @@ interface StoreState {
   loadChats: (userId: string | null) => Promise<void>;
   /** Oturum içinde sohbetlerin hangi kullanıcı için yüklendiği (tek-yükleme koruması). */
   chatsLoadedFor?: string | null;
+  /** Config senkron mutabakatı tamamlanan kullanıcı — saveConfig cloud-push kapısı. */
+  configHydratedFor?: string | null;
   importBackup: (data: { config?: Config; chats?: Chat[] }) => void;
   newChat: (incognito?: boolean) => void;
   selectChat: (id: string) => void;
@@ -499,16 +501,22 @@ export const useStore = create<StoreState>()((set, get) => ({
   setUser: (id, email) => {
     const prev = get().userId;
     set({ userId: id, userEmail: email });
-    /* Çıkış (önceki kullanıcı vardı, şimdi yok) → yerel config'i temizle ki
-       önceki kullanıcının modelleri/git hesapları tarayıcıda kalmasın. Sonraki
-       giriş owner kontrolüyle zaten kendi config'ini yükler. */
-    if (!id && prev) {
-      const clean: Config = { ...DEFAULT_CONFIG };
+    /* İZOLASYON SÜPÜRGESİ — üç durumda yerel config ANINDA temizlenir:
+       (a) çıkış (prev var, id yok), (b) CANLI HESAP DEĞİŞİMİ (prev≠id — login
+       SPA navigasyonu store'u öldürmez, eski config bellekte kalıyordu),
+       (c) yabancı yerel config (sayfa yenilenip FARKLI kullanıcıyla giriş:
+       localStorage sahibi başka kullanıcı). Böylece önceki kullanıcının
+       depoları/bellek kayıtları/anahtarları ne görünür ne de yeni hesabın
+       bulutuna sızar; kullanıcının KENDİ verisi syncConfig ile buluttan gelir. */
+    const localOwner = getConfigOwner();
+    const foreignLocal = !!id && !!localOwner && localOwner !== id;
+    if ((prev && prev !== id) || foreignLocal) {
+      const clean: Config = { ...DEFAULT_CONFIG, models: [POLLINATIONS_DEFAULT_MODEL], activeModelId: POLLINATIONS_DEFAULT_MODEL.id };
       applyTheme(clean.theme ?? "dark");
       const store = getStore();
       if (store) { try { store.setItem(CONFIG_KEY, JSON.stringify(clean)); } catch { /* yok */ } }
       setConfigOwner(null);
-      set({ config: clean, chats: [], currentId: null });
+      set({ config: clean, chats: [], currentId: null, chatsLoadedFor: undefined, configHydratedFor: null });
     }
   },
   loadPlan: async (userId) => {
@@ -529,6 +537,7 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
 
   config: loadConfig(),
+  configHydratedFor: null,
   saveConfig: (c) => {
     const store = getStore();
     if (store) {
@@ -556,9 +565,15 @@ export const useStore = create<StoreState>()((set, get) => ({
     /* Supabase'e senkron (giriş yapıldıysa). Hata yutulmaz: kalıcı başarısızlıkta
        kullanıcı tek seferlik bir uyarı görür (tablo/RLS eksikse "kayboluyor"
        hissinin sessiz kalmaması için). */
-    const { userId } = get();
-    if (userId) setConfigOwner(userId);
-    if (userId && !isGuestMode()) pushCloudConfig(get, userId, c);
+    const { userId, configHydratedFor } = get();
+    /* HİDRASYON KAPISI: owner damgası ve cloud yazımı YALNIZ syncConfig
+       mutabakatı bittikten sonra — giriş anındaki yarış penceresinde bayat
+       (önceki kullanıcıya ait) config asla yeni hesabın bulutuna gidemez.
+       Erken save'ler yerelde kalır; sync birleşimi zaten cloud'a çıkarır. */
+    if (userId && configHydratedFor === userId) {
+      setConfigOwner(userId);
+      if (!isGuestMode()) pushCloudConfig(get, userId, c);
+    }
   },
   rehydrateSecrets: async () => {
     if (!isCryptoAvailable()) return; // kripto yok → düz metin zaten kullanılıyor
@@ -604,7 +619,7 @@ export const useStore = create<StoreState>()((set, get) => ({
         applyTheme(cfg.theme ?? "dark");
         const store = getStore();
         if (store) store.setItem(CONFIG_KEY, JSON.stringify(cfg));
-        set({ config: cfg });
+        set({ config: cfg, configHydratedFor: userId });
         setConfigOwner(userId);
       };
       if (owner === userId) {

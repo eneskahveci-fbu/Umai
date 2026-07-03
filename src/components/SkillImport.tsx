@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Sparkles, Plus, Loader2, ChevronDown, Link2 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { importSkillFromUrl } from "@/lib/skillImport";
 import { CATALOG_SKILLS, type CatalogSkill } from "@/lib/skillCatalog";
 
 /** Açık kaynak skill içe-aktarma: (1) URL'den (GitHub raw, gist, herhangi bir
@@ -24,16 +25,13 @@ export default function SkillImport() {
     if (!/^https?:\/\//i.test(u)) { addToast("Geçerli bir http(s) URL gir", "error"); return; }
     setLoading(true);
     try {
-      const res = await fetch(u);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const text = (await res.text()).slice(0, 50000);
-      if (!text.trim()) throw new Error("boş içerik");
-      const name = decodeURIComponent(u.split("/").pop() || "").replace(/\.[a-z]+$/i, "") || "İçe aktarılan skill";
-      addSkill({ title: name, content: text, tags: ["içe-aktarıldı"], enabled: true, source: "manual" });
-      addToast(`İçe aktarıldı: ${name}`, "success");
+      /* Sunucu proxy'si üzerinden (SSRF korumalı, CORS'a takılmaz) — chat'teki
+         "skill indir <url>" komutuyla aynı yol. */
+      const { title } = await importSkillFromUrl(u);
+      addToast(`İçe aktarıldı: ${title}`, "success");
       setUrl("");
     } catch (e) {
-      addToast(`Getirilemedi (${(e as Error).message}). GitHub'da "Raw" linkini dene; CORS engeli olabilir.`, "error");
+      addToast(`Getirilemedi: ${(e as Error).message}`, "error");
     } finally {
       setLoading(false);
     }

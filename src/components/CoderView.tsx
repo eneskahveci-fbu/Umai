@@ -99,6 +99,7 @@ import { detectSensitive } from "@/lib/pii";
 import { friendlyError } from "@/lib/friendlyError";
 import { autoEffort, autoSwarm, decidePilot, type PilotDecision } from "@/lib/autoPilot";
 import { pickDraftModels, buildBoostInstruction, generateDrafts } from "@/lib/boost";
+import { importSkillFromUrl } from "@/lib/skillImport";
 import { retrieve } from "@/lib/retrieval";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { CRAFT_OPERATING_MANUAL } from "@/lib/constants";
@@ -2205,6 +2206,29 @@ export function CoderView() {
     const store = useStore.getState();
     if (!store.activeModel()) { store.setSettingsOpen(true); return; }
     if (!store.currentId) store.newChat(incognito);
+
+    /* "skill indir <url>" — LLM'e gitmeden ANINDA otomatik içe aktarma:
+       güvenli proxy'den çekilir, skill olarak eklenir, sohbete onay düşer. */
+    const skillCmd = text.match(/^skill\s+(?:indir|yükle|ekle)\s+(https?:\/\/\S+)\s*$/i);
+    if (skillCmd) {
+      const url = skillCmd[1];
+      setInput("");
+      store.pushMessage({ role: "user", content: text });
+      try {
+        const { title, chars } = await importSkillFromUrl(url);
+        store.pushMessage({
+          role: "assistant",
+          content: `✓ **"${title}"** skill'i eklendi (${chars.toLocaleString("tr-TR")} karakter).\n\nBundan sonra her yeni sohbette otomatik geçerli — Skills panelinden yönetebilirsin.`,
+        });
+      } catch (e) {
+        store.pushMessage({
+          role: "assistant",
+          content: `✗ Skill indirilemedi: ${friendlyError((e as Error).message)}\n\nİpucu: GitHub'da dosyanın **Raw** linkini kullan.`,
+        });
+      }
+      void store.persistCurrent();
+      return;
+    }
     setPendingCommit(null);
     hookRunsRef.current = 0; // yeni kullanıcı mesajı → afterEdit döngü sayacını sıfırla
     verifyRunsRef.current = 0; // otonom doğrulama tur sayacını da sıfırla
