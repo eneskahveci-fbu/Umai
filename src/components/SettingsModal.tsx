@@ -173,7 +173,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     extensions: ["eklenti", "extension", "paket", "pack", "git", "ci", "cd", "kural", "web", "modül", "modular"],
     model:    ["model", "api", "anahtar", "key", "openai", "anthropic", "huggingface", "hf", "nvidia", "nim", "provider", "test"],
     github:   ["github", "gitlab", "token", "depo", "repo", "branch", "dal", "kullanıcı", "username"],
-    general:  ["sistem", "prompt", "stil", "style", "tema", "theme", "renk", "color", "accent", "font", "yazı", "ses", "sound", "skill", "memori", "ayar"],
+    general:  ["otomatik", "pilot", "auto", "sistem", "prompt", "stil", "style", "tema", "theme", "renk", "color", "accent", "font", "yazı", "ses", "sound", "skill", "memori", "ayar"],
     advanced: ["webcontainer", "key", "context", "max", "guest", "misafir", "kural", "rules", "rulesfile", "gelişmiş"],
     mcp:      ["mcp", "model context", "protocol", "sunucu", "server", "araç", "tool", "entegrasyon"],
     hooks:    ["hook", "kanca", "olay", "event", "lint", "test", "otomatik", "afteredit", "onfinish", "komut", "command"],
@@ -1678,6 +1678,27 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* ✦ Otomatik Pilot — görünmez zeka anahtarı */}
+            <div>
+              <h4 className="text-sm font-bold mb-2">Otomatik Pilot</h4>
+              <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-brand/30 bg-brand/8 hover:border-brand/50 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={config.autoPilot !== false}
+                  onChange={() => saveConfig({ ...config, autoPilot: config.autoPilot === false })}
+                  className="accent-brand"
+                />
+                <div>
+                  <div className="text-sm font-semibold">✦ Otomatik Pilot</div>
+                  <div className="text-xs text-muted mt-0.5">
+                    Düşünme eforunu, web aramayı, derin araştırmayı, kalite turunu ve ajan
+                    ekibini mesajına göre craft kendisi seçer — hiçbir düğmeyle uğraşma.
+                    Elle açtığın modlar her zaman önceliklidir.
+                  </div>
+                </div>
+              </label>
             </div>
 
             {/* Bildirim sesi + Browser bildirimi */}

@@ -97,6 +97,7 @@ import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/
 import { buildContextSections } from "@/lib/prompt";
 import { detectSensitive } from "@/lib/pii";
 import { friendlyError } from "@/lib/friendlyError";
+import { autoEffort, autoSwarm, decidePilot, type PilotDecision } from "@/lib/autoPilot";
 import { retrieve } from "@/lib/retrieval";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { CRAFT_OPERATING_MANUAL } from "@/lib/constants";
@@ -274,34 +275,6 @@ const THINKING_LEVELS = [
   { key: "max",    label: "Max",    short: "Max" },
 ] as const;
 
-/* Otomatik düşünme eforu: kullanıcı mesajının karmaşıklığına göre efor seçer.
-   Kısa/basit → düşük-orta; uzun/kod/ağır anahtar kelime → yüksek; çok ağır → max.
-   thinkingMode "auto" iken callApi bununla somut efora çözer. */
-function autoEffort(text: string): "low" | "medium" | "high" | "max" {
-  const t = (text || "").trim();
-  const len = t.length;
-  if (/derinlemesine|kapsamlı|baştan (yaz|kur)|comprehensive|in.?depth/i.test(t)) return "max";
-  if (
-    len > 280 ||
-    /```/.test(t) ||
-    /\b(refactor|optimi|debug|implement|mimari|architect|algorithm|performans|g[üu]venlik|security|migrate|taşı|tasarla|yeniden yaz)\b/i.test(t)
-  ) return "high";
-  if (len < 36 && !/\?/.test(t)) return "low";
-  return "medium";
-}
-
-/* Otomatik Ajan Ekibi: yalnızca AÇIKÇA çok-parçalı/çok-adımlı ağır isteklerde
-   true döner (maliyet/sürpriz olmasın diye temkinli eşik; kısa istek → tek ajan). */
-function autoSwarm(text: string): boolean {
-  const t = (text || "").trim();
-  if (t.length < 120) return false;
-  const listItems = (t.match(/^\s*(?:[-*•]|\d+[.)])\s+/gm) || []).length;
-  if (listItems >= 3) return true;
-  const verbs = (t.toLowerCase().match(/\b(ekle|oluştur|yaz|düzenle|refactor|kur|taşı|sil|güncelle|test et|implement|build)\b/g) || []).length;
-  if (verbs >= 4 && t.length > 280) return true;
-  if (/(her .{2,30} için|tüm .{2,40}(?:ler|lar))/i.test(t) && t.length > 200) return true;
-  return false;
-}
 
 /* ⋯ menüsü içinde kompakt düşünme-eforu seçici. Varsayılan "Oto": efor göreve
    göre otomatik seçilir; kullanıcı isterse buradan elle geçersiz kılar. Menüyü
@@ -650,6 +623,8 @@ export function CoderView() {
   const [swarmMode, setSwarmMode] = useState(false);
   /* Derin Araştırma modu: çok-kaynaklı web araması → atıflı rapor (/api/research). */
   const [researchMode, setResearchMode] = useState(false);
+  /* Son gönderimin Otomatik Pilot kararı — ✦ Oto rozeti tooltip'i. */
+  const [lastPilot, setLastPilot] = useState<PilotDecision | null>(null);
   /* ⋯ menüsü sekme durumu: Çalışma Alanı · Modlar · Araçlar. */
   const [moreTab, setMoreTab] = useState<"workspace" | "modes" | "tools">("workspace");
   const swarmModeRef = useRef(false);
@@ -1495,11 +1470,21 @@ export function CoderView() {
     const _lastUserText = String(store.current()?.messages.findLast?.((m) => m.role === "user")?.content ?? "");
     /* Ajan Ekibi: kullanıcı elle açtıysa VEYA otomatik eşik (açıkça çok-parçalı
        ağır istek) tetiklendiyse devreye girer. Devam turlarında otomatik açılmaz. */
+    /* ✦ OTOMATİK PİLOT — görünmez zeka: mod kararları (efor/web/araştırma/
+       kalite/ekip) mesajdan tek noktada türetilir. Elle açılan çipler her
+       zaman geçersiz kılar; devam turu ve slash-ajanlarda devreye girmez. */
+    const pilotRepoCtx = !!store.repo || !!(store.config.localMode && store.config.localBridgeUrl?.trim());
+    const pilot: PilotDecision | null =
+      store.config.autoPilot !== false && !opts?.continuation && !overrideAgent
+        ? decidePilot(_lastUserText, { hasRepo: pilotRepoCtx })
+        : null;
+    setLastPilot(pilot);
     const useSwarm = swarmModeRef.current
-      || (store.config.autoSwarm !== false && !opts?.continuation && autoSwarm(_lastUserText));
-    /* Derin Araştırma: kullanıcı modu açtıysa veya /research ajanı seçiliyse
-       (devam turlarında değil). */
-    const useResearch = (researchModeRef.current || overrideAgent?.id === "research") && !opts?.continuation;
+      || (pilot ? pilot.swarm : (store.config.autoSwarm !== false && !opts?.continuation && autoSwarm(_lastUserText)));
+    /* Derin Araştırma: kullanıcı modu açtıysa, /research ajanı seçiliyse
+       ya da Otomatik Pilot gerek gördüyse (devam turlarında değil). */
+    const useResearch = (researchModeRef.current || overrideAgent?.id === "research" || !!pilot?.research) && !opts?.continuation;
+    const wantWeb = searchOnRef.current || !!pilot?.web;
     /* Ajan Ekibi / Araştırma turunda otomatik EN GÜÇLÜ modeli kullan (ayar açıksa)
        → en yetenekli modelle çalışır. Hata olursa (kredi/anahtar yok) aşağıdaki
        catch bloğu sessizce AKTİF modele döner ve tekrar dener. */
@@ -1632,7 +1617,7 @@ export function CoderView() {
     coderAbort = new AbortController();
     const abortCtl = coderAbort;
 
-    const thinkingMode = store.thinkingMode === "auto" ? autoEffort(_lastUserText) : store.thinkingMode;
+    const thinkingMode = store.thinkingMode === "auto" ? (pilot?.effort ?? autoEffort(_lastUserText)) : store.thinkingMode;
     let finalSystemPrompt = coderSystemPrompt;
     if (thinkingMode === "medium") {
       finalSystemPrompt += "\n\n[EFOR: ORTA] Yanıtlamadan önce kısa bir iç değerlendirme yap, ardından net ve eksiksiz yanıt ver.";
@@ -1648,7 +1633,7 @@ export function CoderView() {
     }
     /* Çok-geçişli kalite modu: taslak → öz-eleştiri → düzeltme döngüsünü tek
        yanıt içinde uygulat (yalnızca nihai sürümü göster). */
-    if (store.config.qualityMode) {
+    if (store.config.qualityMode || pilot?.quality) {
       finalSystemPrompt +=
         "\n\n[KALİTE MODU] Yanıtını üç aşamada üret ama YALNIZCA son sürümü göster: " +
         "(1) TASLAK: hızlı bir ilk çözüm düşün. " +
@@ -1686,7 +1671,7 @@ export function CoderView() {
 
     /* Web search pre-fetch: when searchOn, fetch Jina results before sending to AI */
     let webSearchContext = "";
-    if (searchOnRef.current) {
+    if (wantWeb) {
       const userQuery = lastUserMsg?.content ?? "";
       try {
         const wsr = await fetch(`/api/web-search?q=${encodeURIComponent(userQuery)}`, {
@@ -1757,7 +1742,7 @@ export function CoderView() {
             title: s.title, content: s.content, tags: s.tags, source: s.source, fileName: s.fileName,
           })),
           tools: toolsEnabled,
-          webSearch: searchOnRef.current,
+          webSearch: wantWeb,
           requireWriteApproval: store.config.requireWriteApproval,
           safeMode: store.config.safeMode,
           toolPermissions: store.config.toolPermissions,
@@ -1803,7 +1788,7 @@ export function CoderView() {
          kullanıcının kendi IP'si). Araç-kullanımı/web-arama TOOL-LOOP gerektirir
          → bunlar sunucu-proxy'ye gider (yoksa araçlar sessizce çalışmaz, model
          repodan habersiz kalır). */
-      if (active.provider === "pollinations" && !toolsEnabled && !searchOnRef.current) {
+      if (active.provider === "pollinations" && !toolsEnabled && !wantWeb) {
         /* Bağlam blokları sunucu (/api/chat) ile ORTAK tek kaynaktan gelir →
            Pollinations kullanıcıları da aynı, eksiksiz bağlamı alır. PLATFORM_KNOWLEDGE
            eklenir ki bu sağlayıcıdaki model de platformun farkında olsun. */
@@ -2399,6 +2384,9 @@ export function CoderView() {
 
             {moreTab === "modes" && (
               <div className="px-1.5 pb-1 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+                {config.autoPilot !== false && (
+                  <p className="w-full text-[10px] text-muted/55 mb-0.5">✦ Otomatik Pilot açık — bunlar elle geçersiz kılar.</p>
+                )}
                 <ModeChip
                   icon={<Wrench size={12} />} label="Tools" active={toolsEnabled}
                   onClick={() => {
@@ -3093,8 +3081,18 @@ export function CoderView() {
                     </span>
                   )}
                   {searchOn && <span className="text-brand font-medium">Web</span>}
-                  {config.autoSwarm !== false && !swarmMode && (
-                    <span className="flex items-center gap-1 text-muted/70 font-medium" title="Otomatik ajan açık: ihtiyaca göre tek ajan veya ajan ekibi butona basmadan kendiliğinden çalışır">
+                  {/* ✦ Oto — Otomatik Pilot tek göstergesi: efor/web/araştırma/
+                     kalite/ekip kararlarını craft mesajına göre kendisi verir. */}
+                  {config.autoPilot !== false && (
+                    <span
+                      className="flex items-center gap-1 text-brand/80 font-medium"
+                      title={lastPilot ? `Bu mesajda: ${lastPilot.reasons.join(" · ")}` : "Otomatik Pilot: eforu, web aramayı, araştırmayı, kaliteyi ve ajan ekibini craft seçer"}
+                    >
+                      <Sparkles size={12} /> Oto
+                    </span>
+                  )}
+                  {config.autoPilot === false && config.autoSwarm !== false && !swarmMode && (
+                    <span className="flex items-center gap-1 text-muted/70 font-medium" title="Otomatik ajan açık: ihtiyaca göre tek ajan veya ajan ekibi kendiliğinden çalışır">
                       <Sparkles size={12} className="text-brand/70" /> Oto-ajan
                     </span>
                   )}
