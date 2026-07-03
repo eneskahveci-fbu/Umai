@@ -57,7 +57,9 @@ export function EmptyChat({ hasModel, hasRepo, onAddModel, onPrompt }: EmptyChat
   const showChecklist = !hasModel || !hasChatted || !hasRepo;
 
   return (
-    <div className="flex flex-col items-center justify-center h-full px-6 py-10 select-none">
+    <div className="relative overflow-hidden flex flex-col items-center justify-center h-full px-6 py-10 select-none">
+      {/* Marka tonlu, yavaş süzülen ışıma — yalnız boş sahnede (mesaj gelince kaybolur). */}
+      <div className="aurora absolute inset-0 -z-10" aria-hidden />
       {/* Logo orb — gradyan yüzey + marka parıltısı (gerçek derinlik) */}
       <div
         className="w-16 h-16 rounded-full grid place-items-center mb-5 text-3xl text-brand animate-[pulse_4s_ease-in-out_infinite]"
