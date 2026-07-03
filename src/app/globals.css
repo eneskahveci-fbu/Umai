@@ -164,20 +164,24 @@ body {
 .scrollbar-none { scrollbar-width: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
-/* ─── Markdown çıktısı ─── */
+/* ─── Markdown çıktısı — Claude okuma ritmi ───
+   Gövde --font-scale'e bağlı: kullanıcı yazı boyutu ayarı markdown'ı da
+   ölçekler. Ferah satır aralığı + net başlık hiyerarşisi + nötr vurgular. */
 .prose-chat {
-  line-height: 1.7;
+  font-size: calc(15px * var(--font-scale, 1));
+  line-height: 1.75;
   word-break: break-word;
+  overflow-wrap: break-word;
 }
 .prose-chat p {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
 }
 .prose-chat p:last-child {
   margin-bottom: 0;
 }
 .prose-chat ul,
 .prose-chat ol {
-  margin: 0 0 12px 22px;
+  margin: 0 0 14px 22px;
 }
 .prose-chat ul {
   list-style: disc;
@@ -186,22 +190,39 @@ body {
   list-style: decimal;
 }
 .prose-chat li {
-  margin: 4px 0;
+  margin: 6px 0;
+}
+.prose-chat li > ul,
+.prose-chat li > ol {
+  margin-bottom: 0;
 }
 .prose-chat h1,
 .prose-chat h2,
 .prose-chat h3,
 .prose-chat h4 {
-  margin: 20px 0 8px;
+  margin: 24px 0 10px;
   font-weight: 700;
   line-height: 1.35;
 }
-.prose-chat h1 { font-size: 1.3em; }
-.prose-chat h2 { font-size: 1.15em; }
-.prose-chat h3 { font-size: 1.05em; }
+.prose-chat h1 { font-size: 1.35em; font-weight: 800; margin-top: 28px; }
+.prose-chat h2 { font-size: 1.2em; font-weight: 750; }
+.prose-chat h3 { font-size: 1.08em; }
+.prose-chat h4 { font-size: 1em; }
+.prose-chat h1:first-child,
+.prose-chat h2:first-child,
+.prose-chat h3:first-child,
+.prose-chat h4:first-child {
+  margin-top: 0;
+}
 .prose-chat a {
   color: var(--color-brand);
   text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-brand) 45%, transparent);
+  text-underline-offset: 2px;
+  transition: text-decoration-color 0.15s;
+}
+.prose-chat a:hover {
+  text-decoration-color: var(--color-brand);
 }
 .prose-chat pre {
   background: #0d0c0a;
@@ -211,7 +232,7 @@ body {
   overflow-x: auto;
   margin: 10px 0;
   font-family: var(--font-mono);
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--font-scale, 1));
 }
 html.light .prose-chat pre {
   background: #e8e2d4;
@@ -221,40 +242,53 @@ html.light .prose-chat pre {
   background: transparent !important;
   padding: 0 !important;
 }
+/* Inline kod: nötr (Claude gibi) — gövdeden bağırmayan hafif yüzey + çerçeve. */
 .prose-chat :not(pre) > code {
-  background: var(--color-bgsoft);
+  background: color-mix(in srgb, var(--color-ink) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-line) 80%, transparent);
   padding: 2px 6px;
   border-radius: 5px;
-  color: var(--color-cyan);
+  color: color-mix(in srgb, var(--color-ink) 92%, transparent);
   font-family: var(--font-mono);
-  font-size: 13px;
-}
-html.light .prose-chat :not(pre) > code {
-  color: var(--color-brand);
+  font-size: calc(13px * var(--font-scale, 1));
 }
 .prose-chat hr {
   border: none;
   border-top: 1px solid var(--color-line);
-  margin: 16px 0;
+  margin: 20px 0;
 }
+/* Blockquote: düz metin + sol çizgi + çok hafif yüzey (italiksiz, Claude tarzı). */
 .prose-chat blockquote {
   border-left: 3px solid var(--color-brand);
-  margin: 10px 0;
-  padding: 4px 12px;
-  color: var(--color-muted);
-  font-style: italic;
+  margin: 12px 0;
+  padding: 6px 14px;
+  color: color-mix(in srgb, var(--color-ink) 85%, transparent);
+  background: color-mix(in srgb, var(--color-ink) 3%, transparent);
+  border-radius: 0 8px 8px 0;
+}
+.prose-chat blockquote p:last-child {
+  margin-bottom: 0;
+}
+/* Tablolar: kaydırılabilir sarmalayıcı (MessageBubble table override'ı ekler). */
+.prose-chat .table-wrap {
+  overflow-x: auto;
+  margin: 0 0 14px;
+}
+.prose-chat .table-wrap > table {
+  margin: 0;
 }
 .prose-chat table {
   border-collapse: collapse;
   margin: 10px 0;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   width: 100%;
 }
 .prose-chat th,
 .prose-chat td {
   border: 1px solid var(--color-line);
-  padding: 6px 12px;
+  padding: 8px 12px;
   text-align: left;
+  vertical-align: top;
 }
 .prose-chat th {
   background: var(--color-bgsoft);
@@ -418,11 +452,11 @@ html.light .user-bubble {
 
 /* ─── Smooth fade-in ─── */
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-in {
-  animation: fade-in 0.2s ease-out;
+  animation: fade-in 0.25s ease-out;
 }
 
 /* ─── Modal backdrop ─── */
