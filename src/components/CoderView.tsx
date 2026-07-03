@@ -98,6 +98,7 @@ import { buildContextSections } from "@/lib/prompt";
 import { detectSensitive } from "@/lib/pii";
 import { friendlyError } from "@/lib/friendlyError";
 import { autoEffort, autoSwarm, decidePilot, type PilotDecision } from "@/lib/autoPilot";
+import { pickDraftModels, buildBoostInstruction, generateDrafts } from "@/lib/boost";
 import { retrieve } from "@/lib/retrieval";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { CRAFT_OPERATING_MANUAL } from "@/lib/constants";
@@ -1615,6 +1616,27 @@ export function CoderView() {
     setPendingActions([]); // bekleyen yıkıcı işlem önerileri
     setPendingSurvey(null); // önceki anketi temizle
     coderAbort = new AbortController();
+
+    /* ✦ Faz 3 — Kalite güçlendirme: pilot "kalite" dediyse (araçsız, tekil
+       sohbet turlarında) arka planda 1-2 iç taslak üret; nihai yanıt bunları
+       eleştirip birleştirerek AKIŞLI yazılır. Ortalama model → üstün çıktı. */
+    let boostDrafts: string[] = [];
+    const toolsWanted = store.toolsEnabled && (!!store.repo || !!(store.config.localMode && store.config.localBridgeUrl?.trim()));
+    if (pilot?.quality && !useSwarm && !useResearch && !toolsWanted && !isContinuation) {
+      try {
+        useStore.getState().updateLastThinking("✦ Kalite turu: iç taslak(lar) hazırlanıyor…");
+        const draftProfiles = pickDraftModels(
+          store.config.models, active, pilot.effort === "max" ? 2 : 1, store.strongestModel(),
+        );
+        const withKeys = await Promise.all(draftProfiles.map(async (m) => ({
+          baseUrl: m.baseUrl, model: m.model, provider: m.provider, apiKey: await usableApiKey(m),
+        })));
+        boostDrafts = await generateDrafts({ userText: _lastUserText, models: withKeys, signal: coderAbort.signal });
+        if (boostDrafts.length) {
+          useStore.getState().updateLastThinking(`✦ Kalite turu: ${boostDrafts.length} taslak birleştiriliyor…`);
+        }
+      } catch { boostDrafts = []; /* güçlendirme başarısızsa normal akış */ }
+    }
     const abortCtl = coderAbort;
 
     const thinkingMode = store.thinkingMode === "auto" ? (pilot?.effort ?? autoEffort(_lastUserText)) : store.thinkingMode;
@@ -1633,7 +1655,9 @@ export function CoderView() {
     }
     /* Çok-geçişli kalite modu: taslak → öz-eleştiri → düzeltme döngüsünü tek
        yanıt içinde uygulat (yalnızca nihai sürümü göster). */
-    if (store.config.qualityMode || pilot?.quality) {
+    if (boostDrafts.length > 0) {
+      finalSystemPrompt += buildBoostInstruction(boostDrafts);
+    } else if (store.config.qualityMode || pilot?.quality) {
       finalSystemPrompt +=
         "\n\n[KALİTE MODU] Yanıtını üç aşamada üret ama YALNIZCA son sürümü göster: " +
         "(1) TASLAK: hızlı bir ilk çözüm düşün. " +
