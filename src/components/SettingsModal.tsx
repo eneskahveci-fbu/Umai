@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
 import { isAdminEmail } from "@/lib/admin";
+import { readErrors, clearErrors } from "@/lib/errorLog";
 import { AccountSettings } from "@/components/AccountSettings";
 import { ExtensionsSettings } from "@/components/ExtensionsSettings";
 import { ProUpgrade } from "@/components/ProUpgrade";
@@ -222,6 +223,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   const [quickBusy, setQuickBusy] = useState(false);
   const [quickResult, setQuickResult] = useState<null | "ok" | string>(null);
   const [advOpen, setAdvOpen] = useState(false);
+  const [, setErrTick] = useState(0); // hata paneli temizlenince yeniden çiz
   const [memInput, setMemInput] = useState("");
   /* Özel yazı stili oluşturma formu. */
   const [styleFormOpen, setStyleFormOpen] = useState(false);
@@ -1339,6 +1341,38 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
         {/* GELİŞMİŞ */}
         {tab === "advanced" && (
           <section className="flex flex-col gap-5">
+            {/* Hata-sıfır programı: bu oturumda yakalanan istemci hataları
+               (yalnız cihazda, telemetri yok) — teşhis için kopyala/temizle. */}
+            <div>
+              <h4 className="text-sm font-bold mb-2">Son hatalar (bu oturum)</h4>
+              {(() => {
+                const errs = readErrors();
+                if (errs.length === 0) {
+                  return <p className="text-xs text-muted/60">✓ Bu oturumda yakalanan istemci hatası yok.</p>;
+                }
+                return (
+                  <div className="rounded-xl border border-line bg-bgsoft/50 p-2 space-y-1 max-h-48 overflow-y-auto">
+                    {errs.map((e, i) => (
+                      <div key={i} className="text-[11px] font-mono text-red/90 break-words">
+                        <span className="text-muted/50">{new Date(e.ts).toLocaleTimeString("tr-TR")} {e.source ? `[${e.source}] ` : ""}</span>
+                        {e.message}
+                      </div>
+                    ))}
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(JSON.stringify(errs, null, 2)).catch(() => { /* yok */ }); addToast("Hatalar panoya kopyalandı.", "success"); }}
+                        className="text-[11px] px-2 py-1 rounded-lg border border-line text-muted hover:text-ink"
+                      >Kopyala</button>
+                      <button
+                        onClick={() => { clearErrors(); addToast("Hata günlüğü temizlendi.", "success"); setErrTick((t) => t + 1); }}
+                        className="text-[11px] px-2 py-1 rounded-lg border border-line text-muted hover:text-red"
+                      >Temizle</button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
             {/* Ajan davranışı (Temel'den taşındı) */}
             <div>
               <h4 className="text-sm font-bold mb-2">Ajan Davranışı</h4>
