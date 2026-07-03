@@ -184,7 +184,7 @@ export function Sidebar() {
       onClick={() => selectChat(c.id)}
       className={`group/item flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all duration-100 ${
         currentId === c.id
-          ? "bg-brand/8 border border-brand/20 text-ink"
+          ? "bg-brand/10 border border-brand/25 border-l-2 border-l-brand shadow-sm text-ink"
           : "border border-transparent text-muted hover:text-ink hover:bg-bgsoft/60"
       }`}
     >
