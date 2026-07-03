@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Image as ImageIcon, LayoutTemplate, Sparkles, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav } from "@/lib/surfaceNav";
+import { autoStudioSkill } from "@/lib/autoPilot";
 import type { Artifact, StudioProject } from "@/lib/types";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
 import { deviceById, skillById, STUDIO_DIRECTIONS, type DeviceId } from "@/lib/studioConstants";
@@ -47,7 +48,8 @@ export function StudioView() {
 
   const [view, setView] = useState<"home" | "workspace">("home");
   const [brief, setBrief] = useState("");
-  const [skillId, setSkillId] = useState<string | null>("landing");
+  /* null = ✦ Otomatik: çıktı türünü brief'ten sistem seçer (Open Design sadeliği). */
+  const [skillId, setSkillId] = useState<string | null>(null);
   const [directionId, setDirectionId] = useState<string | null>("minimal");
   const [designSystemId, setDesignSystemId] = useState<string>("craft");
   const [dsModalOpen, setDsModalOpen] = useState(false);
@@ -80,7 +82,8 @@ export function StudioView() {
     if (!b || busy) return;
     /* Şablon uygulanırken state güncellemesi async olduğundan, üretim için
        değerleri doğrudan override'dan al (bayat closure önlenir). */
-    const sk = ov?.skillId ?? skillId;
+    /* ✦ Otomatik: tür seçilmediyse brief'ten çıkar; sinyal yoksa landing. */
+    const sk = ov?.skillId ?? skillId ?? autoStudioSkill(b) ?? "landing";
     const dirId = ov?.directionId ?? directionId;
     const dsObj = designSystemById(config, ov?.designSystemId ?? designSystemId);
     setBusy(true); setPhase("planning");
@@ -183,7 +186,7 @@ export function StudioView() {
 
   const openProject = (p: StudioProject) => {
     stop();
-    setBrief(p.brief); setSkillId(p.skillId ?? "landing"); setDesignSystemId(p.designSystemId || "craft");
+    setBrief(p.brief); setSkillId(p.skillId ?? null); setDesignSystemId(p.designSystemId || "craft");
     setDirectionId(p.directionId ?? "minimal"); setTitle(p.name);
     setArtifact({ type: "html", content: p.html, title: p.name }); setReloadKey((k) => k + 1);
     setCurrentProjectId(p.id); setTweaks(DEFAULT_TWEAKS);

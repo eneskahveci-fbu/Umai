@@ -97,6 +97,17 @@ export function StudioHome({
               className="flex-1 max-w-44 bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/60"
             />
           </div>
+          {/* ✦ Otomatik — varsayılan: türü brief'ten sistem seçer (Open Design sadeliği). */}
+          <button
+            onClick={() => setSkillId(null as unknown as string)}
+            className={`w-full flex items-center gap-3 p-3 rounded-xl border mb-3 text-left transition-all ${skillId === null ? "border-brand bg-brand/10 ring-2 ring-brand/40" : "border-line bg-surface hover:border-brand/40"}`}
+          >
+            <span className="w-8 h-8 rounded-lg grid place-items-center text-brand bg-brand/12 border border-brand/20 shrink-0">✦</span>
+            <span className="min-w-0">
+              <span className={`block text-sm font-semibold ${skillId === null ? "text-brand" : "text-ink"}`}>Otomatik <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">önerilen</span></span>
+              <span className="block text-[11px] text-muted/80">Çıktı türünü brief&apos;inden craft seçer — &quot;5 slaytlık sunum&quot; yaz, sunum çıkar.</span>
+            </span>
+          </button>
           <div className="space-y-3">
             {groups.map((g) => (
               <div key={g.category}>

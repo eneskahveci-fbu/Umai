@@ -3,6 +3,7 @@
    türetilir, mevcut addSkill ile eklenir. Chat kesişimi ("skill indir <url>")
    ve SkillImport paneli aynı yardımcıyı kullanır. */
 import { useStore } from "./store";
+import { parseSkillMd, looksLikeSkillMd } from "./odFormat";
 
 /** Başlığı içerikten türetir: ilk markdown başlığı > ilk anlamlı satır >
     URL dosya adı. 60 karaktere kırpılır. Saf — birim testli. */
@@ -22,14 +23,18 @@ export async function importSkillFromUrl(url: string): Promise<{ title: string; 
     throw new Error(data.error || `İçerik alınamadı (HTTP ${res.status})`);
   }
   const text = (data.text as string).slice(0, 50_000);
-  const title = deriveSkillTitle(text, url);
+  /* Open Design SKILL.md formatı: frontmatter'daki ad/açıklama kullanılır,
+     gövde (workflow) skill içeriği olur — OD kayıt defterleri doğrudan uyumlu. */
+  const od = looksLikeSkillMd(text) ? parseSkillMd(text) : null;
+  const title = od?.name ?? deriveSkillTitle(text, url);
+  const content = od ? (od.description ? `${od.description}\n\n${od.body}` : od.body) : text;
   useStore.getState().addSkill({
     title,
-    content: text,
-    tags: ["içe-aktarılan"],
+    content,
+    tags: od ? ["içe-aktarılan", "open-design"] : ["içe-aktarılan"],
     enabled: true,
     source: "file",
     fileName: url,
   });
-  return { title, chars: text.length };
+  return { title, chars: content.length };
 }

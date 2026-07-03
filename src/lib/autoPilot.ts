@@ -87,3 +87,31 @@ export function decidePilot(text: string, ctx: { hasRepo: boolean }): PilotDecis
   if (swarm) reasons.push("ajan ekibi");
   return { effort, web, research, quality, swarm, reasons };
 }
+
+/* Stüdyo için otomatik çıktı türü (skill) seçimi — brief'ten. Open Design/
+   Claude Design sadeliği: kullanıcı tür seçmek ZORUNDA değil; sistem anlar.
+   Belirgin sinyal yoksa null döner → çağıran "landing" varsayılanını kullanır. */
+export function autoStudioSkill(brief: string): string | null {
+  const t = (brief || "").toLowerCase();
+  if (!t.trim()) return null;
+  const rules: [RegExp, string][] = [
+    [/\b(sunum|slayt|deck|prezentasyon|pitch)\b/, "deck"],
+    [/\b(e-?posta|mail|bülten|newsletter)\b/, "email"],
+    [/\b(sosyal|instagram|post|afiş|banner|story)\b/, "social"],
+    [/\b(dashboard|panel|gösterge|analitik ekran)\b/, "dashboard"],
+    [/\b(tablo|table|liste görünümü)\b/, "table"],
+    [/\b(bileşen|component|kart tasarımı|form tasarımı|buton seti)\b/, "component"],
+    [/\b(fiyat|pricing|paket|abonelik sayfası)\b/, "pricing"],
+    [/\b(blog|makale|yazı sayfası|article)\b/, "blog"],
+    [/\b(portfolyo|portfolio|özgeçmiş|cv sitesi)\b/, "portfolio"],
+    [/\b(404|hata sayfası|boş durum|empty state)\b/, "error"],
+    [/\b(giriş|login|kayıt|signup|auth)\b/, "auth"],
+    [/\b(onboarding|karşılama akışı|tanıtım turu)\b/, "onboarding"],
+    [/\b(ayarlar ekranı|settings)\b/, "settings"],
+    [/\b(mobil uygulama|app ekranı|telefon ekranı)\b/, "mobile"],
+    [/\b(kurumsal site|çok sayfalı site|web sitesi)\b/, "marketing"],
+    [/\b(landing|açılış sayfası|tanıtım sayfası|hero)\b/, "landing"],
+  ];
+  for (const [re, id] of rules) if (re.test(t)) return id;
+  return null;
+}

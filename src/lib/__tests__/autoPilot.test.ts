@@ -51,3 +51,19 @@ describe("yardımcılar", () => {
     expect(autoResearch("kapsamlı rapor")).toBe(false);
   });
 });
+
+describe("autoStudioSkill", () => {
+  it("sunum brief'i → deck", async () => {
+    const { autoStudioSkill } = await import("../autoPilot");
+    expect(autoStudioSkill("Yapay zekâ konulu 5 slaytlık bir sunum hazırla")).toBe("deck");
+  });
+  it("e-posta brief'i → email, dashboard → dashboard", async () => {
+    const { autoStudioSkill } = await import("../autoPilot");
+    expect(autoStudioSkill("kara cuma kampanyası için bir e-posta bülteni")).toBe("email");
+    expect(autoStudioSkill("satış analitiği için dashboard tasarla")).toBe("dashboard");
+  });
+  it("belirsiz brief → null (varsayılana düşer)", async () => {
+    const { autoStudioSkill } = await import("../autoPilot");
+    expect(autoStudioSkill("güzel bir şey yap")).toBe(null);
+  });
+});
