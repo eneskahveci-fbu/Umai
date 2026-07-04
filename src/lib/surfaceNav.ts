@@ -9,10 +9,11 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useStore } from "./store";
 
-export type Surface = "studio" | "canvas" | "image";
+export type Surface = "studio" | "slides" | "canvas" | "image";
 
 export const SURFACE_ROUTES: Record<Surface, string> = {
   studio: "/studio",
+  slides: "/studio/sunum",
   canvas: "/studio/tuval",
   image: "/studio/gorsel",
 };
@@ -26,6 +27,7 @@ export function useSurfaceNav() {
     if (routed) { router.push(SURFACE_ROUTES[which]); return; }
     const s = useStore.getState();
     s.setStudioOpen(which === "studio");
+    s.setSlidesStudioOpen(which === "slides");
     s.setDesignStudioOpen(which === "canvas");
     s.setImageStudioOpen(which === "image");
   };
@@ -34,6 +36,7 @@ export function useSurfaceNav() {
     if (routed) { router.push("/app"); return; }
     const s = useStore.getState();
     s.setStudioOpen(false);
+    s.setSlidesStudioOpen(false);
     s.setDesignStudioOpen(false);
     s.setImageStudioOpen(false);
   };

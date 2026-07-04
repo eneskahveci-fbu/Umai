@@ -6,21 +6,15 @@ import { useStore } from "@/lib/store";
 import { useSurfaceNav } from "@/lib/surfaceNav";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import { buildFallbackChain } from "@/lib/fallback";
+import { fetchImageModels, IMAGE_MODEL_FALLBACK, pollinationsImageUrl, type ImageModelInfo } from "@/lib/pollinations";
 
 /* Görüntü Stüdyosu — Qwen Studio benzeri sohbet akışı, ücretsiz & anahtarsız.
    Konuşarak görsel üret (Pollinations image, keyless): prompt yaz → asistan
    görselleri sohbete döner. Çoklu varyasyon (1/2/4), ücretsiz LLM ile prompt
    geliştirme, her görsel için yeniden varyasyon, indir/sil. Model + format
-   korunur. URL doğrudan <img> ile yüklenir → API anahtarı gerekmez. */
-
-const MODELS: { id: string; label: string }[] = [
-  { id: "flux", label: "Flux — kaliteli" },
-  { id: "turbo", label: "Turbo — hızlı" },
-  { id: "flux-realism", label: "Realism — foto-gerçekçi" },
-  { id: "flux-anime", label: "Anime — çizgi" },
-  { id: "flux-3d", label: "3D — render" },
-  { id: "any-dark", label: "Any Dark — sanatsal" },
-];
+   korunur. URL doğrudan <img> ile yüklenir → API anahtarı gerekmez.
+   Model listesi Pollinations kataloğundan CANLI çekilir (pollinations.ts);
+   ulaşılamazsa küratörlü yedek liste kullanılır. */
 
 const FORMATS: { id: string; label: string; w: number; h: number }[] = [
   { id: "1:1", label: "Kare 1:1", w: 1024, h: 1024 },
@@ -53,8 +47,8 @@ async function usableApiKey(model: { apiKey?: string; provider: string }): Promi
 }
 
 function imgUrl(prompt: string, model: string, w: number, h: number, seed: number) {
-  // enhance=true → Pollinations prompt'u zenginleştirir, daha kaliteli görsel verir.
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&model=${encodeURIComponent(model)}&seed=${seed}&nologo=true&enhance=true`;
+  // enhance → Pollinations prompt'u zenginleştirir; private → herkese açık akışa düşmez.
+  return pollinationsImageUrl(prompt, { model, width: w, height: h, seed });
 }
 
 export function ImageStudio() {
@@ -87,11 +81,19 @@ export function ImageStudio() {
   const [msgs, setMsgs] = useState<ImgMsg[]>([]);
   const [enhancing, setEnhancing] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [freeModels, setFreeModels] = useState<ImageModelInfo[]>(IMAGE_MODEL_FALLBACK);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [msgs]);
+
+  /* Canlı model kataloğu (başarısızlıkta sessizce yedek listede kalır). */
+  useEffect(() => {
+    let on = true;
+    void fetchImageModels().then((list) => { if (on) setFreeModels(list); });
+    return () => { on = false; };
+  }, []);
 
   if (!open) return null;
 
@@ -232,9 +234,10 @@ export function ImageStudio() {
         <span className="w-8 h-8 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0">
           <ImageIcon size={16} />
         </span>
-        {/* Tek stüdyo, üç mod: Stüdyo (brief→AI) · Tuval · Görüntü (bu). */}
+        {/* Tek stüdyo, dört mod: Stüdyo (brief→AI) · Sunum · Tuval · Görüntü (bu). */}
         <div className="flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
           <button onClick={() => nav.go("studio")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Brief ile AI tasarım (web · sunum · yayınla)">Stüdyo</button>
+          <button onClick={() => nav.go("slides")} className="hidden sm:block px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Sunum Stüdyosu (slayt destesi + TTS)">Sunum</button>
           <button onClick={() => nav.go("canvas")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Katman/tuval editörü (slayt · afiş · sosyal)">Tuval</button>
           <button className="px-2.5 py-1 rounded-md bg-brand/15 text-brand">Görüntü</button>
         </div>
@@ -272,7 +275,7 @@ export function ImageStudio() {
               </div>
             ) : (
               <div key={m.id} className="flex flex-col gap-2">
-                <div className="text-[11px] text-muted/45 flex items-center gap-1.5"><Sparkles size={11} className="text-brand" /> {MODELS.find((x) => x.id === m.model)?.label ?? m.model}</div>
+                <div className="text-[11px] text-muted/45 flex items-center gap-1.5"><Sparkles size={11} className="text-brand" /> {freeModels.find((x) => x.id === m.model)?.label ?? m.model}</div>
                 <div className={`grid gap-3 ${(m.items?.length ?? 1) > 1 ? "grid-cols-2" : "grid-cols-1 max-w-md"}`}>
                   {m.items?.map((it) => (
                     <div key={it.id} className="premium-card rounded-2xl overflow-hidden group/img">
@@ -351,7 +354,7 @@ export function ImageStudio() {
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             <select value={model} onChange={(e) => setModel(e.target.value)} className="flex-1 min-w-[130px] max-w-[220px] bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs outline-none focus:border-brand/50 cursor-pointer">
               <optgroup label="Ücretsiz (Pollinations)">
-                {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                {freeModels.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
               </optgroup>
               {userImgModels.length > 0 && (
                 <optgroup label="Eklediğin modeller (kendi anahtarın)">

@@ -15,6 +15,7 @@ import {
   Sparkles,
   LayoutTemplate,
   Image as ImageIcon,
+  Presentation,
   Zap,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -109,6 +110,16 @@ export function CommandPalette() {
         setOpen(false);
       },
       keywords: ["studyo", "stüdyo", "studio", "tasarim", "design", "web", "sunum"],
+    },
+    {
+      id: "open-slides",
+      label: "Sunum Stüdyosu'nu aç (brief → slayt destesi)",
+      icon: <Presentation size={16} />,
+      action: () => {
+        router.push("/studio/sunum");
+        setOpen(false);
+      },
+      keywords: ["sunum", "slayt", "slides", "deck", "presentation", "sunu"],
     },
     {
       id: "open-canvas",

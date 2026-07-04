@@ -88,7 +88,17 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   · PDF. AI arka plan = Pollinations (anahtarsız).
 - **Görüntü Stüdyosu** (`ImageStudio.tsx`): Qwen Studio benzeri sohbet akışı.
   Konuşarak görsel üretir (Pollinations image, keyless), çoklu varyasyon (1/2/4),
-  ücretsiz LLM ile prompt geliştirme, model/format seçimi.
+  ücretsiz LLM ile prompt geliştirme, model/format seçimi. Model listesi
+  Pollinations kataloğundan canlı çekilir (`lib/pollinations.ts`).
+- **Sunum Stüdyosu** (`studio/SlidesStudio.tsx`, rota `/studio/sunum`): Google
+  Slides'tan İLHAM alan craft yorumu. Brief → yapılandırılmış slayt JSON'u
+  (`lib/slidesGen.ts`) → deterministik tema render'ı (`lib/slides.ts`). Slaytlar
+  veri olarak kalır: tema değişimi kayıpsız, tek slaytı AI ile yeniden yazma,
+  Pollinations görselleri (deterministik seed), TTS anlatım (openai-audio),
+  bağımsız HTML/PDF dışa aktarma. Desteler `config.slideDecks`'te saklanır.
+- **Pollinations merkezi** (`lib/pollinations.ts`): görsel URL kurucusu, canlı
+  model kataloğu, TTS (ses seçimi + tarayıcı yedeği), `speakableText`. Sohbette
+  her asistan yanıtında "Seslendir" butonu bunu kullanır.
 - **Sandbox / Artifacts** (`preview.ts` + `ArtifactPanel.tsx`): kod bloğu →
   sandbox'lı iframe canlı önizleme. React/JSX/TSX (Babel standalone CDN),
   HTML+CSS+JS, SVG, mermaid. İframe-içi **console paneli** (parent'a mesaj yok →

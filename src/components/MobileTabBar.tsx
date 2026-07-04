@@ -1,11 +1,11 @@
 "use client";
 
 /* Mobil alt gezinme çubuğu (yalnız sm altı) — stüdyo rotalarında başparmak
-   erişimli yüzey geçişi: Sohbet · Stüdyo · Tuval · Görsel. Aktif sekme
+   erişimli yüzey geçişi: Sohbet · Stüdyo · Sunum · Tuval · Görsel. Aktif sekme
    marka renginde; safe-area alt boşluğu korunur. */
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Image as ImageIcon, LayoutTemplate, MessageSquare, Sparkles } from "lucide-react";
+import { Image as ImageIcon, LayoutTemplate, MessageSquare, Presentation, Sparkles } from "lucide-react";
 
 /* Sanal klavye açık mı? (mobil) — visualViewport küçülmesiyle algılanır.
    Alt bar klavye açıkken gizlenir; sayfalar alt boşluğu buna göre sıfırlar. */
@@ -25,6 +25,7 @@ export function useKeyboardOpen(): boolean {
 const TABS = [
   { href: "/app", label: "Sohbet", icon: MessageSquare },
   { href: "/studio", label: "Stüdyo", icon: Sparkles },
+  { href: "/studio/sunum", label: "Sunum", icon: Presentation },
   { href: "/studio/tuval", label: "Tuval", icon: LayoutTemplate },
   { href: "/studio/gorsel", label: "Görsel", icon: ImageIcon },
 ];

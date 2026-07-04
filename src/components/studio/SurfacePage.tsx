@@ -13,7 +13,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MobileTabBar, useKeyboardOpen } from "@/components/MobileTabBar";
 
 export function SurfacePage({ flag, children }: {
-  flag: "studioOpen" | "designStudioOpen" | "imageStudioOpen";
+  flag: "studioOpen" | "slidesStudioOpen" | "designStudioOpen" | "imageStudioOpen";
   children: React.ReactNode;
 }) {
   const auth = useAuthGate();
@@ -23,6 +23,7 @@ export function SurfacePage({ flag, children }: {
   useEffect(() => {
     const s = useStore.getState();
     const set = flag === "studioOpen" ? s.setStudioOpen
+      : flag === "slidesStudioOpen" ? s.setSlidesStudioOpen
       : flag === "designStudioOpen" ? s.setDesignStudioOpen
       : s.setImageStudioOpen;
     set(true);

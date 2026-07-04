@@ -374,6 +374,9 @@ interface StoreState {
       "Gelişmiş tuval" olarak erişilebilir kalır. */
   studioOpen: boolean;
   setStudioOpen: (b: boolean) => void;
+  /** Sunum Stüdyosu (Google Slides'tan ilhamla; yapılandırılmış slayt desteleri). */
+  slidesStudioOpen: boolean;
+  setSlidesStudioOpen: (b: boolean) => void;
   streaming: boolean;
   setStreaming: (b: boolean) => void;
 
@@ -956,6 +959,8 @@ export const useStore = create<StoreState>()((set, get) => ({
   setDesignStudioOpen: (b) => set({ designStudioOpen: b }),
   studioOpen: false,
   setStudioOpen: (b) => set({ studioOpen: b }),
+  slidesStudioOpen: false,
+  setSlidesStudioOpen: (b) => set({ slidesStudioOpen: b }),
   streaming: false,
   setStreaming: (b) => set({ streaming: b }),
 

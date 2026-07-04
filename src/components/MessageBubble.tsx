@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -11,13 +11,14 @@ import {
   BookMarked, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
   Circle, CircleDot, Compass, FlaskConical, ListChecks, Microscope, Settings2,
   Code2, Copy, FileText, FolderOpen, GitBranch, GitCommit, Globe,
-  Loader2, Pencil, RefreshCw, Search, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, User, Users, Wrench, X,
+  Loader2, Pencil, RefreshCw, Search, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, User, Users, Volume2, VolumeX, Wrench, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ChatMessage, SwarmState } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { CodeBlock } from "./CodeBlock";
 import { ALL_AGENTS } from "@/lib/agents";
+import { playTts, speakableText, stopTts } from "@/lib/pollinations";
 
 /* ── Kod-fence dili normalizasyonu ─────────────────────────────────────
    AI, kod bloğunu `dil:dosya/yolu` biçiminde yazabilir (sistem prompt'u bunu
@@ -490,6 +491,8 @@ function MessageBubbleImpl({
   const rateMessage = useStore((s) => s.rateMessage);
   const addSkill = useStore((s) => s.addSkill);
   const addToast = useStore((s) => s.addToast);
+  const [speakingTts, setSpeakingTts] = useState(false);
+  const speakingRef = useRef(false);
   const [skillSaveOpen, setSkillSaveOpen] = useState(false);
   const [skillTitle, setSkillTitle] = useState("");
   const [skillContent, setSkillContent] = useState("");
@@ -515,6 +518,19 @@ function MessageBubbleImpl({
       setTimeout(() => setCopied(false), 2000);
     } catch { /* yoksay */ }
   };
+
+  /* Seslendirme — Pollinations openai-audio (ücretsiz); hata olursa tarayıcı
+     sesi. Yeni çağrı öncekini keser; ayrılırken (unmount) yalnız bu balonun
+     başlattığı ses durdurulur. */
+  const toggleSpeak = () => {
+    if (speakingTts) { stopTts(); setSpeakingTts(false); return; }
+    const text = speakableText(message.content);
+    if (!text) return;
+    setSpeakingTts(true);
+    playTts(text, useStore.getState().config.ttsVoice || "nova", () => setSpeakingTts(false));
+  };
+  useEffect(() => () => { if (speakingRef.current) stopTts(); }, []);
+  useEffect(() => { speakingRef.current = speakingTts; }, [speakingTts]);
 
   const startEdit = () => {
     setEditText(message.content);
@@ -752,6 +768,10 @@ function MessageBubbleImpl({
             <button onClick={copyMessage} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink px-2 py-1.5 rounded-lg hover:bg-bgsoft transition-colors">
               {copied ? <Check size={12} /> : <Copy size={12} />}
               <span>{copied ? "Kopyalandı" : "Kopyala"}</span>
+            </button>
+            <button onClick={toggleSpeak} className={`flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg hover:bg-bgsoft transition-colors ${speakingTts ? "text-brand" : "text-muted/50 hover:text-ink"}`} title="Yanıtı seslendir (Pollinations)">
+              {speakingTts ? <VolumeX size={12} /> : <Volume2 size={12} />}
+              <span>{speakingTts ? "Durdur" : "Seslendir"}</span>
             </button>
             {showRegenerate && onRegenerate && (
               <button onClick={onRegenerate} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink px-2 py-1.5 rounded-lg hover:bg-bgsoft transition-colors">

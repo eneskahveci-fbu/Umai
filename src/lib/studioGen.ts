@@ -60,7 +60,8 @@ function stripCode(s: string): string {
   return s.replace(/```[\s\S]*?(```|$)/g, "").trim();
 }
 
-async function resolveKey(): Promise<{ baseUrl: string; model: string; apiKey: string; provider: string } | null> {
+/* Sunum Stüdyosu (slidesGen) da aynı model çözümlemesini kullanır. */
+export async function resolveKey(): Promise<{ baseUrl: string; model: string; apiKey: string; provider: string } | null> {
   const store = useStore.getState();
   const active = store.strongestModel() ?? store.activeModel();
   if (!active) return null;
