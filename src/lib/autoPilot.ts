@@ -117,6 +117,10 @@ export function autoStudioSkill(brief: string): string | null {
     [/\b(mobil uygulama|app ekranı|telefon ekranı)\b/, "mobile"],
     [/\b(kurumsal site|çok sayfalı site|web sitesi)\b/, "marketing"],
     [/\b(landing|açılış sayfası|tanıtım sayfası|hero)\b/, "landing"],
+    /* Akademik & araştırma çıktı türleri */
+    [/\b(akademik poster|bilimsel poster|araştırma posteri|poster)\b/, "poster"],
+    [/\b(araştırma özeti|proje özeti|one[- ]?pager|tek sayfa(lık)? özet)\b/, "onepager"],
+    [/\b(sertifika|katılım belgesi|başarı belgesi|certificate|diploma)\b/, "certificate"],
   ];
   for (const [re, id] of rules) if (re.test(t)) return id;
   return null;
