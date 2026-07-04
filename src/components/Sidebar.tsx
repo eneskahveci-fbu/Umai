@@ -313,7 +313,7 @@ export function Sidebar() {
       <div className="h-14 px-4 flex items-center justify-between border-b border-line/60 shrink-0">
         <div className="flex items-center gap-2 font-extrabold text-base tracking-tight">
           <SidebarLogo size={22} />
-          <span><span className="text-ink">Craft</span><span className="brand-text">.Coder</span></span>
+          <span className="text-ink">Craft</span>
         </div>
         <button
           onClick={() => setSidebarOpen(false)}

@@ -269,7 +269,7 @@ async function bootWcTerminal(
   } else {
     await mountDefaults(wc);
   }
-  term.writeln("\x1b[1;35m▲ Craft Coder sandbox\x1b[0m — Node.js + busybox-shell hazır");
+  term.writeln("\x1b[1;35m▲ Craft sandbox\x1b[0m — Node.js + busybox-shell hazır");
   term.writeln("\x1b[2mDeneyin: \x1b[36mnpm install\x1b[2m, \x1b[36mnpm run dev\x1b[2m, \x1b[36mnpm test\x1b[2m, \x1b[36mls\x1b[0m\n");
 
   const proc = await wc.spawn("jsh", { terminal: { cols: term.cols, rows: term.rows } });

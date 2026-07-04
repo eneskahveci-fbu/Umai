@@ -49,6 +49,7 @@ import { calculateCost, formatCost } from "@/lib/pricing";
 import { quickComplete } from "@/lib/quickComplete";
 import { fetchUserRepos } from "@/lib/github";
 import { fetchGitLabUserRepos } from "@/lib/gitlab";
+import { friendlyError } from "@/lib/friendlyError";
 import type { Provider, ResponseStyle } from "@/lib/types";
 
 export type SettingsTab = "model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim";
@@ -458,41 +459,79 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
 
   /* Birleşik ekleme: preset (veya Gelişmiş'teki override'lar) ile modeli ekle,
      AKTİF yap, anahtarı sağlayıcı hafızasına yaz ve canlı test et. */
-  const addAndTest = async () => {
-    const key = apiKey.trim() || config.providerKeys?.[provider] || "";
-    if (!key && !KEY_OPTIONAL.includes(provider)) { addToast("Önce API anahtarını yapıştır.", "error"); return; }
-    const bu = baseUrl.trim() || PRESETS[provider].baseUrl;
-    const mdl = model.trim() || PRESETS[provider].model;
-    if (!bu || !mdl) { addToast("Base URL ve model gerekli (Gelişmiş bölümünden gir).", "error"); return; }
-    const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `m_${Date.now()}`;
-    const newModel = { id, label: label.trim() || cleanLabel(provider), provider, baseUrl: bu, model: mdl, apiKey: key };
-    /* addModel mevcut aktif modeli korur; burada yeni model aktif yapılır. */
-    saveConfig({
-      ...config,
-      models: [...config.models, newModel],
-      activeModelId: id,
-      providerKeys: key ? { ...config.providerKeys, [provider]: key } : config.providerKeys,
-    });
-    setLabel("");
-    setQuickBusy(true);
-    setQuickResult(null);
+  /* Bir modeli kısa bir "Merhaba" ile dener; başarılıysa null, değilse kısa
+     hata metni döner. Model adı geçersizse (decommissioned/yanlış) bunu ayırt
+     eder → çağıran gerçek listeden geçerli modele geçebilir. */
+  const probeModel = async (bu: string, mdl: string, key: string, prov: string): Promise<{ ok: true } | { ok: false; detail: string; badModel: boolean }> => {
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [{ role: "user", content: "Merhaba" }], baseUrl: bu, model: mdl, apiKey: key, provider }),
+        body: JSON.stringify({ messages: [{ role: "user", content: "Merhaba" }], baseUrl: bu, model: mdl, apiKey: key, provider: prov }),
       });
-      if (res.ok) {
-        setQuickResult("ok");
-        addToast("Model eklendi ve çalışıyor — artık aktif.", "success");
-      } else {
-        const t = (await res.text()).slice(0, 140);
-        setQuickResult(t || `HTTP ${res.status}`);
-        addToast("Model eklendi ama test başarısız.", "error");
-      }
+      if (res.ok) return { ok: true };
+      const detail = (await res.text().catch(() => "")).slice(0, 200);
+      const low = detail.toLowerCase();
+      const badModel = /model|not found|does not exist|decommission|unknown|no such|geçersiz|bulunamadı/.test(low);
+      return { ok: false, detail: detail || `HTTP ${res.status}`, badModel };
     } catch (e) {
-      setQuickResult((e as Error).message);
-      addToast(`Test hatası: ${(e as Error).message}`, "error");
+      return { ok: false, detail: (e as Error).message, badModel: false };
+    }
+  };
+
+  const addAndTest = async () => {
+    const key = apiKey.trim() || config.providerKeys?.[provider] || "";
+    if (!key && !KEY_OPTIONAL.includes(provider)) { addToast("Önce API anahtarını yapıştır.", "error"); return; }
+    const bu = baseUrl.trim() || PRESETS[provider].baseUrl;
+    let mdl = model.trim() || PRESETS[provider].model;
+    if (!bu || !mdl) { addToast("Base URL ve model gerekli (Gelişmiş bölümünden gir).", "error"); return; }
+    const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `m_${Date.now()}`;
+    setLabel("");
+    setQuickBusy(true);
+    setQuickResult(null);
+
+    const persist = (finalModel: string) => saveConfig({
+      ...useStore.getState().config,
+      models: [...useStore.getState().config.models.filter((m) => m.id !== id), { id, label: label.trim() || cleanLabel(provider), provider, baseUrl: bu, model: finalModel, apiKey: key }],
+      activeModelId: id,
+      providerKeys: key ? { ...useStore.getState().config.providerKeys, [provider]: key } : useStore.getState().config.providerKeys,
+    });
+
+    try {
+      /* Model her hâlükârda KAYDEDİLİR (test sadece bir kontrol). */
+      persist(mdl);
+      let r = await probeModel(bu, mdl, key, provider);
+
+      /* Test, model adının geçersizliği yüzünden başarısızsa: anahtarla gerçek
+         model listesini çek, geçerli bir modele otomatik geç ve BİR KEZ daha dene
+         → "preset modeli bayat" kaynaklı hataları kullanıcı görmeden düzeltir. */
+      if (!r.ok && r.badModel && provider !== "pollinations") {
+        try {
+          const mr = await fetch("/api/models", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ baseUrl: bu, apiKey: key, provider }),
+          });
+          const md = await mr.json().catch(() => ({}));
+          const list: string[] = Array.isArray(md.models) ? md.models : [];
+          if (list.length && !list.includes(mdl)) {
+            const preferred = (PROVIDER_MODELS[provider] ?? []).find((m) => list.includes(m)) || list[0];
+            mdl = preferred;
+            setModel(preferred);
+            setFetchedModels(list);
+            persist(preferred);
+            r = await probeModel(bu, preferred, key, provider);
+          }
+        } catch { /* liste alınamadı → mevcut hatayı göster */ }
+      }
+
+      if (r.ok) {
+        setQuickResult("ok");
+        addToast(`Model eklendi ve çalışıyor (${mdl}) — artık aktif.`, "success");
+      } else {
+        setQuickResult(friendlyError(r.detail));
+        /* Model KAYDEDİLDİ — kullanıcı "eklenmedi" sanmasın. */
+        addToast("Model kaydedildi. Test yanıtı alınamadı — anahtarı/model adını kontrol et ya da yine de kullanmayı dene.", "info");
+      }
     } finally {
       setQuickBusy(false);
     }
@@ -714,7 +753,9 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 </div>
               )}
               {quickResult && quickResult !== "ok" && (
-                <div className="mt-2 text-[11px] text-red break-words">Test başarısız: {quickResult}</div>
+                <div className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/8 px-2.5 py-2 text-[11px] text-muted break-words leading-relaxed">
+                  <span className="font-semibold text-amber-400">Model kaydedildi</span>, ama test yanıtı alınamadı: {quickResult}
+                </div>
               )}
 
               {/* Gelişmiş — ad · Base URL · model (custom seçilince otomatik açık) */}
@@ -1886,7 +1927,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
 
             <div className="p-3 bg-brand/5 border border-brand/20 rounded-xl text-xs text-muted space-y-1.5">
               <div className="font-semibold text-brand">MCP nedir?</div>
-              <p>Model Context Protocol, Anthropic tarafından geliştirilen bir standarttır. Kendi araçlarını (veritabanı sorgu, dosya okuma, API çağrısı vb.) Craft Coder&apos;a bağlayarak AI&apos;ın bunları otomatik kullanmasını sağlar.</p>
+              <p>Model Context Protocol, Anthropic tarafından geliştirilen bir standarttır. Kendi araçlarını (veritabanı sorgu, dosya okuma, API çağrısı vb.) Craft&apos;a bağlayarak AI&apos;ın bunları otomatik kullanmasını sağlar.</p>
               <p>Aktif sunucuların araçları, araç kullanımı açıkken her sohbette AI&apos;a sunulur.</p>
             </div>
           </section>

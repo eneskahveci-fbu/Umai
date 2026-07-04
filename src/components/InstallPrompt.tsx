@@ -50,7 +50,7 @@ export function InstallPrompt() {
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl border border-line bg-surface shadow-2xl animate-in slide-in-from-bottom-4 duration-200 max-w-[92vw]">
       <Download size={16} className="text-brand shrink-0" />
-      <span className="text-sm text-ink">Craft Coder&apos;ı uygulama olarak yükle</span>
+      <span className="text-sm text-ink">Craft&apos;ı uygulama olarak yükle</span>
       <button
         onClick={install}
         className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand text-[#111110] hover:bg-branddim transition-colors shrink-0"

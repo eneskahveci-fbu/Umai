@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Craft Coder — AI kod asistanı",
-    short_name: "Craft Coder",
+    name: "Craft — AI kod asistanı",
+    short_name: "Craft",
     description:
       "OpenAI-uyumlu herhangi bir modelle çalışan AI kod asistanı.",
     start_url: "/app",

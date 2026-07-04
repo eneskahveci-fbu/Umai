@@ -63,7 +63,7 @@ function buildHeaders(provider: Provider, apiKey: string, req: Request): Record<
   }
   if (provider === "openrouter") {
     h["HTTP-Referer"] = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://craft-ai-web.vercel.app";
-    h["X-Title"] = "Craft Coder";
+    h["X-Title"] = "Craft";
   }
   return h;
 }
