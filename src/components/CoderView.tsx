@@ -55,6 +55,7 @@ import { bridgeListFiles, bridgeReadFile, buildTreeFromPaths } from "@/lib/bridg
 import { extractAllFileFences } from "@/lib/parsers";
 import { fuzzyFiles } from "@/lib/fuzzy";
 import { buildPreview } from "@/lib/preview";
+import { splitReasoning } from "@/lib/reasoning";
 
 import { RightPanel } from "./RightPanel";
 
@@ -2062,15 +2063,13 @@ export function CoderView() {
       }
       if (!full) useStore.getState().updateLastContent("_(Model boş yanıt döndürdü.)_");
 
-      /* Extended thinking: <think>...</think> bloklarını ayır */
+      /* Muhakeme sızıntısını ayır: <think>/<thinking>/<reasoning> etiketleri +
+         harmony kanalları (analysis→düşünce, final→içerik) + artık kontrol
+         token'ları. Yalnız temizlenmiş bir içerik kaldıysa uygula (boşa düşürme). */
       {
-        const thinkMatch = full.match(/^<think>([\s\S]*?)<\/think>\s*/);
-        if (thinkMatch) {
-          const thinking = thinkMatch[1].trim();
-          const cleanContent = full.slice(thinkMatch[0].length).trim();
-          if (cleanContent) useStore.getState().updateLastContent(cleanContent);
-          if (thinking) useStore.getState().updateLastThinking(thinking);
-        }
+        const { content: cleanContent, thinking } = splitReasoning(full);
+        if (cleanContent && cleanContent !== full.trim()) useStore.getState().updateLastContent(cleanContent);
+        if (thinking) useStore.getState().updateLastThinking(thinkingFull ? `${thinkingFull}\n\n${thinking}` : thinking);
       }
 
       /* Skills kullanım sayacını artır (sadece başarılı yanıtta) */
