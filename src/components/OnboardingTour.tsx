@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowRight, Check, GitBranch, MessageSquare, Settings, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, Check, MessageSquare, Sparkles, Wand2, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useModalA11y } from "@/lib/useModalA11y";
 
@@ -17,7 +18,7 @@ export function OnboardingTour() {
   const setOnboardingDone = useStore((s) => s.setOnboardingDone);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const hasModel = useStore((s) => s.config.models.length > 0);
-  const hasGithub = useStore((s) => s.config.githubAccounts.length > 0);
+  const router = useRouter();
 
   const [step, setStep] = useState(0);
   const [visible, setVisible] = useState(false);
@@ -41,53 +42,59 @@ export function OnboardingTour() {
   const steps: Step[] = [
     {
       icon: <span className="text-2xl">◈</span>,
-      title: "Craft Coder'a hoş geldin",
+      title: "Craft'a hoş geldin 👋",
       body: (
         <>
-          Bu, kendi <strong className="text-ink">API anahtarınla</strong> çalışan bir AI kod asistanı.
-          OpenAI, Anthropic, Hugging Face veya OpenAI-uyumlu herhangi bir model — sen seç.
-          Anahtarın <strong className="text-ink">tarayıcında</strong> kalır, sunucumuza gönderilmez.
+          Ne istediğini <strong className="text-ink">sıradan cümlelerle</strong> yaz — Craft senin için yapsın.
+          Yazılım ya da yapay zeka bilmene gerek yok. Kurulum da yok: <strong className="text-ink">ücretsiz</strong> bir
+          yapay zeka hazır bekliyor, hemen başlayabilirsin.
         </>
       ),
     },
     {
-      icon: <Settings size={22} className="text-brand" />,
-      title: "1. Bir model ekle",
-      body: hasModel ? (
-        <>Harika — bir model zaten ekli. <Check size={13} className="inline text-green" /></>
-      ) : (
+      icon: <Wand2 size={22} className="text-brand" />,
+      title: "İki şey yapabilirsin",
+      body: (
         <>
-          Ayarlar → Model&apos;den bir provider seç, baseURL + API anahtarını gir, &quot;Test&quot; düğmesiyle doğrula.
-          Cevap dönüyorsa hazırsın.
+          <strong className="text-ink">Tasarla & üret:</strong> web sitesi, sunum, görsel — bir cümle yeter (Stüdyo).
+          <br />
+          <strong className="text-ink">Kod & geliştirme:</strong> kod yazdır, düzelt, deponu bağla.
+          <br />
+          <span className="text-muted/70">İstediğin zaman ikisi arasında geçiş yaparsın.</span>
         </>
       ),
-      action: hasModel ? undefined : {
-        label: "Ayarlar'ı aç",
-        onClick: () => { setSettingsOpen(true); setVisible(false); },
+      action: {
+        label: "Tasarlamayı dene (Stüdyo)",
+        onClick: () => { dismiss(); router.push("/studio"); },
       },
     },
     {
-      icon: <GitBranch size={22} className="text-brand" />,
-      title: "2. (Opsiyonel) GitHub bağla",
-      body: hasGithub ? (
-        <>GitHub hesabı bağlı. <Check size={13} className="inline text-green" /></>
-      ) : (
+      icon: <MessageSquare size={22} className="text-brand" />,
+      title: "Sadece yaz",
+      body: (
         <>
-          Kod tabanına özel cevaplar için Ayarlar → GitHub&apos;tan kişisel access token ekle (
-          <code className="text-[11px] bg-bgsoft px-1 rounded">repo</code> izni yeter). Sonra sol panelden bir depo seç.
+          Aşağıdaki kutuya ne istediğini yaz ve gönder. Sonucu beğenmezsen
+          {" "}<strong className="text-ink">&quot;daha sade yap&quot;</strong>, <strong className="text-ink">&quot;rengi değiştir&quot;</strong> gibi
+          konuşarak düzeltebilirsin. Denemekten çekinme — her şey geri alınabilir.
         </>
       ),
     },
     {
-      icon: <MessageSquare size={22} className="text-brand" />,
-      title: "3. İlk sorunu sor",
-      body: (
+      icon: <Sparkles size={22} className="text-brand" />,
+      title: "İleri düzey (opsiyonel)",
+      body: hasModel ? (
         <>
-          Composer&apos;a yaz. <code className="text-[11px] bg-bgsoft px-1 rounded">/</code> ile agent seç,
-          {" "}<code className="text-[11px] bg-bgsoft px-1 rounded">@</code> ile dosya mention&apos;la.
-          AI birden fazla dosya yazınca, otomatik <strong className="text-ink">çok dosyalı commit</strong> barı çıkar.
+          İstersen <strong className="text-ink">kendi yapay zeka modelini</strong> ekleyebilir (Gemini, Groq, NVIDIA…),
+          GitHub/GitLab deponu bağlayabilirsin. Anahtarların yalnızca
+          {" "}<strong className="text-ink">tarayıcında</strong> kalır, bize gönderilmez.
         </>
+      ) : (
+        <>Ayarlar&apos;dan kendi modelini ekleyebilir, deponu bağlayabilirsin. Anahtarların tarayıcında kalır.</>
       ),
+      action: {
+        label: "Ayarlar'ı aç",
+        onClick: () => { setSettingsOpen(true); setVisible(false); },
+      },
     },
   ];
 
