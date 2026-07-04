@@ -122,6 +122,25 @@ export const STUDIO_SKILLS: StudioSkill[] = [
     instructions: "Bir SOSYAL MEDYA görseli üret (kare 1:1 sahne): güçlü başlık, kısa destek metni, marka rengi arka plan/gradyan ve logo alanı. Büyük tipografi, küçük ekranda okunur, dikkat çekici.",
     defaultDevice: "web",
   },
+  // ── Akademik & Araştırma ─────────────────────────────────────────────
+  {
+    id: "poster", name: "Akademik Poster", icon: "🔬", category: "Akademik",
+    desc: "Bilimsel/araştırma posteri (bölümlü)",
+    instructions: "Bir BİLİMSEL/ARAŞTIRMA POSTERİ üret (dikey, büyük format): üstte başlık + yazarlar + kurum satırı; ardından çok sütunlu bölümler — Özet, Giriş/Amaç, Yöntem, Bulgular (grafik/tablo alanları CSS ile), Sonuç ve Kaynakça. Uzaktan okunur büyük başlıklar, net bölüm ayrımı, ciddi ve akademik ama modern görünüm. Sahte içerik değil, iskelet + örnek yer tutucular.",
+    defaultDevice: "web",
+  },
+  {
+    id: "onepager", name: "Araştırma Özeti", icon: "📄", category: "Akademik",
+    desc: "Tek sayfalık proje/araştırma özeti",
+    instructions: "Tek sayfalık bir PROJE/ARAŞTIRMA ÖZETİ (one-pager) üret: başlık + kısa tanım, problem/amaç, yöntem, beklenen çıktı/etki, ekip ve iletişim kutusu. Taranabilir, bölümlü, yazdırmaya uygun (A4), kurumsal-ciddi ama okunur.",
+    defaultDevice: "web",
+  },
+  {
+    id: "certificate", name: "Sertifika / Belge", icon: "🏅", category: "Akademik",
+    desc: "Katılım/başarı sertifikası düzeni",
+    instructions: "Resmi bir SERTİFİKA/BELGE üret (yatay A4): süslü çerçeve/kenarlık, kurum başlığı, 'Katılım/Başarı Belgesi' başlığı, ad-soyad yer tutucusu, açıklama metni, tarih ve iki imza alanı. Zarif, dengeli, yazdırılabilir; ölçülü bir vurgu rengi.",
+    defaultDevice: "web",
+  },
   // ── Bileşen ──────────────────────────────────────────────────────────
   {
     id: "component", name: "UI Bileşeni", icon: "🧩", category: "Bileşen",

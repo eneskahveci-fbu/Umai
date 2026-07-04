@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Code2,
   FileText,
+  FlaskConical,
   Image as ImageIcon,
   LayoutTemplate,
   MessageCircle,
@@ -211,6 +212,38 @@ export default function Home() {
           <span className="inline-flex items-center gap-2"><ShieldCheck size={15} className="text-brand" /> Anahtarların sende kalır</span>
           <span className="inline-flex items-center gap-2"><Sparkles size={15} className="text-brand" /> Ücretsiz & kredi kartsız</span>
           <span className="inline-flex items-center gap-2"><MessageCircle size={15} className="text-brand" /> Türkçe, insan diliyle</span>
+        </div>
+      </section>
+
+      {/* ARAŞTIRMA & KURUMLAR */}
+      <section className="max-w-5xl mx-auto px-5 sm:px-6 py-14 w-full">
+        <div className="text-center mb-8">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-brand/70 mb-3">
+            <FlaskConical size={13} /> Araştırma & Kurumlar için
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-balance">Ar-Ge ekipleri, akademisyenler ve kurumlar için</h2>
+          <p className="text-muted max-w-2xl mx-auto mt-3 text-balance">Proje başvurusundan sunuma, rapordan postere kadar — araştırma işini konuşarak hazırla. Verini kendi kontrolünde tut.</p>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-3 mb-6">
+          {[
+            { icon: <FileText size={20} />, title: "Başvuru & rapor", desc: "Destek/hibe proje önerisi, dönem ve sonuç raporu iskeletleri; literatür özeti ve kaynakça. Hazır şablonlar Skills panelinde." },
+            { icon: <LayoutTemplate size={20} />, title: "Poster & sunum", desc: "Akademik poster, tek sayfalık proje özeti, proje sunumu ve sertifika — Stüdyo'da bir cümleyle üret, PDF olarak dışa aktar." },
+            { icon: <ShieldCheck size={20} />, title: "Veri sende kalır", desc: "Anahtarların yalnız tarayıcında; içerik sunucuda saklanmaz. Kendi modelini (yerel/kurum) bağla — gizlilik-önce mimari." },
+          ].map((f) => (
+            <div key={f.title} className="premium-card rounded-2xl p-5">
+              <div className="w-11 h-11 rounded-xl bg-brand/10 text-brand grid place-items-center mb-3">{f.icon}</div>
+              <h3 className="font-bold text-[15px] mb-1">{f.title}</h3>
+              <p className="text-muted text-[13px] leading-relaxed">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link href="/app" className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-[#111110] font-semibold px-6 py-3 rounded-xl text-sm transition-colors">
+            Araştırma için dene <ArrowRight size={15} />
+          </Link>
+          <a href="mailto:eneskahveci.bs@gmail.com?subject=Craft%20—%20Kurumsal%2FAra%C5%9Ft%C4%B1rma%20Kullan%C4%B1m%C4%B1" className="inline-flex items-center gap-2 border border-line bg-surface text-muted hover:text-ink hover:border-brand/40 px-6 py-3 rounded-xl text-sm font-medium transition-colors">
+            Kurumsal kullanım / teklif <ArrowRight size={15} />
+          </a>
         </div>
       </section>
 

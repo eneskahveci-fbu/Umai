@@ -482,6 +482,108 @@ export const DEFAULT_SKILLS: Skill[] = [
       "- Çevresel/önceden var olan hataları kendi değişikliğininkilerden ayır ve açıkça not et.\n" +
       "- \"Tamamlandı\" demeden önce derleme/lint/test'in temiz olduğundan emin ol; hedeflenen davranışı gözlemle.",
   },
+  /* ── Araştırma & Akademi şablonları ──────────────────────────────────
+     Varsayılan KAPALI (enabled:false): kod sohbetlerini kirletmesin; kullanıcı
+     Skills panelinden ilgili işi yaparken açar. Marka/kurum adı içermez. */
+  {
+    id: "research_proposal",
+    title: "Ar-Ge Proje Öneri İskeleti",
+    fileName: "arge-proje-onerisi.md",
+    source: "file",
+    enabled: false,
+    usageCount: 0,
+    createdAt: 1735690000000,
+    tags: ["araştırma", "proje", "başvuru", "ar-ge"],
+    content:
+      "# Ar-Ge Proje Öneri İskeleti\n\n" +
+      "Kullanıcı bir araştırma/Ar-Ge proje önerisi (destek/hibe başvurusu) yazmak istediğinde, bu bölümleri sırayla ve akademik-resmi dille kur:\n\n" +
+      "1. **Özet (Abstract)** — problem, amaç, yöntem ve beklenen katkının 200-300 kelimelik özeti.\n" +
+      "2. **Konu, Kapsam ve Literatür** — alanın güncel durumu, boşluk (gap) ve bu projenin özgün değeri; iddiaları kaynağa dayandır.\n" +
+      "3. **Amaç ve Hedefler** — genel amaç + ölçülebilir, numaralı alt hedefler.\n" +
+      "4. **Özgün Değer / Yenilikçi Yön** — mevcut çözümlerden farkı, katma değeri.\n" +
+      "5. **Yöntem (Materyal & Yöntem)** — iş paketleri (İP), her İP'nin faaliyetleri, kullanılacak yöntem ve doğrulama.\n" +
+      "6. **İş-Zaman Çizelgesi** — İP'lerin aylara yayılmış tablo iskeleti (Gantt mantığı).\n" +
+      "7. **Risk Yönetimi (B Planı)** — olası riskler ve azaltma stratejileri tablosu.\n" +
+      "8. **Yaygın Etki & Çıktılar** — bilimsel/ekonomik/toplumsal etki, hedeflenen yayın/patent/prototip.\n" +
+      "9. **Bütçe Gerekçesi** — ana kalemler ve neden gerekli oldukları (rakam uydurma; yer tutucu bırak).\n\n" +
+      "Kurallar: Uydurma referans/istatistik VERME — kaynak gerekiyorsa web araması iste veya '[kaynak eklenecek]' yer tutucusu koy. Somut, ölçülebilir, değerlendiriciyi ikna eden bir dil kullan. İstenirse TR ve EN sürüm üret.",
+  },
+  {
+    id: "research_report",
+    title: "Dönem / Sonuç Raporu İskeleti",
+    fileName: "donem-sonuc-raporu.md",
+    source: "file",
+    enabled: false,
+    usageCount: 0,
+    createdAt: 1735690001000,
+    tags: ["araştırma", "rapor", "proje"],
+    content:
+      "# Dönem / Sonuç Raporu İskeleti\n\n" +
+      "Bir Ar-Ge projesinin periyodik (dönem) ya da sonuç raporunu yazarken:\n\n" +
+      "1. **Yönetici Özeti** — dönemde ne yapıldı, hedeflere göre durum.\n" +
+      "2. **İş Paketi Bazında İlerleme** — her İP için planlanan vs. gerçekleşen, tamamlanma yüzdesi, kanıt/çıktı.\n" +
+      "3. **Elde Edilen Bulgular / Sonuçlar** — veriler, tablolar, grafik açıklamaları (yer tutucu).\n" +
+      "4. **Sapmalar ve Gerekçeleri** — plandan sapma varsa nedeni ve düzeltici aksiyon.\n" +
+      "5. **Bir Sonraki Dönem Planı** — yaklaşan faaliyetler.\n" +
+      "6. **Çıktılar** — yayın, sunum, prototip, tescil vb. listesi.\n\n" +
+      "Resmi, nesnel ve kanıta dayalı yaz; abartma yapma. Sayısal iddiaları kullanıcıdan iste, uydurma.",
+  },
+  {
+    id: "research_litreview",
+    title: "Literatür Özeti & Kaynakça",
+    fileName: "literatur-ozeti.md",
+    source: "file",
+    enabled: false,
+    usageCount: 0,
+    createdAt: 1735690002000,
+    tags: ["araştırma", "literatür", "kaynakça", "akademik"],
+    content:
+      "# Literatür Özeti & Kaynakça\n\n" +
+      "Bir konuda literatür taraması/özeti istendiğinde:\n\n" +
+      "- ÖNCE güncel bilgi için web araması yap (mevcutsa); eski/uydurma bilgiye dayanma.\n" +
+      "- Konuyu alt temalara böl; her tema için mevcut yaklaşımları, bulguları ve tartışmaları özetle.\n" +
+      "- Kaynak GÖSTERMEDEN iddia etme. Emin olmadığın atıfları '[doğrulanacak]' olarak işaretle — sahte DOI/yazar/yıl ASLA uydurma.\n" +
+      "- Sonunda tutarlı bir kaynakça formatı (APA benzeri) ile listele; eksikse yer tutucu bırak.\n" +
+      "- Alandaki boşluğu (research gap) net biçimde belirt — bu, öneri yazımına köprü olur.",
+  },
+  {
+    id: "research_dmp",
+    title: "Veri Yönetim Planı & Gizlilik",
+    fileName: "veri-yonetim-plani.md",
+    source: "file",
+    enabled: false,
+    usageCount: 0,
+    createdAt: 1735690003000,
+    tags: ["araştırma", "veri", "kvkk", "gizlilik", "etik"],
+    content:
+      "# Veri Yönetim Planı & Gizlilik\n\n" +
+      "Bir proje için veri yönetim planı / gizlilik & etik metni hazırlarken şu başlıkları kur:\n\n" +
+      "1. **Toplanacak Veriler** — türü, kaynağı, formatı, tahmini hacmi.\n" +
+      "2. **Kişisel Veri & Hukuki Dayanak** — kişisel veri işleniyorsa amaç, işleme dayanağı, açık rıza süreci; ilgili kişisel verilerin korunması mevzuatına uyum ilkeleri (aydınlatma, veri minimizasyonu, saklama süresi).\n" +
+      "3. **Saklama & Güvenlik** — nerede, ne kadar süre, şifreleme/erişim kontrolü, yedekleme.\n" +
+      "4. **Anonimleştirme / Takma Adlandırma** — yöntem ve uygulanma noktaları.\n" +
+      "5. **Paylaşım & Erişim** — kimlerle, hangi koşullarda; açık erişim/ambargo politikası.\n" +
+      "6. **Etik** — gerekli izinler (etik kurul onayı vb.), katılımcı hakları.\n\n" +
+      "Genel, uyum-odaklı ve dikkatli bir dil kullan; hukuki tavsiye yerine geçmediğini belirt.",
+  },
+  {
+    id: "research_translate",
+    title: "Akademik TR ↔ EN Çeviri & Parlatma",
+    fileName: "akademik-ceviri.md",
+    source: "file",
+    enabled: false,
+    usageCount: 0,
+    createdAt: 1735690004000,
+    tags: ["akademik", "çeviri", "dil", "redaksiyon"],
+    content:
+      "# Akademik TR ↔ EN Çeviri & Parlatma\n\n" +
+      "Akademik metin çevirisi/redaksiyonu istendiğinde:\n\n" +
+      "- Anlamı BİREBİR koru; terimleri alanın yerleşik karşılıklarıyla çevir, uydurma terim türetme.\n" +
+      "- Akademik, resmi ve akıcı bir ton kullan; gereksiz süsten ve makine-çevirisi kokusundan kaçın.\n" +
+      "- Dil bilgisi, tutarlılık (terim/zaman), ve akış açısından iyileştir; değiştirdiğin önemli yerleri istenirse kısaca not et.\n" +
+      "- Özet/abstract için kelime sınırına saygı göster.\n" +
+      "- İçeriği DEĞİŞTİRME (yeni iddia ekleme/çıkarma); yalnızca dil ve biçim üzerinde çalış.",
+  },
 ];
 
 export const POLLINATIONS_DEFAULT_MODEL: ModelProfile = {
