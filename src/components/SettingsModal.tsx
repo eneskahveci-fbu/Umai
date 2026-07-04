@@ -50,6 +50,7 @@ import { quickComplete } from "@/lib/quickComplete";
 import { fetchUserRepos } from "@/lib/github";
 import { fetchGitLabUserRepos } from "@/lib/gitlab";
 import { friendlyError } from "@/lib/friendlyError";
+import { pickReplacementModel } from "@/lib/modelPicker";
 import type { Provider, ResponseStyle } from "@/lib/types";
 
 export type SettingsTab = "model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim";
@@ -223,6 +224,10 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   /* Birleşik model ekleme: ekle + aktif yap + test durumu ve Gelişmiş bölümü. */
   const [quickBusy, setQuickBusy] = useState(false);
   const [quickResult, setQuickResult] = useState<null | "ok" | string>(null);
+  /* Self-heal model değişimi olduysa (bkz. addAndTest), sonuç ok/başarısız
+     olsun fark etmeksizin bu notu ayrıca göster — quickResult'ın "ok" ile
+     "başarısız" render dallarını karıştırmadan. */
+  const [quickSwapNote, setQuickSwapNote] = useState<{ tone: "info" | "warning"; text: string } | null>(null);
   const [advOpen, setAdvOpen] = useState(false);
   const [, setErrTick] = useState(0); // hata paneli temizlenince yeniden çiz
   const [memInput, setMemInput] = useState("");
@@ -271,8 +276,12 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
           const models: string[] = data.models;
           setFetchedModels(models);
           if (models.length && !models.includes(model.trim())) {
-            const preferred = (PROVIDER_MODELS[provider] ?? []).find((m) => models.includes(m));
-            setModel(preferred || models[0]);
+            /* Henüz hiçbir şey başarısız olmadı — tahmin yürütmeye gerek yok.
+               Eşleşme varsa uygula; yoksa modeli DEĞİŞTİRME, kullanıcı
+               Gelişmiş'ten kendi seçsin (liste zaten fetchedModels'te). */
+            const r = pickReplacementModel(models, PROVIDER_MODELS[provider] ?? [], model.trim());
+            if (r.kind === "hardcoded-match" || r.kind === "free-tier-match") setModel(r.model);
+            else setAdvOpen(true);
           }
         })
         .catch(() => { /* sessiz; manuel "Yenile" butonu var */ });
@@ -339,13 +348,21 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
       const models: string[] = data.models;
       setFetchedModels(models);
       if (models.length) {
-        /* Mevcut model bu anahtarla erişilebilir değilse, ilk geçerli modele
-           otomatik düzelt; varsa önerilen (PRESET) modeli tercih et. */
+        /* Mevcut model bu anahtarla erişilebilir değilse: bilinen/ücretsiz bir
+           eşleşme varsa uygula; yoksa TAHMİN ETME — modeli olduğu gibi bırak,
+           Gelişmiş paneli aç ve kullanıcı kendi seçsin (liste zaten hazır). */
+        let noMatchNotice = false;
         if (!models.includes(model.trim())) {
-          const preferred = (PROVIDER_MODELS[provider] ?? []).find((m) => models.includes(m));
-          setModel(preferred || models[0]);
+          const r = pickReplacementModel(models, PROVIDER_MODELS[provider] ?? [], model.trim());
+          if (r.kind === "hardcoded-match" || r.kind === "free-tier-match") {
+            setModel(r.model);
+          } else {
+            setAdvOpen(true);
+            noMatchNotice = true;
+            if (!opts?.silent) addToast(`'${model.trim()}' bu anahtarla bulunamadı. Aşağıdan bir model seç (Gelişmiş → Model seçimi).`, "info");
+          }
         }
-        if (!opts?.silent) addToast(`${models.length} model bulundu.`, "success");
+        if (!opts?.silent && !noMatchNotice) addToast(`${models.length} model bulundu.`, "success");
       } else if (!opts?.silent) {
         addToast("Bu anahtarla model bulunamadı.", "info");
       }
@@ -472,7 +489,12 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
       if (res.ok) return { ok: true };
       const detail = (await res.text().catch(() => "")).slice(0, 200);
       const low = detail.toLowerCase();
-      const badModel = /model|not found|does not exist|decommission|unknown|no such|geçersiz|bulunamadı/.test(low);
+      /* Durum koduna göre kapı: yalnız 400/404 "model hatası" sayılabilir.
+         401/403/429/5xx ASLA — aksi halde ör. "Ayarlar → Modeller'den
+         anahtarı kontrol et" (401 mesajı, içinde "model" alt-dizesi geçer)
+         yanlışlıkla bad-model sanılıp gereksiz bir self-heal tetiklenir. */
+      const badModel = (res.status === 400 || res.status === 404) &&
+        /\bmodel\b|not found|does not exist|decommission|unknown model|no such model|geçersiz model|model bulunamadı/.test(low);
       return { ok: false, detail: detail || `HTTP ${res.status}`, badModel };
     } catch (e) {
       return { ok: false, detail: (e as Error).message, badModel: false };
@@ -489,6 +511,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     setLabel("");
     setQuickBusy(true);
     setQuickResult(null);
+    setQuickSwapNote(null);
 
     const persist = (finalModel: string) => saveConfig({
       ...useStore.getState().config,
@@ -503,8 +526,13 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
       let r = await probeModel(bu, mdl, key, provider);
 
       /* Test, model adının geçersizliği yüzünden başarısızsa: anahtarla gerçek
-         model listesini çek, geçerli bir modele otomatik geç ve BİR KEZ daha dene
-         → "preset modeli bayat" kaynaklı hataları kullanıcı görmeden düzeltir. */
+         model listesini çek, GÜVENLİ bir modele geç ve BİR KEZ daha dene →
+         "preset modeli bayat" kaynaklı hataları kullanıcı görmeden düzeltir.
+         Asla rastgele (ör. ücretli) bir modele sessizce düşülmez — bkz.
+         modelPicker.ts; hangi katmanda eşleşme bulunduğuna göre kullanıcıya
+         FARKLI TONDA haber verilir (A4). */
+      let swapNotice: { tone: "info" | "warning"; text: string } | null = null;
+      const originalModel = mdl;
       if (!r.ok && r.badModel && provider !== "pollinations") {
         try {
           const mr = await fetch("/api/models", {
@@ -514,19 +542,33 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
           const md = await mr.json().catch(() => ({}));
           const list: string[] = Array.isArray(md.models) ? md.models : [];
           if (list.length && !list.includes(mdl)) {
-            const preferred = (PROVIDER_MODELS[provider] ?? []).find((m) => list.includes(m)) || list[0];
-            mdl = preferred;
-            setModel(preferred);
-            setFetchedModels(list);
-            persist(preferred);
-            r = await probeModel(bu, preferred, key, provider);
+            const pick = pickReplacementModel(list, PROVIDER_MODELS[provider] ?? [], originalModel);
+            const preferred = pick.kind === "no-safe-match" ? pick.firstAvailable : pick.model;
+            if (preferred) {
+              mdl = preferred;
+              setModel(preferred);
+              setFetchedModels(list);
+              persist(preferred);
+              r = await probeModel(bu, preferred, key, provider);
+              if (pick.kind === "hardcoded-match") {
+                swapNotice = { tone: "info", text: `Model güncellendi: '${originalModel}' artık yok, önerilen '${preferred}' kullanılıyor.` };
+              } else if (pick.kind === "free-tier-match") {
+                swapNotice = { tone: "info", text: `Ücretsiz model değişti: '${originalModel}' artık yok, '${preferred}' (ücretsiz) kullanılıyor.` };
+              } else {
+                swapNotice = { tone: "warning", text: `Dikkat: '${originalModel}' bulunamadı ve ücretsiz alternatif yok. Geçici olarak '${preferred}' denendi — ücretli/uygun olmayabilir, Ayarlar → Modeller'den kendin seç.` };
+              }
+            }
           }
         } catch { /* liste alınamadı → mevcut hatayı göster */ }
       }
 
+      if (swapNotice) {
+        setQuickSwapNote(swapNotice);
+        addToast(swapNotice.text, swapNotice.tone === "warning" ? "error" : "info");
+      }
       if (r.ok) {
         setQuickResult("ok");
-        addToast(`Model eklendi ve çalışıyor (${mdl}) — artık aktif.`, "success");
+        if (!swapNotice) addToast(`Model eklendi ve çalışıyor (${mdl}) — artık aktif.`, "success");
       } else {
         setQuickResult(friendlyError(r.detail));
         /* Model KAYDEDİLDİ — kullanıcı "eklenmedi" sanmasın. */
@@ -747,6 +789,11 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   {quickBusy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Ekle ve test et
                 </button>
               </div>
+              {quickSwapNote && (
+                <div className={`mt-2 rounded-lg border px-2.5 py-2 text-[11px] break-words leading-relaxed ${quickSwapNote.tone === "warning" ? "border-red/30 bg-red/8 text-red" : "border-brand/30 bg-brand/8 text-muted"}`}>
+                  {quickSwapNote.text}
+                </div>
+              )}
               {quickResult === "ok" && (
                 <div className="mt-2 flex items-center gap-1.5 text-[11px] text-green font-semibold">
                   <Check size={12} /> Çalışıyor — bu model artık aktif.

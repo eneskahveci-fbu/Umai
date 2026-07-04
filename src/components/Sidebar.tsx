@@ -334,9 +334,9 @@ export function Sidebar() {
         </button>
         <button
           onClick={() => router.push("/studio")}
-          className="premium-card w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-ink/80 hover:text-ink hover:border-brand/40 transition-all hover:-translate-y-0.5"
+          className="group premium-card w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-ink/80 hover:text-ink hover:border-brand/40 transition-all hover:-translate-y-0.5"
         >
-          <Sparkles size={15} className="text-brand" /> Stüdyo
+          <Sparkles size={15} className="text-brand transition-transform duration-200 group-hover:scale-110 group-hover:rotate-6" /> Stüdyo
           <span className="ml-auto text-[9px] font-bold uppercase tracking-wider text-brand/70 bg-brand/10 px-1.5 py-0.5 rounded">Tasarım · Tuval · Görsel</span>
         </button>
       </div>

@@ -200,7 +200,7 @@ export function StudioWorkspace({
           ) : (
             <div className="h-full grid place-items-center text-center px-6">
               <div className="max-w-xs flex flex-col items-center gap-3">
-                <span className="w-14 h-14 rounded-2xl grid place-items-center text-brand bg-brand/10 border border-brand/20">
+                <span className="w-14 h-14 rounded-2xl grid place-items-center text-brand bg-brand/10 border border-brand/20 animate-breathe">
                   <Sparkles size={24} />
                 </span>
                 <p className="text-sm text-ink/80 font-semibold">Tasarımın burada belirecek</p>
