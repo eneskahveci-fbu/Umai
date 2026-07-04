@@ -12,8 +12,12 @@ import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MobileTabBar, useKeyboardOpen } from "@/components/MobileTabBar";
 
+export type SurfaceFlag =
+  | "studioOpen" | "slidesStudioOpen" | "docsStudioOpen" | "formsStudioOpen"
+  | "designStudioOpen" | "imageStudioOpen" | "notebookStudioOpen";
+
 export function SurfacePage({ flag, children }: {
-  flag: "studioOpen" | "slidesStudioOpen" | "designStudioOpen" | "imageStudioOpen";
+  flag: SurfaceFlag;
   children: React.ReactNode;
 }) {
   const auth = useAuthGate();
@@ -22,10 +26,16 @@ export function SurfacePage({ flag, children }: {
 
   useEffect(() => {
     const s = useStore.getState();
-    const set = flag === "studioOpen" ? s.setStudioOpen
-      : flag === "slidesStudioOpen" ? s.setSlidesStudioOpen
-      : flag === "designStudioOpen" ? s.setDesignStudioOpen
-      : s.setImageStudioOpen;
+    const setters: Record<SurfaceFlag, (b: boolean) => void> = {
+      studioOpen: s.setStudioOpen,
+      slidesStudioOpen: s.setSlidesStudioOpen,
+      docsStudioOpen: s.setDocsStudioOpen,
+      formsStudioOpen: s.setFormsStudioOpen,
+      designStudioOpen: s.setDesignStudioOpen,
+      imageStudioOpen: s.setImageStudioOpen,
+      notebookStudioOpen: s.setNotebookStudioOpen,
+    };
+    const set = setters[flag];
     set(true);
     return () => set(false);
   }, [flag]);

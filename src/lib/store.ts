@@ -377,6 +377,15 @@ interface StoreState {
   /** Sunum Stüdyosu (Google Slides'tan ilhamla; yapılandırılmış slayt desteleri). */
   slidesStudioOpen: boolean;
   setSlidesStudioOpen: (b: boolean) => void;
+  /** Doküman Stüdyosu (Notion'dan ilhamla; blok tabanlı doküman). */
+  docsStudioOpen: boolean;
+  setDocsStudioOpen: (b: boolean) => void;
+  /** Anket Stüdyosu (Google Forms'tan ilhamla). */
+  formsStudioOpen: boolean;
+  setFormsStudioOpen: (b: boolean) => void;
+  /** Defter (NotebookLM'den ilhamla; kaynak-temelli sohbet). */
+  notebookStudioOpen: boolean;
+  setNotebookStudioOpen: (b: boolean) => void;
   streaming: boolean;
   setStreaming: (b: boolean) => void;
 
@@ -961,6 +970,12 @@ export const useStore = create<StoreState>()((set, get) => ({
   setStudioOpen: (b) => set({ studioOpen: b }),
   slidesStudioOpen: false,
   setSlidesStudioOpen: (b) => set({ slidesStudioOpen: b }),
+  docsStudioOpen: false,
+  setDocsStudioOpen: (b) => set({ docsStudioOpen: b }),
+  formsStudioOpen: false,
+  setFormsStudioOpen: (b) => set({ formsStudioOpen: b }),
+  notebookStudioOpen: false,
+  setNotebookStudioOpen: (b) => set({ notebookStudioOpen: b }),
   streaming: false,
   setStreaming: (b) => set({ streaming: b }),
 

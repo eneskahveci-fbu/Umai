@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, ImageIcon, Loader2, Send, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { useSurfaceNav } from "@/lib/surfaceNav";
+import { consumeSurfaceHandoff, useSurfaceNav } from "@/lib/surfaceNav";
+import { StudioSwitcher } from "./studio/StudioSwitcher";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import { buildFallbackChain } from "@/lib/fallback";
 import { fetchImageModels, IMAGE_MODEL_FALLBACK, pollinationsImageUrl, type ImageModelInfo } from "@/lib/pollinations";
@@ -93,6 +94,14 @@ export function ImageStudio() {
     let on = true;
     void fetchImageModels().then((list) => { if (on) setFreeModels(list); });
     return () => { on = false; };
+  }, []);
+
+  /* Hub'dan taşınan brief'i al (tek stüdyo hissi). */
+  useEffect(() => {
+    const b = consumeSurfaceHandoff("image");
+    if (!b) return;
+    const id = setTimeout(() => setPrompt(b), 0);
+    return () => clearTimeout(id);
   }, []);
 
   if (!open) return null;
@@ -234,13 +243,7 @@ export function ImageStudio() {
         <span className="w-8 h-8 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0">
           <ImageIcon size={16} />
         </span>
-        {/* Tek stüdyo, dört mod: Stüdyo (brief→AI) · Sunum · Tuval · Görüntü (bu). */}
-        <div className="flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
-          <button onClick={() => nav.go("studio")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Brief ile AI tasarım (web · sunum · yayınla)">Stüdyo</button>
-          <button onClick={() => nav.go("slides")} className="hidden sm:block px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Sunum Stüdyosu (slayt destesi + TTS)">Sunum</button>
-          <button onClick={() => nav.go("canvas")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Katman/tuval editörü (slayt · afiş · sosyal)">Tuval</button>
-          <button className="px-2.5 py-1 rounded-md bg-brand/15 text-brand">Görüntü</button>
-        </div>
+        <StudioSwitcher active="image" />
         {msgs.length > 0 && (
           <button onClick={() => setMsgs([])} className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line hover:border-brand/40 text-xs font-semibold transition-colors">
             <Trash2 size={13} /> Temizle

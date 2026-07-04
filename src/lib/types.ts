@@ -291,6 +291,66 @@ export interface SlideDeck {
   updatedAt: number;
 }
 
+/** Doküman Stüdyosu — Notion'dan ilhamla blok tabanlı doküman (craft yorumu). */
+export type DocBlockType = "h1" | "h2" | "p" | "bullet" | "todo" | "quote" | "code" | "divider";
+
+export interface DocBlock {
+  id: string;
+  type: DocBlockType;
+  text: string;
+  /** Yalnız todo blokları için. */
+  checked?: boolean;
+}
+
+export interface CraftDoc {
+  id: string;
+  title: string;
+  blocks: DocBlock[];
+  brief?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Anket Stüdyosu — Google Forms'tan ilhamla (craft yorumu). */
+export type FormQuestionType = "short" | "long" | "choice" | "multi" | "rating";
+
+export interface FormQuestion {
+  id: string;
+  type: FormQuestionType;
+  label: string;
+  /** choice/multi için seçenekler. */
+  options?: string[];
+  required?: boolean;
+}
+
+export interface CraftForm {
+  id: string;
+  title: string;
+  desc?: string;
+  questions: FormQuestion[];
+  brief?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Defter — NotebookLM'den ilhamla kaynak-temelli çalışma alanı. */
+export interface NotebookSource {
+  id: string;
+  name: string;
+  text: string;
+  url?: string;
+  /** Sohbet bağlamına dahil mi. */
+  enabled: boolean;
+}
+
+export interface CraftNotebook {
+  id: string;
+  title: string;
+  sources: NotebookSource[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 /** Tasarım Stüdyosu'nda kaydedilen tek bir tasarım (HTML/CSS/JS). */
 export interface SavedDesign {
   id: string;
@@ -400,6 +460,12 @@ export interface Config {
   studioProjects?: StudioProject[];
   /** Sunum Stüdyosu: kaydedilen slayt desteleri. */
   slideDecks?: SlideDeck[];
+  /** Doküman Stüdyosu: kaydedilen dokümanlar. */
+  craftDocs?: CraftDoc[];
+  /** Anket Stüdyosu: kaydedilen anketler. */
+  craftForms?: CraftForm[];
+  /** Defter: kaydedilen kaynak defterleri. */
+  craftNotebooks?: CraftNotebook[];
   /** Seslendirme (TTS) için tercih edilen Pollinations sesi (varsayılan: nova). */
   ttsVoice?: string;
   mcpServers?: McpServer[];
