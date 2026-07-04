@@ -262,6 +262,35 @@ export interface StudioProject {
   updatedAt: number;
 }
 
+/** Sunum Stüdyosu — slayt düzenleri (Google Slides'tan ilhamla, craft yorumu). */
+export type SlideLayout = "cover" | "section" | "bullets" | "two-col" | "image" | "quote" | "end";
+
+export interface Slide {
+  id: string;
+  layout: SlideLayout;
+  title?: string;
+  subtitle?: string;
+  bullets?: string[];
+  /** Serbest gövde metni (two-col ikinci sütunu, quote sözü, image alt yazısı). */
+  body?: string;
+  /** Pollinations görseli için İngilizce sahne betimi (image/cover düzenleri). */
+  imagePrompt?: string;
+  /** Sabitlenmiş görsel URL'i — imagePrompt + deterministik seed'den üretilir. */
+  imageUrl?: string;
+  /** Konuşmacı notları: sunumda gizli, seslendirmede (TTS) okunur. */
+  notes?: string;
+}
+
+export interface SlideDeck {
+  id: string;
+  title: string;
+  themeId: string;
+  slides: Slide[];
+  brief?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 /** Tasarım Stüdyosu'nda kaydedilen tek bir tasarım (HTML/CSS/JS). */
 export interface SavedDesign {
   id: string;
@@ -369,6 +398,10 @@ export interface Config {
   customDesignSystems?: DesignSystem[];
   /** Stüdyo: kaydedilen projeler (çok-proje çalışma alanı). */
   studioProjects?: StudioProject[];
+  /** Sunum Stüdyosu: kaydedilen slayt desteleri. */
+  slideDecks?: SlideDeck[];
+  /** Seslendirme (TTS) için tercih edilen Pollinations sesi (varsayılan: nova). */
+  ttsVoice?: string;
   mcpServers?: McpServer[];
   /** Yerel Mod: kullanıcının makinesindeki Local Bridge adresi (ör. http://localhost:4319).
       Doluysa ve localMode açıksa ajan GitHub/GitLab API yerine gerçek dosya

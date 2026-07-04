@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Image as ImageIcon, LayoutTemplate, Sparkles, X } from "lucide-react";
+import { Image as ImageIcon, LayoutTemplate, Presentation, Sparkles, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav } from "@/lib/surfaceNav";
 import { autoStudioSkill } from "@/lib/autoPilot";
@@ -214,9 +214,10 @@ export function StudioView() {
         <div className="flex items-center gap-1.5 text-sm font-bold">
           <Sparkles size={15} className="text-brand" /> Stüdyo
         </div>
-        {/* Tek stüdyo, üç mod: Stüdyo (brief→AI) · Tuval (katman editörü) · Görüntü. */}
+        {/* Tek stüdyo, dört mod: Stüdyo (brief→AI) · Sunum · Tuval (katman editörü) · Görüntü. */}
         <div className="flex items-center bg-bgsoft border border-line/60 rounded-lg p-0.5 text-xs ml-1">
           <button className="px-2.5 py-1 rounded-md bg-brand/15 text-brand font-semibold">Stüdyo</button>
+          <button onClick={() => nav.go("slides")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink flex items-center gap-1" title="Sunum Stüdyosu (slayt destesi + TTS)"><Presentation size={12} /> Sunum</button>
           <button onClick={() => nav.go("canvas")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink flex items-center gap-1" title="Katman/tuval editörü (slayt · afiş · sosyal)"><LayoutTemplate size={12} /> Tuval</button>
           <button onClick={() => nav.go("image")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink flex items-center gap-1" title="AI görsel üretimi"><ImageIcon size={12} /> Görüntü</button>
         </div>
