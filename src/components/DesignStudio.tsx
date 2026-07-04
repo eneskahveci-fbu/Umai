@@ -1279,9 +1279,13 @@ KURALLAR:
             </div>
             )}
 
-            {/* SAĞ — Tweaks paneli */}
+            {/* SAĞ — Tweaks paneli. Mobilde alt-sayfa (bottom sheet) olarak açılır;
+                masaüstünde sağ sütun. ⋯ menüdeki "Tweaks paneli" iki düzende de çalışır. */}
             {tweaksOpen && (
-              <div className="w-72 shrink-0 border-l border-line/60 overflow-y-auto p-4 space-y-4 bg-surface/30 hidden sm:block">
+              <div className="fixed inset-x-0 bottom-0 z-40 max-h-[60vh] rounded-t-2xl border-t border-line bg-surface shadow-2xl overflow-y-auto p-4 space-y-4 pb-safe sm:static sm:z-auto sm:max-h-none sm:rounded-none sm:shadow-none sm:w-72 sm:shrink-0 sm:border-t-0 sm:border-l sm:border-line/60 sm:bg-surface/30">
+                <button onClick={() => setTweaksOpen(false)} className="sm:hidden w-full flex items-center justify-center gap-1.5 text-xs text-muted py-1 -mt-1">
+                  <span className="w-8 h-1 rounded-full bg-line" /> Kapat
+                </button>
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-widest text-muted/45 mb-1.5">Boyut</div>
                   <select value={d.fmt} onChange={(e) => setFormat(FORMATS.find((f) => f.id === e.target.value)!)} className="w-full bg-bgsoft border border-line rounded-lg px-2.5 py-2 text-sm outline-none focus:border-brand/50 cursor-pointer">

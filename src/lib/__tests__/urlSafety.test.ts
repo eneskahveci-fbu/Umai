@@ -1,5 +1,55 @@
 import { describe, it, expect } from "vitest";
-import { isSafeRemoteUrl } from "../urlSafety";
+import { isSafeRemoteUrl, safeFetch } from "../urlSafety";
+
+/* Sahte fetch: verilen URL→yanıt haritasıyla yönlendirme zinciri simüle eder. */
+function fakeFetch(map: Record<string, { status: number; location?: string }>): typeof fetch {
+  return (async (input: RequestInfo | URL) => {
+    const u = String(input);
+    const r = map[u];
+    if (!r) throw new Error(`beklenmeyen istek: ${u}`);
+    return new Response("ok", { status: r.status, headers: r.location ? { location: r.location } : {} });
+  }) as typeof fetch;
+}
+
+describe("safeFetch (yönlendirme SSRF koruması)", () => {
+  it("düz 200 yanıtı geçer", async () => {
+    const res = await safeFetch("https://example.com/a", undefined, {
+      fetchImpl: fakeFetch({ "https://example.com/a": { status: 200 } }),
+    });
+    expect(res.status).toBe(200);
+  });
+  it("public→public yönlendirmeyi izler", async () => {
+    const res = await safeFetch("https://example.com/a", undefined, {
+      fetchImpl: fakeFetch({
+        "https://example.com/a": { status: 302, location: "https://cdn.example.com/b" },
+        "https://cdn.example.com/b": { status: 200 },
+      }),
+    });
+    expect(res.status).toBe(200);
+  });
+  it("iç ağa yönlendirmeyi REDDEDER (metadata SSRF)", async () => {
+    await expect(
+      safeFetch("https://example.com/a", undefined, {
+        fetchImpl: fakeFetch({
+          "https://example.com/a": { status: 302, location: "http://169.254.169.254/latest/meta-data/" },
+        }),
+      }),
+    ).rejects.toThrow(/Güvensiz/);
+  });
+  it("hop limitini aşınca hata atar", async () => {
+    await expect(
+      safeFetch("https://example.com/1", undefined, {
+        maxHops: 2,
+        fetchImpl: fakeFetch({
+          "https://example.com/1": { status: 302, location: "https://example.com/2" },
+          "https://example.com/2": { status: 302, location: "https://example.com/3" },
+          "https://example.com/3": { status: 302, location: "https://example.com/4" },
+          "https://example.com/4": { status: 302, location: "https://example.com/5" },
+        }),
+      }),
+    ).rejects.toThrow(/yönlendirme/);
+  });
+});
 
 describe("isSafeRemoteUrl", () => {
   it("güvenli genel adresleri kabul eder", () => {

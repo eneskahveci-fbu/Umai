@@ -1041,7 +1041,10 @@ function friendlyApiError(status: number, rawDetail: string, ctx?: { model?: str
   let providerMsg = "";
   try {
     const json = JSON.parse(rawDetail);
-    providerMsg = json?.error?.message || json?.message || "";
+    /* Bazı sağlayıcılar message'ı string değil obje/dizi döndürür — string'e
+       zorla; yoksa aşağıdaki .toLowerCase() hata yakalama yolunu çökertir. */
+    const cand = json?.error?.message ?? json?.message ?? (typeof json?.error === "string" ? json.error : "");
+    providerMsg = typeof cand === "string" ? cand : JSON.stringify(cand ?? "");
   } catch { /* raw text */ }
   const low = providerMsg.toLowerCase();
 

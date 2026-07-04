@@ -1,39 +1,22 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
-/* Uygulama "smoke" testleri — anonim/yerel modda (giriş gerekmez) çökmeden
-   açılmalı ve temel sohbet bileşeni hazır olmalı. LLM çağrısı YAPILMAZ
-   (deterministik kalsın). */
-
-/* İlk ziyarette "hoş geldin" tanıtım modalı (OnboardingTour) açılır ve odak
-   tuzağıyla etkileşimi engeller; testlerden önce kapatılır (gerçek ilk-açılış). */
-async function dismissOnboarding(page: Page) {
-  const skip = page.getByRole("button", { name: "Atla" });
-  try {
-    await skip.waitFor({ state: "visible", timeout: 4000 });
-    await skip.click();
-    await skip.waitFor({ state: "hidden", timeout: 4000 });
-  } catch {
-    /* tanıtım görünmediyse (flag set) sorun yok */
-  }
-}
-
+/* Uygulama kabuğu "smoke" testleri — /app bilinçli olarak auth kapılıdır
+   (girişsiz açılmaz, bkz. src/lib/authGate.ts). Girişsiz senaryoda doğru
+   davranış /login yönlendirmesi + çalışan bir giriş formudur. LLM çağrısı
+   YAPILMAZ (deterministik kalsın). */
 test.describe("Uygulama", () => {
-  test("/app çökmeden yüklenir ve mesaj kutusu hazır", async ({ page }) => {
+  test("girişsiz /app → /login yönlendirmesi", async ({ page }) => {
     await page.goto("/app");
-    await dismissOnboarding(page);
-    // Composer (textarea) görünür olmalı — uygulama temel olarak çalışıyor demektir.
-    const composer = page.locator("textarea").first();
-    await expect(composer).toBeVisible({ timeout: 15_000 });
-    await composer.fill("merhaba");
-    await expect(composer).toHaveValue("merhaba");
+    await page.waitForURL(/\/login/, { timeout: 20_000 });
   });
 
-  test("klavye kısayolu ile ayarlar açılır (Ctrl+,)", async ({ page }) => {
-    await page.goto("/app");
-    await dismissOnboarding(page);
-    await page.locator("textarea").first().waitFor({ state: "visible", timeout: 15_000 });
-    await page.keyboard.press("Control+Comma");
-    // Ayarlar modali bir diyalog/başlık göstermeli (Model sekmesi vb.).
-    await expect(page.getByText(/Model/).first()).toBeVisible({ timeout: 10_000 });
+  test("/login formu hazır: e-posta alanı doldurulabiliyor", async ({ page }) => {
+    await page.goto("/login");
+    const email = page.locator('input[type="email"]');
+    await expect(email).toBeVisible({ timeout: 15_000 });
+    await email.fill("test@example.com");
+    await expect(email).toHaveValue("test@example.com");
+    // Giriş sekmesi + gönder butonu görünür (form çökmeden kurulmuş).
+    await expect(page.getByRole("button", { name: "Giriş Yap" }).first()).toBeVisible();
   });
 });

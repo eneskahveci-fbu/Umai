@@ -84,8 +84,10 @@ function htmlDoc(html: string, css: string, js: string): string {
   const isFull = /<html[\s>]/i.test(html);
   if (isFull) {
     let doc = html;
-    if (css) doc = /<\/head>/i.test(doc) ? doc.replace(/<\/head>/i, `<style>${css}</style></head>`) : `<style>${css}</style>` + doc;
-    if (js) doc = /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, `<script>${safeScript(js)}</script></body>`) : doc + `<script>${safeScript(js)}</script>`;
+    /* replacement FONKSİYON olmalı: kullanıcı CSS/JS'i string olarak verilirse
+       içindeki $&, $' gibi kalıplar replace tarafından yorumlanıp çıktıyı bozar. */
+    if (css) doc = /<\/head>/i.test(doc) ? doc.replace(/<\/head>/i, () => `<style>${css}</style></head>`) : `<style>${css}</style>` + doc;
+    if (js) doc = /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, () => `<script>${safeScript(js)}</script></body>`) : doc + `<script>${safeScript(js)}</script>`;
     return doc;
   }
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;margin:1rem}${css}</style></head><body>${CONSOLE_UI}

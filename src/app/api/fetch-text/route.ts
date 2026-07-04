@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isSafeRemoteUrl } from "@/lib/urlSafety";
+import { isSafeRemoteUrl, safeFetch } from "@/lib/urlSafety";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -21,7 +21,7 @@ export async function GET(req: Request) {
   try {
     // gist sayfa URL'sini ham içeriğe çevir (kolaylık).
     const target = u.replace(/^https:\/\/gist\.github\.com\/([^/]+)\/([0-9a-f]+)$/i, "https://gist.githubusercontent.com/$1/$2/raw");
-    const r = await fetch(target, {
+    const r = await safeFetch(target, {
       headers: { Accept: "text/plain, text/markdown, application/json, */*", "User-Agent": "craft-ai" },
       signal: AbortSignal.timeout(15000),
     });
