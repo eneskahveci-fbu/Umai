@@ -361,7 +361,9 @@ export function DesignStudio() {
 
   // Paneller
   const [chatOpen, setChatOpen] = useState(true);
-  const [tweaksOpen, setTweaksOpen] = useState(true);
+  /* Masaüstünde sağ sütun açık; mobilde bottom sheet varsayılan KAPALI
+     (açılışta tuvalin %60'ını kaplamasın — ⋯ menüden açılır). */
+  const [tweaksOpen, setTweaksOpen] = useState(() => (typeof window !== "undefined" ? window.innerWidth >= 640 : true));
   const [exportMenu, setExportMenu] = useState(false);
   const [studioMenu, setStudioMenu] = useState(false);
 
@@ -1282,7 +1284,7 @@ KURALLAR:
             {/* SAĞ — Tweaks paneli. Mobilde alt-sayfa (bottom sheet) olarak açılır;
                 masaüstünde sağ sütun. ⋯ menüdeki "Tweaks paneli" iki düzende de çalışır. */}
             {tweaksOpen && (
-              <div className="fixed inset-x-0 bottom-0 z-40 max-h-[60vh] rounded-t-2xl border-t border-line bg-surface shadow-2xl overflow-y-auto p-4 space-y-4 pb-safe sm:static sm:z-auto sm:max-h-none sm:rounded-none sm:shadow-none sm:w-72 sm:shrink-0 sm:border-t-0 sm:border-l sm:border-line/60 sm:bg-surface/30">
+              <div className="fixed inset-x-0 bottom-0 z-40 max-h-[60vh] rounded-t-2xl border-t border-line bg-surface shadow-2xl overflow-y-auto p-4 space-y-4 pb-[calc(var(--surface-pb,0px)+1rem)] sm:static sm:z-auto sm:max-h-none sm:rounded-none sm:shadow-none sm:w-72 sm:shrink-0 sm:border-t-0 sm:border-l sm:border-line/60 sm:bg-surface/30 sm:pb-4">
                 <button onClick={() => setTweaksOpen(false)} className="sm:hidden w-full flex items-center justify-center gap-1.5 text-xs text-muted py-1 -mt-1">
                   <span className="w-8 h-1 rounded-full bg-line" /> Kapat
                 </button>
