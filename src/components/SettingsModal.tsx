@@ -174,8 +174,8 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     extensions: ["eklenti", "extension", "paket", "pack", "git", "ci", "cd", "kural", "web", "modül", "modular"],
     model:    ["model", "api", "anahtar", "key", "openai", "anthropic", "huggingface", "hf", "nvidia", "nim", "provider", "test"],
     github:   ["github", "gitlab", "token", "depo", "repo", "branch", "dal", "kullanıcı", "username"],
-    general:  ["otomatik", "pilot", "auto", "sistem", "prompt", "stil", "style", "tema", "theme", "renk", "color", "accent", "font", "yazı", "ses", "sound", "skill", "memori", "ayar"],
-    advanced: ["webcontainer", "key", "context", "max", "guest", "misafir", "kural", "rules", "rulesfile", "gelişmiş"],
+    general:  ["otomatik", "pilot", "auto", "davranış", "web", "arama", "search", "bildirim", "notification", "ses", "sound", "kalite", "quality", "hatırla", "bellek", "memori", "memory", "sistem", "prompt", "stil", "style", "tema", "theme", "renk", "color", "accent", "font", "yazı", "boyut", "bağlam", "context", "yedek", "backup", "skill", "ayar", "kısayol"],
+    advanced: ["webcontainer", "gelişmiş", "guest", "misafir", "terminal", "hibrit", "köprü", "bridge", "otomasyon", "automation", "yerel", "local", "hata", "error", "kural", "rules", "rulesfile"],
     mcp:      ["mcp", "model context", "protocol", "sunucu", "server", "araç", "tool", "entegrasyon"],
     hooks:    ["hook", "kanca", "olay", "event", "lint", "test", "otomatik", "afteredit", "onfinish", "komut", "command"],
   };
@@ -1099,6 +1099,55 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
         {/* GENEL */}
         {tab === "general" && (
           <section className="flex flex-col gap-5">
+            {/* ✦ Otomatik Pilot — en başta: "her şeyi benim yerime hallet" anahtarı */}
+            <div>
+              <h4 className="text-sm font-bold mb-2">Otomatik Pilot</h4>
+              <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-brand/30 bg-brand/8 hover:border-brand/50 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={config.autoPilot !== false}
+                  onChange={() => saveConfig({ ...config, autoPilot: config.autoPilot === false })}
+                  className="accent-brand"
+                />
+                <div>
+                  <div className="text-sm font-semibold">✦ Otomatik Pilot <span className="text-[10px] font-bold uppercase tracking-wider text-brand/70">önerilen</span></div>
+                  <div className="text-xs text-muted mt-0.5 leading-relaxed">
+                    Craft; ne kadar düşüneceğine, internette arama yapıp yapmayacağına ve kalite
+                    turuna mesajına bakarak kendisi karar verir. Hiçbir ayara dokunmana gerek kalmaz.
+                    Sen bir modu elle açarsan o her zaman öncelikli olur.
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            {/* Ajan Davranışı — her gün etkileyen davranış anahtarları (açıklamalı) */}
+            <div>
+              <h4 className="text-sm font-bold mb-2">Davranış</h4>
+              <div className="flex flex-col gap-2">
+                {[
+                  { on: config.webSearch, toggle: () => saveConfig({ ...config, webSearch: !config.webSearch }),
+                    title: "İnternette arama", desc: "Güncel bilgi gereken sorularda (döviz, haber, fiyat…) en yeni veriyi internetten çeker." },
+                  { on: config.autoMemory !== false, toggle: () => saveConfig({ ...config, autoMemory: config.autoMemory === false }),
+                    title: "Otomatik hatırlama", desc: "Tercihlerini (ör. hangi dili sevdiğin) kendiliğinden not eder, sonraki sohbetlerde hatırlar." },
+                  { on: config.qualityMode, toggle: () => saveConfig({ ...config, qualityMode: !config.qualityMode }),
+                    title: "Kalite modu", desc: "Yanıtı önce taslak, sonra öz-eleştiri ve düzeltmeyle üretir — daha doğru, biraz daha yavaş." },
+                  { on: config.autoContinue !== false, toggle: () => saveConfig({ ...config, autoContinue: config.autoContinue === false }),
+                    title: "Kesilince otomatik sürdür", desc: "Uzun yanıt sınıra takılıp yarıda kalırsa kaldığı yerden kendiliğinden devam eder." },
+                  { on: config.agentsUseStrongestModel !== false, toggle: () => saveConfig({ ...config, agentsUseStrongestModel: config.agentsUseStrongestModel === false }),
+                    title: "Zor işlerde en güçlü modeli kullan", desc: "Ajan ekibi çalışırken en yetenekli (anahtarı olan) modeli seçer — daha iyi sonuç, biraz daha maliyet." },
+                ].map((it) => (
+                  <label key={it.title} className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
+                    <input type="checkbox" checked={!!it.on} onChange={it.toggle} className="accent-brand mt-0.5 shrink-0" />
+                    <span className="min-w-0">
+                      <span className="text-sm font-semibold block">{it.title}</span>
+                      <span className="text-xs text-muted mt-0.5 leading-relaxed block">{it.desc}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Görünüm — tema + vurgu rengi + yazı boyutu tek grupta */}
             {/* Tema */}
             <div>
               <h4 className="text-sm font-bold mb-2">Tema</h4>
@@ -1110,6 +1159,91 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 <input type="checkbox" checked={!!config.autoTheme} onChange={() => saveConfig({ ...config, autoTheme: !config.autoTheme })} className="accent-brand" />
                 Sistem temasını izle (işletim sistemine göre otomatik)
               </label>
+            </div>
+
+            {/* Vurgu rengi */}
+            <div>
+              <h4 className="text-sm font-bold mb-2">Vurgu Rengi</h4>
+              <div className="flex gap-2">
+                {([
+                  { k: "amber",  label: "Amber",   color: "bg-[#c8a87e]" },
+                  { k: "green",  label: "Yeşil",   color: "bg-[#3ddc84]" },
+                  { k: "orange", label: "Turuncu", color: "bg-[#f97316]" },
+                ] as { k: "amber" | "green" | "orange"; label: string; color: string }[]).map(({ k, label, color }) => (
+                  <button
+                    key={k}
+                    onClick={() => {
+                      saveConfig({ ...config, accentColor: k });
+                      const cls = document.documentElement.classList;
+                      cls.remove("accent-amber", "accent-green", "accent-orange");
+                      cls.add(`accent-${k}`);
+                    }}
+                    className={`flex-1 py-2 rounded-lg border text-xs flex items-center justify-center gap-1.5 transition-colors ${
+                      config.accentColor === k ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
+                    }`}
+                  >
+                    <span className={`w-2.5 h-2.5 rounded-full ${color} shrink-0`} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Yazı tipi boyutu */}
+            <div>
+              <h4 className="text-sm font-bold mb-2">Yazı Boyutu</h4>
+              <div className="flex gap-2">
+                {(["sm", "base", "lg"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => {
+                      saveConfig({ ...config, fontScale: s });
+                      document.documentElement.className = document.documentElement.className
+                        .replace(/font-\w+/g, "")
+                        .concat(` font-${s}`);
+                    }}
+                    className={`flex-1 py-2 rounded-lg border text-sm transition-colors ${
+                      config.fontScale === s ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
+                    }`}
+                  >
+                    {s === "sm" ? "Küçük" : s === "base" ? "Normal" : "Büyük"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Bildirimler */}
+            <div>
+              <h4 className="text-sm font-bold mb-2">Bildirimler</h4>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={config.soundEnabled}
+                    onChange={() => saveConfig({ ...config, soundEnabled: !config.soundEnabled })}
+                    className="accent-brand"
+                  />
+                  <div>
+                    <div className="text-sm font-semibold">Ses bildirimi</div>
+                    <div className="text-xs text-muted mt-0.5">Yanıt tamamlanınca kısa bir bip sesi çalar.</div>
+                  </div>
+                </label>
+                <button
+                  onClick={async () => {
+                    if (!("Notification" in window)) { addToast("Bu tarayıcı bildirimleri desteklemiyor.", "error"); return; }
+                    const perm = await Notification.requestPermission();
+                    if (perm === "granted") addToast("Bildirimler açık — sekme arka plandayken uyarı alacaksın.", "success");
+                    else addToast("Bildirim izni verilmedi.", "error");
+                  }}
+                  className="flex items-center gap-3 p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 text-sm text-left transition-colors"
+                >
+                  <span className="text-lg">🔔</span>
+                  <div>
+                    <div className="text-sm font-semibold">Tarayıcı bildirimi aç</div>
+                    <div className="text-xs text-muted mt-0.5">Sekme arka planda iken yanıt hazır olunca bildirim gelir.</div>
+                  </div>
+                </button>
+              </div>
             </div>
 
             {/* Yedekle / geri yükle */}
@@ -1140,6 +1274,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                       if (!file) return;
                       try {
                         const data = JSON.parse(await file.text());
+                        if (!confirm("Bu yedek MEVCUT ayarlarının ve sohbetlerinin yerine geçecek. Devam edilsin mi?")) { e.target.value = ""; return; }
                         useStore.getState().importBackup({ config: data.config, chats: data.chats });
                         addToast("Yedek geri yüklendi ✓", "success");
                       } catch { addToast("Geçersiz yedek dosyası", "error"); }
@@ -1268,7 +1403,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               <div>
                 <h4 className="text-sm font-bold mb-1">Proje Promptu: {activeProj.name}</h4>
                 <textarea value={activeProj.systemPrompt} onChange={(e) => updateProject(activeProj.id, { systemPrompt: e.target.value })} rows={3} className="input-mono !text-xs" placeholder="Bu projenin için özel sistem promptu..." />
-                <div className="grid grid-cols-3 gap-2 mt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                   <label className="text-xs">
                     <span className="text-muted block mb-1">Model</span>
                     <select
@@ -1315,7 +1450,8 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
 
             {/* Bağlam limiti */}
             <div>
-              <h4 className="text-sm font-bold mb-2">Bağlam Penceresi</h4>
+              <h4 className="text-sm font-bold mb-1">Bağlam Penceresi</h4>
+              <p className="text-xs text-muted mb-2 leading-relaxed">Modelin bir seferde ne kadar geçmişi (token) hatırlayacağı. Yükseği daha fazla bağlam demektir ama maliyeti artırır; modelin gerçek sınırının üstüne çıkmak fark etmez. Emin değilsen varsayılanda bırak.</p>
               <select value={config.maxContext} onChange={(e) => saveConfig({ ...config, maxContext: Number(e.target.value) })} className="input-mono text-xs">
                 {[4096, 8192, 16384, 32768, 65536, 131072, 200000, 400000, 1000000, 2000000].map((n) => (
                   <option key={n} value={n}>{n >= 1000000 ? `${(n / 1000000).toFixed(0)}M token` : `${(n / 1024).toFixed(0)}K token`}</option>
@@ -1371,33 +1507,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   </div>
                 );
               })()}
-            </div>
-
-            {/* Ajan davranışı (Temel'den taşındı) */}
-            <div>
-              <h4 className="text-sm font-bold mb-2">Ajan Davranışı</h4>
-              <div className="flex flex-col gap-2">
-                <label className="flex items-center gap-3 text-sm cursor-pointer">
-                  <input type="checkbox" checked={config.webSearch} onChange={() => saveConfig({ ...config, webSearch: !config.webSearch })} className="accent-brand" />
-                  Web arama (varsayılan açık)
-                </label>
-                <label className="flex items-center gap-3 text-sm cursor-pointer">
-                  <input type="checkbox" checked={config.agentsUseStrongestModel !== false} onChange={() => saveConfig({ ...config, agentsUseStrongestModel: config.agentsUseStrongestModel === false })} className="accent-brand" />
-                  Ajanlar en güçlü modeli kullansın (Ekip/alt-ajan)
-                </label>
-                <label className="flex items-center gap-3 text-sm cursor-pointer">
-                  <input type="checkbox" checked={config.autoMemory !== false} onChange={() => saveConfig({ ...config, autoMemory: config.autoMemory === false })} className="accent-brand" />
-                  Otomatik bellek — kalıcı tercihleri 🧠 skill&apos;ine damıt
-                </label>
-                <label className="flex items-center gap-3 text-sm cursor-pointer">
-                  <input type="checkbox" checked={config.autoContinue !== false} onChange={() => saveConfig({ ...config, autoContinue: config.autoContinue === false })} className="accent-brand" />
-                  Otomatik devam — yanıt token sınırında kesilirse kendiliğinden sürdür
-                </label>
-                <label className="flex items-center gap-3 text-sm cursor-pointer">
-                  <input type="checkbox" checked={!!config.qualityMode} onChange={() => saveConfig({ ...config, qualityMode: !config.qualityMode })} className="accent-brand" />
-                  Kalite modu — taslak → öz-eleştiri → düzeltme (daha doğru, biraz daha yavaş)
-                </label>
-              </div>
             </div>
 
             {/* Guest mode */}
@@ -1568,6 +1677,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 Belirli bir olayda terminalde otomatik komut çalıştır.{" "}
                 <strong className="text-muted">Dosya yazınca</strong> = ajan kod yazdığında,{" "}
                 <strong className="text-muted">Yanıttan sonra</strong> = her yanıtın ardından. Terminal bağlı olmalı.
+                {" "}<strong className="text-amber-400">Dikkat:</strong> buraya yazdığın komutlar gerçekten çalışır — yalnızca güvendiğin komutları ekle.
               </p>
               <div className="space-y-2">
                 {(config.automations ?? []).map((a) => (
@@ -1586,9 +1696,9 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     >
                       <option value="afterWrite">Dosya yazınca</option>
                       <option value="afterResponse">Yanıttan sonra</option>
-                      <option value="preToolUse">Araç öncesi (preToolUse)</option>
-                      <option value="postToolUse">Araç sonrası (postToolUse)</option>
-                      <option value="onStop">Tur bitince (onStop)</option>
+                      <option value="preToolUse">Araç öncesi</option>
+                      <option value="postToolUse">Araç sonrası</option>
+                      <option value="onStop">Tur bitince</option>
                     </select>
                     <input
                       value={a.command}
@@ -1662,112 +1772,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             </div>
             </>
             )}
-
-            {/* Yazı tipi boyutu */}
-            <div>
-              <h4 className="text-sm font-bold mb-2">Kod Yazı Tipi Boyutu</h4>
-              <div className="flex gap-2">
-                {(["sm", "base", "lg"] as const).map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => {
-                      saveConfig({ ...config, fontScale: s });
-                      document.documentElement.className = document.documentElement.className
-                        .replace(/font-\w+/g, "")
-                        .concat(` font-${s}`);
-                    }}
-                    className={`flex-1 py-2 rounded-lg border text-sm transition-colors ${
-                      config.fontScale === s ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
-                    }`}
-                  >
-                    {s === "sm" ? "Küçük" : s === "base" ? "Normal" : "Büyük"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Vurgu rengi */}
-            <div>
-              <h4 className="text-sm font-bold mb-2">Vurgu Rengi</h4>
-              <div className="flex gap-2">
-                {([
-                  { k: "amber",  label: "Amber",   color: "bg-[#c8a87e]" },
-                  { k: "green",  label: "Yeşil",   color: "bg-[#3ddc84]" },
-                  { k: "orange", label: "Turuncu", color: "bg-[#f97316]" },
-                ] as { k: "amber" | "green" | "orange"; label: string; color: string }[]).map(({ k, label, color }) => (
-                  <button
-                    key={k}
-                    onClick={() => {
-                      saveConfig({ ...config, accentColor: k });
-                      const cls = document.documentElement.classList;
-                      cls.remove("accent-amber", "accent-green", "accent-orange");
-                      cls.add(`accent-${k}`);
-                    }}
-                    className={`flex-1 py-2 rounded-lg border text-xs flex items-center justify-center gap-1.5 transition-colors ${
-                      config.accentColor === k ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
-                    }`}
-                  >
-                    <span className={`w-2.5 h-2.5 rounded-full ${color} shrink-0`} />
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* ✦ Otomatik Pilot — görünmez zeka anahtarı */}
-            <div>
-              <h4 className="text-sm font-bold mb-2">Otomatik Pilot</h4>
-              <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-brand/30 bg-brand/8 hover:border-brand/50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={config.autoPilot !== false}
-                  onChange={() => saveConfig({ ...config, autoPilot: config.autoPilot === false })}
-                  className="accent-brand"
-                />
-                <div>
-                  <div className="text-sm font-semibold">✦ Otomatik Pilot</div>
-                  <div className="text-xs text-muted mt-0.5">
-                    Düşünme eforunu, web aramayı, derin araştırmayı, kalite turunu ve ajan
-                    ekibini mesajına göre craft kendisi seçer — hiçbir düğmeyle uğraşma.
-                    Elle açtığın modlar her zaman önceliklidir.
-                  </div>
-                </div>
-              </label>
-            </div>
-
-            {/* Bildirim sesi + Browser bildirimi */}
-            <div>
-              <h4 className="text-sm font-bold mb-2">Bildirimler</h4>
-              <div className="flex flex-col gap-2">
-                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={config.soundEnabled}
-                    onChange={() => saveConfig({ ...config, soundEnabled: !config.soundEnabled })}
-                    className="accent-brand"
-                  />
-                  <div>
-                    <div className="text-sm font-semibold">Ses bildirimi</div>
-                    <div className="text-xs text-muted mt-0.5">Yanıt tamamlanınca kısa bir bip sesi çalar.</div>
-                  </div>
-                </label>
-                <button
-                  onClick={async () => {
-                    if (!("Notification" in window)) { addToast("Bu tarayıcı bildirimleri desteklemiyor.", "error"); return; }
-                    const perm = await Notification.requestPermission();
-                    if (perm === "granted") addToast("Bildirimler açık — sekme arka plandayken uyarı alacaksın.", "success");
-                    else addToast("Bildirim izni verilmedi.", "error");
-                  }}
-                  className="flex items-center gap-3 p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 text-sm text-left transition-colors"
-                >
-                  <span className="text-lg">🔔</span>
-                  <div>
-                    <div className="text-sm font-semibold">Tarayıcı bildirimi aç</div>
-                    <div className="text-xs text-muted mt-0.5">Sekme arka planda iken yanıt hazır olunca bildirim gelir.</div>
-                  </div>
-                </button>
-              </div>
-            </div>
 
             {/* İstatistikler */}
             <div>
