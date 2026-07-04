@@ -577,7 +577,10 @@ html.light body {
   box-shadow:
     0 1px 0 color-mix(in srgb, var(--color-ink) 7%, transparent) inset,
     0 8px 24px -12px rgba(0,0,0,.55);
+  /* Tailwind hover durumları (border-brand/40, translate, gölge) yumuşak aksın. */
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
 }
+@media (prefers-reduced-motion: reduce) { .premium-card { transition: none; } }
 
 /* 4) İnce ayraç parıltısı — başlık/header altına marka tonlu hairline. */
 .brand-rule { position: relative; }
