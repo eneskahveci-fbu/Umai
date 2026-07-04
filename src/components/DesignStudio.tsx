@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav } from "@/lib/surfaceNav";
+import { StudioSwitcher } from "./studio/StudioSwitcher";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import { buildFallbackChain } from "@/lib/fallback";
 import { buildSingleBlockPreview, parseBlocks } from "@/lib/preview";
@@ -915,13 +916,7 @@ KURALLAR:
       {/* Üst araç çubuğu */}
       <div className="brand-rule glass shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5">
         <span className="w-8 h-8 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0"><Sparkles size={16} /></span>
-        {/* Tek stüdyo, dört mod: Stüdyo (brief→AI) · Sunum · Tuval (bu) · Görüntü. */}
-        <div className="flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
-          <button onClick={() => nav.go("studio")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Brief ile AI tasarım (web · sunum · yayınla)">Stüdyo</button>
-          <button onClick={() => nav.go("slides")} className="hidden sm:block px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Sunum Stüdyosu (slayt destesi + TTS)">Sunum</button>
-          <button className="px-2.5 py-1 rounded-md bg-brand/15 text-brand">Tuval</button>
-          <button onClick={() => nav.go("image")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="AI görsel üretimi">Görüntü</button>
-        </div>
+        <StudioSwitcher active="canvas" />
         {/* (a) Alt mod — Tuval (katman) | Kod (HTML/React). Mobilde ⋯ menüde. */}
         <div className="hidden sm:flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
           <button onClick={() => setDmode("canvas")} className={`px-2 py-1 rounded-md transition-colors ${dmode === "canvas" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`}>Tuval</button>

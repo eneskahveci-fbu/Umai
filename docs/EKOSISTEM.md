@@ -21,8 +21,11 @@ paletinde (⌘K) yer alır.
 ## Anket: sıradaki ilham hangi ekosistemden gelsin?
 
 > **Anket sonucu (2026-07-04):** Notion, Google Forms, Canva ve NotebookLM'in
-> **dördü de** seçildi. Uygulama sırası (değer/emek oranına göre):
-> **1) Notion Docs → 2) Google Forms → 3) Canva şablon pazarı → 4) NotebookLM.**
+> **dördü de** seçildi — ve **dördü de aynı gün uygulandı**:
+> Doküman (`/studio/dokuman`), Anket (`/studio/anket`), şablon JSON
+> dışa/içe aktarma (sunum·doküman·anket) ve Defter (`/studio/defter`).
+> Tüm yüzeyler ortak `StudioSwitcher` mod çubuğuyla TEK stüdyoda birleşti:
+> **Tasarım · Sunum · Doküman · Anket · Tuval · Görüntü · Defter.**
 > Figma ve Obsidian şimdilik beklemede.
 
 Hepsi **ücretsiz altyapıyla** (localStorage + Supabase free tier + Pollinations)

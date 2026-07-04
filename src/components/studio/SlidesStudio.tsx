@@ -6,7 +6,9 @@ import {
   Printer, RefreshCw, Save, Sparkles, Trash2, Volume2, VolumeX, Wand2, X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { useSurfaceNav } from "@/lib/surfaceNav";
+import { consumeSurfaceHandoff, useSurfaceNav } from "@/lib/surfaceNav";
+import { StudioSwitcher } from "./StudioSwitcher";
+import { downloadTemplate, pickTemplateFile } from "@/lib/templateShare";
 import type { Slide, SlideDeck, SlideLayout } from "@/lib/types";
 import {
   deckToHtml, MAX_SLIDES, newSlide, SLIDE_LAYOUTS, SLIDE_THEMES,
@@ -168,11 +170,20 @@ export function SlidesStudio() {
   /* Yüzeyden çıkınca sesi kes. */
   useEffect(() => () => stopTts(), []);
 
+  /* Hub'dan taşınan brief'i al (tek stüdyo hissi). */
+  useEffect(() => {
+    const b = consumeSurfaceHandoff("slides");
+    if (!b) return;
+    const id = setTimeout(() => setBrief(b), 0);
+    return () => clearTimeout(id);
+  }, []);
+
   if (!open) return null;
 
   const slide: Slide | null = deck ? deck.slides[Math.min(sel, deck.slides.length - 1)] ?? null : null;
 
-  const patchDeck = (d: SlideDeck) => setDeck({ ...d, updatedAt: Date.now() });
+  /* updatedAt damgası kaydetme anında vurulur (render saf kalır). */
+  const patchDeck = (d: SlideDeck) => setDeck(d);
   const patchSlide = (patch: Partial<Slide>) => {
     if (!deck || !slide) return;
     patchDeck({ ...deck, slides: deck.slides.map((s) => (s.id === slide.id ? { ...s, ...patch } : s)) });
@@ -255,8 +266,10 @@ export function SlidesStudio() {
 
   const saveDeck = () => {
     if (!deck) return;
+    const stamped = { ...deck, updatedAt: Date.now() };
+    setDeck(stamped);
     const existing = config.slideDecks ?? [];
-    saveConfig({ ...config, slideDecks: [deck, ...existing.filter((d) => d.id !== deck.id)].slice(0, 30) });
+    saveConfig({ ...config, slideDecks: [stamped, ...existing.filter((d) => d.id !== deck.id)].slice(0, 30) });
     addToast("Sunum kaydedildi.", "success");
   };
 
@@ -303,13 +316,7 @@ export function SlidesStudio() {
         <div className="flex items-center gap-1.5 text-sm font-bold">
           <Presentation size={15} className="text-brand" /> Sunum
         </div>
-        {/* Tek stüdyo, dört mod: Stüdyo · Sunum (bu) · Tuval · Görüntü. */}
-        <div className="flex items-center bg-bgsoft border border-line/60 rounded-lg p-0.5 text-xs ml-1">
-          <button onClick={() => nav.go("studio")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Brief ile AI tasarım">Stüdyo</button>
-          <button className="px-2.5 py-1 rounded-md bg-brand/15 text-brand font-semibold">Sunum</button>
-          <button onClick={() => nav.go("canvas")} className="hidden sm:block px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="Katman/tuval editörü">Tuval</button>
-          <button onClick={() => nav.go("image")} className="px-2.5 py-1 rounded-md text-muted hover:text-ink transition-colors" title="AI görsel üretimi">Görüntü</button>
-        </div>
+        <StudioSwitcher active="slides" />
         {view === "work" && deck && (
           <>
             <button onClick={newDeck} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink ml-1">+ Yeni</button>
@@ -381,11 +388,19 @@ export function SlidesStudio() {
                 <button key={s} onClick={() => setBrief(s)} className="text-left text-[12.5px] leading-snug px-3 py-2.5 rounded-xl border border-line/60 hover:border-brand/50 hover:bg-bgsoft/60 text-muted hover:text-ink transition-colors">{s}</button>
               ))}
             </div>
-            {savedDecks.length > 0 && (
-              <button onClick={() => setDecksOpen(true)} className="mx-auto text-xs text-muted/80 hover:text-ink inline-flex items-center gap-1.5 transition-colors">
-                <Presentation size={13} className="text-brand" /> Kayıtlı sunumlar ({savedDecks.length})
+            <div className="flex items-center justify-center gap-4 text-xs text-muted/80">
+              {savedDecks.length > 0 && (
+                <button onClick={() => setDecksOpen(true)} className="inline-flex items-center gap-1.5 hover:text-ink transition-colors">
+                  <Presentation size={13} className="text-brand" /> Kayıtlı sunumlar ({savedDecks.length})
+                </button>
+              )}
+              <button
+                onClick={() => pickTemplateFile((t) => { if (t.kind === "deck") openDeck(t.data); else addToast("Bu dosya bir sunum şablonu değil.", "error"); }, (m) => addToast(m, "error"))}
+                className="inline-flex items-center gap-1.5 hover:text-ink transition-colors"
+              >
+                <Download size={13} className="text-brand rotate-180" /> Şablon içe aktar (.json)
               </button>
-            )}
+            </div>
           </div>
         </div>
       ) : deck && slide ? (
@@ -544,6 +559,7 @@ export function SlidesStudio() {
                   <div className="text-sm font-semibold truncate">{d.title}</div>
                   <div className="text-[11px] text-muted/60">{d.slides.length} slayt · {new Date(d.updatedAt).toLocaleDateString("tr-TR")}</div>
                 </button>
+                <button onClick={() => downloadTemplate({ kind: "deck", data: d }, d.title)} className="w-7 h-7 grid place-items-center rounded-lg text-muted/50 hover:text-brand" title="Şablon olarak dışa aktar (.json)"><Download size={13} /></button>
                 <button onClick={() => removeDeck(d.id)} className="w-7 h-7 grid place-items-center rounded-lg text-muted/50 hover:text-red" title="Sil"><Trash2 size={13} /></button>
               </div>
             ))}

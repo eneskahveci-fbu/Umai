@@ -15,6 +15,7 @@ import {
   Sparkles,
   LayoutTemplate,
   Image as ImageIcon,
+  ListChecks,
   Presentation,
   Zap,
 } from "lucide-react";
@@ -120,6 +121,36 @@ export function CommandPalette() {
         setOpen(false);
       },
       keywords: ["sunum", "slayt", "slides", "deck", "presentation", "sunu"],
+    },
+    {
+      id: "open-docs",
+      label: "Doküman Stüdyosu'nu aç (blok tabanlı)",
+      icon: <FileText size={16} />,
+      action: () => {
+        router.push("/studio/dokuman");
+        setOpen(false);
+      },
+      keywords: ["dokuman", "doküman", "docs", "not", "notion", "yazi", "yazı", "markdown"],
+    },
+    {
+      id: "open-forms",
+      label: "Anket Stüdyosu'nu aç (AI anket + HTML form)",
+      icon: <ListChecks size={16} />,
+      action: () => {
+        router.push("/studio/anket");
+        setOpen(false);
+      },
+      keywords: ["anket", "form", "survey", "soru", "geri bildirim", "feedback"],
+    },
+    {
+      id: "open-notebook",
+      label: "Defter'i aç (kaynaklı sohbet + sesli özet)",
+      icon: <BookOpen size={16} />,
+      action: () => {
+        router.push("/studio/defter");
+        setOpen(false);
+      },
+      keywords: ["defter", "notebook", "kaynak", "arastirma", "araştırma", "notebooklm", "ozet", "özet"],
     },
     {
       id: "open-canvas",
