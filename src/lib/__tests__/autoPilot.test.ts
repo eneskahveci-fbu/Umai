@@ -47,6 +47,12 @@ describe("yardımcılar", () => {
   it("autoWeb: genel bilgi sorusu tetiklemez", () => {
     expect(autoWeb("Python'da liste nasıl sıralanır?")).toBe(false);
   });
+  it("autoWeb: döviz/güncel veri sorusu tetikler", () => {
+    expect(autoWeb("1 dolar kaç tl")).toBe(true);
+    expect(autoWeb("euro ne kadar bugün")).toBe(true);
+    expect(autoWeb("gram altın fiyatı")).toBe(true);
+    expect(autoWeb("bitcoin kaç dolar")).toBe(true);
+  });
   it("autoResearch: kısa metinde tetiklenmez", () => {
     expect(autoResearch("kapsamlı rapor")).toBe(false);
   });

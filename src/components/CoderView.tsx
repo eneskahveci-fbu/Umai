@@ -121,7 +121,7 @@ declare global {
 /* "⋯ Daha fazla" — az kullanılan eylemleri tek menüde toplar.
    Açılır menü createPortal ile body'e render edilir (overflow kabı kırpmasın).
    placement: "top" (composer, yukarı açılır) | "bottom" (header, aşağı açılır). */
-function MoreMenu({ active, children, placement = "top", icon }: { active?: boolean; children: React.ReactNode; placement?: "top" | "bottom"; icon?: React.ReactNode }) {
+function MoreMenu({ active, children, placement = "top", icon, title = "Daha fazla" }: { active?: boolean; children: React.ReactNode; placement?: "top" | "bottom"; icon?: React.ReactNode; title?: string }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -158,7 +158,7 @@ function MoreMenu({ active, children, placement = "top", icon }: { active?: bool
       <button
         ref={btnRef}
         onClick={() => setOpen((o) => !o)}
-        title="Daha fazla"
+        title={title}
         className={`flex items-center gap-1.5 text-[12px] px-2 py-2 sm:py-1.5 rounded-lg transition-colors active:scale-95 ${
           open || active ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft active:bg-bgsoft"
         }`}
@@ -617,9 +617,8 @@ export function CoderView() {
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
-  const [searchOn, setSearchOn] = useState(false);
-  const searchOnRef = useRef(false);
-  useEffect(() => { searchOnRef.current = searchOn; }, [searchOn]);
+  /* Web araması artık MANUEL toggle DEĞİL — Otomatik Pilot (pilot.web) karar
+     verir. Döviz/güncel bilgi sorularında kendiliğinden çalışır (autoWeb). */
   /* Çoklu-ajan ("Ajan Ekibi" / Swarm) modu: planlayıcı → paralel uzman işçiler
      → birleştirici (/api/orchestrate). Tek mesajda bir ajan ekibi çalışır. */
   const [swarmMode, setSwarmMode] = useState(false);
@@ -1486,7 +1485,7 @@ export function CoderView() {
     /* Derin Araştırma: kullanıcı modu açtıysa, /research ajanı seçiliyse
        ya da Otomatik Pilot gerek gördüyse (devam turlarında değil). */
     const useResearch = (researchModeRef.current || overrideAgent?.id === "research" || !!pilot?.research) && !opts?.continuation;
-    const wantWeb = searchOnRef.current || !!pilot?.web;
+    const wantWeb = !!pilot?.web;
     /* Ajan Ekibi / Araştırma turunda otomatik EN GÜÇLÜ modeli kullan (ayar açıksa)
        → en yetenekli modelle çalışır. Hata olursa (kredi/anahtar yok) aşağıdaki
        catch bloğu sessizce AKTİF modele döner ve tekrar dener. */
@@ -3098,11 +3097,11 @@ export function CoderView() {
                     }}
                   />
                 )}
-                {/* Daha fazla — mikrofon ile gönder arasında; mesaj-oluşturma eylemleri */}
-                <MoreMenu active={searchOn}>
-                  <MoreItem icon={<Paperclip size={14} />} label="Dosya ekle" onClick={() => fileRef.current?.click()} />
-                  <MoreItem icon={<ImageIcon size={14} />} label="Görsel ekle" onClick={() => imgRef.current?.click()} />
-                  <MoreItem icon={<Globe size={14} />} label="Web arama" active={searchOn} onClick={() => setSearchOn(!searchOn)} />
+                {/* Dosya & görsel ekleme — tek ikon (ataç). Web araması artık
+                    Otomatik Pilot ile kendiliğinden çalışır (manuel toggle yok). */}
+                <MoreMenu icon={<Paperclip size={16} />} title="Dosya veya görsel ekle">
+                  <MoreItem icon={<Paperclip size={14} />} label="Dosya ekle" desc="kod, metin, belge" onClick={() => fileRef.current?.click()} />
+                  <MoreItem icon={<ImageIcon size={14} />} label="Görsel ekle" desc="fotoğraf, ekran görüntüsü" onClick={() => imgRef.current?.click()} />
                 </MoreMenu>
                 {streaming ? (
                   <button onClick={stop} className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-red hover:bg-red/80 active:bg-red/70 text-white grid place-items-center transition-colors" title="Durdur">
@@ -3128,7 +3127,7 @@ export function CoderView() {
                       <ShieldCheck size={12} /> Güvenli
                     </span>
                   )}
-                  {searchOn && <span className="text-brand font-medium">Web</span>}
+                  {lastPilot?.web && <span className="flex items-center gap-1 text-brand font-medium" title="Web araması: en güncel veri internetten çekilir"><Globe size={12} /> Web</span>}
                   {/* ✦ Oto — Otomatik Pilot tek göstergesi: efor/web/araştırma/
                      kalite/ekip kararlarını craft mesajına göre kendisi verir. */}
                   {config.autoPilot !== false && (
