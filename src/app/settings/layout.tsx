@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Ayarlar — Craft Coder",
+  title: "Ayarlar — Craft",
   description: "Model, Git, eklenti ve hesap ayarları.",
 };
 
