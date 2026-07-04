@@ -88,7 +88,36 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   · PDF. AI arka plan = Pollinations (anahtarsız).
 - **Görüntü Stüdyosu** (`ImageStudio.tsx`): Qwen Studio benzeri sohbet akışı.
   Konuşarak görsel üretir (Pollinations image, keyless), çoklu varyasyon (1/2/4),
-  ücretsiz LLM ile prompt geliştirme, model/format seçimi.
+  ücretsiz LLM ile prompt geliştirme, model/format seçimi. Model listesi
+  Pollinations kataloğundan canlı çekilir (`lib/pollinations.ts`).
+- **Sunum Stüdyosu** (`studio/SlidesStudio.tsx`, rota `/studio/sunum`): Google
+  Slides'tan İLHAM alan craft yorumu. Brief → yapılandırılmış slayt JSON'u
+  (`lib/slidesGen.ts`) → deterministik tema render'ı (`lib/slides.ts`). Slaytlar
+  veri olarak kalır: tema değişimi kayıpsız, tek slaytı AI ile yeniden yazma,
+  Pollinations görselleri (deterministik seed), TTS anlatım (openai-audio),
+  bağımsız HTML/PDF dışa aktarma. Desteler `config.slideDecks`'te saklanır.
+- **Pollinations merkezi** (`lib/pollinations.ts`): görsel URL kurucusu, canlı
+  model kataloğu, TTS (ses seçimi + tarayıcı yedeği), `speakableText`. Sohbette
+  her asistan yanıtında "Seslendir" butonu bunu kullanır.
+- **Tek stüdyo, yedi mod** (`studio/StudioSwitcher.tsx`): tüm stüdyo yüzeyleri
+  ortak mod çubuğunu paylaşır — Tasarım · Sunum · Doküman · Anket · Tuval ·
+  Görüntü · Defter. Hub'daki (`StudioHome`) araç çipleri brief'i seçilen araca
+  taşır (`surfaceNav.setSurfaceHandoff`).
+- **Doküman Stüdyosu** (`studio/DocsStudio.tsx`, `/studio/dokuman`): Notion'dan
+  ilhamla blok tabanlı doküman (`lib/docs.ts`) — AI taslak + "devam et",
+  Markdown/bağımsız HTML dışa aktarma, `config.craftDocs`.
+- **Anket Stüdyosu** (`studio/FormsStudio.tsx`, `/studio/anket`): Google
+  Forms'tan ilhamla (`lib/forms.ts`) — AI soru üretimi, canlı önizleme,
+  SUNUCUSUZ bağımsız HTML form (yanıtlar dolduranın tarayıcısında + CSV),
+  `/api/publish` ile bağlantı, `config.craftForms`.
+- **Defter** (`studio/NotebookStudio.tsx`, `/studio/defter`): NotebookLM'den
+  ilhamla kaynak-temelli sohbet — metin yapıştır / URL getir (`/api/fetch-text`),
+  yalnız kaynaklardan [n] atıflı yanıt, Pollinations TTS "sesli özet",
+  `config.craftNotebooks`.
+- **Şablon paylaşımı** (`lib/templateShare.ts`): sunum/doküman/anket JSON
+  olarak dışa/içe aktarılır (Canva'nın şablon paylaşımından ilham, sunucusuz).
+- **Ortak üretim çekirdeği** (`lib/genChat.ts`): stüdyo motorlarının paylaştığı
+  akışlı LLM çağrısı + JSON ayıklama; anahtarsızda Pollinations'a düşer.
 - **Sandbox / Artifacts** (`preview.ts` + `ArtifactPanel.tsx`): kod bloğu →
   sandbox'lı iframe canlı önizleme. React/JSX/TSX (Babel standalone CDN),
   HTML+CSS+JS, SVG, mermaid. İframe-içi **console paneli** (parent'a mesaj yok →

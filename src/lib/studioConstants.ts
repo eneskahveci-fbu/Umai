@@ -158,11 +158,13 @@ export const STUDIO_SKILLS: StudioSkill[] = [
 
 /** Skilleri kategoriye göre grupla (picker UI için). */
 export function skillsByCategory(): { category: string; skills: StudioSkill[] }[] {
-  const order = ["Web", "Uygulama", "İçerik", "Bileşen"];
+  const order = ["Web", "Uygulama", "İçerik", "Akademik", "Bileşen"];
+  /* Listede olmayan kategori sona düşer (indexOf -1 başa alırdı — düzeltildi). */
+  const rank = (c: string) => { const i = order.indexOf(c); return i === -1 ? order.length : i; };
   const map = new Map<string, StudioSkill[]>();
   for (const s of STUDIO_SKILLS) { const a = map.get(s.category) ?? []; a.push(s); map.set(s.category, a); }
   return [...map.keys()]
-    .sort((a, b) => (order.indexOf(a) + 99) - (order.indexOf(b) + 99))
+    .sort((a, b) => rank(a) - rank(b))
     .map((category) => ({ category, skills: map.get(category)! }));
 }
 

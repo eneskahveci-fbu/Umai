@@ -1,9 +1,20 @@
 "use client";
 
-import { ArrowUp, FolderOpen, Loader2, Sparkles } from "lucide-react";
+import { ArrowUp, BookOpen, FileText, Image as ImageIcon, FolderOpen, ListChecks, Loader2, Presentation, Sparkles } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { skillsByCategory, STUDIO_DIRECTIONS } from "@/lib/studioConstants";
 import { allDesignSystems } from "@/lib/designSystems";
+import { setSurfaceHandoff, useSurfaceNav, type Surface } from "@/lib/surfaceNav";
+
+/* Hub çipleri: aynı brief'i tek dokunuşla başka stüdyo aracına taşır
+   (Sunum/Doküman/Anket/Görsel/Defter) — "tek sayfadan her şey" hissi. */
+const TOOL_CHIPS: { id: Surface; name: string; icon: typeof Sparkles }[] = [
+  { id: "slides", name: "Sunum", icon: Presentation },
+  { id: "docs", name: "Doküman", icon: FileText },
+  { id: "forms", name: "Anket", icon: ListChecks },
+  { id: "image", name: "Görsel", icon: ImageIcon },
+  { id: "notebook", name: "Defter", icon: BookOpen },
+];
 
 const selectCls =
   "flex-1 min-w-0 bg-bgsoft border border-line rounded-lg px-2.5 py-2 text-xs outline-none focus:border-brand/60 cursor-pointer";
@@ -32,6 +43,12 @@ export function StudioHome({
 }) {
   const config = useStore((s) => s.config);
   const systems = allDesignSystems(config);
+  const nav = useSurfaceNav();
+  const goTool = (id: Surface) => {
+    const b = brief.trim();
+    if (b) setSurfaceHandoff(id, b);
+    nav.go(id);
+  };
   return (
     <div className="flex-1 min-h-0 overflow-auto">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-20 flex flex-col gap-5">
@@ -98,6 +115,23 @@ export function StudioHome({
               {busy ? <Loader2 size={15} className="animate-spin" /> : <ArrowUp size={15} />} Üret
             </button>
           </div>
+        </div>
+
+        {/* Aynı brief'i başka araca taşı — tek stüdyo, tek sayfa hissi. */}
+        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+          <span className="text-[11px] text-muted/50">{brief.trim() ? "Bu brief ile:" : "Diğer araçlar:"}</span>
+          {TOOL_CHIPS.map((t) => {
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.id}
+                onClick={() => goTool(t.id)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-line/60 hover:border-brand/50 text-[11px] text-muted hover:text-ink transition-colors"
+              >
+                <Icon size={11} className="text-brand" /> {t.name}
+              </button>
+            );
+          })}
         </div>
 
         {/* Sessiz bağlantılar — kalabalık yok, ihtiyacı olan bulur. */}
