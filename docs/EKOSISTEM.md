@@ -20,21 +20,26 @@ paletinde (⌘K) yer alır.
 
 ## Anket: sıradaki ilham hangi ekosistemden gelsin?
 
+> **Anket sonucu (2026-07-04):** Notion, Google Forms, Canva ve NotebookLM'in
+> **dördü de** seçildi. Uygulama sırası (değer/emek oranına göre):
+> **1) Notion Docs → 2) Google Forms → 3) Canva şablon pazarı → 4) NotebookLM.**
+> Figma ve Obsidian şimdilik beklemede.
+
 Hepsi **ücretsiz altyapıyla** (localStorage + Supabase free tier + Pollinations)
 yapılabilecek şekilde seçildi. Birden fazla işaretlenebilir; sıralama önerilen
 önceliktir.
 
-- [ ] **1. Notion — "Craft Docs" (ÖNERİLEN)**
+- [x] **1. Notion — "Craft Docs" (ÖNERİLEN)**
   Blok tabanlı doküman/wiki yüzeyi: AI ile taslak, sohbetten dokümana dönüştürme,
   Skills ile beslenen şablonlar. Sunum Stüdyosu'nun JSON-veri yaklaşımı bloklara
   birebir taşınır — altyapının %60'ı hazır. *Maliyet: 0 ₺ (localStorage).*
 
-- [ ] **2. Google Forms — "Craft Anket"**
+- [x] **2. Google Forms — "Craft Anket"**
   Brief → anket JSON'u → paylaşılabilir bağımsız HTML formu (`/api/publish`
   zaten var). Yanıtlar Supabase free tier'da toplanır, özet AI ile çıkarılır.
   Bu dokümandaki anketin kendisi bile bu özellikle yapılabilirdi. *Maliyet: 0 ₺.*
 
-- [ ] **3. Canva — şablon pazarı & marka kiti genişletmesi**
+- [x] **3. Canva — şablon pazarı & marka kiti genişletmesi**
   Mevcut tasarım sistemleri + şablon galerisini topluluk paylaşımına açmak:
   şablonu bağlantıyla paylaş / içe aktar (JSON). Tuval'in katman modeliyle uyumlu.
   *Maliyet: 0 ₺ (paylaşım `/api/publish` üstünden).*
@@ -47,7 +52,7 @@ yapılabilecek şekilde seçildi. Birden fazla işaretlenebilir; sıralama öner
   Sohbetler + skills + dokümanlar arasında otomatik bağlantı grafiği; "bunu
   daha önce konuşmuştuk" hafızası (mevcut `rag.ts` üstüne). *Maliyet: 0 ₺.*
 
-- [ ] **6. NotebookLM — kaynak-temelli çalışma alanı**
+- [x] **6. NotebookLM — kaynak-temelli çalışma alanı**
   PDF/URL kaynakları yükle (pdf.ts var) → kaynaklara sadık AI sohbeti +
   Pollinations TTS ile "sesli özet" (podcast benzeri). *Maliyet: 0 ₺.*
 
