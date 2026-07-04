@@ -1092,7 +1092,11 @@ export async function POST(req: Request) {
   let model = body.model || "";
   let apiKey = body.apiKey || "";
   let provider: string = body.provider || "hf";
-  const providerNeedsKey = provider !== "pollinations" && provider !== "ollama" && provider !== "local";
+  /* KEYLESS_CHAT_PROVIDERS ile senkron tutulmalı: "custom" (kullanıcının
+     kendi anahtarsız çalışabilen OpenAI-uyumlu ucu) buradan hariç
+     tutulmazsa, anahtarsız custom istek sessizce Pollinations'a düşer ve
+     kullanıcının gerçek endpoint'i hiç kullanılmaz. */
+  const providerNeedsKey = provider !== "pollinations" && provider !== "ollama" && provider !== "local" && provider !== "custom";
   const hasServerKey = !!process.env.LLM_API_KEY;
 
   const access = resolveModelAccess({

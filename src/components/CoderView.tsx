@@ -3110,7 +3110,7 @@ export function CoderView() {
                   <button
                     onClick={send}
                     disabled={!input.trim() && pendingImages.length === 0 && attachedFiles.length === 0}
-                    className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-brand hover:bg-branddim active:bg-branddim text-white grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-brand hover:bg-branddim active:bg-branddim text-white grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95"
                   >
                     <ArrowUp size={17} />
                   </button>
@@ -3134,7 +3134,7 @@ export function CoderView() {
                       className="flex items-center gap-1 text-brand/80 font-medium"
                       title={lastPilot ? `Bu mesajda: ${lastPilot.reasons.join(" · ")}` : "Otomatik Pilot: eforu, web aramayı, araştırmayı, kaliteyi ve ajan ekibini craft seçer"}
                     >
-                      <Sparkles size={12} /> Oto
+                      <Sparkles size={12} className="animate-breathe" /> Oto
                     </span>
                   )}
                   {config.autoPilot === false && config.autoSwarm !== false && !swarmMode && (

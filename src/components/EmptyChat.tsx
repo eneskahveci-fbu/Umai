@@ -38,14 +38,14 @@ export function EmptyChat({ onPrompt }: EmptyChatProps) {
       {/* Marka tonlu, yavaş süzülen ışıma — yalnız boş sahnede. */}
       <div className="aurora absolute inset-0 -z-10" aria-hidden />
 
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand/70 mb-2">{greeting()} 👋</div>
-      <h2 className="text-[26px] sm:text-[28px] font-extrabold tracking-tight mb-2 text-center text-balance">Ne üzerinde çalışalım?</h2>
-      <p className="text-sm text-muted/70 max-w-sm text-center leading-relaxed mb-6">
+      <div className="animate-rise text-[11px] font-semibold uppercase tracking-[0.18em] text-brand/70 mb-2">{greeting()} 👋</div>
+      <h2 className="animate-rise text-[26px] sm:text-[28px] font-extrabold tracking-tight mb-2 text-center text-balance" style={{ animationDelay: "60ms" }}>Ne üzerinde çalışalım?</h2>
+      <p className="animate-rise text-sm text-muted/70 max-w-sm text-center leading-relaxed mb-6" style={{ animationDelay: "120ms" }}>
         Sıradan cümlelerle anlat — gerisini Craft halletsin.
       </p>
 
       {/* Kompakt öneri çipleri — büyük kart yığını yerine sade bir sıra. */}
-      <div className="flex flex-wrap items-center justify-center gap-2 max-w-md mb-6">
+      <div className="animate-rise flex flex-wrap items-center justify-center gap-2 max-w-md mb-6" style={{ animationDelay: "180ms" }}>
         {SAMPLE_PROMPTS.map(({ icon: Icon, label, text }) => (
           <button
             key={label}
@@ -59,7 +59,7 @@ export function EmptyChat({ onPrompt }: EmptyChatProps) {
       </div>
 
       {/* İnce bağlantılar: devam + Stüdyo köprüsü (kart değil). */}
-      <div className="flex flex-col items-center gap-2 text-xs">
+      <div className="animate-rise flex flex-col items-center gap-2 text-xs" style={{ animationDelay: "240ms" }}>
         {lastChat && (
           <button
             onClick={() => selectChat(lastChat.id)}

@@ -9,10 +9,11 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import {
   BookMarked, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-  Circle, CircleDot, ListChecks,
+  Circle, CircleDot, Compass, FlaskConical, ListChecks, Microscope, Settings2,
   Code2, Copy, FileText, FolderOpen, GitBranch, GitCommit, Globe,
   Loader2, Pencil, RefreshCw, Search, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, User, Users, Wrench, X,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { ChatMessage, SwarmState } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { CodeBlock } from "./CodeBlock";
@@ -260,13 +261,15 @@ function PlanPanel({ plan }: { plan: string }) {
 
 /* ── Ajan Ekibi (Swarm) ilerleme paneli ────────────────────────────── */
 
-const SWARM_ROLE_ICON: Record<string, string> = {
-  mimar: "📐",
-  kodlayıcı: "⌨️",
-  test: "🧪",
-  inceleyici: "🔍",
-  araştırmacı: "🔬",
-  genel: "⚙️",
+/* Emoji yerine lucide ikonları — panelin geri kalanı (Loader2/Check/X/
+   Users/Search) zaten lucide; emoji/ikon karışımı tutarsız duruyordu. */
+const SWARM_ROLE_ICON: Record<string, LucideIcon> = {
+  mimar: Compass,
+  kodlayıcı: Code2,
+  test: FlaskConical,
+  inceleyici: Search,
+  araştırmacı: Microscope,
+  genel: Settings2,
 };
 
 const SWARM_PHASE_LABEL: Record<SwarmState["phase"], string> = {
@@ -307,11 +310,11 @@ function SwarmPanel({ swarm }: { swarm: SwarmState }) {
         </div>
       ) : (
         <div className="px-3 py-2.5 space-y-1.5">
-          {agents.map((a, i) => (
+          {agents.map((a, i) => {
+            const RoleIcon = SWARM_ROLE_ICON[a.role] ?? Settings2;
+            return (
             <div key={i} className="flex items-start gap-2 text-xs">
-              <span className="shrink-0 mt-0.5 w-4 text-center leading-none">
-                {SWARM_ROLE_ICON[a.role] ?? "⚙️"}
-              </span>
+              <RoleIcon size={13} className="text-muted/70 shrink-0 mt-0.5" />
               {a.status === "done" ? (
                 <Check size={12} className="text-green shrink-0 mt-0.5" />
               ) : a.status === "error" ? (
@@ -327,7 +330,8 @@ function SwarmPanel({ swarm }: { swarm: SwarmState }) {
                 {a.title}
               </span>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -620,8 +624,8 @@ function MessageBubbleImpl({
   /* ── ASSISTANT BUBBLE ────────────────────────────────────────────── */
   return (
     <div className="group/msg flex gap-3 py-3 animate-fade-in">
-      {/* Avatar */}
-      <div className="shrink-0 w-7 h-7 rounded-full bg-bgsoft border border-brand/20 grid place-items-center text-brand text-sm mt-0.5 shadow-sm">
+      {/* Avatar — bu mesaj akarken hafif bir halka parıltısı alır (transient). */}
+      <div className={`shrink-0 w-7 h-7 rounded-full bg-bgsoft border border-brand/20 grid place-items-center text-brand text-sm mt-0.5 shadow-sm${streamingNow ? " animate-stream-glow" : ""}`}>
         ✦
       </div>
 

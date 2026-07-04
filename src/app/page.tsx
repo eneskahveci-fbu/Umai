@@ -165,7 +165,7 @@ export default function Home() {
             >
               <div className="absolute inset-0 -z-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(200,168,126,0.08),transparent)]" />
               <div className="relative flex items-center gap-3 mb-4">
-                <span className="w-12 h-12 rounded-2xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0">
+                <span className="w-12 h-12 rounded-2xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0 transition-transform duration-200 group-hover:scale-110">
                   {p.icon}
                 </span>
                 <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand/70">{p.badge}</span>
