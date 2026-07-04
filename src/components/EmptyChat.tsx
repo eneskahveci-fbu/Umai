@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowRight, Check, Code2, GitBranch, History, MessageCircle, Settings, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Check, Code2, GitBranch, History, MessageCircle, Settings, Sparkles, Wand2 } from "lucide-react";
 import { useStore } from "@/lib/store";
 
 interface EmptyChatProps {
@@ -11,10 +12,10 @@ interface EmptyChatProps {
 }
 
 const SAMPLE_PROMPTS = [
-  { icon: Code2, label: "Bu fonksiyonu yeniden yaz", text: "Aşağıdaki fonksiyonu daha okunabilir ve test edilebilir hâle getir:\n\n" },
-  { icon: Sparkles, label: "Bir özellik ekle", text: "Bu projeye şu özelliği eklemek istiyorum: " },
-  { icon: GitBranch, label: "Bir hatayı incele", text: "Şu hatayı alıyorum, sebebi ne olabilir:\n\n" },
-  { icon: MessageCircle, label: "Mimari fikir tartış", text: "Şu konuda nasıl bir mimari kurardın: " },
+  { icon: Code2, label: "Kodumu daha iyi yap", text: "Aşağıdaki kodu daha okunabilir ve test edilebilir hâle getir:\n\n" },
+  { icon: Sparkles, label: "Yeni bir özellik ekle", text: "Şu özelliği eklemek istiyorum, nasıl yaparım: " },
+  { icon: GitBranch, label: "Bir hatayı çöz", text: "Şu hatayı alıyorum, sebebi ne olabilir:\n\n" },
+  { icon: MessageCircle, label: "Bir şey açıkla / öğren", text: "Şunu basitçe açıklar mısın: " },
 ];
 
 /* Saate göre kısa selamlama — boş duruma kişisel/profesyonel bir giriş verir. */
@@ -74,11 +75,22 @@ export function EmptyChat({ hasModel, hasRepo, onAddModel, onPrompt }: EmptyChat
 
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand/70 mb-1.5">{greeting()} 👋</div>
       <h2 className="text-[27px] font-extrabold tracking-tight mb-2 text-center text-balance">Ne üzerinde çalışalım?</h2>
-      <p className="text-sm text-muted/70 max-w-md text-center leading-relaxed mb-7">
-        Dosya ekle, kod yapıştır veya bir soru sor.
+      <p className="text-sm text-muted/70 max-w-md text-center leading-relaxed mb-4">
+        Bir soru sor, kod yapıştır ya da dosya ekle — sıradan cümlelerle anlat, gerisini Craft halletsin.
         <br />
-        <span className="text-muted/45 text-xs">/ ile agent seç · @ ile dosya mention · &quot;skill indir &lt;url&gt;&quot; ile eğitim seti yükle</span>
+        <span className="text-muted/45 text-xs">/ ile agent seç · @ ile dosya ekle · &quot;skill indir &lt;url&gt;&quot; ile eğitim seti yükle</span>
       </p>
+
+      {/* Yaratıcı işler için köprü — buraya varsayılan düşen, kod yazmayacak
+          kullanıcı tıkanmasın (akıllı ayrımın diğer yolu). */}
+      <Link
+        href="/studio"
+        className="group inline-flex items-center gap-2 text-xs font-medium px-3.5 py-2 rounded-full border border-line bg-surface/70 text-muted hover:text-ink hover:border-brand/40 transition-colors mb-7"
+      >
+        <Wand2 size={13} className="text-brand" />
+        Kod değil, bir şey <span className="text-ink/80 font-semibold">tasarlamak</span> mı istiyorsun? Stüdyo&apos;ya geç
+        <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
+      </Link>
 
       {!hasModel ? (
         <div className="w-full max-w-md premium-card rounded-2xl p-3">
