@@ -28,7 +28,12 @@ export function useAuthGate(): "checking" | "in" | "out" {
   }, []);
 
   useEffect(() => {
-    if (state === "out") router.replace("/login");
+    if (state === "out") {
+      /* Girişten sonra kullanıcıyı geldiği yüzeye geri götür ("akıllı ayrım":
+         Yaratmaya başla → /studio, girişsizse login sonrası yine /studio'ya). */
+      const here = window.location.pathname + window.location.search;
+      router.replace(`/login?next=${encodeURIComponent(here)}`);
+    }
   }, [state, router]);
 
   return state;
