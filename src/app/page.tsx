@@ -7,7 +7,6 @@ import {
   Image as ImageIcon,
   LayoutTemplate,
   MessageCircle,
-  Palette,
   ShieldCheck,
   Sparkles,
   Wand2,
@@ -59,14 +58,6 @@ const CAN_DO = [
   { icon: <FileText size={20} />, title: "Sunum hazırla", desc: "Konuyu söyle, slaytları senin için kursun. PDF ya da bağımsız dosya olarak dışa aktar." },
   { icon: <ImageIcon size={20} />, title: "Görsel üret", desc: "Hayal ettiğini anlat, yapay zeka çizsin. Birden çok varyasyon, anahtar gerekmez." },
   { icon: <MessageCircle size={20} />, title: "Her şeyi sor", desc: "E-posta yaz, bir metni özetle, fikir al, öğren. Sıradan bir sohbet kadar kolay." },
-  { icon: <Palette size={20} />, title: "Tasarımı ayarla", desc: "Renk, düzen, ton — konuşarak değiştir. Kod bilmene gerek yok, sen anlat o uygulasın." },
-  { icon: <Code2 size={20} />, title: "Kod üret & düzelt", desc: "İsteyen için tam güç: depoya bağlan, ajan dosyaları okuyup yazsın, commit et." },
-];
-
-const STEPS = [
-  { n: "1", title: "Ne istediğini yaz", desc: "Sıradan cümlelerle anlat — \"bir portfolyo sitesi\", \"tanıtım sunumu\", \"şu metni düzelt\". Teknik terim yok." },
-  { n: "2", title: "Yapay zeka üretsin", desc: "Saniyeler içinde sonucu canlı gör. Beğenmediysen \"daha sade yap\", \"rengi değiştir\" de — konuşarak düzelt." },
-  { n: "3", title: "Kullan & paylaş", desc: "İndir, paylaş bağlantısı al ya da doğrudan depona gönder. Kurulum yok, ücretsiz başlar." },
 ];
 
 const FAQS = [
@@ -195,40 +186,19 @@ export default function Home() {
         <p className="text-xs text-muted/60 mt-6">Emin değil misin? İkisini de tek hesapta dener, istediğin zaman geçiş yaparsın.</p>
       </header>
 
-      {/* NE YAPABİLİRSİN */}
-      <section className="max-w-6xl mx-auto px-5 sm:px-6 py-16 w-full">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl sm:text-4xl font-extrabold mb-3 tracking-tight text-balance">Craft ile neler yapabilirsin?</h2>
-          <p className="text-muted max-w-xl mx-auto text-balance">Hepsi konuşarak. Menü aramak, ayar kurcalamak yok — sadece ne istediğini söyle.</p>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* NE YAPABİLİRSİN — sade, dört öğe */}
+      <section className="max-w-4xl mx-auto px-5 sm:px-6 py-14 w-full">
+        <h2 className="text-2xl sm:text-3xl font-extrabold mb-8 tracking-tight text-center text-balance">Craft ile neler yapabilirsin?</h2>
+        <div className="grid sm:grid-cols-2 gap-3">
           {CAN_DO.map((f) => (
-            <div key={f.title} className="hover-lift group premium-card rounded-2xl p-6">
-              <div className="w-12 h-12 rounded-2xl bg-brand/10 text-brand grid place-items-center mb-4 group-hover:bg-brand/15 transition-colors">
+            <div key={f.title} className="premium-card rounded-2xl p-5 flex items-start gap-4">
+              <div className="w-11 h-11 rounded-xl bg-brand/10 text-brand grid place-items-center shrink-0">
                 {f.icon}
               </div>
-              <h3 className="font-bold text-lg mb-1.5">{f.title}</h3>
-              <p className="text-muted text-sm leading-relaxed">{f.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* NASIL ÇALIŞIR — 3 adım, insan dili */}
-      <section className="max-w-5xl mx-auto px-5 sm:px-6 py-16 w-full">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl sm:text-4xl font-extrabold mb-3 tracking-tight">Üç adımda hazır</h2>
-          <p className="text-muted max-w-xl mx-auto">Ne indirmen ne kurman ne de öğrenmen gerekir.</p>
-        </div>
-        <div className="grid sm:grid-cols-3 gap-5">
-          {STEPS.map((s, i) => (
-            <div key={s.n} className="relative premium-card rounded-2xl p-6">
-              {i < STEPS.length - 1 && (
-                <div className="hidden sm:block absolute top-9 -right-3 text-brand/30 z-10"><ArrowRight size={18} /></div>
-              )}
-              <span className="inline-grid place-items-center w-9 h-9 rounded-full brand-gradient text-[#111110] font-extrabold text-sm mb-4">{s.n}</span>
-              <h3 className="font-bold text-lg mb-2">{s.title}</h3>
-              <p className="text-muted text-sm leading-relaxed">{s.desc}</p>
+              <div className="min-w-0">
+                <h3 className="font-bold text-[15px] mb-1">{f.title}</h3>
+                <p className="text-muted text-[13px] leading-relaxed">{f.desc}</p>
+              </div>
             </div>
           ))}
         </div>
