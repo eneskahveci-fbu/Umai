@@ -1190,6 +1190,15 @@ export async function POST(req: Request) {
   };
 
   let sysPrompt = body.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+  /* İç muhakeme sızıntısına karşı koruma: bazı ücretsiz modeller (ör. harmony
+     tabanlı) çözümleme/düşünme metnini DÜZ İÇERİK olarak yayıp yanıta karıştırır
+     ("we need web search…", "Provide answer. Ok."). Modele yalnızca NİHAİ cevabı
+     yazmasını, muhakemeyi göstermemesini söyle → temiz yanıt. */
+  sysPrompt +=
+    `\n\n[Yanıt biçimi] Yalnızca KULLANICIYA yönelik NİHAİ cevabı yaz. İç muhakemeni, ` +
+    `"düşünme"/"analiz" adımlarını, kendi kendine notları ("we need…", "user wants…", ` +
+    `"provide answer", "no code", "ok") veya sahte konuşma dökümlerini (User:/Assistant:) ` +
+    `ASLA yanıt metnine yazma. Doğrudan sonucu ver.`;
   /* Eklenen her model, içinde çalıştığı platformun tüm özelliklerini bilsin. */
   sysPrompt += `\n\n${PLATFORM_KNOWLEDGE}`;
   if (body.projectPrompt) sysPrompt += `\n\n[Proje talimatları]: ${body.projectPrompt}`;
