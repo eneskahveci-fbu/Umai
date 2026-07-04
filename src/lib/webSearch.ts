@@ -108,15 +108,113 @@ async function wikipedia(q: string): Promise<SearchResult[]> {
   }));
 }
 
-/** Sırayla backend'leri dener; ilk dolu sonucu döndürür. */
+/* ————— Canlı veri (döviz kuru) — anahtarsız, güncel —————
+   Snippet tabanlı arama motorları döviz/altın gibi CANLI verilerde bayat
+   kalır (model eğitim verisindeki eski kura düşer). Bu yüzden döviz sorularını
+   yakalayıp otoriter, anahtarsız bir FX API'sinden GÜNCEL kuru çekeriz. */
+
+/* Türkçe/İngilizce para birimi adları → ISO 4217 kodu. */
+const CURRENCY_WORDS: Record<string, string> = {
+  dolar: "USD", usd: "USD", "$": "USD", "amerikan doları": "USD",
+  euro: "EUR", avro: "EUR", eur: "EUR", "€": "EUR",
+  sterlin: "GBP", pound: "GBP", gbp: "GBP", "£": "GBP",
+  tl: "TRY", lira: "TRY", "türk lirası": "TRY", try: "TRY",
+  yen: "JPY", jpy: "JPY",
+  frank: "CHF", chf: "CHF",
+  yuan: "CNY", cny: "CNY",
+  ruble: "RUB", rub: "RUB",
+  riyal: "SAR", sar: "SAR",
+  dirhem: "AED", aed: "AED",
+  rupi: "INR", inr: "INR",
+  won: "KRW", krw: "KRW",
+  "kanada doları": "CAD", cad: "CAD",
+  "avustralya doları": "AUD", aud: "AUD",
+};
+
+export interface CurrencyQuery { amount: number; from: string; to: string; }
+
+/* "1 dolar kaç tl", "100 euro ne kadar", "usd to try", "dolar tl" → {amount,from,to}.
+   Saf fonksiyon → birim testli. Eşleşme yoksa null. */
+export function parseCurrencyQuery(text: string): CurrencyQuery | null {
+  const lower = (text || "").toLowerCase();
+  /* Miktarı HAM metinden çıkar (2,5 / 2.5 bozulmasın); ardından kelime eşleşmesi
+     için noktalamayı boşluğa çevir. */
+  const amountMatch = lower.match(/(\d+(?:[.,]\d+)?)/);
+  const t = lower.replace(/[?!]/g, " ").replace(/(?<!\d)[.,]|[.,](?!\d)/g, " ").replace(/\s+/g, " ").trim();
+  if (!t) return null;
+  /* Metinde geçen para birimlerini sırayla topla (çok kelimeli adlar önce). */
+  const names = Object.keys(CURRENCY_WORDS).sort((a, b) => b.length - a.length);
+  const found: { code: string; idx: number }[] = [];
+  const used: [number, number][] = [];
+  for (const name of names) {
+    const isWordy = /[a-zçğıöşü]/.test(name);
+    const re = isWordy ? new RegExp(`(?:^|[^a-zçğıöşü])(${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})(?![a-zçğıöşü])`, "g") : null;
+    if (re) {
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(t))) {
+        const at = m.index + m[0].indexOf(name);
+        if (!used.some(([s, e]) => at < e && at + name.length > s)) { found.push({ code: CURRENCY_WORDS[name], idx: at }); used.push([at, at + name.length]); }
+      }
+    } else if (t.includes(name)) {
+      const at = t.indexOf(name);
+      found.push({ code: CURRENCY_WORDS[name], idx: at });
+    }
+  }
+  /* Farklı iki para birimi gerek (aynı kod tekrarı sayılmaz). */
+  const ordered = found.sort((a, b) => a.idx - b.idx);
+  const distinct: { code: string; idx: number }[] = [];
+  for (const f of ordered) if (!distinct.some((d) => d.code === f.code)) distinct.push(f);
+  if (distinct.length < 2) return null;
+  const amount = amountMatch ? parseFloat(amountMatch[1].replace(",", ".")) : 1;
+  return { amount: amount > 0 ? amount : 1, from: distinct[0].code, to: distinct[1].code };
+}
+
+async function liveCurrency(query: string): Promise<SearchResult[]> {
+  const cq = parseCurrencyQuery(query);
+  if (!cq || cq.from === cq.to) return [];
+  /* Frankfurter (ECB, anahtarsız) → open.er-api yedeği. */
+  const fetchRate = async (): Promise<{ rate: number; date: string } | null> => {
+    try {
+      const r = await fetch(`https://api.frankfurter.app/latest?from=${cq.from}&to=${cq.to}`, { signal: AbortSignal.timeout(8000) });
+      if (r.ok) {
+        const d = (await r.json()) as { rates?: Record<string, number>; date?: string };
+        const rate = d.rates?.[cq.to];
+        if (typeof rate === "number") return { rate, date: d.date ?? "" };
+      }
+    } catch { /* yedeğe düş */ }
+    try {
+      const r = await fetch(`https://open.er-api.com/v6/latest/${cq.from}`, { signal: AbortSignal.timeout(8000) });
+      if (r.ok) {
+        const d = (await r.json()) as { rates?: Record<string, number>; time_last_update_utc?: string };
+        const rate = d.rates?.[cq.to];
+        if (typeof rate === "number") return { rate, date: (d.time_last_update_utc ?? "").slice(0, 16) };
+      }
+    } catch { /* sonuç yok */ }
+    return null;
+  };
+  const res = await fetchRate();
+  if (!res) return [];
+  const total = cq.amount * res.rate;
+  const fmt = (n: number) => n.toLocaleString("tr-TR", { maximumFractionDigits: 4 });
+  return [{
+    title: `${fmt(cq.amount)} ${cq.from} = ${fmt(total)} ${cq.to} (güncel kur)`,
+    url: "https://www.frankfurter.app",
+    snippet: `Güncel döviz kuru${res.date ? ` (${res.date})` : ""}: 1 ${cq.from} = ${fmt(res.rate)} ${cq.to}. ` +
+      `${fmt(cq.amount)} ${cq.from} ≈ ${fmt(total)} ${cq.to}. Kaynak: Frankfurter/ECB, anahtarsız canlı veri.`,
+  }];
+}
+
+/** Sırayla backend'leri dener; ilk dolu sonucu döndürür. Döviz gibi CANLI
+    veriler için otoriter sonuç en başa eklenir (arama motoru bayat kalır). */
 export async function searchWeb(query: string): Promise<SearchResult[]> {
+  const live = await liveCurrency(query).catch(() => [] as SearchResult[]);
   for (const backend of [ddgHtml, ddgLite, ddgInstant, wikipedia]) {
     try {
       const r = await backend(query);
-      if (r.length) return r;
+      if (r.length) return [...live, ...r];
     } catch { /* sıradakine geç */ }
   }
-  return [];
+  return live;
 }
 
 /** Arama sonuçlarını LLM/istemci için okunabilir metne çevirir. */

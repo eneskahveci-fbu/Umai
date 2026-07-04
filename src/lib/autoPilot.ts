@@ -54,6 +54,12 @@ export function autoWeb(text: string): boolean {
   if (t.length < 8) return false;
   if (/```/.test(t)) return false; // kod odaklı istek — web gereksiz
   return /\b(güncel|bugün|şu an(da)?|son (sürüm|dakika|haber)|en yeni|fiyat[ıi]?|kur[uu]?|haber|hava (durumu|nasıl)|kim kazandı|ne zaman çık|piyasa|döviz|maç|skor)\b/.test(t)
+    /* Döviz / değerli metal / kripto / borsa — canlı veri gerektirir (kaç/ne kadar). */
+    || /\b(dolar|euro|avro|sterlin|\$|€|£)\b/.test(t)
+    || /\b(gram altın|çeyrek altın|tam altın|gram gümüş|ons)\b/.test(t)
+    || /\b(bitcoin|btc|ethereum|eth|kripto|dogecoin|solana)\b/.test(t)
+    || /\b(borsa|bist|nasdaq|hisse|faiz|enflasyon)\b/.test(t)
+    || /\b(kaç (tl|lira|dolar|euro)|ne kadar (tl|lira|dolar|euro))\b/.test(t)
     || (/\b20(2[4-9]|3\d)\b/.test(t) && /\?/.test(t));
 }
 
