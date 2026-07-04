@@ -229,7 +229,7 @@ export function StudioView() {
           placeholder="Tasarım adı"
           className="ml-auto hidden sm:block w-44 bg-transparent text-xs text-muted focus:text-ink border-b border-transparent focus:border-line outline-none px-1 py-0.5"
         />
-        <button onClick={() => nav.close()} className="text-muted hover:text-ink p-1 rounded hover:bg-bgsoft sm:ml-1" title="Kapat"><X size={16} /></button>
+        <button onClick={() => nav.close()} className="text-muted hover:text-ink p-1 rounded hover:bg-bgsoft ml-auto sm:ml-1" title="Kapat"><X size={16} /></button>
       </div>
 
       {view === "home" ? (
