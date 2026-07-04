@@ -1,18 +1,17 @@
 import Link from "next/link";
-import { InstallCommand } from "@/components/InstallCommand";
 import {
   ArrowRight,
-  Boxes,
-  Code2,
-  GitBranch,
-  MessageSquare,
-  ShieldCheck,
-  VenetianMask,
-  Zap,
-  Brain,
-  Globe,
-  Terminal,
   ChevronDown,
+  Code2,
+  FileText,
+  Image as ImageIcon,
+  LayoutTemplate,
+  MessageCircle,
+  Palette,
+  ShieldCheck,
+  Sparkles,
+  Wand2,
+  Zap,
 } from "lucide-react";
 
 function LogoMark({ size = 28 }: { size?: number }) {
@@ -31,270 +30,181 @@ function LogoMark({ size = 28 }: { size?: number }) {
   );
 }
 
-const FEATURES = [
+/* İki yol — "akıllı ayrım": kullanıcı ilk saniyede kendini seçer. Her yol
+   kendi sade deneyimine gider (yaratıcı → stüdyo, kod → uygulama). */
+const PATHS = [
   {
-    icon: <MessageSquare size={20} />,
-    title: "Sohbet & Gizli Mod",
-    desc: "Kaydedilen normal sohbet ya da hiçbir yere yazılmayan gizli sohbet. Gizli modda geçmiş, sunucu veya localStorage'a dokunmaz.",
+    href: "/studio",
+    badge: "Yaratıcı işler",
+    title: "Tasarla, üret, sor",
+    desc: "Bir cümle yaz — web sitesi, sunum, afiş ya da görsel çıksın. Yapay zeka gerisini halleder. Hiçbir şey bilmene gerek yok.",
+    icon: <Wand2 size={24} />,
+    chips: ["Web sitesi", "Sunum", "Görsel", "Her şeyi sor"],
+    cta: "Yaratmaya başla",
   },
   {
-    icon: <Boxes size={20} />,
-    title: "Çoklu Model",
-    desc: "Birden fazla model API'si ekle; üst bardan istediğini seçip onunla çalış. Her model ayrı ayarlanabilir.",
-  },
-  {
-    icon: <Code2 size={20} />,
-    title: "Kod & Depo",
-    desc: "GitHub veya GitLab deposuna bağlan, dosyaları gez, içeriği sohbete gönderip kod sor. Diff görünümü ile değişiklikleri karşılaştır. Sohbet, kod ve terminal tek ekranda.",
-  },
-  {
-    icon: <GitBranch size={20} />,
-    title: "GitHub & GitLab Desteği",
-    desc: "GitHub ve GitLab token'larını ekle, özel depolara eriş, repo'lar arası geçiş yap. Tek tıkla commit & push.",
-  },
-  {
-    icon: <VenetianMask size={20} />,
-    title: "Gizlilik Önce",
-    desc: "Anahtarların tarayıcında kalır, sunucuya gönderilmez. İstersen Supabase ile cihazlar arası güvenli senkron.",
-  },
-  {
-    icon: <ShieldCheck size={20} />,
-    title: "Geçmiş Senkron",
-    desc: "Giriş yaparsan sohbet geçmişin Supabase'de saklanır ve her cihazdan açılır. Offline modda yerel çalışır.",
-  },
-  {
-    icon: <Brain size={20} />,
-    title: "Skills & Bellek",
-    desc: "Sık kullandığın prompt'ları Skill olarak kaydet. Model her yanıtta bunları bağlam olarak alır.",
-  },
-  {
-    icon: <Zap size={20} />,
-    title: "Hızlı Komutlar",
-    desc: "⌘K komut paleti, / slash menüsü ve @ mention ile dosyaları ve snippet'ları anında ekle.",
-  },
-  {
-    icon: <Globe size={20} />,
-    title: "PWA Desteği",
-    desc: "Tarayıcıdan yükle, masaüstü gibi çalıştır. Offline banner, service worker ve hızlı yükleme.",
+    href: "/app",
+    badge: "Kod & geliştirme",
+    title: "Kod yaz, depona bağlan",
+    desc: "Dosyalarını okur, kod üretir, GitHub/GitLab deponu gezer. Sohbet, kod ve terminal tek ekranda — istediğin modelle.",
+    icon: <Code2 size={24} />,
+    chips: ["Sohbet", "Depo bağla", "Ajan", "Commit"],
+    cta: "Kodlamaya başla",
   },
 ];
 
-const PROVIDERS = [
-  { label: "🤗 Hugging Face", desc: "Ücretsiz inference" },
-  { label: "🐋 DeepSeek", desc: "Uygun maliyetli" },
-  { label: "🔀 OpenRouter", desc: "100+ model" },
-  { label: "🦙 Ollama", desc: "Yerel model" },
-  { label: "⚡ Groq", desc: "Ultra hızlı" },
-  { label: "🧠 Anthropic", desc: "Claude serisi" },
-  { label: "✨ Google Gemini", desc: "Multimodal" },
-  { label: "🌟 Mistral", desc: "Açık kaynak" },
-  { label: "⚙️ vLLM / LM Studio", desc: "Kendi sunucun" },
+/* İnsan diliyle "ne yapabilirsin" — jargon yok, herkes anlar. */
+const CAN_DO = [
+  { icon: <LayoutTemplate size={20} />, title: "Web sitesi tasarla", desc: "\"Kahve dükkânım için modern bir sayfa\" yaz — dakikada canlı, indirilebilir bir site çıkar." },
+  { icon: <FileText size={20} />, title: "Sunum hazırla", desc: "Konuyu söyle, slaytları senin için kursun. PDF ya da bağımsız dosya olarak dışa aktar." },
+  { icon: <ImageIcon size={20} />, title: "Görsel üret", desc: "Hayal ettiğini anlat, yapay zeka çizsin. Birden çok varyasyon, anahtar gerekmez." },
+  { icon: <MessageCircle size={20} />, title: "Her şeyi sor", desc: "E-posta yaz, bir metni özetle, fikir al, öğren. Sıradan bir sohbet kadar kolay." },
+  { icon: <Palette size={20} />, title: "Tasarımı ayarla", desc: "Renk, düzen, ton — konuşarak değiştir. Kod bilmene gerek yok, sen anlat o uygulasın." },
+  { icon: <Code2 size={20} />, title: "Kod üret & düzelt", desc: "İsteyen için tam güç: depoya bağlan, ajan dosyaları okuyup yazsın, commit et." },
 ];
 
-const HOW_IT_WORKS = [
-  {
-    step: "1",
-    title: "API Anahtarını Ekle",
-    desc: "Ayarlardan OpenAI-uyumlu herhangi bir sağlayıcının API anahtarını ekle. Anahtar yalnızca tarayıcında saklanır.",
-    icon: <Terminal size={22} />,
-  },
-  {
-    step: "2",
-    title: "Sohbet Et ve Kod Yaz",
-    desc: "Tek ekranda soru sor; deponu bağla, ajan dosyaları kendi okuyup kod üretsin — sohbet, kod ve terminal bir arada.",
-    icon: <MessageSquare size={22} />,
-  },
-  {
-    step: "3",
-    title: "Commit & Push",
-    desc: "Oluşturulan kodu diff'le karşılaştır, tek tıkla commit & push et — değişikliklerin doğrudan depona gider.",
-    icon: <Zap size={22} />,
-  },
+const STEPS = [
+  { n: "1", title: "Ne istediğini yaz", desc: "Sıradan cümlelerle anlat — \"bir portfolyo sitesi\", \"tanıtım sunumu\", \"şu metni düzelt\". Teknik terim yok." },
+  { n: "2", title: "Yapay zeka üretsin", desc: "Saniyeler içinde sonucu canlı gör. Beğenmediysen \"daha sade yap\", \"rengi değiştir\" de — konuşarak düzelt." },
+  { n: "3", title: "Kullan & paylaş", desc: "İndir, paylaş bağlantısı al ya da doğrudan depona gönder. Kurulum yok, ücretsiz başlar." },
 ];
 
 const FAQS = [
   {
-    q: "Craft Coder ücretsiz mi?",
-    a: "Evet, tamamen ücretsiz. Kendi API anahtarını getir (BYOK) modeliyle çalışır; Craft Coder herhangi bir model ücreti almaz.",
+    q: "Yazılım veya yapay zeka bilmiyorum, kullanabilir miyim?",
+    a: "Evet — Craft tam da bunun için tasarlandı. Ne istediğini sıradan cümlelerle yazarsın, gerisini yapay zeka halleder. Hiçbir kurulum, kod ya da teknik bilgi gerekmez.",
   },
   {
-    q: "Hangi modeller destekleniyor?",
-    a: "OpenAI-uyumlu herhangi bir uç desteklenir: Hugging Face, DeepSeek, OpenRouter, Groq, Anthropic, Google Gemini, Mistral, Ollama, vLLM ve daha fazlası.",
+    q: "Ücretsiz mi? Kredi kartı istiyor mu?",
+    a: "Anında, ücretsiz ve kredi kartsız başlarsın. Hazır gelen ücretsiz yapay zeka ile hemen üretmeye başlayabilirsin. İleri düzey için istersen kendi modelini ekleyebilirsin.",
   },
   {
-    q: "Verilerim nerede saklanıyor?",
-    a: "API anahtarların yalnızca tarayıcında (localStorage veya gizli modda sessionStorage) saklanır. Sohbet geçmişi için isteğe bağlı Supabase entegrasyonu var; kullanmak zorunda değilsin.",
+    q: "Neler yapabilirim?",
+    a: "Web sitesi ve sunum tasarlayabilir, görsel üretebilir, metin yazdırabilir, soru sorabilirsin. Yazılımcıysan kod üretip GitHub/GitLab depona bağlanabilirsin — hepsi tek yerde.",
   },
   {
-    q: "GitHub ve GitLab entegrasyonu nasıl çalışıyor?",
-    a: "Ayarlardan GitHub veya GitLab personal access token'ınla bağlanırsın. Repo'ları gezebilir, dosya içeriklerini sohbete gönderebilir, kod değişikliklerini commit edebilirsin. Her iki platform da aynı anda desteklenir.",
+    q: "Verilerim güvende mi?",
+    a: "Evet. Kendi anahtarını eklersen yalnızca senin tarayıcında kalır, sunucuya gönderilmez. Sohbetlerin için isteğe bağlı bulut senkronu var; kullanmak zorunda değilsin.",
   },
   {
-    q: "Mobilde çalışıyor mu?",
-    a: "Evet. PWA olarak yüklediğinde masaüstü uygulaması gibi çalışır. iOS ve Android'de tam destek var.",
+    q: "Telefonda çalışıyor mu?",
+    a: "Evet, telefon ve tablette tam çalışır. Ana ekrana uygulama gibi de ekleyebilirsin.",
   },
 ];
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://craft-coder.vercel.app";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://craft-coder.vercel.app";
 
 const JSON_LD_APP = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "Craft Coder",
+  name: "Craft",
   description:
-    "OpenAI-uyumlu herhangi bir modelle çalışan AI kod asistanı. Sohbet, gizli sohbet ve GitHub/GitLab deposuna bağlı kod üretimi — sohbet, kod ve terminal tek ekranda.",
+    "Herkes için yapay zeka stüdyosu. Web sitesi ve sunum tasarla, görsel üret, her şeyi sor — ya da kod yazıp GitHub/GitLab depona bağlan. Kurulum yok, ücretsiz başlar.",
   url: SITE_URL,
-  applicationCategory: "DeveloperApplication",
+  applicationCategory: "DesignApplication",
   operatingSystem: "Web",
   inLanguage: "tr",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-  author: {
-    "@type": "Person",
-    name: "Enes Kahveci",
-    email: "eneskahveci.bs@gmail.com",
-  },
-  featureList: [
-    "Çoklu model desteği",
-    "Coder entegrasyonu",
-    "Gizli sohbet modu",
-    "PWA desteği",
-    "Supabase senkron",
-  ],
+  author: { "@type": "Person", name: "Enes Kahveci", email: "eneskahveci.bs@gmail.com" },
+  featureList: ["Web sitesi tasarımı", "Sunum üretimi", "Görsel üretimi", "Yapay zeka sohbeti", "Kod & depo entegrasyonu"],
 };
 
 const JSON_LD_FAQ = {
   "@context": "https://schema.org",
   "@type": "FAQPage",
-  mainEntity: FAQS.map((f) => ({
-    "@type": "Question",
-    name: f.q,
-    acceptedAnswer: { "@type": "Answer", text: f.a },
-  })),
+  mainEntity: FAQS.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })),
 };
 
 export default function Home() {
   return (
     <div className="min-h-screen flex flex-col">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_APP) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_FAQ) }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_APP) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_FAQ) }} />
 
       {/* NAV */}
-      <nav className="sticky top-0 z-50 backdrop-blur-md bg-bg/85 border-b border-line/40">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+      <nav className="sticky top-0 z-50 glass border-b border-line/40">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5 font-extrabold text-xl tracking-tight">
             <LogoMark size={28} />
-            <span className="text-ink">craft</span><span className="brand-text">.coder</span>
+            <span className="text-ink">craft</span>
           </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/pricing"
-              className="hidden sm:inline-flex text-sm text-muted hover:text-ink font-medium px-3 py-2 transition-colors"
-            >
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link href="/pricing" className="hidden sm:inline-flex text-sm text-muted hover:text-ink font-medium px-3 py-2 transition-colors">
               Fiyatlandırma
             </Link>
             <Link
               href="/app"
               className="flex items-center gap-1.5 bg-brand hover:bg-branddim text-[#111110] font-semibold px-4 py-2 rounded-xl text-sm transition-colors shadow-sm shadow-brand/20"
             >
-              Uygulamayı Aç <ArrowRight size={15} />
+              Başla <ArrowRight size={15} />
             </Link>
           </div>
         </div>
       </nav>
 
       {/* HERO */}
-      <header className="relative max-w-6xl mx-auto px-6 pt-24 pb-20 text-center overflow-hidden w-full">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_65%_50%_at_50%_0%,rgba(200,168,126,0.12),transparent)]" />
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_35%_25%_at_85%_65%,rgba(200,168,126,0.05),transparent)]" />
+      <header className="relative max-w-5xl mx-auto px-5 sm:px-6 pt-20 sm:pt-28 pb-14 text-center overflow-hidden w-full">
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_65%_50%_at_50%_0%,rgba(200,168,126,0.14),transparent)]" />
         <div className="aurora absolute inset-0 -z-10" aria-hidden />
 
         <span className="animate-rise inline-flex items-center gap-2 text-sm text-muted border border-line bg-surface/70 backdrop-blur-sm px-4 py-1.5 rounded-full mb-8">
-          <span className="w-2 h-2 rounded-full bg-green animate-pulse" />
-          model bağımsız · gizlilik önce · ücretsiz
+          <Sparkles size={13} className="text-brand" />
+          kurulum yok · ücretsiz · anında
         </span>
 
-        <h1 className="animate-rise text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-tight" style={{ animationDelay: "60ms" }}>
-          Kod için tasarlanmış
+        <h1 className="animate-rise text-[2.6rem] leading-[1.06] sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-balance" style={{ animationDelay: "60ms" }}>
+          Bir cümle yaz,
           <br />
-          <span className="brand-text">AI asistanın</span>
+          <span className="brand-text">gerisini yapay zeka halletsin.</span>
         </h1>
 
-        <p className="animate-rise text-lg text-muted max-w-2xl mx-auto mt-6 leading-relaxed" style={{ animationDelay: "120ms" }}>
-          Dosyalarını okur, kod yazar, GitHub ve GitLab depolarını gezer — hepsi istediğin modelle.
-          Anthropic, DeepSeek, Groq, Gemini ya da kendi yerel modelin: tek arayüzde, anahtarın sende kalır.
+        <p className="animate-rise text-lg text-muted max-w-2xl mx-auto mt-6 leading-relaxed text-balance" style={{ animationDelay: "120ms" }}>
+          Web sitesi ve sunum tasarla, görsel üret, her şeyi sor — ya da kod yazıp depona bağlan.
+          Yazılım da yapay zeka da bilmene gerek yok. Sen anlat, Craft yapsın.
         </p>
 
-        <div className="flex gap-3 justify-center mt-10 flex-wrap">
-          <Link
-            href="/app"
-            className="flex items-center gap-2 bg-brand hover:bg-branddim text-[#111110] font-semibold px-8 py-3.5 rounded-2xl shadow-lg shadow-brand/20 hover:shadow-brand/30 transition-all duration-200"
-          >
-            Hemen Başla <ArrowRight size={16} />
-          </Link>
-        </div>
-
-        {/* Terminal kurulum komutu (Mac & Linux) */}
-        <InstallCommand />
-
-        {/* Stats */}
-        <div className="flex flex-wrap justify-center gap-10 mt-14">
-          {[
-            { val: "9+", label: "Desteklenen sağlayıcı" },
-            { val: "100%", label: "Ücretsiz & kendi anahtarınla" },
-            { val: "0", label: "Sunucuya gönderilen anahtar" },
-          ].map((s) => (
-            <div key={s.label} className="text-center">
-              <div className="text-3xl font-extrabold brand-text">{s.val}</div>
-              <div className="text-xs text-muted mt-1">{s.label}</div>
-            </div>
+        {/* İKİ YOL — akıllı ayrım */}
+        <div className="grid sm:grid-cols-2 gap-4 mt-12 text-left animate-rise" style={{ animationDelay: "180ms" }}>
+          {PATHS.map((p) => (
+            <Link
+              key={p.href}
+              href={p.href}
+              className="hover-lift group relative premium-card rounded-3xl p-6 sm:p-7 flex flex-col overflow-hidden"
+            >
+              <div className="absolute inset-0 -z-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(200,168,126,0.08),transparent)]" />
+              <div className="relative flex items-center gap-3 mb-4">
+                <span className="w-12 h-12 rounded-2xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0">
+                  {p.icon}
+                </span>
+                <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand/70">{p.badge}</span>
+              </div>
+              <h2 className="relative text-2xl font-extrabold tracking-tight mb-2">{p.title}</h2>
+              <p className="relative text-sm text-muted leading-relaxed mb-5 flex-1">{p.desc}</p>
+              <div className="relative flex flex-wrap gap-1.5 mb-5">
+                {p.chips.map((c) => (
+                  <span key={c} className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-bgsoft border border-line/70 text-muted">{c}</span>
+                ))}
+              </div>
+              <span className="relative inline-flex items-center gap-1.5 text-sm font-semibold text-brand group-hover:gap-2.5 transition-all">
+                {p.cta} <ArrowRight size={15} />
+              </span>
+            </Link>
           ))}
         </div>
+
+        <p className="text-xs text-muted/60 mt-6">Emin değil misin? İkisini de tek hesapta dener, istediğin zaman geçiş yaparsın.</p>
       </header>
 
-      {/* NASIL ÇALIŞIR */}
-      <section className="max-w-6xl mx-auto px-6 py-16 w-full">
+      {/* NE YAPABİLİRSİN */}
+      <section className="max-w-6xl mx-auto px-5 sm:px-6 py-16 w-full">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-extrabold mb-3">Nasıl çalışır?</h2>
-          <p className="text-muted max-w-xl mx-auto">Dakikalar içinde kurulum yok, indirme yok — tarayıcıda hemen başla.</p>
-        </div>
-        <div className="grid sm:grid-cols-3 gap-6">
-          {HOW_IT_WORKS.map((step) => (
-            <div key={step.step} className="hover-lift relative rounded-2xl border border-line bg-surface p-6 hover:border-brand/40">
-              <div className="flex items-center gap-3 mb-4">
-                <span className="w-8 h-8 rounded-full brand-gradient grid place-items-center text-[#111110] font-bold text-sm flex-shrink-0">
-                  {step.step}
-                </span>
-                <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand grid place-items-center">
-                  {step.icon}
-                </div>
-              </div>
-              <h3 className="font-bold text-lg mb-2">{step.title}</h3>
-              <p className="text-muted text-sm leading-relaxed">{step.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* FEATURES */}
-      <section className="max-w-6xl mx-auto px-6 py-8 w-full">
-        <div className="text-center mb-10">
-          <h2 className="text-3xl font-extrabold mb-3">Tüm özellikler</h2>
-          <p className="text-muted">Bir AI asistanından beklediğin her şey ve daha fazlası.</p>
+          <h2 className="text-3xl sm:text-4xl font-extrabold mb-3 tracking-tight text-balance">Craft ile neler yapabilirsin?</h2>
+          <p className="text-muted max-w-xl mx-auto text-balance">Hepsi konuşarak. Menü aramak, ayar kurcalamak yok — sadece ne istediğini söyle.</p>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {FEATURES.map((f) => (
-            <div
-              key={f.title}
-              className="hover-lift group rounded-2xl border border-line bg-surface p-6 hover:border-brand/40 hover:shadow-lg hover:shadow-brand/5"
-            >
-              <div className="w-11 h-11 rounded-xl bg-brand/10 text-brand grid place-items-center mb-4 group-hover:bg-brand/15 transition-colors">
+          {CAN_DO.map((f) => (
+            <div key={f.title} className="hover-lift group premium-card rounded-2xl p-6">
+              <div className="w-12 h-12 rounded-2xl bg-brand/10 text-brand grid place-items-center mb-4 group-hover:bg-brand/15 transition-colors">
                 {f.icon}
               </div>
               <h3 className="font-bold text-lg mb-1.5">{f.title}</h3>
@@ -304,65 +214,67 @@ export default function Home() {
         </div>
       </section>
 
-      {/* PROVIDERS */}
-      <section className="max-w-6xl mx-auto px-6 py-14 w-full text-center">
-        <h2 className="text-3xl font-extrabold mb-3">İstediğin modelle çalış</h2>
-        <p className="text-muted mb-8 max-w-xl mx-auto">
-          OpenAI-uyumlu her uç desteklenir. API anahtarın tarayıcında kalır, biz görmeyiz.
-        </p>
-        <div className="flex flex-wrap gap-3 justify-center">
-          {PROVIDERS.map((p) => (
-            <div
-              key={p.label}
-              className="group flex flex-col items-center px-5 py-3 rounded-2xl border border-line bg-surface hover:border-brand/40 transition-all duration-200"
-            >
-              <span className="text-sm font-semibold">{p.label}</span>
-              <span className="text-xs text-muted mt-0.5">{p.desc}</span>
+      {/* NASIL ÇALIŞIR — 3 adım, insan dili */}
+      <section className="max-w-5xl mx-auto px-5 sm:px-6 py-16 w-full">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl sm:text-4xl font-extrabold mb-3 tracking-tight">Üç adımda hazır</h2>
+          <p className="text-muted max-w-xl mx-auto">Ne indirmen ne kurman ne de öğrenmen gerekir.</p>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-5">
+          {STEPS.map((s, i) => (
+            <div key={s.n} className="relative premium-card rounded-2xl p-6">
+              {i < STEPS.length - 1 && (
+                <div className="hidden sm:block absolute top-9 -right-3 text-brand/30 z-10"><ArrowRight size={18} /></div>
+              )}
+              <span className="inline-grid place-items-center w-9 h-9 rounded-full brand-gradient text-[#111110] font-extrabold text-sm mb-4">{s.n}</span>
+              <h3 className="font-bold text-lg mb-2">{s.title}</h3>
+              <p className="text-muted text-sm leading-relaxed">{s.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
+      {/* GÜVEN ŞERİDİ */}
+      <section className="max-w-4xl mx-auto px-5 sm:px-6 py-8 w-full">
+        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-muted">
+          <span className="inline-flex items-center gap-2"><Zap size={15} className="text-brand" /> Anında başlar</span>
+          <span className="inline-flex items-center gap-2"><ShieldCheck size={15} className="text-brand" /> Anahtarların sende kalır</span>
+          <span className="inline-flex items-center gap-2"><Sparkles size={15} className="text-brand" /> Ücretsiz & kredi kartsız</span>
+          <span className="inline-flex items-center gap-2"><MessageCircle size={15} className="text-brand" /> Türkçe, insan diliyle</span>
+        </div>
+      </section>
+
       {/* CTA BANNER */}
-      <section className="max-w-6xl mx-auto px-6 py-10 w-full">
-        <div className="relative rounded-3xl overflow-hidden border border-brand/20 bg-surface p-10 text-center">
-          <div className="absolute inset-0 -z-0 bg-[radial-gradient(ellipse_60%_80%_at_50%_50%,rgba(200,168,126,0.07),transparent)]" />
-          <h2 className="text-3xl font-extrabold mb-3 relative">
-            Hemen dene — kurulum yok
-          </h2>
-          <p className="text-muted mb-7 max-w-lg mx-auto relative">
-            Tarayıcını aç, API anahtarını ekle ve kodlamaya başla. Ücretsiz, gizliliğe saygılı, kendi anahtarınla.
+      <section className="max-w-5xl mx-auto px-5 sm:px-6 py-14 w-full">
+        <div className="relative rounded-[2rem] overflow-hidden border border-brand/20 bg-surface p-10 sm:p-14 text-center elev-2">
+          <div className="aurora absolute inset-0 -z-0" aria-hidden />
+          <div className="absolute inset-0 -z-0 bg-[radial-gradient(ellipse_60%_90%_at_50%_50%,rgba(200,168,126,0.08),transparent)]" />
+          <h2 className="text-3xl sm:text-4xl font-extrabold mb-3 relative tracking-tight text-balance">Aklındaki şeyi bugün yap</h2>
+          <p className="text-muted mb-8 max-w-lg mx-auto relative text-balance">
+            Bir cümle yeter. Craft&apos;ı aç, ne istediğini yaz ve sonucu saniyeler içinde gör.
           </p>
           <Link
             href="/app"
-            className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-[#111110] font-semibold px-8 py-3.5 rounded-2xl shadow-lg shadow-brand/20 transition-all duration-200 relative"
+            className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-[#111110] font-semibold px-8 py-4 rounded-2xl shadow-lg shadow-brand/25 hover:shadow-brand/35 transition-all duration-200 relative text-[15px]"
           >
-            Uygulamayı Aç <ArrowRight size={16} />
+            Ücretsiz başla <ArrowRight size={17} />
           </Link>
         </div>
       </section>
 
       {/* FAQ */}
-      <section className="max-w-3xl mx-auto px-6 py-14 w-full">
+      <section className="max-w-3xl mx-auto px-5 sm:px-6 py-14 w-full">
         <div className="text-center mb-10">
-          <h2 className="text-3xl font-extrabold mb-3">Sık sorulan sorular</h2>
+          <h2 className="text-3xl font-extrabold mb-3 tracking-tight">Sık sorulan sorular</h2>
         </div>
         <div className="space-y-3">
           {FAQS.map((faq) => (
-            <details
-              key={faq.q}
-              className="group rounded-2xl border border-line bg-surface overflow-hidden"
-            >
-              <summary className="flex items-center justify-between px-6 py-4 cursor-pointer font-semibold text-sm list-none hover:text-brand transition-colors">
+            <details key={faq.q} className="group premium-card rounded-2xl overflow-hidden">
+              <summary className="flex items-center justify-between px-6 py-4 cursor-pointer font-semibold text-[15px] list-none hover:text-brand transition-colors">
                 {faq.q}
-                <ChevronDown
-                  size={16}
-                  className="text-muted transition-transform duration-200 group-open:rotate-180 flex-shrink-0 ml-3"
-                />
+                <ChevronDown size={16} className="text-muted transition-transform duration-200 group-open:rotate-180 flex-shrink-0 ml-3" />
               </summary>
-              <p className="px-6 pb-5 text-sm text-muted leading-relaxed">
-                {faq.a}
-              </p>
+              <p className="px-6 pb-5 text-sm text-muted leading-relaxed">{faq.a}</p>
             </details>
           ))}
         </div>
@@ -370,35 +282,21 @@ export default function Home() {
 
       {/* FOOTER */}
       <footer className="border-t border-line mt-auto">
-        <div className="max-w-6xl mx-auto px-6 py-12 text-center">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6 py-12 text-center">
           <div className="flex items-center justify-center gap-2 font-extrabold text-lg mb-3">
             <LogoMark size={22} />
-            <span className="text-ink">craft</span><span className="brand-text">.coder</span>
+            <span className="text-ink">craft</span>
           </div>
-          <p className="text-sm text-muted">
-            Terminal &amp; web tabanlı AI kod asistanı · Kendi anahtarınla (BYOK)
-          </p>
+          <p className="text-sm text-muted">Herkes için yapay zeka stüdyosu · Tasarla, üret, sor</p>
 
-          <div className="mt-8 inline-block rounded-2xl border border-line bg-surface px-8 py-5">
-            <div className="text-xs uppercase tracking-widest text-muted mb-1">
-              Geliştirici
-            </div>
-            <div className="text-lg font-bold brand-text">Enes Kahveci</div>
-            <a
-              href="mailto:eneskahveci.bs@gmail.com"
-              className="text-sm text-muted hover:text-brand transition-colors"
-            >
-              eneskahveci.bs@gmail.com
-            </a>
-          </div>
-
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 mt-6 text-xs text-muted/70">
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 mt-8 text-xs text-muted/70">
+            <Link href="/pricing" className="hover:text-brand transition-colors">Fiyatlandırma</Link>
             <Link href="/privacy" className="hover:text-brand transition-colors">Gizlilik Politikası</Link>
             <Link href="/terms" className="hover:text-brand transition-colors">Kullanım Şartları</Link>
             <Link href="/cookies" className="hover:text-brand transition-colors">Çerez Politikası</Link>
             <a href="mailto:eneskahveci.bs@gmail.com" className="hover:text-brand transition-colors">İletişim</a>
           </div>
-          <p className="text-xs text-muted/60 mt-4">© 2026 Enes Kahveci · Tüm hakları saklıdır.</p>
+          <p className="text-xs text-muted/60 mt-5">© 2026 Enes Kahveci · Tüm hakları saklıdır.</p>
         </div>
       </footer>
     </div>

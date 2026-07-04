@@ -8,8 +8,22 @@ import { createClient } from "@/lib/supabase/client";
 
 type Mode = "login" | "signup";
 
+/* Giriş sonrası dönülecek iç yol — açık yönlendirmeye (open redirect) karşı
+   YALNIZCA tek '/' ile başlayan site-içi yollar kabul edilir ('//host' veya
+   'https://' reddedilir). Yoksa /app. */
+function safeNext(): string {
+  if (typeof window === "undefined") return "/app";
+  const raw = new URLSearchParams(window.location.search).get("next");
+  if (raw && /^\/(?!\/)/.test(raw)) return raw;
+  return "/app";
+}
+
 export default function LoginPage() {
   const router = useRouter();
+  const nextPath = safeNext();
+  const callbackUrl = typeof window !== "undefined"
+    ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`
+    : "/auth/callback";
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -62,7 +76,7 @@ export default function LoginPage() {
       const { error: err } = await sb.auth.signUp({
         email: email.trim(),
         password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        options: { emailRedirectTo: callbackUrl },
       });
       setLoading(false);
       if (err) {
@@ -94,7 +108,7 @@ export default function LoginPage() {
       return;
     }
     writeAttempts({ count: 0, lockUntil: 0 });
-    router.replace("/app");
+    router.replace(nextPath);
     router.refresh();
   };
 
@@ -105,7 +119,7 @@ export default function LoginPage() {
     if (!sb) { setError("Kimlik doğrulama yapılandırılmamış."); setGlLoading(false); return; }
     const { error: err } = await sb.auth.signInWithOAuth({
       provider: "gitlab",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: callbackUrl },
     });
     if (err) { setError(err.message); setGlLoading(false); }
   };
@@ -118,7 +132,7 @@ export default function LoginPage() {
     if (!sb) { setError("Kimlik doğrulama yapılandırılmamış."); setGhLoading(false); return; }
     const { error: err } = await sb.auth.signInWithOAuth({
       provider: "github",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: callbackUrl },
     });
     if (err) { setError(err.message); setGhLoading(false); }
   };
@@ -131,7 +145,7 @@ export default function LoginPage() {
     if (!sb) { setError("Kimlik doğrulama yapılandırılmamış."); setGoogleLoading(false); return; }
     const { error: err } = await sb.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: callbackUrl },
     });
     if (err) { setError(err.message); setGoogleLoading(false); }
   };
