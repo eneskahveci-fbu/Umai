@@ -1,4 +1,4 @@
-import { isSafeRemoteUrl } from "./urlSafety";
+import { isSafeRemoteUrl, safeFetch } from "./urlSafety";
 
 /* Ücretsiz, anahtarsız web arama + sayfa okuma. Tek kaynak: chat route'unun
    web_search/read_url araçları, /api/web-search ve /api/search bunu kullanır.
@@ -148,7 +148,7 @@ export async function fetchUrl(rawUrl: string): Promise<string> {
     }
   } catch { /* yedeğe düş */ }
   try {
-    const res = await fetch(url, { headers: HTML_HEADERS, signal: AbortSignal.timeout(15000) });
+    const res = await safeFetch(url, { headers: HTML_HEADERS, signal: AbortSignal.timeout(15000) });
     if (!res.ok) return `Sayfa alınamadı (${res.status}).`;
     const html = await res.text();
     return strip(html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "")).slice(0, 8000) || "Sayfa boş döndü.";

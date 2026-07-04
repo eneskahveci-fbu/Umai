@@ -22,6 +22,32 @@ function isPrivateIPv4(host: string): boolean {
   return false;
 }
 
+/** Kullanıcı URL'ini yönlendirmeleri TEK TEK doğrulayarak getirir.
+    `fetch` varsayılanı yönlendirmeleri körlemesine izler — public bir adres
+    302 ile iç ağa/metadata'ya (169.254.169.254) sıçrayabilir. Burada her hop
+    isSafeRemoteUrl'den geçer; güvensiz hop'ta veya hop limitinde hata atılır. */
+export async function safeFetch(
+  rawUrl: string,
+  init?: RequestInit,
+  opts?: { maxHops?: number; fetchImpl?: typeof fetch },
+): Promise<Response> {
+  const doFetch = opts?.fetchImpl ?? fetch;
+  const maxHops = opts?.maxHops ?? 4;
+  let url = rawUrl;
+  for (let hop = 0; hop <= maxHops; hop++) {
+    if (!isSafeRemoteUrl(url)) throw new Error("Güvensiz adres (iç ağ/loopback yönlendirmesi engellendi).");
+    const res = await doFetch(url, { ...init, redirect: "manual" });
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get("location");
+      if (!loc) return res;
+      url = new URL(loc, url).toString();
+      continue;
+    }
+    return res;
+  }
+  throw new Error("Çok fazla yönlendirme.");
+}
+
 /** Kullanıcı URL'i sunucudan güvenle getirilebilir mi? */
 export function isSafeRemoteUrl(raw: string): boolean {
   let u: URL;
