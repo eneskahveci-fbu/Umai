@@ -98,7 +98,7 @@ export function StudioWorkspace({
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
               rows={1}
-              placeholder="Değişiklik iste (ör. 'CTA'yı yeşil yap, fiyat ekle')…"
+              placeholder="Değiştirmek istediğini yaz — 'başlığı büyüt', 'mavi yap', 'fiyat bölümü ekle'…"
               className="flex-1 bg-transparent resize-none outline-none text-sm py-1 max-h-28"
             />
             {busy ? (
@@ -188,14 +188,22 @@ export function StudioWorkspace({
                 </div>
                 <div className="h-3 w-full rounded bg-line/50" />
                 <div className="h-3 w-5/6 rounded bg-line/50" />
-                <p className="text-xs text-muted/60 flex items-center gap-1.5 pt-1">
-                  <Loader2 size={12} className="animate-spin text-brand" /> Tasarım üretiliyor…
+                <p className="text-sm text-brand/90 font-medium flex items-center gap-2 pt-1">
+                  <Loader2 size={14} className="animate-spin" />
+                  {phase ? PHASE_LABEL[phase] : "Tasarımın hazırlanıyor…"}
                 </p>
+                <p className="text-xs text-muted/60">Birkaç saniye sürebilir — sonucu beğenmezsen konuşarak değiştirebilirsin.</p>
               </div>
             </div>
           ) : (
             <div className="h-full grid place-items-center text-center px-6">
-              <p className="text-sm text-muted">Henüz önizleme yok.</p>
+              <div className="max-w-xs flex flex-col items-center gap-3">
+                <span className="w-14 h-14 rounded-2xl grid place-items-center text-brand bg-brand/10 border border-brand/20">
+                  <Sparkles size={24} />
+                </span>
+                <p className="text-sm text-ink/80 font-semibold">Tasarımın burada belirecek</p>
+                <p className="text-xs text-muted/70 leading-relaxed">Soldaki kutuya ne istediğini yaz — birkaç saniyede canlı önizlemesini gör, sonra konuşarak değiştir.</p>
+              </div>
             </div>
           )}
         </div>
