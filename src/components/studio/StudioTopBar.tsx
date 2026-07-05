@@ -6,13 +6,16 @@ import { X } from "lucide-react";
 import { StudioSwitcher } from "./StudioSwitcher";
 import type { Surface } from "@/lib/surfaceNav";
 
-/* Stüdyo üst çubuğu — 7 yüzeyin elle kopyaladığı başlık şeridini (ikon+isim +
-   mod anahtarı + "+ Yeni" + opsiyonel başlık input'u + eylemler + kapat) tek
-   yerde toplar. `showWorkActions` false iken yalnız ikon/isim + kapat görünür
-   (giriş ekranı); true iken "+ Yeni"/başlık/eylemler açılır ve kapat butonu
-   otomatik sona kayar — üç stüdyonun aynı ml-auto mantığını tekrar yazmaz. */
+/* Stüdyo üst çubuğu — 7 yüzeyin elle kopyaladığı başlık şeridini (mod anahtarı +
+   "+ Yeni" + opsiyonel başlık input'u + eylemler + kapat) tek yerde toplar.
+   `showWorkActions` false iken yalnız anahtar + kapat görünür (giriş ekranı);
+   true iken "+ Yeni"/başlık/eylemler açılır ve kapat butonu otomatik sona
+   kayar — üç stüdyonun aynı ml-auto mantığını tekrar yazmaz.
+   `icon`/`label` artık görsel olarak basılmıyor (StudioSwitcher'ın kendi
+   tetikleyicisi zaten aktif modun ikon+ismini gösteriyor — tekrar olurdu);
+   yalnız çubuğun `aria-label`'ı için kullanılıyor, bu yüzden 7 çağıran
+   dosyanın hiçbiri değişmedi. */
 export function StudioTopBar({
-  icon: Icon,
   label,
   activeSurface,
   showWorkActions,
@@ -33,10 +36,7 @@ export function StudioTopBar({
   onClose: () => void;
 }) {
   return (
-    <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line">
-      <div className="flex items-center gap-1.5 text-sm font-bold shrink-0">
-        <Icon size={15} className="text-brand" /> <span className="hidden sm:inline">{label}</span>
-      </div>
+    <div aria-label={`${label} başlık çubuğu`} className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line">
       <StudioSwitcher active={activeSurface} />
       {showWorkActions && (
         <>
