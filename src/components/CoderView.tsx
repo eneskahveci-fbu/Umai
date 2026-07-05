@@ -1475,10 +1475,15 @@ export function CoderView() {
        ağır istek) tetiklendiyse devreye girer. Devam turlarında otomatik açılmaz. */
     /* ✦ OTOMATİK PİLOT — görünmez zeka: mod kararları (efor/web/araştırma/
        kalite/ekip) mesajdan tek noktada türetilir. Elle açılan çipler her
-       zaman geçersiz kılar; devam turu ve slash-ajanlarda devreye girmez. */
+       zaman geçersiz kılar; devam turu ve slash-ajanlarda devreye girmez.
+       Admin DIŞINDAKİ tüm hesaplarda Otomatik Pilot HER ZAMAN açıktır (Claude
+       gibi tam otomatik — kapatma anahtarı bile yok); yalnız admin Ayarlar'dan
+       kapatıp elle yönetebilir. */
+    const isAdminNow = isAdminEmail(store.userEmail);
+    const pilotEnabled = isAdminNow ? store.config.autoPilot !== false : true;
     const pilotRepoCtx = !!store.repo || !!(store.config.localMode && store.config.localBridgeUrl?.trim());
     const pilot: PilotDecision | null =
-      store.config.autoPilot !== false && !opts?.continuation && !overrideAgent
+      pilotEnabled && !opts?.continuation && !overrideAgent
         ? decidePilot(_lastUserText, { hasRepo: pilotRepoCtx })
         : null;
     setLastPilot(pilot);
@@ -1641,7 +1646,9 @@ export function CoderView() {
     }
     const abortCtl = coderAbort;
 
-    const thinkingMode = store.thinkingMode === "auto" ? (pilot?.effort ?? autoEffort(_lastUserText)) : store.thinkingMode;
+    /* Admin dışı hesaplarda düşünme eforu HER ZAMAN otomatik (Claude gibi —
+       manuel efor seçici yalnız admin'e görünür, bkz. EffortMenuControl). */
+    const thinkingMode = (isAdminNow && store.thinkingMode !== "auto") ? store.thinkingMode : (pilot?.effort ?? autoEffort(_lastUserText));
     let finalSystemPrompt = coderSystemPrompt;
     if (thinkingMode === "medium") {
       finalSystemPrompt += "\n\n[EFOR: ORTA] Yanıtlamadan önce kısa bir iç değerlendirme yap, ardından net ve eksiksiz yanıt ver.";
@@ -2383,7 +2390,10 @@ export function CoderView() {
           )}
           {/* Birleşik ⋯ menüsü — gruplu: Hızlı eylemler · Çalışma Alanı · Modlar · Araçlar */}
           <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen || toolsEnabled || !!config.safeMode || swarmMode || researchMode}>
-            <EffortMenuControl />
+            {/* Manuel efor seçici yalnız admin'e — diğer tüm hesaplarda efor
+               (ve web/kalite/ekip/araştırma) Otomatik Pilot tarafından
+               mesajdan tek başına kararlaştırılır, elle geçersiz kılma yok. */}
+            {isAdmin && <EffortMenuControl />}
             <div className="h-px bg-line my-1" />
 
             <MoreItem icon={<VenetianMask size={14} />} label="Gizli sohbet" onClick={() => useStore.getState().newChat(true)} />
@@ -2429,7 +2439,12 @@ export function CoderView() {
               </>
             )}
 
-            {moreTab === "modes" && (
+            {/* Mod çipleri (elle geçersiz kılma) yalnız admin'e — diğer
+               hesaplarda Tools/Güvenli/Kalite/Ekip/Araştırma otomatik yönetilir
+               (Tools: repo bağlanınca kendiliğinden açılır; kalan dördü
+               Otomatik Pilot'ın mesaj-bazlı kararına bağlıdır); Öğrenme Modu
+               Ayarlar → Temel'den standing tercih olarak açılabilir. */}
+            {moreTab === "modes" && isAdmin && (
               <div className="px-1.5 pb-1 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
                 {config.autoPilot !== false && (
                   <p className="w-full text-[10px] text-muted/55 mb-0.5">✦ Otomatik Pilot açık — bunlar elle geçersiz kılar.</p>

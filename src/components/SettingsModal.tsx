@@ -176,7 +176,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     extensions: ["eklenti", "extension", "paket", "pack", "git", "ci", "cd", "kural", "web", "modül", "modular"],
     model:    ["model", "api", "anahtar", "key", "openai", "anthropic", "huggingface", "hf", "nvidia", "nim", "provider", "test"],
     github:   ["github", "gitlab", "token", "depo", "repo", "branch", "dal", "kullanıcı", "username"],
-    general:  ["otomatik", "pilot", "auto", "davranış", "web", "arama", "search", "bildirim", "notification", "ses", "sound", "kalite", "quality", "hatırla", "bellek", "memori", "memory", "sistem", "prompt", "stil", "style", "tema", "theme", "renk", "color", "accent", "font", "yazı", "boyut", "bağlam", "context", "yedek", "backup", "skill", "ayar", "kısayol"],
+    general:  ["otomatik", "pilot", "auto", "davranış", "web", "arama", "search", "bildirim", "notification", "ses", "sound", "kalite", "quality", "hatırla", "bellek", "memori", "memory", "sistem", "prompt", "stil", "style", "tema", "theme", "renk", "color", "accent", "font", "yazı", "boyut", "bağlam", "context", "yedek", "backup", "skill", "ayar", "kısayol", "öğrenme", "öğren", "learning", "eğitim", "ders"],
     advanced: ["webcontainer", "gelişmiş", "guest", "misafir", "terminal", "hibrit", "köprü", "bridge", "otomasyon", "automation", "yerel", "local", "hata", "error", "kural", "rules", "rulesfile"],
     mcp:      ["mcp", "model context", "protocol", "sunucu", "server", "araç", "tool", "entegrasyon"],
     hooks:    ["hook", "kanca", "olay", "event", "lint", "test", "otomatik", "afteredit", "onfinish", "komut", "command"],
@@ -1187,25 +1187,40 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
         {/* GENEL */}
         {tab === "general" && (
           <section className="flex flex-col gap-5">
-            {/* ✦ Otomatik Pilot — en başta: "her şeyi benim yerime hallet" anahtarı */}
+            {/* ✦ Otomatik Pilot — en başta: "her şeyi benim yerime hallet" anahtarı.
+               Admin dışı hesaplarda HER ZAMAN açık (kapatma anahtarı yok — Claude
+               gibi tam otomatik); yalnız admin Ayarlar'dan kapatıp elle yönetebilir. */}
             <div>
               <h4 className="text-sm font-bold mb-2">Otomatik Pilot</h4>
-              <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-brand/30 bg-brand/8 hover:border-brand/50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={config.autoPilot !== false}
-                  onChange={() => saveConfig({ ...config, autoPilot: config.autoPilot === false })}
-                  className="accent-brand"
-                />
-                <div>
-                  <div className="text-sm font-semibold">✦ Otomatik Pilot <span className="text-[10px] font-bold uppercase tracking-wider text-brand/70">önerilen</span></div>
-                  <div className="text-xs text-muted mt-0.5 leading-relaxed">
-                    Craft; ne kadar düşüneceğine, internette arama yapıp yapmayacağına ve kalite
-                    turuna mesajına bakarak kendisi karar verir. Hiçbir ayara dokunmana gerek kalmaz.
-                    Sen bir modu elle açarsan o her zaman öncelikli olur.
+              {isAdmin ? (
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-brand/30 bg-brand/8 hover:border-brand/50 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={config.autoPilot !== false}
+                    onChange={() => saveConfig({ ...config, autoPilot: config.autoPilot === false })}
+                    className="accent-brand"
+                  />
+                  <div>
+                    <div className="text-sm font-semibold">✦ Otomatik Pilot <span className="text-[10px] font-bold uppercase tracking-wider text-brand/70">önerilen</span></div>
+                    <div className="text-xs text-muted mt-0.5 leading-relaxed">
+                      Craft; ne kadar düşüneceğine, internette arama yapıp yapmayacağına ve kalite
+                      turuna mesajına bakarak kendisi karar verir. Hiçbir ayara dokunmana gerek kalmaz.
+                      Sen bir modu elle açarsan o her zaman öncelikli olur.
+                    </div>
+                  </div>
+                </label>
+              ) : (
+                <div className="flex items-center gap-3 p-3 rounded-xl border border-brand/30 bg-brand/8">
+                  <Check size={16} className="text-brand shrink-0" />
+                  <div>
+                    <div className="text-sm font-semibold">✦ Otomatik Pilot her zaman açık</div>
+                    <div className="text-xs text-muted mt-0.5 leading-relaxed">
+                      Craft; ne kadar düşüneceğine, internette arama yapıp yapmayacağına ve kalite
+                      turuna mesajına bakarak kendisi karar verir. Hiçbir ayara dokunmana gerek yok.
+                    </div>
                   </div>
                 </div>
-              </label>
+              )}
             </div>
 
             {/* Ajan Davranışı — her gün etkileyen davranış anahtarları (açıklamalı) */}
@@ -1223,6 +1238,8 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     title: "Kesilince otomatik sürdür", desc: "Uzun yanıt sınıra takılıp yarıda kalırsa kaldığı yerden kendiliğinden devam eder." },
                   { on: config.agentsUseStrongestModel !== false, toggle: () => saveConfig({ ...config, agentsUseStrongestModel: config.agentsUseStrongestModel === false }),
                     title: "Zor işlerde en güçlü modeli kullan", desc: "Ajan ekibi çalışırken en yetenekli (anahtarı olan) modeli seçer — daha iyi sonuç, biraz daha maliyet." },
+                  { on: !!config.learningMode, toggle: () => saveConfig({ ...config, learningMode: !config.learningMode }),
+                    title: "Öğrenme Modu", desc: "Yanıtlar adım adım, kavramları açıklayarak verilir — üniversite/öğrenme amaçlı kullanım için." },
                 ].map((it) => (
                   <label key={it.title} className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
                     <input type="checkbox" checked={!!it.on} onChange={it.toggle} className="accent-brand mt-0.5 shrink-0" />
