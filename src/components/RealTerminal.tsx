@@ -455,7 +455,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-line/30 bg-black/20 shrink-0">
         <Power size={11} className={
           status === "ready" ? "text-green" :
-          status === "booting" ? "text-amber-400 animate-pulse" :
+          status === "booting" ? "text-yellow animate-pulse" :
           status === "error" ? "text-red" : "text-white/30"
         } />
         <span className="text-[11px] font-mono text-white/50 truncate max-w-[140px]">
@@ -523,7 +523,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
               <strong className="text-white/60">Ya da kendi sunucunu bağla (Ayarlar → Terminal).</strong>
             </p>
             <div className="flex items-center justify-center gap-2 flex-wrap">
-              <button onClick={() => setSettingsOpen(true)} className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-white hover:bg-branddim transition-colors font-semibold">
+              <button onClick={() => setSettingsOpen(true)} className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-[#111110] hover:bg-branddim transition-colors font-semibold">
                 <SettingsIcon size={11} /> Ayarlar
               </button>
               {codespaceHref && (
@@ -543,15 +543,15 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
             <p className="text-[11px] text-white/40 leading-relaxed mb-3">{errMsg}</p>
             <div className="flex items-center justify-center gap-2 flex-wrap">
               {useWs ? (
-                <button onClick={() => setSettingsOpen(true)} className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-white hover:bg-branddim transition-colors font-semibold">
+                <button onClick={() => setSettingsOpen(true)} className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-[#111110] hover:bg-branddim transition-colors font-semibold">
                   <SettingsIcon size={11} /> Ayarlar
                 </button>
               ) : codespaceHref ? (
-                <a href={codespaceHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-white hover:bg-branddim transition-colors font-semibold">
+                <a href={codespaceHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-[#111110] hover:bg-branddim transition-colors font-semibold">
                   <Cloud size={11} /> Codespaces&apos;te aç
                 </a>
               ) : (
-                <button onClick={() => setSettingsOpen(true)} className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-white hover:bg-branddim transition-colors font-semibold">
+                <button onClick={() => setSettingsOpen(true)} className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-[#111110] hover:bg-branddim transition-colors font-semibold">
                   <SettingsIcon size={11} /> Sunucu bağla
                 </button>
               )}

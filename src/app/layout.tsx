@@ -5,12 +5,12 @@ import { NativeInit } from "@/components/NativeInit";
 
 const inter = Inter({
   variable: "--font-inter",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
 });
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
 });
 
 /* Monokrom emoji fontu — tüm emojileri tek renk glif olarak çizer ve metnin

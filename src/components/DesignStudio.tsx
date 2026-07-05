@@ -948,7 +948,7 @@ KURALLAR:
             )}
           </div>
 
-          <button onClick={save} className="btn-brand-glow flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-white text-xs font-bold"><Save size={13} /> <span className="hidden sm:inline">Kaydet</span></button>
+          <button onClick={save} className="btn-brand-glow flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-[#111110] text-xs font-bold"><Save size={13} /> <span className="hidden sm:inline">Kaydet</span></button>
 
           {/* ⋯ ikincil eylemler (sade üst bar) */}
           <div className="relative">
@@ -1101,7 +1101,7 @@ KURALLAR:
                       placeholder={dmode === "code" ? "Kod tasarımı iste (ör. fiyatlandırma sayfası)…" : "Tasarım iste veya değişiklik söyle…"}
                       className="flex-1 bg-transparent text-sm outline-none resize-none max-h-24 py-1"
                     />
-                    <button onClick={onSend} disabled={busy} className="shrink-0 w-7 h-7 grid place-items-center rounded-lg bg-brand text-white disabled:opacity-50 transition-opacity">
+                    <button onClick={onSend} disabled={busy} className="shrink-0 w-7 h-7 grid place-items-center rounded-lg bg-brand text-[#111110] disabled:opacity-50 transition-opacity">
                       {busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                     </button>
                   </div>
@@ -1246,7 +1246,7 @@ KURALLAR:
                             placeholder="bunu kırmızı yap…"
                             className="w-36 bg-bgsoft border border-line rounded px-1.5 py-0.5 text-[11px] outline-none focus:border-brand/50"
                           />
-                          <button onClick={() => void aiEditLayer()} disabled={aiSelBusy} title="Uygula" className="w-6 h-6 grid place-items-center rounded bg-brand text-white disabled:opacity-50 shrink-0">
+                          <button onClick={() => void aiEditLayer()} disabled={aiSelBusy} title="Uygula" className="w-6 h-6 grid place-items-center rounded bg-brand text-[#111110] disabled:opacity-50 shrink-0">
                             {aiSelBusy ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
                           </button>
                         </div>

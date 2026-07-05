@@ -141,7 +141,7 @@ export function DiffModal() {
             </button>
             <button
               onClick={copyNew}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-brand hover:bg-branddim text-white font-semibold transition-colors"
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-brand hover:bg-branddim text-[#111110] font-semibold transition-colors"
             >
               {copied ? <Check size={12} /> : <Copy size={12} />}
               {copied ? "Kopyalandı" : "Yeniyi kopyala"}

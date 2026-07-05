@@ -61,7 +61,7 @@ export default async function SharedChatPage({ params }: Props) {
         </div>
 
         <div className="mt-10 text-center">
-          <Link href="/app" className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-white font-semibold px-6 py-3 rounded-2xl transition-colors">
+          <Link href="/app" className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-[#111110] font-semibold px-6 py-3 rounded-2xl transition-colors">
             ⚡ Craft ile kendi sohbetini başlat
           </Link>
         </div>

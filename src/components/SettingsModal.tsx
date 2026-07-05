@@ -784,7 +784,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 <button
                   onClick={addAndTest}
                   disabled={quickBusy || (!apiKey.trim() && !config.providerKeys?.[provider] && !KEY_OPTIONAL.includes(provider))}
-                  className="px-3 py-2 rounded-lg bg-brand hover:bg-branddim text-white text-xs font-semibold disabled:opacity-40 flex items-center gap-1.5 shrink-0"
+                  className="px-3 py-2 rounded-lg bg-brand hover:bg-branddim text-[#111110] text-xs font-semibold disabled:opacity-40 flex items-center gap-1.5 shrink-0"
                 >
                   {quickBusy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Ekle ve test et
                 </button>
@@ -800,8 +800,8 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 </div>
               )}
               {quickResult && quickResult !== "ok" && (
-                <div className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/8 px-2.5 py-2 text-[11px] text-muted break-words leading-relaxed">
-                  <span className="font-semibold text-amber-400">Model kaydedildi</span>, ama test yanıtı alınamadı: {quickResult}
+                <div className="mt-2 rounded-lg border border-yellow/30 bg-yellow/8 px-2.5 py-2 text-[11px] text-muted break-words leading-relaxed">
+                  <span className="font-semibold text-yellow">Model kaydedildi</span>, ama test yanıtı alınamadı: {quickResult}
                 </div>
               )}
 
@@ -861,7 +861,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   return (
                     <div key={m.id} className={`flex flex-col gap-2 px-3 py-2.5 rounded-xl border ${active ? "border-branddim bg-brand/10" : "border-line bg-bgsoft"}`}>
                       <div className="flex items-center gap-2">
-                        <button onClick={() => setActiveModel(m.id)} className={`w-5 h-5 rounded-full grid place-items-center border ${active ? "bg-brand border-brand text-white" : "border-muted"}`}>
+                        <button onClick={() => setActiveModel(m.id)} className={`w-5 h-5 rounded-full grid place-items-center border ${active ? "bg-brand border-brand text-[#111110]" : "border-muted"}`}>
                           {active && <Check size={11} />}
                         </button>
                         <div className="flex-1 min-w-0">
@@ -892,7 +892,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               return (
                 <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50 mb-4">
                   <div className="flex items-center gap-1.5 mb-1.5">
-                    <Layers size={13} className="text-amber-400 shrink-0" />
+                    <Layers size={13} className="text-yellow shrink-0" />
                     <span className="text-xs font-bold text-muted uppercase tracking-wide">Otomatik ücretsiz yedek zinciri</span>
                   </div>
                   <p className="text-xs text-muted leading-relaxed mb-2.5">
@@ -916,7 +916,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     ))}
                   </div>
                   {chain.length === 0 && (
-                    <p className="text-xs text-amber-400/90 mt-2 leading-relaxed">
+                    <p className="text-xs text-yellow/90 mt-2 leading-relaxed">
                       Henüz yedek yok. Ücretsiz bir sağlayıcı (Google Gemini / Groq / OpenRouter) eklersen
                       otomatik olarak bu zincire katılır.
                     </p>
@@ -942,7 +942,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                       <div key={a.id} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${isActive ? "border-branddim bg-brand/10" : "border-line bg-bgsoft"}`}>
                         <button
                           onClick={() => setActiveGithub(a.id)}
-                          className={`w-5 h-5 rounded-full grid place-items-center border shrink-0 ${isActive ? "bg-brand border-brand text-white" : "border-muted"}`}
+                          className={`w-5 h-5 rounded-full grid place-items-center border shrink-0 ${isActive ? "bg-brand border-brand text-[#111110]" : "border-muted"}`}
                         >
                           {isActive && <Check size={11} />}
                         </button>
@@ -958,7 +958,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               <button
                 onClick={() => connectGitOAuth("github")}
                 disabled={oauthBusy !== null}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-brand text-white font-semibold text-sm hover:bg-brand/90 transition-colors disabled:opacity-50 mb-3"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-brand text-[#111110] font-semibold text-sm hover:bg-brand/90 transition-colors disabled:opacity-50 mb-3"
               >
                 {oauthBusy === "github" ? <Loader2 size={16} className="animate-spin" /> : <GitBranch size={16} />}
                 GitHub ile bağlan
@@ -985,7 +985,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                       <div key={r} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${isActive ? "border-branddim bg-brand/10" : "border-line bg-bgsoft"}`}>
                         <button
                           onClick={() => setActiveRepo(r)}
-                          className={`w-5 h-5 rounded-full grid place-items-center border shrink-0 ${isActive ? "bg-brand border-brand text-white" : "border-muted"}`}
+                          className={`w-5 h-5 rounded-full grid place-items-center border shrink-0 ${isActive ? "bg-brand border-brand text-[#111110]" : "border-muted"}`}
                         >
                           {isActive && <Check size={11} />}
                         </button>
@@ -1052,7 +1052,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                       <div key={a.id} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${isActive ? "border-branddim bg-brand/10" : "border-line bg-bgsoft"}`}>
                         <button
                           onClick={() => setActiveGitlab(a.id)}
-                          className={`w-5 h-5 rounded-full grid place-items-center border shrink-0 ${isActive ? "bg-brand border-brand text-white" : "border-muted"}`}
+                          className={`w-5 h-5 rounded-full grid place-items-center border shrink-0 ${isActive ? "bg-brand border-brand text-[#111110]" : "border-muted"}`}
                         >
                           {isActive && <Check size={11} />}
                         </button>
@@ -1068,7 +1068,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               <button
                 onClick={() => connectGitOAuth("gitlab")}
                 disabled={oauthBusy !== null}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-brand text-white font-semibold text-sm hover:bg-brand/90 transition-colors disabled:opacity-50 mb-3"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-brand text-[#111110] font-semibold text-sm hover:bg-brand/90 transition-colors disabled:opacity-50 mb-3"
               >
                 {oauthBusy === "gitlab" ? <Loader2 size={16} className="animate-spin" /> : <GitBranch size={16} />}
                 GitLab ile bağlan
@@ -1108,8 +1108,8 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     <div className="text-xs text-muted mt-0.5">Editörde yazarken ghost-text önerisi (Tab ile kabul). Aktif modelin API kotasını kullanır.</div>
                   </div>
                 </label>
-                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-amber-400/50 transition-colors">
-                  <input type="checkbox" checked={!!config.safeMode} onChange={() => saveConfig({ ...config, safeMode: !config.safeMode })} className="accent-amber-400 mt-0.5" />
+                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-yellow/50 transition-colors">
+                  <input type="checkbox" checked={!!config.safeMode} onChange={() => saveConfig({ ...config, safeMode: !config.safeMode })} className="accent-yellow mt-0.5" />
                   <div>
                     <div className="text-sm font-semibold">Güvenli Mod (salt-okunur)</div>
                     <div className="text-xs text-muted mt-0.5">Açıkken ajan HİÇBİR değişiklik yapamaz: yazma, silme, yeniden adlandırma, dal/PR ve komut araçları tamamen devre dışı. Yalnızca okuma, arama ve analiz. Değişiklik gerekirse kod bloğu olarak önerir. Composer&apos;daki ⋯ menüsünden de açılır.</div>
@@ -1141,8 +1141,8 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     />
                   </div>
                 )}
-                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-amber-400/50 transition-colors">
-                  <input type="checkbox" checked={config.commandGuard !== false} onChange={() => saveConfig({ ...config, commandGuard: config.commandGuard === false })} className="accent-amber-400 mt-0.5" />
+                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-yellow/50 transition-colors">
+                  <input type="checkbox" checked={config.commandGuard !== false} onChange={() => saveConfig({ ...config, commandGuard: config.commandGuard === false })} className="accent-yellow mt-0.5" />
                   <div>
                     <div className="text-sm font-semibold">Tehlikeli komut kalkanı</div>
                     <div className="text-xs text-muted mt-0.5">Açıkken (varsayılan) ajanın çalıştırmak istediği <b>katastrofik</b> komutlar (<code>rm -rf /</code>, fork bomb, <code>mkfs</code>, <code>curl | sh</code>, sistem kapatma…) çalıştırılmadan engellenir ve ajana geri bildirilir. Normal komutlar (<code>npm test</code>, <code>rm -rf node_modules</code>…) etkilenmez.</div>
@@ -1456,7 +1456,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                         setStyleFormOpen(false); setStyleName(""); setStyleInstr(""); setStyleSample("");
                         addToast("Özel stil kaydedildi ve etkinleştirildi.", "success");
                       }}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-brand text-white font-semibold"
+                      className="text-xs px-3 py-1.5 rounded-lg bg-brand text-[#111110] font-semibold"
                     >Kaydet</button>
                   </div>
                 </div>
@@ -1480,7 +1480,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               )}
               <div className="flex gap-2">
                 <input value={memInput} onChange={(e) => setMemInput(e.target.value)} placeholder="Örn: Python tercih ederim" className="input-mono !py-1.5 text-xs flex-1" onKeyDown={(e) => { if (e.key === "Enter") { if (memInput.trim()) { addMemory(memInput.trim()); setMemInput(""); } } }} />
-                <button onClick={() => { if (memInput.trim()) { addMemory(memInput.trim()); setMemInput(""); } }} className="text-xs px-3 py-1.5 rounded-lg bg-brand text-white font-semibold shrink-0">Ekle</button>
+                <button onClick={() => { if (memInput.trim()) { addMemory(memInput.trim()); setMemInput(""); } }} className="text-xs px-3 py-1.5 rounded-lg bg-brand text-[#111110] font-semibold shrink-0">Ekle</button>
               </div>
               {/* Otomatik hatırlananlar: ajanın konuşmalardan damıttığı kalıcı bilgiler (düzenle/sil). */}
               {(() => {
@@ -1782,7 +1782,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 Belirli bir olayda terminalde otomatik komut çalıştır.{" "}
                 <strong className="text-muted">Dosya yazınca</strong> = ajan kod yazdığında,{" "}
                 <strong className="text-muted">Yanıttan sonra</strong> = her yanıtın ardından. Terminal bağlı olmalı.
-                {" "}<strong className="text-amber-400">Dikkat:</strong> buraya yazdığın komutlar gerçekten çalışır — yalnızca güvendiğin komutları ekle.
+                {" "}<strong className="text-yellow">Dikkat:</strong> buraya yazdığın komutlar gerçekten çalışır — yalnızca güvendiğin komutları ekle.
               </p>
               <div className="space-y-2">
                 {(config.automations ?? []).map((a) => (
@@ -1982,7 +1982,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     setMcpName(""); setMcpUrl(""); setMcpHeaderKey(""); setMcpHeaderVal("");
                     addToast("MCP sunucusu eklendi.", "success");
                   }}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-branddim transition-colors"
+                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-brand text-[#111110] text-sm font-semibold hover:bg-branddim transition-colors"
                 >
                   <Plus size={14} /> Ekle
                 </button>
@@ -2050,7 +2050,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     setHookLabel(""); setHookCommand("");
                     addToast("Kanca eklendi.", "success");
                   }}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-branddim transition-colors"
+                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-brand text-[#111110] text-sm font-semibold hover:bg-branddim transition-colors"
                 >
                   <Plus size={14} /> Ekle
                 </button>
@@ -2087,7 +2087,7 @@ function ToolPermissions() {
 
   const categories: string[] = [];
   for (const t of ALL_TOOL_CATALOG) if (!categories.includes(t.category)) categories.push(t.category);
-  const riskColor: Record<string, string> = { low: "bg-muted/40", medium: "bg-amber-400", high: "bg-red" };
+  const riskColor: Record<string, string> = { low: "bg-muted/40", medium: "bg-yellow", high: "bg-red" };
   const riskLabel: Record<string, string> = { low: "düşük", medium: "orta", high: "yüksek" };
   const deniedCount = ALL_TOOL_CATALOG.filter((t) => !isAllowed(t.name)).length;
 
@@ -2098,7 +2098,7 @@ function ToolPermissions() {
           <div className="text-sm font-semibold">Araç izinleri</div>
           <div className="text-xs text-muted mt-0.5">
             Ajanın kullanabileceği araçları tek tek aç/kapat. Kapatılan araç ajana hiç sunulmaz.
-            {deniedCount > 0 && <span className="text-amber-400"> · {deniedCount} araç kapalı</span>}
+            {deniedCount > 0 && <span className="text-yellow"> · {deniedCount} araç kapalı</span>}
           </div>
         </div>
         {deniedCount > 0 && (

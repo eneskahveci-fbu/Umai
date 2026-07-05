@@ -190,7 +190,7 @@ export function MultiCommitBar({
                 selected.has(f.path) ? "bg-brand border-brand" : "border-line hover:border-muted"
               }`}
             >
-              {selected.has(f.path) && <Check size={9} className="text-white" />}
+              {selected.has(f.path) && <Check size={9} className="text-[#111110]" />}
             </button>
             <FileText size={12} className="text-muted/50 shrink-0" />
             <button
@@ -240,7 +240,7 @@ export function MultiCommitBar({
           onClick={writeSandbox}
           disabled={writingSandbox || toCommit.length === 0}
           title="WebContainer (sandbox) FS'sine yaz"
-          className="flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg bg-amber-400/15 hover:bg-amber-400/25 text-amber-400/90 font-semibold disabled:opacity-50 transition-colors"
+          className="flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg bg-yellow/15 hover:bg-yellow/25 text-yellow/90 font-semibold disabled:opacity-50 transition-colors"
         >
           {writingSandbox ? <Loader2 size={11} className="animate-spin" /> : <Terminal size={11} />}
           Sandbox
@@ -249,7 +249,7 @@ export function MultiCommitBar({
         <button
           onClick={commit}
           disabled={committing || done || toCommit.length === 0}
-          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-brand hover:bg-branddim text-white font-semibold disabled:opacity-50 transition-colors"
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-brand hover:bg-branddim text-[#111110] font-semibold disabled:opacity-50 transition-colors"
         >
           {done ? <Check size={12} /> : committing ? <Loader2 size={12} className="animate-spin" /> : <GitCommit size={12} />}
           {done ? "Tamam" : committing ? `${toCommit.length}…` : `${toCommit.length} commit`}

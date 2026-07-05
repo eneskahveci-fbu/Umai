@@ -346,7 +346,7 @@ export function ImageStudio() {
             <button
               onClick={send}
               disabled={!prompt.trim()}
-              className="shrink-0 w-9 h-9 grid place-items-center rounded-xl bg-brand text-white disabled:opacity-40 transition-opacity"
+              className="shrink-0 w-9 h-9 grid place-items-center rounded-xl bg-brand text-[#111110] disabled:opacity-40 transition-opacity"
               title="Üret"
             >
               <Send size={16} />

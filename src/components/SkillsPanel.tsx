@@ -264,7 +264,7 @@ function SkillsTab({
           <button
             onClick={save}
             disabled={!content.trim()}
-            className="shrink-0 w-9 self-stretch rounded-lg bg-amber-400 hover:bg-amber-300 text-black grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="shrink-0 w-9 self-stretch rounded-lg bg-yellow hover:bg-yellow text-black grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             title="Ekle (Ctrl+Enter)"
           >
             <Plus size={15} />
@@ -286,7 +286,7 @@ function SkillsTab({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Skill ara…"
-            className="w-full bg-bgsoft/40 rounded-lg pl-7 pr-3 py-1.5 text-xs outline-none focus:ring-1 ring-amber-400/30 placeholder:text-muted/35"
+            className="w-full bg-bgsoft/40 rounded-lg pl-7 pr-3 py-1.5 text-xs outline-none focus:ring-1 ring-yellow/30 placeholder:text-muted/35"
           />
         </div>
       </div>
@@ -395,7 +395,7 @@ function AgentsTab() {
             />
             <div className="flex items-center justify-end gap-2">
               <button onClick={() => { reset(); setCreating(false); }} className="px-3 py-1.5 rounded-lg text-xs text-muted hover:text-ink transition-colors">İptal</button>
-              <button onClick={create} disabled={!cmd.trim() || !prompt.trim()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-semibold hover:bg-branddim disabled:opacity-30 transition-colors">
+              <button onClick={create} disabled={!cmd.trim() || !prompt.trim()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-[#111110] text-xs font-semibold hover:bg-branddim disabled:opacity-30 transition-colors">
                 <Check size={13} /> Oluştur
               </button>
             </div>
@@ -443,7 +443,7 @@ function AgentsTab() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="font-bold text-sm">{a.label}</h3>
-                  <code className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-400/80">
+                  <code className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-yellow/10 text-yellow/80">
                     {a.command}
                   </code>
                 </div>
@@ -504,7 +504,7 @@ function ProgressTab({
               <div key={s.id} className="bg-bgsoft/30 border border-line/40 rounded-lg px-3 py-2">
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    {s.source === "file" ? <FileText size={11} className="text-muted/50 shrink-0" /> : <BookMarked size={11} className="text-amber-400/60 shrink-0" />}
+                    {s.source === "file" ? <FileText size={11} className="text-muted/50 shrink-0" /> : <BookMarked size={11} className="text-yellow/60 shrink-0" />}
                     <span className="text-xs font-medium truncate">{s.title}</span>
                     {!s.enabled && <span className="text-[10px] text-muted/40">(pasif)</span>}
                   </div>
@@ -512,7 +512,7 @@ function ProgressTab({
                 </div>
                 <div className="h-1.5 bg-bgsoft/60 rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all ${s.enabled ? "bg-amber-400/70" : "bg-muted/30"}`}
+                    className={`h-full rounded-full transition-all ${s.enabled ? "bg-yellow/70" : "bg-muted/30"}`}
                     style={{ width: `${pct}%` }}
                   />
                 </div>
@@ -528,7 +528,7 @@ function ProgressTab({
 /* ───────── Helpers ───────── */
 
 function StatCard({ label, value, accent }: { label: string; value: number; accent?: "amber" | "green" }) {
-  const color = accent === "amber" ? "text-amber-400" : accent === "green" ? "text-green" : "text-ink";
+  const color = accent === "amber" ? "text-yellow" : accent === "green" ? "text-green" : "text-ink";
   return (
     <div className="bg-bgsoft/40 border border-line/60 rounded-xl px-3 py-2.5">
       <p className="text-[10px] uppercase tracking-wider text-muted/50 font-semibold">{label}</p>
@@ -564,7 +564,7 @@ function SkillCard({
 
   if (editing) {
     return (
-      <div className="bg-bgsoft/40 border border-amber-400/40 rounded-xl px-3 py-3 space-y-2">
+      <div className="bg-bgsoft/40 border border-yellow/40 rounded-xl px-3 py-3 space-y-2">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -590,7 +590,7 @@ function SkillCard({
               content: content.trim() || skill.content,
               tags: tagsRaw.split(",").map((x) => x.trim()).filter(Boolean),
             })}
-            className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-amber-400 text-black font-semibold hover:bg-amber-300 transition-colors"
+            className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-yellow text-black font-semibold hover:bg-yellow transition-colors"
           >
             <Check size={11} /> Kaydet
           </button>
@@ -606,7 +606,7 @@ function SkillCard({
           onClick={onToggle}
           className={`w-3.5 h-3.5 rounded border mt-1 shrink-0 grid place-items-center transition-colors ${
             skill.enabled
-              ? "bg-amber-400 border-amber-400"
+              ? "bg-yellow border-yellow"
               : "border-line hover:border-muted bg-transparent"
           }`}
           title={skill.enabled ? "Devre dışı bırak" : "Aktifleştir"}
@@ -620,7 +620,7 @@ function SkillCard({
               <code className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand/10 text-brand/80">file</code>
             )}
             {skill.tags.map((t) => (
-              <code key={t} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-400/80">{t}</code>
+              <code key={t} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-yellow/10 text-yellow/80">{t}</code>
             ))}
             {skill.usageCount > 0 && (
               <span className="text-[10px] text-muted/50 font-mono">· {skill.usageCount}× kullanıldı</span>

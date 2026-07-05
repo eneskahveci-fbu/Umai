@@ -210,7 +210,7 @@ GitLab `main`'e cherry-pick ile taşınır — toptan branch push'tan kaçın.
 
 - Tip ve arayüzleri `import type` ile içe aktar; `any` kullanma.
 - Tailwind tasarım token'larını kullan (`bg-surface`, `text-muted`,
-  `border-line`, vurgu `amber-400`).
+  `border-line`, vurgu/dikkat rengi `yellow` — `amber-400` değil).
 - Global durum için yeni `useState` yerine mevcut Zustand store action'larını
   kullan; `saveConfig` config'i hem state'e hem localStorage'a yazar.
 - Yanıtlar ve kullanıcıya dönük metinler Türkçe.

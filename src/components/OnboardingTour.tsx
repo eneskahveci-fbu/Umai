@@ -160,7 +160,7 @@ export function OnboardingTour() {
 
           <button
             onClick={() => (isLast ? dismiss() : setStep((s) => s + 1))}
-            className="flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-lg bg-brand hover:bg-branddim text-white font-semibold transition-colors"
+            className="flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-lg bg-brand hover:bg-branddim text-[#111110] font-semibold transition-colors"
           >
             {isLast ? <>Başla <Check size={12} /></> : <>Devam <ArrowRight size={12} /></>}
           </button>
