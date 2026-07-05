@@ -422,7 +422,7 @@ function AgentsTab() {
                   <p className="text-[12px] text-muted/70 leading-relaxed mb-2">{a.description}</p>
                   <details className="text-[11px]">
                     <summary className="text-muted/50 cursor-pointer hover:text-muted">Sistem prompt&apos;u gör</summary>
-                    <pre className="mt-2 text-[11px] font-mono bg-[#0a0a0d] text-muted/70 px-3 py-2 rounded-lg whitespace-pre-wrap leading-relaxed">{a.systemPrompt}</pre>
+                    <pre className="mt-2 text-[11px] font-mono bg-codebg text-muted/70 px-3 py-2 rounded-lg whitespace-pre-wrap leading-relaxed">{a.systemPrompt}</pre>
                   </details>
                 </div>
               </div>
@@ -450,7 +450,7 @@ function AgentsTab() {
                 <p className="text-[12px] text-muted/70 leading-relaxed mb-2">{a.description}</p>
                 <details className="text-[11px]">
                   <summary className="text-muted/50 cursor-pointer hover:text-muted">Sistem prompt&apos;u gör</summary>
-                  <pre className="mt-2 text-[11px] font-mono bg-[#0a0a0d] text-muted/70 px-3 py-2 rounded-lg whitespace-pre-wrap leading-relaxed">{a.systemPrompt}</pre>
+                  <pre className="mt-2 text-[11px] font-mono bg-codebg text-muted/70 px-3 py-2 rounded-lg whitespace-pre-wrap leading-relaxed">{a.systemPrompt}</pre>
                 </details>
               </div>
             </div>

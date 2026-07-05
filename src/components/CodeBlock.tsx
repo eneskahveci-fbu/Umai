@@ -136,7 +136,7 @@ export function CodeBlock({
 
   return (
     <div className="relative group/code">
-      <div className="flex items-center justify-between px-4 py-1.5 bg-[#0c0e14] rounded-t-[10px] border border-b-0 border-line text-xs text-muted">
+      <div className="flex items-center justify-between px-4 py-1.5 bg-codebg rounded-t-[10px] border border-b-0 border-line text-xs text-muted">
         <span className="font-mono flex items-center gap-1.5 min-w-0">
           <span className="shrink-0">{lang || "code"}</span>
           {filePath && <span className="text-muted/40 truncate">· {filePath}</span>}
@@ -205,7 +205,7 @@ export function CodeBlock({
       </div>
       {/* Python (Pyodide) çıktısı */}
       {(pyOut || pyRunning) && (
-        <div className="border border-t-0 border-line rounded-b-[10px] bg-[#0a0a0d] -mt-px">
+        <div className="border border-t-0 border-line rounded-b-[10px] bg-codebg -mt-px">
           <div className="flex items-center gap-1.5 px-4 py-1.5 border-b border-line/40 text-[10px] uppercase tracking-wider text-muted/60 font-bold">
             <Terminal size={11} /> Çıktı
             {pyOut?.error && <span className="text-red/80 normal-case tracking-normal font-normal ml-1">· hata</span>}

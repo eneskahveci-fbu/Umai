@@ -68,7 +68,7 @@ import { VoiceButton } from "./VoiceButton";
 const RealTerminal = dynamic(() => import("./RealTerminal").then((m) => m.RealTerminal), {
   ssr: false,
   loading: () => (
-    <div className="h-64 shrink-0 border-t border-line/60 bg-[#0a0a0d] grid place-items-center">
+    <div className="h-64 shrink-0 border-t border-line/60 bg-codebg grid place-items-center">
       <div className="text-xs text-muted/50">Terminal yükleniyor…</div>
     </div>
   ),

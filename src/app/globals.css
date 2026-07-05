@@ -16,7 +16,8 @@
   --color-blue: #5aa7ff;
   --color-red: #ff6b6b;
   --color-green: #3ddc84;
-  --color-purple: #c8a87e;
+  --color-purple: #a78bfa;
+  --color-codebg: #0a0a0d;
 
   /* Emoji yazı tipi yığınının başına monokrom Noto Emoji konur: metin glifleri
      birincil fonttan, emoji glifleri tek renk Noto Emoji'den gelir ve tema
@@ -58,6 +59,7 @@ html.light {
   --color-green: #2a8040;
   --color-red: #c04040;
   --color-blue: #3860b8;
+  --color-purple: #7c3aed;
 }
 
 /* ─── Gradyanlar ─── */

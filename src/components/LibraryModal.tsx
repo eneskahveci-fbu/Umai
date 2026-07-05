@@ -158,7 +158,7 @@ function SnippetsTab() {
                   </button>
                 </div>
               </div>
-              <pre className="text-[11px] font-mono px-3 py-2 overflow-x-auto max-h-44 bg-[#0a0a0d] text-muted/80 leading-relaxed">
+              <pre className="text-[11px] font-mono px-3 py-2 overflow-x-auto max-h-44 bg-codebg text-muted/80 leading-relaxed">
                 <code>{s.code}</code>
               </pre>
             </div>

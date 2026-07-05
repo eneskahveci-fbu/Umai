@@ -4,6 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useModalA11y } from "@/lib/useModalA11y";
 import {
+  Bell,
   Brain,
   Check,
   ChevronRight,
@@ -13,13 +14,16 @@ import {
   Download,
   FolderGit2,
   GitBranch,
+  Link2,
   Loader2,
+  Lock,
   Upload,
   Moon,
   Pencil,
   Play,
   Plus,
   Search,
+  Server,
   Sun,
   Trash2,
   User,
@@ -845,7 +849,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
 
             {/* Güven kartı — anahtarın nerede yaşadığını sade dille anlatır. */}
             <div className="mb-4 rounded-xl border border-line/60 bg-bgsoft/40 p-3 text-[11px] text-muted leading-relaxed">
-              <div className="font-bold text-ink/80 mb-1">🔒 Anahtarın nerede saklanır?</div>
+              <div className="font-bold text-ink/80 mb-1 flex items-center gap-1.5"><Lock size={12} /> Anahtarın nerede saklanır?</div>
               <ul className="list-disc pl-4 space-y-0.5">
                 <li>Yalnızca <strong>bu tarayıcıda</strong>, şifrelenmiş olarak saklanır — sunucuya kaydedilmez.</li>
                 <li>İstekler doğrudan senin anahtarınla sağlayıcıya gider; craft aracıdır, içerik saklamaz.</li>
@@ -1187,10 +1191,11 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
         {/* GENEL */}
         {tab === "general" && (
           <section className="flex flex-col gap-5">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted/45 -mb-2">İçerik &amp; Davranış</div>
             {/* ✦ Otomatik Pilot — en başta: "her şeyi benim yerime hallet" anahtarı.
                Admin dışı hesaplarda HER ZAMAN açık (kapatma anahtarı yok — Claude
                gibi tam otomatik); yalnız admin Ayarlar'dan kapatıp elle yönetebilir. */}
-            <div>
+            <div className="premium-card rounded-xl p-4">
               <h4 className="text-sm font-bold mb-2">Otomatik Pilot</h4>
               {isAdmin ? (
                 <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-brand/30 bg-brand/8 hover:border-brand/50 transition-colors">
@@ -1224,7 +1229,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             </div>
 
             {/* Ajan Davranışı — her gün etkileyen davranış anahtarları (açıklamalı) */}
-            <div>
+            <div className="premium-card rounded-xl p-4">
               <h4 className="text-sm font-bold mb-2">Davranış</h4>
               <div className="flex flex-col gap-2">
                 {[
@@ -1253,8 +1258,8 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             </div>
 
             {/* Görünüm — tema + vurgu rengi + yazı boyutu tek grupta */}
-            {/* Tema */}
-            <div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted/45 -mb-2 mt-1">Görünüm</div>
+            <div className="premium-card rounded-xl p-4">
               <h4 className="text-sm font-bold mb-2">Tema</h4>
               <button onClick={toggleTheme} disabled={!!config.autoTheme} className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-line bg-bgsoft hover:border-brand text-sm disabled:opacity-50 w-full">
                 {config.theme === "dark" ? <><Moon size={15} /> Koyu tema</> : <><Sun size={15} /> Açık tema</>}
@@ -1267,7 +1272,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             </div>
 
             {/* Vurgu rengi */}
-            <div>
+            <div className="premium-card rounded-xl p-4">
               <h4 className="text-sm font-bold mb-2">Vurgu Rengi</h4>
               <div className="flex gap-2">
                 {([
@@ -1295,7 +1300,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             </div>
 
             {/* Yazı tipi boyutu */}
-            <div>
+            <div className="premium-card rounded-xl p-4">
               <h4 className="text-sm font-bold mb-2">Yazı Boyutu</h4>
               <div className="flex gap-2">
                 {(["sm", "base", "lg"] as const).map((s) => (
@@ -1318,7 +1323,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             </div>
 
             {/* Bildirimler */}
-            <div>
+            <div className="premium-card rounded-xl p-4">
               <h4 className="text-sm font-bold mb-2">Bildirimler</h4>
               <div className="flex flex-col gap-2">
                 <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
@@ -1342,7 +1347,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   }}
                   className="flex items-center gap-3 p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 text-sm text-left transition-colors"
                 >
-                  <span className="text-lg">🔔</span>
+                  <Bell size={16} className="text-brand shrink-0" />
                   <div>
                     <div className="text-sm font-semibold">Tarayıcı bildirimi aç</div>
                     <div className="text-xs text-muted mt-0.5">Sekme arka planda iken yanıt hazır olunca bildirim gelir.</div>
@@ -1352,7 +1357,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             </div>
 
             {/* Yedekle / geri yükle */}
-            <div>
+            <div className="premium-card rounded-xl p-4">
               <h4 className="text-sm font-bold mb-2">Yedek</h4>
               <div className="flex gap-2">
                 <button
@@ -1392,7 +1397,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             </div>
 
             {/* Yanıt stili */}
-            <div>
+            <div className="premium-card rounded-xl p-4">
               <h4 className="text-sm font-bold mb-2">Yanıt Stili</h4>
               <div className="grid grid-cols-3 gap-1.5">
                 {(Object.entries(STYLE_LABELS) as [ResponseStyle, typeof STYLE_LABELS.normal][]).map(([k, v]) => (
@@ -1464,7 +1469,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             </div>
 
             {/* Bellek */}
-            <div>
+            <div className="premium-card rounded-xl p-4">
               <h4 className="text-sm font-bold mb-1">Bellek</h4>
               <p className="text-xs text-muted mb-2">Sohbetler arası hatırlanmasını istediğin bilgileri ekle.</p>
               {config.memories.length > 0 && (
@@ -1505,7 +1510,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
 
             {/* Proje promptu */}
             {activeProj && (
-              <div>
+              <div className="premium-card rounded-xl p-4">
                 <h4 className="text-sm font-bold mb-1">Proje Promptu: {activeProj.name}</h4>
                 <textarea value={activeProj.systemPrompt} onChange={(e) => updateProject(activeProj.id, { systemPrompt: e.target.value })} rows={3} className="input-mono !text-xs" placeholder="Bu projenin için özel sistem promptu..." />
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
@@ -1547,14 +1552,14 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             )}
 
             {/* Sistem promptu */}
-            <div>
+            <div className="premium-card rounded-xl p-4">
               <h4 className="text-sm font-bold mb-1">Sistem Promptu</h4>
               <textarea value={systemPromptDraft} onChange={(e) => setSystemPromptDraft(e.target.value)} onBlur={() => saveConfig({ ...config, systemPrompt: systemPromptDraft })} rows={4} className="input-mono !text-xs leading-relaxed" />
               <button onClick={() => { saveConfig({ ...config, systemPrompt: DEFAULT_SYSTEM_PROMPT }); setSystemPromptDraft(DEFAULT_SYSTEM_PROMPT); }} className="text-xs text-muted hover:text-brand mt-1">Varsayılana sıfırla</button>
             </div>
 
             {/* Bağlam limiti */}
-            <div>
+            <div className="premium-card rounded-xl p-4">
               <h4 className="text-sm font-bold mb-1">Bağlam Penceresi</h4>
               <p className="text-xs text-muted mb-2 leading-relaxed">Modelin bir seferde ne kadar geçmişi (token) hatırlayacağı. Yükseği daha fazla bağlam demektir ama maliyeti artırır; modelin gerçek sınırının üstüne çıkmak fark etmez. Emin değilsen varsayılanda bırak.</p>
               <select value={config.maxContext} onChange={(e) => saveConfig({ ...config, maxContext: Number(e.target.value) })} className="input-mono text-xs">
@@ -1565,7 +1570,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             </div>
 
             {/* Kısayollar */}
-            <div>
+            <div className="premium-card rounded-xl p-4">
               <h4 className="text-sm font-bold mb-2">Klavye Kısayolları</h4>
               <div className="grid gap-1.5 text-xs">
                 {[["Ctrl + N", "Yeni sohbet"], ["Ctrl + Shift + N", "Gizli sohbet"], ["Ctrl + ,", "Ayarlar"]].map(([key, desc]) => (
@@ -1672,7 +1677,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             <>
             {/* Hibrit Sunucu — tek adres hem terminal hem dosya sistemi kurar */}
             <div>
-              <h4 className="text-sm font-bold mb-1 flex items-center gap-1.5">🔗 Hibrit Sunucu <span className="text-[10px] font-normal text-brand/80 bg-brand/10 px-1.5 py-0.5 rounded">tek adres</span></h4>
+              <h4 className="text-sm font-bold mb-1 flex items-center gap-1.5"><Link2 size={14} className="text-brand shrink-0" /> Hibrit Sunucu <span className="text-[10px] font-normal text-brand/80 bg-brand/10 px-1.5 py-0.5 rounded">tek adres</span></h4>
               <p className="text-xs text-muted/70 mb-2 leading-relaxed">
                 Oracle/sunucu kurulumunun verdiği{" "}
                 <code className="text-brand/80 bg-bgsoft px-1 rounded text-[11px]">wss://…/?token=…</code>{" "}
@@ -1835,7 +1840,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             <>
             {/* Yerel Mod (Local Bridge) */}
             <div>
-              <h4 className="text-sm font-bold mb-1">🖥️ Yerel Mod (Local Bridge)</h4>
+              <h4 className="text-sm font-bold mb-1 flex items-center gap-1.5"><Server size={14} className="text-brand shrink-0" /> Yerel Mod (Local Bridge)</h4>
               <p className="text-xs text-muted/70 mb-2 leading-relaxed">
                 Açıkken ajan GitHub/GitLab API yerine{" "}
                 <strong className="text-muted">gerçek dosya sistemine ve kabuğa</strong>{" "}

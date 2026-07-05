@@ -142,8 +142,8 @@ export function ArtifactPanel() {
           <a href={publishedUrl} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline truncate min-w-0 flex-1">{publishedUrl}</a>
           <button
             onClick={async () => { try { await navigator.clipboard.writeText(publishedUrl); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); } catch { /* yok say */ } }}
-            className="shrink-0 text-muted hover:text-ink font-semibold"
-          >{linkCopied ? "Kopyalandı ✓" : "Kopyala"}</button>
+            className="shrink-0 flex items-center gap-1 text-muted hover:text-ink font-semibold"
+          >{linkCopied ? <><Check size={12} /> Kopyalandı</> : "Kopyala"}</button>
         </div>
       )}
 
@@ -159,7 +159,7 @@ export function ArtifactPanel() {
             title="Artifact preview"
           />
         ) : (
-          <pre className="w-full h-full overflow-auto m-0 p-4 text-[12px] leading-relaxed font-mono bg-[#0b0b0d] text-[#d6d6d6]"><code>{shown.content}</code></pre>
+          <pre className="w-full h-full overflow-auto m-0 p-4 text-[12px] leading-relaxed font-mono bg-codebg text-[#d6d6d6]"><code>{shown.content}</code></pre>
         )}
       </div>
     </div>
