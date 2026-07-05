@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import {
   BookOpen, FolderOpen, Globe, Link2, Loader2, Plus, Save, Send,
-  Sparkles, Trash2, Volume2, VolumeX, X,
+  Sparkles, Trash2, Volume2, VolumeX,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav } from "@/lib/surfaceNav";
-import { StudioSwitcher } from "./StudioSwitcher";
+import { StudioTopBar } from "./StudioTopBar";
+import { SavedItemsModal } from "./SavedItemsModal";
 import type { CraftNotebook, NotebookSource } from "@/lib/types";
 import { streamChat } from "@/lib/genChat";
 import { playTts, stopTts, TTS_MAX_CHARS, TTS_VOICES } from "@/lib/pollinations";
@@ -183,26 +184,23 @@ export function NotebookStudio() {
   return (
     <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       {/* Üst bar */}
-      <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line">
-        <div className="flex items-center gap-1.5 text-sm font-bold shrink-0">
-          <BookOpen size={15} className="text-brand" /> <span className="hidden sm:inline">Defter</span>
-        </div>
-        <StudioSwitcher active="notebook" />
-        <button onClick={newNb} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink ml-1 shrink-0">+ Yeni</button>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Defter adı"
-          className="ml-auto hidden md:block w-40 bg-transparent text-xs text-muted focus:text-ink border-b border-transparent focus:border-line outline-none px-1 py-0.5"
-        />
-        <div className="flex items-center gap-1 ml-auto md:ml-1 shrink-0">
-          {saved.length > 0 && (
-            <button onClick={() => setSavedOpen(true)} title="Kayıtlı defterler" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
-          )}
-          <button onClick={saveNb} title="Defteri kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
-        </div>
-        <button onClick={() => nav.close()} className="w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors shrink-0" title="Kapat"><X size={16} /></button>
-      </div>
+      <StudioTopBar
+        icon={BookOpen}
+        label="Defter"
+        activeSurface="notebook"
+        showWorkActions
+        onNew={newNb}
+        onClose={() => nav.close()}
+        title={{ value: title, onChange: setTitle, placeholder: "Defter adı" }}
+        actions={
+          <>
+            {saved.length > 0 && (
+              <button onClick={() => setSavedOpen(true)} title="Kayıtlı defterler" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
+            )}
+            <button onClick={saveNb} title="Defteri kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+          </>
+        }
+      />
 
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
         {/* Kaynak paneli */}
@@ -318,26 +316,23 @@ export function NotebookStudio() {
       </div>
 
       {/* Kayıtlı defterler */}
-      {savedOpen && (
-        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-modal-bg" onClick={() => setSavedOpen(false)}>
-          <div className="w-full max-w-lg max-h-[70vh] overflow-y-auto rounded-2xl border border-line bg-surface p-4 space-y-2" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-bold flex items-center gap-1.5"><BookOpen size={14} className="text-brand" /> Kayıtlı defterler</h2>
-              <button onClick={() => setSavedOpen(false)} className="w-7 h-7 grid place-items-center rounded-lg text-muted hover:text-ink"><X size={14} /></button>
-            </div>
-            {saved.length === 0 && <p className="text-xs text-muted/60">Henüz kayıtlı defter yok.</p>}
-            {saved.map((n) => (
-              <div key={n.id} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-line/60 hover:border-brand/40 transition-colors">
-                <button onClick={() => openNb(n)} className="flex-1 min-w-0 text-left">
-                  <div className="text-sm font-semibold truncate">{n.title}</div>
-                  <div className="text-[11px] text-muted/60">{n.sources.length} kaynak · {new Date(n.updatedAt).toLocaleDateString("tr-TR")}</div>
-                </button>
-                <button onClick={() => removeNb(n.id)} className="w-7 h-7 grid place-items-center rounded-lg text-muted/50 hover:text-red" title="Sil"><Trash2 size={13} /></button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <SavedItemsModal
+        open={savedOpen}
+        onClose={() => setSavedOpen(false)}
+        title="Kayıtlı defterler"
+        icon={BookOpen}
+        items={saved}
+        getKey={(n) => n.id}
+        renderRow={(n) => (
+          <>
+            <div className="text-sm font-semibold truncate">{n.title}</div>
+            <div className="text-[11px] text-muted/60">{n.sources.length} kaynak · {new Date(n.updatedAt).toLocaleDateString("tr-TR")}</div>
+          </>
+        )}
+        onOpen={openNb}
+        onDelete={(n) => removeNb(n.id)}
+        emptyLabel="Henüz kayıtlı defter yok."
+      />
     </div>
   );
 }

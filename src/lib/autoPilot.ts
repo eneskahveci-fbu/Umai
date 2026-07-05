@@ -101,7 +101,6 @@ export function autoStudioSkill(brief: string): string | null {
   const t = (brief || "").toLowerCase();
   if (!t.trim()) return null;
   const rules: [RegExp, string][] = [
-    [/\b(sunum|slayt|deck|prezentasyon|pitch)\b/, "deck"],
     [/\b(e-?posta|mail|bülten|newsletter)\b/, "email"],
     [/\b(sosyal|instagram|post|afiş|banner|story)\b/, "social"],
     [/\b(dashboard|panel|gösterge|analitik ekran)\b/, "dashboard"],
