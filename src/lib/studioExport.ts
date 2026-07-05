@@ -26,6 +26,25 @@ export function openInTab(html: string): boolean {
   return !!w;
 }
 
+/** HTML'i /api/publish ile paylaşılabilir bağlantıya çevirir, panoya kopyalar.
+    Başarısızlıkta null döner; toast metni çağırana bırakılır. */
+export async function publishArtifact(title: string, html: string): Promise<string | null> {
+  try {
+    const res = await fetch("/api/publish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: title || "craft", type: "html", content: html }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.id) return null;
+    const url = `${window.location.origin}/a/${data.id}`;
+    try { await navigator.clipboard.writeText(url); } catch { /* yok say */ }
+    return url;
+  } catch {
+    return null;
+  }
+}
+
 /** Yazdır panelini açarak PDF'e aktar (tarayıcı "PDF olarak kaydet"). */
 export function printPdf(html: string): boolean {
   const w = window.open("", "_blank");
