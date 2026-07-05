@@ -3,15 +3,17 @@
 import { useEffect, useState } from "react";
 import {
   ArrowDown, ArrowUp, Download, FolderOpen, Globe, ListChecks, Loader2,
-  Plus, Save, Sparkles, Trash2, X,
+  Plus, Save, Sparkles, Trash2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { consumeSurfaceHandoff, useSurfaceNav } from "@/lib/surfaceNav";
-import { StudioSwitcher } from "./StudioSwitcher";
+import { StudioTopBar } from "./StudioTopBar";
+import { SavedItemsModal } from "./SavedItemsModal";
 import { safeFileName } from "./DocsStudio";
 import type { CraftForm, FormQuestion, FormQuestionType } from "@/lib/types";
 import { FORM_QUESTION_TYPES, formToHtml, generateForm, MAX_FORM_QUESTIONS, newQuestion } from "@/lib/forms";
 import { downloadTemplate, pickTemplateFile } from "@/lib/templateShare";
+import { publishArtifact } from "@/lib/studioExport";
 
 /* Anket Stüdyosu — Google Forms'tan İLHAM alan craft yorumu (klon değil):
    brief → yapılandırılmış soru listesi → canlı önizleme → BAĞIMSIZ HTML form.
@@ -118,17 +120,9 @@ export function FormsStudio() {
   /* Paylaşılabilir bağlantı — mevcut /api/publish altyapısı (Stüdyo ile aynı). */
   const publish = async () => {
     if (!form) return;
-    try {
-      const res = await fetch("/api/publish", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: form.title || "craft anketi", type: "html", content: formToHtml(form) }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.id) { addToast(data.error || "Yayınlama başarısız.", "error"); return; }
-      const url = `${window.location.origin}/a/${data.id}`;
-      try { await navigator.clipboard.writeText(url); } catch { /* yok say */ }
-      addToast("Yayınlandı — bağlantı kopyalandı.", "success");
-    } catch (e) { addToast((e as Error).message || "Yayınlama başarısız.", "error"); }
+    const url = await publishArtifact(form.title || "craft anketi", formToHtml(form));
+    if (url) addToast("Yayınlandı — bağlantı kopyalandı.", "success");
+    else addToast("Yayınlama başarısız.", "error");
   };
 
   const openForm = (f: CraftForm) => { setForm(f); setView("work"); setSavedOpen(false); setPreviewKey((k) => k + 1); };
@@ -140,23 +134,21 @@ export function FormsStudio() {
   return (
     <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       {/* Üst bar */}
-      <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line">
-        <div className="flex items-center gap-1.5 text-sm font-bold shrink-0">
-          <ListChecks size={15} className="text-brand" /> <span className="hidden sm:inline">Anket</span>
-        </div>
-        <StudioSwitcher active="forms" />
-        {view === "work" && form && (
+      <StudioTopBar
+        icon={ListChecks}
+        label="Anket"
+        activeSurface="forms"
+        showWorkActions={view === "work" && !!form}
+        onNew={() => { setForm(null); setView("home"); setBrief(""); }}
+        onClose={() => nav.close()}
+        actions={
           <>
-            <button onClick={() => { setForm(null); setView("home"); setBrief(""); }} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink ml-1 shrink-0">+ Yeni</button>
-            <div className="flex items-center gap-1 ml-auto shrink-0">
-              <button onClick={saveForm} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
-              <button onClick={exportHtml} title="Bağımsız HTML indir (sunucusuz anket)" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
-              <button onClick={() => void publish()} title="Yayınla — paylaşılabilir bağlantı" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-[#111110] text-xs font-semibold hover:bg-branddim transition-colors"><Globe size={13} /> <span className="hidden sm:inline">Yayınla</span></button>
-            </div>
+            <button onClick={saveForm} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+            <button onClick={exportHtml} title="Bağımsız HTML indir (sunucusuz anket)" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
+            <button onClick={() => void publish()} title="Yayınla — paylaşılabilir bağlantı" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-[#111110] text-xs font-semibold hover:bg-branddim transition-colors"><Globe size={13} /> <span className="hidden sm:inline">Yayınla</span></button>
           </>
-        )}
-        <button onClick={() => nav.close()} className={`${view === "work" ? "" : "ml-auto"} w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors shrink-0`} title="Kapat"><X size={16} /></button>
-      </div>
+        }
+      />
 
       {view === "home" ? (
         <div className="flex-1 min-h-0 overflow-auto">
@@ -287,27 +279,24 @@ export function FormsStudio() {
       ) : null}
 
       {/* Kayıtlı anketler */}
-      {savedOpen && (
-        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-modal-bg" onClick={() => setSavedOpen(false)}>
-          <div className="w-full max-w-lg max-h-[70vh] overflow-y-auto rounded-2xl border border-line bg-surface p-4 space-y-2" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-bold flex items-center gap-1.5"><ListChecks size={14} className="text-brand" /> Kayıtlı anketler</h2>
-              <button onClick={() => setSavedOpen(false)} className="w-7 h-7 grid place-items-center rounded-lg text-muted hover:text-ink"><X size={14} /></button>
-            </div>
-            {saved.length === 0 && <p className="text-xs text-muted/60">Henüz kayıtlı anket yok.</p>}
-            {saved.map((f) => (
-              <div key={f.id} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-line/60 hover:border-brand/40 transition-colors">
-                <button onClick={() => openForm(f)} className="flex-1 min-w-0 text-left">
-                  <div className="text-sm font-semibold truncate">{f.title}</div>
-                  <div className="text-[11px] text-muted/60">{f.questions.length} soru · {new Date(f.updatedAt).toLocaleDateString("tr-TR")}</div>
-                </button>
-                <button onClick={() => downloadTemplate({ kind: "form", data: f }, f.title)} className="w-7 h-7 grid place-items-center rounded-lg text-muted/50 hover:text-brand" title="Şablon olarak dışa aktar (.json)"><Download size={13} /></button>
-                <button onClick={() => removeForm(f.id)} className="w-7 h-7 grid place-items-center rounded-lg text-muted/50 hover:text-red" title="Sil"><Trash2 size={13} /></button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <SavedItemsModal
+        open={savedOpen}
+        onClose={() => setSavedOpen(false)}
+        title="Kayıtlı anketler"
+        icon={ListChecks}
+        items={saved}
+        getKey={(f) => f.id}
+        renderRow={(f) => (
+          <>
+            <div className="text-sm font-semibold truncate">{f.title}</div>
+            <div className="text-[11px] text-muted/60">{f.questions.length} soru · {new Date(f.updatedAt).toLocaleDateString("tr-TR")}</div>
+          </>
+        )}
+        onOpen={openForm}
+        onDelete={(f) => removeForm(f.id)}
+        onExportTemplate={(f) => downloadTemplate({ kind: "form", data: f }, f.title)}
+        emptyLabel="Henüz kayıtlı anket yok."
+      />
     </div>
   );
 }
