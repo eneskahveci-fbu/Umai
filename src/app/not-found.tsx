@@ -29,7 +29,7 @@ export default function NotFound() {
         <div className="flex gap-3 justify-center flex-wrap">
           <Link
             href="/"
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand hover:bg-branddim text-white font-semibold text-sm transition-colors"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand hover:bg-branddim text-[#111110] font-semibold text-sm transition-colors"
           >
             <Home size={15} aria-hidden="true" />
             Ana sayfa

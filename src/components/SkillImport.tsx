@@ -65,7 +65,7 @@ export default function SkillImport() {
             <button
               onClick={importUrl}
               disabled={loading || !url.trim()}
-              className="shrink-0 px-3 rounded-lg bg-amber-400 hover:bg-amber-300 text-black grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="shrink-0 px-3 rounded-lg bg-yellow hover:bg-yellow text-black grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               title="URL'den içe aktar"
             >
               {loading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}

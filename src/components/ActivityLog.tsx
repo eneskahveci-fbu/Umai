@@ -124,7 +124,7 @@ function ActivityRow({ entry }: { entry: Entry }) {
     label = "komut";
     detail = entry.command;
   } else {
-    icon = <FileEdit size={13} className="text-amber-400/80 shrink-0" />;
+    icon = <FileEdit size={13} className="text-yellow/80 shrink-0" />;
     label = entry.created ? "oluşturuldu" : "değiştirildi";
     detail = entry.path;
   }

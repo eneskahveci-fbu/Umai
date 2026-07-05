@@ -357,7 +357,7 @@ export const DEFAULT_SKILLS: Skill[] = [
     content:
       "# Tailwind & UI Tutarlılığı\n\n" +
       "- Tailwind CSS v4 kullanılır. Inline style yerine utility sınıfları kullan.\n" +
-      "- Projenin tasarım token'larını kullan: `bg-bg`, `bg-surface`, `bg-bgsoft`, `text-ink`, `text-muted`, `border-line` ve vurgu için `amber-400`.\n" +
+      "- Projenin tasarım token'larını kullan: `bg-bg`, `bg-surface`, `bg-bgsoft`, `text-ink`, `text-muted`, `border-line` ve vurgu için `yellow`.\n" +
       "- Yeni bileşenleri mevcut yapıyla uyumlu yap: yuvarlatılmış köşeler (`rounded-xl`/`rounded-2xl`), ince kenarlıklar, `transition-colors`.\n" +
       "- Erişilebilirlik: butonlara `title`/`aria-label`, modallara `role=\"dialog\"` ve `aria-modal`, klavye ile kapatma (Esc) ekle.\n" +
       "- İkonlar için `lucide-react` kullan; boyutu `size={...}` ile ver.",

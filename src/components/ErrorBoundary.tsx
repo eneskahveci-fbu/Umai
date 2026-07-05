@@ -60,7 +60,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
           <p className="text-muted text-sm mb-4">{msg}</p>
           <button
             onClick={() => { this.reset(); window.location.reload(); }}
-            className="px-5 py-2.5 rounded-xl bg-brand hover:bg-branddim text-white font-semibold text-sm"
+            className="px-5 py-2.5 rounded-xl bg-brand hover:bg-branddim text-[#111110] font-semibold text-sm"
           >
             Sayfayı Yenile
           </button>

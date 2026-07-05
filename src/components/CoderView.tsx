@@ -472,7 +472,7 @@ function SurveyCard({
                   className={[
                     "px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors text-left",
                     selected[qi] === opt.label
-                      ? "bg-brand text-white border-brand"
+                      ? "bg-brand text-[#111110] border-brand"
                       : "border-line bg-bgsoft text-muted hover:border-brand/50 hover:text-ink",
                   ].join(" ")}
                 >
@@ -498,7 +498,7 @@ function SurveyCard({
         <button
           onClick={submit}
           disabled={!ready}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand text-white disabled:opacity-40 hover:bg-branddim transition-colors"
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand text-[#111110] disabled:opacity-40 hover:bg-branddim transition-colors"
         >
           Yanıtla &amp; Devam Et
         </button>
@@ -2590,7 +2590,7 @@ export function CoderView() {
                   {!connecting && (
                     <div className="flex flex-col gap-1.5 items-center">
                       {config.activeRepo ? (
-                        <button onClick={() => connectRepo()} className="text-[10px] px-3 py-1.5 rounded-lg bg-brand text-white font-semibold hover:bg-branddim transition-colors flex items-center gap-1">
+                        <button onClick={() => connectRepo()} className="text-[10px] px-3 py-1.5 rounded-lg bg-brand text-[#111110] font-semibold hover:bg-branddim transition-colors flex items-center gap-1">
                           <FolderGit2 size={10} /> Bağlan
                         </button>
                       ) : null}
@@ -2764,7 +2764,7 @@ export function CoderView() {
               <div className={`shrink-0 flex items-center gap-2 px-4 py-2 text-xs font-semibold border-b ${
                 isDanger
                   ? "bg-red/5 border-red/20 text-red"
-                  : "bg-amber-400/5 border-amber-400/20 text-amber-400"
+                  : "bg-yellow/5 border-yellow/20 text-yellow"
               }`}>
                 <span>{isDanger ? "⛔" : "⚠️"}</span>
                 <span>
@@ -2838,7 +2838,7 @@ export function CoderView() {
                               useStore.getState().pushMessage({ role: "user", content: "Planı onaylıyorum, uygula." });
                               try { await callApi(); } finally { planApprovedRef.current = false; }
                             }}
-                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand text-white hover:bg-branddim font-semibold transition-colors shrink-0"
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand text-[#111110] hover:bg-branddim font-semibold transition-colors shrink-0"
                           >
                             <Check size={12} /> Onayla &amp; Uygula
                           </button>
@@ -2892,7 +2892,7 @@ export function CoderView() {
                       )}
                       {isLastAssistant && !streaming && checkpoints.length > 0 && repo && (
                         <div className="ml-11 max-w-2xl mt-2 flex items-center gap-2 px-3 py-2 rounded-xl border border-line bg-bgsoft/50 text-xs">
-                          <RotateCcw size={13} className="text-amber-400 shrink-0" />
+                          <RotateCcw size={13} className="text-yellow shrink-0" />
                           <span className="text-muted flex-1 min-w-0 truncate">
                             Ajan {checkpoints.length} dosyayı değiştirdi
                             {checkpoints.length === 1 ? ` (${checkpoints[0].path})` : ""}
@@ -2900,7 +2900,7 @@ export function CoderView() {
                           <button
                             onClick={undoCheckpoints}
                             disabled={undoing}
-                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-400/10 text-amber-400 hover:bg-amber-400/20 font-semibold disabled:opacity-50 transition-colors shrink-0"
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-yellow/10 text-yellow hover:bg-yellow/20 font-semibold disabled:opacity-50 transition-colors shrink-0"
                           >
                             {undoing ? <Loader2Icon size={12} className="animate-spin" /> : <RotateCcw size={12} />}
                             {undoing ? "Geri alınıyor…" : "Geri Al"}
@@ -3137,7 +3137,7 @@ export function CoderView() {
                   <button
                     onClick={send}
                     disabled={!input.trim() && pendingImages.length === 0 && attachedFiles.length === 0}
-                    className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-brand hover:bg-branddim active:bg-branddim text-white grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95"
+                    className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-brand hover:bg-branddim active:bg-branddim text-[#111110] grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95"
                   >
                     <ArrowUp size={17} />
                   </button>
@@ -3149,7 +3149,7 @@ export function CoderView() {
 
                 <div className="flex items-center gap-1.5 text-[11px] text-muted/50 shrink-0">
                   {config.safeMode && (
-                    <span className="flex items-center gap-1 text-amber-400 font-medium" title="Salt-okunur: ajan hiçbir değişiklik yapamaz">
+                    <span className="flex items-center gap-1 text-yellow font-medium" title="Salt-okunur: ajan hiçbir değişiklik yapamaz">
                       <ShieldCheck size={12} /> Güvenli
                     </span>
                   )}
@@ -3175,7 +3175,7 @@ export function CoderView() {
                   {config.learningMode && <span className="flex items-center gap-1 text-brand font-medium" title="Öğrenme Modu: adım adım eğitsel açıklama"><GraduationCap size={12} /> Öğrenme</span>}
                   {activeAgent && <span className="text-brand font-medium">{activeAgent.command}</span>}
                   {sensitiveHits.length > 0 && (
-                    <span className="flex items-center gap-1 text-amber-400 font-medium" title={`Mesajında hassas veri olabilir (${sensitiveHits.join(", ")}). API anahtarlarını/kart bilgilerini sohbete yazma.`}>
+                    <span className="flex items-center gap-1 text-yellow font-medium" title={`Mesajında hassas veri olabilir (${sensitiveHits.join(", ")}). API anahtarlarını/kart bilgilerini sohbete yazma.`}>
                       <ShieldCheck size={12} /> Hassas veri?
                     </span>
                   )}
@@ -3277,7 +3277,7 @@ export function CoderView() {
             <button
               onClick={() => void handlePrReview()}
               disabled={!prNumber || prLoading}
-              className="w-full flex items-center justify-center gap-2 bg-brand text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-branddim disabled:opacity-50 transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-brand text-[#111110] text-sm font-semibold py-2.5 rounded-xl hover:bg-branddim disabled:opacity-50 transition-colors"
             >
               {prLoading ? <Loader2Icon size={14} className="animate-spin" /> : <><GitPullRequest size={14} /> İncele</>}
             </button>
@@ -3442,7 +3442,7 @@ function UsageBadge({ chat, pendingTokens = 0 }: { chat: { totalInTokens?: numbe
         onClick={toggle}
         className={`flex items-center gap-1 sm:gap-1.5 text-[10px] font-mono px-1.5 sm:px-2 py-1 rounded-lg border mr-0.5 sm:mr-1 transition-colors hover:border-brand/40 ${
           danger ? "border-red/40 bg-red/5 text-red"
-          : warn ? "border-amber-400/40 bg-amber-400/5 text-amber-400"
+          : warn ? "border-yellow/40 bg-yellow/5 text-yellow"
           : "border-line/40 text-muted/70"
         }`}
         title={pendingTokens > 0
@@ -3538,7 +3538,7 @@ function UsageModal({ chat, pos, onClose }: { chat: { totalInTokens?: number; to
                 <span>Bağlam penceresi</span><span className="font-mono">{pct.toFixed(0)}%</span>
               </div>
               <div className="h-1.5 rounded-full bg-bgsoft overflow-hidden">
-                <div className={`h-full transition-all ${pct >= 95 ? "bg-red" : pct >= 80 ? "bg-amber-400" : "bg-brand"}`} style={{ width: `${pct}%` }} />
+                <div className={`h-full transition-all ${pct >= 95 ? "bg-red" : pct >= 80 ? "bg-yellow" : "bg-brand"}`} style={{ width: `${pct}%` }} />
               </div>
             </div>
           </div>

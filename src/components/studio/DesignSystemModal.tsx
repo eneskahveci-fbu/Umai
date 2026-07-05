@@ -129,7 +129,7 @@ export function DesignSystemModal({
                 <textarea value={form.tokensCss} onChange={(e) => setForm({ ...form, tokensCss: e.target.value })} rows={2} placeholder=":root{--brand:#...;--bg:#...} (opsiyonel)" className="input-mono !text-xs w-full" />
                 <div className="flex justify-end gap-2">
                   <button onClick={() => setCreating(false)} className="text-xs px-3 py-1.5 rounded-lg text-muted hover:text-ink">İptal</button>
-                  <button onClick={saveCustom} className="text-xs px-3 py-1.5 rounded-lg bg-brand text-white font-semibold">Kaydet</button>
+                  <button onClick={saveCustom} className="text-xs px-3 py-1.5 rounded-lg bg-brand text-[#111110] font-semibold">Kaydet</button>
                 </div>
               </div>
             ) : detail ? (

@@ -114,7 +114,7 @@ export function GitPanel({ onClose, onReviewPr }: { onClose: () => void; onRevie
               placeholder="yeni-dal-adi" className="input-mono text-xs"
               onKeyDown={(e) => { if (e.key === "Enter") createBranch(); }} />
             <button onClick={createBranch} disabled={loading || !branchName.trim()}
-              className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-brand hover:bg-branddim text-white text-xs font-semibold disabled:opacity-40 transition-colors">
+              className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-brand hover:bg-branddim text-[#111110] text-xs font-semibold disabled:opacity-40 transition-colors">
               {loading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Dal Oluştur
             </button>
             {result && (
@@ -145,7 +145,7 @@ export function GitPanel({ onClose, onReviewPr }: { onClose: () => void; onRevie
             <textarea value={prBody} onChange={(e) => setPrBody(e.target.value)}
               placeholder="Açıklama (opsiyonel)" rows={3} className="input-mono text-xs resize-none" />
             <button onClick={createPR} disabled={loading || !prTitle.trim() || !prHead.trim()}
-              className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-brand hover:bg-branddim text-white text-xs font-semibold disabled:opacity-40 transition-colors">
+              className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-brand hover:bg-branddim text-[#111110] text-xs font-semibold disabled:opacity-40 transition-colors">
               {loading ? <Loader2 size={12} className="animate-spin" /> : <GitPullRequest size={12} />} {prLabel} Oluştur
             </button>
           </div>

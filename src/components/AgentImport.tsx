@@ -95,7 +95,7 @@ export default function AgentImport({
             <button
               onClick={importUrl}
               disabled={loading || !url.trim()}
-              className="shrink-0 px-3 rounded-lg bg-brand hover:bg-branddim text-white grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="shrink-0 px-3 rounded-lg bg-brand hover:bg-branddim text-[#111110] grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               title="URL'den içe aktar"
             >
               {loading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}

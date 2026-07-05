@@ -750,12 +750,12 @@ function MessageBubbleImpl({
 
         {/* Token limit cut-off strip */}
         {!streamingNow && message.finishReason === "length" && onContinue && (
-          <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl border border-amber-400/20 bg-amber-400/5 text-xs animate-fade-in">
-            <ChevronRight size={12} className="text-amber-400/70 shrink-0" />
+          <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl border border-yellow/20 bg-yellow/5 text-xs animate-fade-in">
+            <ChevronRight size={12} className="text-yellow/70 shrink-0" />
             <span className="text-muted/60 flex-1 min-w-0">Yanıt token sınırında kesildi.</span>
             <button
               onClick={onContinue}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-400/10 text-amber-400 hover:bg-amber-400/20 font-semibold transition-colors shrink-0"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-yellow/10 text-yellow hover:bg-yellow/20 font-semibold transition-colors shrink-0"
             >
               <ChevronRight size={11} /> Devam et
             </button>
