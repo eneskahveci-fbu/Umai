@@ -11,6 +11,7 @@ import { useAuthGate, useThemeClasses } from "@/lib/authGate";
 import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MobileTabBar, useKeyboardOpen } from "@/components/MobileTabBar";
+import { BackgroundJobs } from "@/components/BackgroundJobs";
 
 export type SurfaceFlag =
   | "studioOpen" | "slidesStudioOpen" | "docsStudioOpen" | "formsStudioOpen"
@@ -49,6 +50,7 @@ export function SurfacePage({ flag, children }: {
         {children}
         <MobileTabBar />
         <ToastContainer />
+        <BackgroundJobs />
       </div>
     </ErrorBoundary>
   );

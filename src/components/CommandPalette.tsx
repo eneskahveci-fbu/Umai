@@ -12,6 +12,7 @@ import {
   Search,
   FileText,
   Activity,
+  Bot,
   Sparkles,
   LayoutTemplate,
   Image as ImageIcon,
@@ -101,6 +102,20 @@ export function CommandPalette() {
         setOpen(false);
       },
       keywords: ["tema", "theme", "dark", "light", "koyu", "acik", "degistir"],
+    },
+    {
+      id: "background-job",
+      label: "Görevi arka planda çalıştır",
+      icon: <Bot size={16} />,
+      action: () => {
+        const goal = (typeof window !== "undefined" ? window.prompt("Arka planda çalıştırılacak hedefi yaz:") : "")?.trim();
+        setOpen(false);
+        if (goal) {
+          useStore.getState().enqueueJob(goal);
+          useStore.getState().addToast("Görev arka plana alındı — bitince haber vereceğim.", "success");
+        }
+      },
+      keywords: ["gorev", "görev", "arka plan", "background", "otonom", "ajan", "job", "kuyruk"],
     },
     {
       id: "open-studio",

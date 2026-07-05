@@ -20,6 +20,7 @@ import type {
   ToolCallRecord,
   TreeNode,
 } from "./types";
+import { deriveJobTitle, type BackgroundJob } from "./jobs";
 import { DEFAULT_CONFIG, DEFAULT_REPO, DEFAULT_SKILLS, POLLINATIONS_DEFAULT_MODEL } from "./constants";
 import { encryptConfigSecrets, decryptConfigSecrets, isCryptoAvailable, hasPlaintextSecret } from "./secureKeys";
 import { applyEditBranch, applySwitchBranch } from "./branching";
@@ -73,6 +74,26 @@ function saveSnippets(s: Snippet[]) {
   const store = getStore();
   if (!store) return;
   store.setItem(SNIPPETS_KEY, JSON.stringify(s));
+}
+
+/* Görev kuyruğu (Otonom Ajan) — yalnız yerelde tutulur (cloud'a gitmez;
+   geçici, cihaza özgü). Sayfa yenilenince yarım kalan işler tekrar "queued"a
+   çekilir → çalıştırıcı kaldığı yerden sürdürür. */
+const JOBS_KEY = "craftai_jobs";
+function loadJobs(): BackgroundJob[] {
+  const store = getStore();
+  if (!store) return [];
+  try {
+    const raw = JSON.parse(store.getItem(JOBS_KEY) || "[]") as BackgroundJob[];
+    if (!Array.isArray(raw)) return [];
+    /* Yenilemede "running" kalmış iş varsa (çalıştırıcı öldü) yeniden kuyruğa al. */
+    return raw.map((j) => (j.status === "running" ? { ...j, status: "queued" as const } : j)).slice(0, 40);
+  } catch { return []; }
+}
+function saveJobs(jobs: BackgroundJob[]) {
+  const store = getStore();
+  if (!store) return;
+  try { store.setItem(JOBS_KEY, JSON.stringify(jobs.slice(0, 40))); } catch { /* kota — yok say */ }
 }
 
 /* Kullanıcının açıkça sildiği varsayılan skill id'leri burada tutulur. Böylece
@@ -487,6 +508,15 @@ interface StoreState {
   addSnippet: (s: Omit<Snippet, "id" | "created_at">) => void;
   removeSnippet: (id: string) => void;
   reorderSnippets: (fromId: string, toId: string) => void;
+
+  // görev kuyruğu (Otonom Ajan — arka plan işleri)
+  backgroundJobs: BackgroundJob[];
+  /** Yeni bir hedefi kuyruğa ekler, işin id'sini döndürür. */
+  enqueueJob: (goal: string) => string;
+  updateJob: (id: string, patch: Partial<BackgroundJob>) => void;
+  removeJob: (id: string) => void;
+  /** Biten/hatalı/iptal işleri temizler. */
+  clearFinishedJobs: () => void;
 
   // diff modal
   diffModal: { original: string; newCode: string; language: string; path?: string } | null;
@@ -1527,6 +1557,30 @@ export const useStore = create<StoreState>()((set, get) => ({
     saveSnippets(snips);
     set({ snippets: snips });
   },
+
+  /* görev kuyruğu (Otonom Ajan) */
+  backgroundJobs: loadJobs(),
+  enqueueJob: (goal) => {
+    const now = Date.now();
+    const id = `job_${now.toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const job: BackgroundJob = { id, goal: goal.trim(), title: deriveJobTitle(goal), status: "queued", steps: [], createdAt: now, updatedAt: now };
+    set((st) => { const jobs = [job, ...st.backgroundJobs].slice(0, 40); saveJobs(jobs); return { backgroundJobs: jobs }; });
+    return id;
+  },
+  updateJob: (id, patch) =>
+    set((st) => {
+      const jobs = st.backgroundJobs.map((j) => (j.id === id ? { ...j, ...patch, updatedAt: Date.now() } : j));
+      saveJobs(jobs);
+      return { backgroundJobs: jobs };
+    }),
+  removeJob: (id) =>
+    set((st) => { const jobs = st.backgroundJobs.filter((j) => j.id !== id); saveJobs(jobs); return { backgroundJobs: jobs }; }),
+  clearFinishedJobs: () =>
+    set((st) => {
+      const jobs = st.backgroundJobs.filter((j) => j.status === "queued" || j.status === "running");
+      saveJobs(jobs);
+      return { backgroundJobs: jobs };
+    }),
 
   /* diff modal */
   diffModal: null,

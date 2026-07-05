@@ -16,6 +16,7 @@ import { DiffModal } from "@/components/DiffModal";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { BackgroundJobs } from "@/components/BackgroundJobs";
 import { useStore } from "@/lib/store";
 import { createClient, supabaseConfigured } from "@/lib/supabase/client";
 import { registerServiceWorker, watchConnection } from "@/lib/sw-register";
@@ -288,6 +289,7 @@ export default function AppPage() {
         <OfflineBanner />
         <OnboardingTour />
         <InstallPrompt />
+        <BackgroundJobs />
       </div>
     </ErrorBoundary>
   );
