@@ -7,8 +7,10 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { consumeSurfaceHandoff, useSurfaceNav } from "@/lib/surfaceNav";
-import { StudioSwitcher } from "./StudioSwitcher";
+import { StudioTopBar } from "./StudioTopBar";
+import { SavedItemsModal } from "./SavedItemsModal";
 import { downloadTemplate, pickTemplateFile } from "@/lib/templateShare";
+import { downloadHtml, printPdf as printPdfDoc } from "@/lib/studioExport";
 import type { Slide, SlideDeck, SlideLayout } from "@/lib/types";
 import {
   deckToHtml, MAX_SLIDES, newSlide, SLIDE_LAYOUTS, SLIDE_THEMES,
@@ -284,21 +286,12 @@ export function SlidesStudio() {
 
   const exportHtml = () => {
     if (!deck) return;
-    const blob = new Blob([deckToHtml(deck)], { type: "text/html;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${(deck.title || "sunum").replace(/[^\wğüşöçıİĞÜŞÖÇ -]/g, "").trim() || "sunum"}.html`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    downloadHtml(deckToHtml(deck), deck.title || "sunum");
   };
 
   const printPdf = () => {
     if (!deck) return;
-    const w = window.open("", "_blank");
-    if (!w) { addToast("Açılır pencere engellendi — HTML indirip tarayıcıdan yazdır.", "error"); return; }
-    w.document.write(deckToHtml(deck));
-    w.document.close();
-    addToast("Yeni sekmede Ctrl/Cmd+P ile PDF'e yazdır.", "info");
+    if (!printPdfDoc(deckToHtml(deck))) addToast("Açılır pencere engellendi — HTML indirip tarayıcıdan yazdır.", "error");
   };
 
   const newDeck = () => {
@@ -312,30 +305,23 @@ export function SlidesStudio() {
   return (
     <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       {/* Üst bar — mod seçici + eylemler */}
-      <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line">
-        <div className="flex items-center gap-1.5 text-sm font-bold">
-          <Presentation size={15} className="text-brand" /> Sunum
-        </div>
-        <StudioSwitcher active="slides" />
-        {view === "work" && deck && (
+      <StudioTopBar
+        icon={Presentation}
+        label="Sunum"
+        activeSurface="slides"
+        showWorkActions={view === "work" && !!deck}
+        onNew={newDeck}
+        onClose={() => nav.close()}
+        title={deck ? { value: deck.title, onChange: (v) => patchDeck({ ...deck, title: v }), placeholder: "Sunum adı" } : undefined}
+        actions={
           <>
-            <button onClick={newDeck} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink ml-1">+ Yeni</button>
-            <input
-              value={deck.title}
-              onChange={(e) => patchDeck({ ...deck, title: e.target.value })}
-              placeholder="Sunum adı"
-              className="ml-auto hidden md:block w-44 bg-transparent text-xs text-muted focus:text-ink border-b border-transparent focus:border-line outline-none px-1 py-0.5"
-            />
-            <div className="flex items-center gap-1 ml-auto md:ml-1">
-              <button onClick={saveDeck} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
-              <button onClick={exportHtml} title="Bağımsız HTML indir" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
-              <button onClick={printPdf} title="Yazdır / PDF" className="hidden sm:grid w-8 h-8 place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Printer size={15} /></button>
-              <button onClick={() => setPlayerOpen(true)} title="Sunumu başlat" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-[#111110] text-xs font-semibold hover:bg-branddim transition-colors"><MonitorPlay size={14} /> Sun</button>
-            </div>
+            <button onClick={saveDeck} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+            <button onClick={exportHtml} title="Bağımsız HTML indir" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
+            <button onClick={printPdf} title="Yazdır / PDF" className="hidden sm:grid w-8 h-8 place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Printer size={15} /></button>
+            <button onClick={() => setPlayerOpen(true)} title="Sunumu başlat" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-[#111110] text-xs font-semibold hover:bg-branddim transition-colors"><MonitorPlay size={14} /> Sun</button>
           </>
-        )}
-        <button onClick={() => nav.close()} className={`${view === "work" ? "" : "ml-auto"} w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors`} title="Kapat"><X size={16} /></button>
-      </div>
+        }
+      />
 
       {view === "home" ? (
         /* ── Giriş: brief kartı ── */
@@ -545,27 +531,24 @@ export function SlidesStudio() {
       )}
 
       {/* Kayıtlı sunumlar */}
-      {decksOpen && (
-        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-modal-bg" onClick={() => setDecksOpen(false)}>
-          <div className="w-full max-w-lg max-h-[70vh] overflow-y-auto rounded-2xl border border-line bg-surface p-4 space-y-2" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-bold flex items-center gap-1.5"><Presentation size={14} className="text-brand" /> Kayıtlı sunumlar</h2>
-              <button onClick={() => setDecksOpen(false)} className="w-7 h-7 grid place-items-center rounded-lg text-muted hover:text-ink"><X size={14} /></button>
-            </div>
-            {savedDecks.length === 0 && <p className="text-xs text-muted/60">Henüz kayıtlı sunum yok.</p>}
-            {savedDecks.map((d) => (
-              <div key={d.id} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-line/60 hover:border-brand/40 transition-colors">
-                <button onClick={() => openDeck(d)} className="flex-1 min-w-0 text-left">
-                  <div className="text-sm font-semibold truncate">{d.title}</div>
-                  <div className="text-[11px] text-muted/60">{d.slides.length} slayt · {new Date(d.updatedAt).toLocaleDateString("tr-TR")}</div>
-                </button>
-                <button onClick={() => downloadTemplate({ kind: "deck", data: d }, d.title)} className="w-7 h-7 grid place-items-center rounded-lg text-muted/50 hover:text-brand" title="Şablon olarak dışa aktar (.json)"><Download size={13} /></button>
-                <button onClick={() => removeDeck(d.id)} className="w-7 h-7 grid place-items-center rounded-lg text-muted/50 hover:text-red" title="Sil"><Trash2 size={13} /></button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <SavedItemsModal
+        open={decksOpen}
+        onClose={() => setDecksOpen(false)}
+        title="Kayıtlı sunumlar"
+        icon={Presentation}
+        items={savedDecks}
+        getKey={(d) => d.id}
+        renderRow={(d) => (
+          <>
+            <div className="text-sm font-semibold truncate">{d.title}</div>
+            <div className="text-[11px] text-muted/60">{d.slides.length} slayt · {new Date(d.updatedAt).toLocaleDateString("tr-TR")}</div>
+          </>
+        )}
+        onOpen={openDeck}
+        onDelete={(d) => removeDeck(d.id)}
+        onExportTemplate={(d) => downloadTemplate({ kind: "deck", data: d }, d.title)}
+        emptyLabel="Henüz kayıtlı sunum yok."
+      />
     </div>
   );
 }

@@ -9,6 +9,8 @@ export type ExportMenuOption = {
   label: string;
   icon: ReactNode;
   onSelect: () => void;
+  /** true ise bu seçenekten önce ince bir ayraç çizgisi çizilir (ör. "Yayınla"yı indirme seçeneklerinden ayırmak için). */
+  separatorBefore?: boolean;
 };
 
 /* Dışa aktarma dropdown'ı — Tuval'in elle yazdığı "İndir" menüsünü standart
@@ -44,13 +46,15 @@ export function ExportMenu({
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div className={`absolute ${align === "right" ? "right-0" : "left-0"} mt-1.5 z-20 w-44 bg-surface border border-line rounded-xl shadow-2xl p-1 text-sm`}>
             {options.map((o) => (
-              <button
-                key={o.key}
-                onClick={() => { setOpen(false); o.onSelect(); }}
-                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"
-              >
-                {o.icon} {o.label}
-              </button>
+              <div key={o.key}>
+                {o.separatorBefore && <div className="h-px bg-line my-1" />}
+                <button
+                  onClick={() => { setOpen(false); o.onSelect(); }}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"
+                >
+                  {o.icon} {o.label}
+                </button>
+              </div>
             ))}
           </div>
         </>

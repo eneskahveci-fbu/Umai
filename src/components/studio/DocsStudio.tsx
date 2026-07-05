@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import {
   ArrowDown, ArrowUp, Download, FileCode, FileText, FolderOpen, Loader2,
-  Plus, Save, Sparkles, Trash2, Wand2, X,
+  Plus, Save, Sparkles, Trash2, Wand2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { consumeSurfaceHandoff, useSurfaceNav } from "@/lib/surfaceNav";
-import { StudioSwitcher } from "./StudioSwitcher";
+import { StudioTopBar } from "./StudioTopBar";
+import { SavedItemsModal } from "./SavedItemsModal";
 import type { CraftDoc, DocBlock, DocBlockType } from "@/lib/types";
 import {
   continueDoc, DOC_BLOCK_TYPES, docToHtml, docToMarkdown, generateDoc,
@@ -175,23 +176,21 @@ export function DocsStudio() {
   return (
     <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       {/* Üst bar */}
-      <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line">
-        <div className="flex items-center gap-1.5 text-sm font-bold shrink-0">
-          <FileText size={15} className="text-brand" /> <span className="hidden sm:inline">Doküman</span>
-        </div>
-        <StudioSwitcher active="docs" />
-        {view === "work" && doc && (
+      <StudioTopBar
+        icon={FileText}
+        label="Doküman"
+        activeSurface="docs"
+        showWorkActions={view === "work" && !!doc}
+        onNew={() => { setDoc(null); setView("home"); setBrief(""); }}
+        onClose={() => nav.close()}
+        actions={
           <>
-            <button onClick={() => { setDoc(null); setView("home"); setBrief(""); }} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink ml-1 shrink-0">+ Yeni</button>
-            <div className="flex items-center gap-1 ml-auto shrink-0">
-              <button onClick={saveDoc} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
-              <button onClick={() => download(`${safeFileName(doc.title, "dokuman")}.md`, docToMarkdown(doc), "text/markdown;charset=utf-8")} title="Markdown indir" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
-              <button onClick={() => download(`${safeFileName(doc.title, "dokuman")}.html`, docToHtml(doc), "text/html;charset=utf-8")} title="Bağımsız HTML indir (yazdır → PDF)" className="hidden sm:grid w-8 h-8 place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FileCode size={15} /></button>
-            </div>
+            <button onClick={saveDoc} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+            <button onClick={() => doc && download(`${safeFileName(doc.title, "dokuman")}.md`, docToMarkdown(doc), "text/markdown;charset=utf-8")} title="Markdown indir" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
+            <button onClick={() => doc && download(`${safeFileName(doc.title, "dokuman")}.html`, docToHtml(doc), "text/html;charset=utf-8")} title="Bağımsız HTML indir (yazdır → PDF)" className="hidden sm:grid w-8 h-8 place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FileCode size={15} /></button>
           </>
-        )}
-        <button onClick={() => nav.close()} className={`${view === "work" ? "" : "ml-auto"} w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors shrink-0`} title="Kapat"><X size={16} /></button>
-      </div>
+        }
+      />
 
       {view === "home" ? (
         <div className="flex-1 min-h-0 overflow-auto">
@@ -294,27 +293,24 @@ export function DocsStudio() {
       ) : null}
 
       {/* Kayıtlı dokümanlar */}
-      {savedOpen && (
-        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-modal-bg" onClick={() => setSavedOpen(false)}>
-          <div className="w-full max-w-lg max-h-[70vh] overflow-y-auto rounded-2xl border border-line bg-surface p-4 space-y-2" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-bold flex items-center gap-1.5"><FileText size={14} className="text-brand" /> Kayıtlı dokümanlar</h2>
-              <button onClick={() => setSavedOpen(false)} className="w-7 h-7 grid place-items-center rounded-lg text-muted hover:text-ink"><X size={14} /></button>
-            </div>
-            {saved.length === 0 && <p className="text-xs text-muted/60">Henüz kayıtlı doküman yok.</p>}
-            {saved.map((d) => (
-              <div key={d.id} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-line/60 hover:border-brand/40 transition-colors">
-                <button onClick={() => openDoc(d)} className="flex-1 min-w-0 text-left">
-                  <div className="text-sm font-semibold truncate">{d.title}</div>
-                  <div className="text-[11px] text-muted/60">{d.blocks.length} blok · {new Date(d.updatedAt).toLocaleDateString("tr-TR")}</div>
-                </button>
-                <button onClick={() => downloadTemplate({ kind: "doc", data: d }, d.title)} className="w-7 h-7 grid place-items-center rounded-lg text-muted/50 hover:text-brand" title="Şablon olarak dışa aktar (.json)"><Download size={13} /></button>
-                <button onClick={() => removeDoc(d.id)} className="w-7 h-7 grid place-items-center rounded-lg text-muted/50 hover:text-red" title="Sil"><Trash2 size={13} /></button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <SavedItemsModal
+        open={savedOpen}
+        onClose={() => setSavedOpen(false)}
+        title="Kayıtlı dokümanlar"
+        icon={FileText}
+        items={saved}
+        getKey={(d) => d.id}
+        renderRow={(d) => (
+          <>
+            <div className="text-sm font-semibold truncate">{d.title}</div>
+            <div className="text-[11px] text-muted/60">{d.blocks.length} blok · {new Date(d.updatedAt).toLocaleDateString("tr-TR")}</div>
+          </>
+        )}
+        onOpen={openDoc}
+        onDelete={(d) => removeDoc(d.id)}
+        onExportTemplate={(d) => downloadTemplate({ kind: "doc", data: d }, d.title)}
+        emptyLabel="Henüz kayıtlı doküman yok."
+      />
     </div>
   );
 }

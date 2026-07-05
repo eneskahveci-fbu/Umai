@@ -7,6 +7,7 @@ import type { StudioPhase } from "@/lib/studioGen";
 import { downloadHtml, openInTab, printPdf } from "@/lib/studioExport";
 import { useStore } from "@/lib/store";
 import { DeviceFrame } from "./DeviceFrame";
+import { ExportMenu } from "./ExportMenu";
 import type { StudioMsg, StudioTweaks } from "./StudioView";
 
 const PHASE_LABEL: Record<StudioPhase, string> = {
@@ -56,13 +57,11 @@ export function StudioWorkspace({
 }) {
   const addToast = useStore((s) => s.addToast);
   const [input, setInput] = useState("");
-  const [exportOpen, setExportOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [tweaksOpen, setTweaksOpen] = useState(true);
 
   const submit = () => { const t = input.trim(); if (!t || busy) return; setInput(""); onFollowup(t); };
   const exportAs = (fn: () => boolean | void, okMsg?: string) => {
-    setExportOpen(false);
     if (!artifact) return;
     const r = fn();
     if (r === false) addToast("Açılır pencere engellendi — izin ver.", "error");
@@ -157,18 +156,16 @@ export function StudioWorkspace({
             <button onClick={onOpenProjects} className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-bgsoft transition-colors" title="Projelerim"><FolderOpen size={15} /></button>
             <button onClick={onSave} disabled={!artifact} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-line text-muted hover:text-ink disabled:opacity-40" title="Projeyi kaydet"><Save size={13} /> Kaydet</button>
             <button onClick={() => setTweaksOpen((v) => !v)} className={`p-1.5 rounded-lg transition-colors ${tweaksOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`} title="İnce ayar"><SlidersHorizontal size={15} /></button>
-            <div className="relative">
-              <button onClick={() => setExportOpen((v) => !v)} disabled={!artifact} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-line text-muted hover:text-ink disabled:opacity-40" title="Dışa aktar"><Download size={13} /> Dışa aktar</button>
-              {exportOpen && artifact && (
-                <div className="absolute right-0 top-full mt-1 w-44 bg-surface border border-line rounded-xl shadow-xl p-1 z-20 text-sm">
-                  <button onClick={() => exportAs(() => downloadHtml(effectiveSrc, title))} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft text-left"><Download size={14} className="text-brand" /> HTML indir</button>
-                  <button onClick={() => exportAs(() => printPdf(effectiveSrc))} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft text-left"><FileText size={14} className="text-brand" /> PDF (yazdır)</button>
-                  <button onClick={() => exportAs(() => openInTab(effectiveSrc))} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft text-left"><ExternalLink size={14} className="text-brand" /> Yeni sekmede aç</button>
-                  <div className="h-px bg-line my-1" />
-                  <button onClick={() => { setExportOpen(false); onPublish(); }} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft text-left"><Link2 size={14} className="text-brand" /> Yayınla (link)</button>
-                </div>
-              )}
-            </div>
+            <ExportMenu
+              triggerLabel="Dışa aktar"
+              disabled={!artifact}
+              options={[
+                { key: "html", label: "HTML indir", icon: <Download size={14} className="text-brand" />, onSelect: () => exportAs(() => downloadHtml(effectiveSrc, title)) },
+                { key: "pdf", label: "PDF (yazdır)", icon: <FileText size={14} className="text-brand" />, onSelect: () => exportAs(() => printPdf(effectiveSrc)) },
+                { key: "tab", label: "Yeni sekmede aç", icon: <ExternalLink size={14} className="text-brand" />, onSelect: () => exportAs(() => openInTab(effectiveSrc)) },
+                { key: "publish", label: "Yayınla (link)", icon: <Link2 size={14} className="text-brand" />, onSelect: onPublish, separatorBefore: true },
+              ]}
+            />
           </div>
         </div>
 
