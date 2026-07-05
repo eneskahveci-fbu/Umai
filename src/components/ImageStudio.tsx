@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, ImageIcon, Loader2, Send, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { consumeSurfaceHandoff, useSurfaceNav } from "@/lib/surfaceNav";
-import { StudioSwitcher } from "./studio/StudioSwitcher";
+import { StudioTopBar } from "./studio/StudioTopBar";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import { buildFallbackChain } from "@/lib/fallback";
 import { fetchImageModels, IMAGE_MODEL_FALLBACK, pollinationsImageUrl, type ImageModelInfo } from "@/lib/pollinations";
@@ -239,24 +239,18 @@ export function ImageStudio() {
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       {/* Üst bar */}
-      <div className="brand-rule glass shrink-0 flex items-center gap-3 px-4 sm:px-6 py-3">
-        <span className="w-8 h-8 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0">
-          <ImageIcon size={16} />
-        </span>
-        <StudioSwitcher active="image" />
-        {msgs.length > 0 && (
-          <button onClick={() => setMsgs([])} className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line hover:border-brand/40 text-xs font-semibold transition-colors">
+      <StudioTopBar
+        icon={ImageIcon}
+        label="Görüntü"
+        activeSurface="image"
+        showWorkActions
+        onClose={() => nav.close()}
+        actions={msgs.length > 0 ? (
+          <button onClick={() => setMsgs([])} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line hover:border-brand/40 text-xs font-semibold transition-colors">
             <Trash2 size={13} /> Temizle
           </button>
-        )}
-        <button
-          onClick={() => nav.close()}
-          className={`${msgs.length > 0 ? "" : "ml-auto"} w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors`}
-          title="Kapat"
-        >
-          <X size={16} />
-        </button>
-      </div>
+        ) : undefined}
+      />
 
       {/* Sohbet akışı */}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">

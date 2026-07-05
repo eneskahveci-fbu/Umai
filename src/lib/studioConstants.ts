@@ -105,9 +105,9 @@ export const STUDIO_SKILLS: StudioSkill[] = [
   },
   // ── İçerik ───────────────────────────────────────────────────────────
   {
-    id: "deck", name: "Sunum (çok slayt)", icon: "🖼️", category: "İçerik",
-    desc: "Çok slaytlı, gezinilebilir sunum",
-    instructions: "Çok slaytlı bir SUNUM üret: güçlü kapak + içerik slaytları + kapanış. Büyük tipografi, nefes alan boşluk, marka renkleriyle tutarlı; projeksiyon için yüksek kontrast. (Slayt yapısı/gezinme ayrıca belirtilecek.)",
+    id: "deck", name: "Tek sayfa sunum görseli", icon: "🖼️", category: "İçerik",
+    desc: "Kaydırılabilir tek HTML sayfası (gerçek slayt destesi için Sunum stüdyosunu kullan)",
+    instructions: "Kapak + içerik bölümleri + kapanıştan oluşan, aşağı KAYDIRILARAK gezilen TEK bir HTML sayfası üret (gerçek slayt-slayt geçişli bir deste değil). Büyük tipografi, nefes alan boşluk, marka renkleriyle tutarlı; projeksiyon için yüksek kontrast.",
     defaultDevice: "web",
   },
   {

@@ -59,9 +59,9 @@ describe("yardımcılar", () => {
 });
 
 describe("autoStudioSkill", () => {
-  it("sunum brief'i → deck", async () => {
+  it("sunum brief'i artık deck'e yönlendirmiyor (gerçek Sunum stüdyosuna yönlendirme StudioView'da)", async () => {
     const { autoStudioSkill } = await import("../autoPilot");
-    expect(autoStudioSkill("Yapay zekâ konulu 5 slaytlık bir sunum hazırla")).toBe("deck");
+    expect(autoStudioSkill("Yapay zekâ konulu 5 slaytlık bir sunum hazırla")).toBeNull();
   });
   it("e-posta brief'i → email, dashboard → dashboard", async () => {
     const { autoStudioSkill } = await import("../autoPilot");

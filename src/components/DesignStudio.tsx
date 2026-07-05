@@ -8,6 +8,7 @@ import {
 import { useStore } from "@/lib/store";
 import { useSurfaceNav } from "@/lib/surfaceNav";
 import { StudioSwitcher } from "./studio/StudioSwitcher";
+import { ExportMenu } from "./studio/ExportMenu";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import { buildFallbackChain } from "@/lib/fallback";
 import { buildSingleBlockPreview, parseBlocks } from "@/lib/preview";
@@ -365,7 +366,6 @@ export function DesignStudio() {
   /* Masaüstünde sağ sütun açık; mobilde bottom sheet varsayılan KAPALI
      (açılışta tuvalin %60'ını kaplamasın — ⋯ menüden açılır). */
   const [tweaksOpen, setTweaksOpen] = useState(() => (typeof window !== "undefined" ? window.innerWidth >= 640 : true));
-  const [exportMenu, setExportMenu] = useState(false);
   const [studioMenu, setStudioMenu] = useState(false);
 
   // Sohbet
@@ -801,7 +801,7 @@ KURALLAR:
     new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => res(i); i.onerror = rej; i.src = src; });
 
   const exportPng = async () => {
-    setExportMenu(false); setExporting(true);
+    setExporting(true);
     try {
       const mult = QUALITY[quality].mult;
       const cv = document.createElement("canvas");
@@ -865,7 +865,6 @@ KURALLAR:
   };
 
   const exportHtml = () => {
-    setExportMenu(false);
     const stages = pages.map((p) => pageStage(p, "")).join("");
     const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title || "Tasarım")}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a0d;display:flex;flex-direction:column;align-items:center;gap:24px;padding:24px;min-height:100vh}.stage{container-type:inline-size;width:min(96vw,960px);position:relative;overflow:hidden;border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,.5)}</style></head><body>${stages}</body></html>`;
     const blob = new Blob([html], { type: "text/html" });
@@ -875,7 +874,6 @@ KURALLAR:
   };
 
   const exportPdf = () => {
-    setExportMenu(false);
     const w = window.open("", "_blank");
     if (!w) { addToast("Açılır pencere engellendi — PDF için açılır pencereye izin ver.", "error"); return; }
     const first = pages[0];
@@ -932,21 +930,16 @@ KURALLAR:
 
         <div className="ml-auto flex items-center gap-1 sm:gap-1.5">
           {/* Dışa aktar */}
-          <div className="relative">
-            <button onClick={() => setExportMenu((v) => !v)} disabled={exporting} className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-line hover:border-brand/50 text-xs font-semibold transition-colors disabled:opacity-50">
-              {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} <span className="hidden sm:inline">İndir</span>
-            </button>
-            {exportMenu && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setExportMenu(false)} />
-                <div className="absolute right-0 mt-1.5 z-20 w-44 bg-surface border border-line rounded-xl shadow-2xl p-1 text-sm">
-                  <button onClick={exportPng} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><FileImage size={14} className="text-brand" /> PNG görsel</button>
-                  <button onClick={exportHtml} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><FileCode size={14} className="text-brand" /> Bağımsız HTML</button>
-                  <button onClick={exportPdf} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><FileText size={14} className="text-brand" /> PDF (yazdır)</button>
-                </div>
-              </>
-            )}
-          </div>
+          <ExportMenu
+            triggerLabel="İndir"
+            busy={exporting}
+            disabled={exporting}
+            options={[
+              { key: "png", label: "PNG görsel", icon: <FileImage size={14} className="text-brand" />, onSelect: exportPng },
+              { key: "html", label: "Bağımsız HTML", icon: <FileCode size={14} className="text-brand" />, onSelect: exportHtml },
+              { key: "pdf", label: "PDF (yazdır)", icon: <FileText size={14} className="text-brand" />, onSelect: exportPdf },
+            ]}
+          />
 
           <button onClick={save} className="btn-brand-glow flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-[#111110] text-xs font-bold"><Save size={13} /> <span className="hidden sm:inline">Kaydet</span></button>
 
@@ -959,7 +952,7 @@ KURALLAR:
                 <div className="absolute right-0 mt-1.5 z-20 w-52 bg-surface border border-line rounded-xl shadow-2xl p-1 text-sm">
                   {/* Mobilde üst bardan kaldırılanlar (⋯'den erişilir) */}
                   <div className="sm:hidden">
-                    <button onClick={() => { setDmode((m) => (m === "code" ? "canvas" : "code")); setStudioMenu(false); }} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><FileCode size={14} className={dmode === "code" ? "text-brand" : "text-muted/60"} /> Kod modu {dmode === "code" ? "✓" : ""}</button>
+                    <button onClick={() => { setDmode((m) => (m === "code" ? "canvas" : "code")); setStudioMenu(false); }} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><FileCode size={14} className={dmode === "code" ? "text-brand" : "text-muted/60"} /> Kod modu</button>
                     {dmode === "canvas" && (
                       <div className="flex gap-1 px-2 pb-1">
                         <button onClick={doUndo} disabled={!hist.past.length} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-line text-xs text-muted hover:text-ink disabled:opacity-30"><Undo2 size={13} /> Geri al</button>
@@ -971,8 +964,8 @@ KURALLAR:
                   <button onClick={() => { setView((v) => (v === "templates" ? "design" : "templates")); setStudioMenu(false); }} className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left ${view === "templates" ? "text-brand" : ""}`}><LayoutTemplate size={14} className="text-brand" /> Hazır şablonlar</button>
                   <button onClick={() => { setView((v) => (v === "gallery" ? "design" : "gallery")); setStudioMenu(false); }} className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left ${view === "gallery" ? "text-brand" : ""}`}><span className="flex items-center gap-2"><LayoutGrid size={14} className="text-brand" /> Kayıtlı tasarımlar</span><span className="text-[10px] font-mono text-muted/60">{saved.length}</span></button>
                   <div className="h-px bg-line/60 my-1" />
-                  <button onClick={() => setChatOpen((v) => !v)} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><MessageSquare size={14} className={chatOpen ? "text-brand" : "text-muted/60"} /> Sohbet paneli {chatOpen ? "✓" : ""}</button>
-                  <button onClick={() => setTweaksOpen((v) => !v)} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><Sliders size={14} className={tweaksOpen ? "text-brand" : "text-muted/60"} /> Tweaks paneli {tweaksOpen ? "✓" : ""}</button>
+                  <button onClick={() => setChatOpen((v) => !v)} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><MessageSquare size={14} className={chatOpen ? "text-brand" : "text-muted/60"} /> Sohbet paneli</button>
+                  <button onClick={() => setTweaksOpen((v) => !v)} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><Sliders size={14} className={tweaksOpen ? "text-brand" : "text-muted/60"} /> Tweaks paneli</button>
                   <div className="h-px bg-line/60 my-1" />
                   <div className="flex items-center justify-between gap-2 px-2.5 py-1.5">
                     <span className="text-xs text-muted/70">Kalite</span>

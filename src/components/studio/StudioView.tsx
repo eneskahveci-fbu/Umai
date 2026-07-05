@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { useSurfaceNav } from "@/lib/surfaceNav";
+import { setSurfaceHandoff, useSurfaceNav } from "@/lib/surfaceNav";
 import { autoStudioSkill } from "@/lib/autoPilot";
 import type { Artifact, StudioProject } from "@/lib/types";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
@@ -23,6 +23,11 @@ export interface StudioMsg { role: "user" | "assistant"; text: string; }
 export interface StudioTweaks { fontScale: number; fontFamily: string; accent: string; }
 
 const DEFAULT_TWEAKS: StudioTweaks = { fontScale: 1, fontFamily: "", accent: "" };
+
+/* Sunum niyeti taşıyan brief'ler artık sessizce "deck" (tek sayfa görsel)
+   skill'ine düşmüyor — bunun yerine gerçek slayt destesi üreten Sunum
+   stüdyosuna yönlendiren bir ipucu gösterilir (bkz. Karar 4). */
+const PRESENTATION_INTENT = /\b(sunum|slayt|deck|prezentasyon|pitch)\b/i;
 
 /* Üretilen HTML'in <head>'ine bir <style> bloğu enjekte eder (yoksa başa ekler). */
 function injectHeadStyle(html: string, css: string, id: string): string {
@@ -86,6 +91,13 @@ export function StudioView() {
        değerleri doğrudan override'dan al (bayat closure önlenir). */
     /* ✦ Otomatik: tür seçilmediyse brief'ten çıkar; sinyal yoksa landing. */
     const sk = ov?.skillId ?? skillId ?? autoStudioSkill(b) ?? "landing";
+    /* Skill elle seçilmediyse ve brief sunum niyeti taşıyorsa, gerçek slayt
+       destesi üreten Sunum stüdyosuna yönlendiren bir ipucu göster (bkz. Karar 4). */
+    if (!followup && !ov?.skillId && !skillId && PRESENTATION_INTENT.test(b)) {
+      addToast("Gerçek, gezinilebilir bir slayt destesi mi lazım?", "info", {
+        action: { label: "Sunum stüdyosuna geç", fn: () => { setSurfaceHandoff("slides", b); nav.go("slides"); } },
+      });
+    }
     const dirId = ov?.directionId ?? directionId;
     const dsObj = designSystemById(config, ov?.designSystemId ?? designSystemId);
     setBusy(true); setPhase("planning");
