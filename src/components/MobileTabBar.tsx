@@ -2,8 +2,8 @@
 
 /* Mobil alt gezinme çubuğu (yalnız sm altı) — iki öğe: Sohbet · Stüdyo.
    Stüdyo'nun 7 modu (Tasarım/Sunum/Doküman/Anket/Tuval/Görüntü/Defter) tek
-   tıkla erişilemez değil: içeri girince StudioSwitcher (ikon-only, yatay
-   kaydırılabilir) tümüne ulaştırır — ayrı sekmeler burada gereksiz karmaşa
+   tıkla erişilemez değil: içeri girince StudioSwitcher (kompakt açılır
+   liste) tümüne ulaştırır — ayrı sekmeler burada gereksiz karmaşa
    yaratıyordu. Aktif sekme marka renginde; safe-area alt boşluğu korunur. */
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
