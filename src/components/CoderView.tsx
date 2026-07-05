@@ -1646,9 +1646,9 @@ export function CoderView() {
     }
     const abortCtl = coderAbort;
 
-    /* Admin dışı hesaplarda düşünme eforu HER ZAMAN otomatik (Claude gibi —
-       manuel efor seçici yalnız admin'e görünür, bkz. EffortMenuControl). */
-    const thinkingMode = (isAdminNow && store.thinkingMode !== "auto") ? store.thinkingMode : (pilot?.effort ?? autoEffort(_lastUserText));
+    /* Efor "otomatik" bırakılırsa Otomatik Pilot karar verir; kullanıcı elle
+       bir seviye seçtiyse (bkz. EffortMenuControl) o seçim geçerli olur. */
+    const thinkingMode = store.thinkingMode === "auto" ? (pilot?.effort ?? autoEffort(_lastUserText)) : store.thinkingMode;
     let finalSystemPrompt = coderSystemPrompt;
     if (thinkingMode === "medium") {
       finalSystemPrompt += "\n\n[EFOR: ORTA] Yanıtlamadan önce kısa bir iç değerlendirme yap, ardından net ve eksiksiz yanıt ver.";
@@ -2390,10 +2390,9 @@ export function CoderView() {
           )}
           {/* Birleşik ⋯ menüsü — gruplu: Hızlı eylemler · Çalışma Alanı · Modlar · Araçlar */}
           <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen || toolsEnabled || !!config.safeMode || swarmMode || researchMode}>
-            {/* Manuel efor seçici yalnız admin'e — diğer tüm hesaplarda efor
-               (ve web/kalite/ekip/araştırma) Otomatik Pilot tarafından
-               mesajdan tek başına kararlaştırılır, elle geçersiz kılma yok. */}
-            {isAdmin && <EffortMenuControl />}
+            {/* Efor seçici herkese açık; "otomatik" dışı bir seviye seçilirse
+               Otomatik Pilot'un o mesaj için kararını geçersiz kılar. */}
+            <EffortMenuControl />
             <div className="h-px bg-line my-1" />
 
             <MoreItem icon={<VenetianMask size={14} />} label="Gizli sohbet" onClick={() => useStore.getState().newChat(true)} />
