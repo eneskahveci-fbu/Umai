@@ -23,7 +23,7 @@ export const STUDIO_SURFACES: { id: Surface; name: string; icon: LucideIcon; tit
   { id: "canvas", name: "Tuval", icon: LayoutTemplate, title: "Katman/tuval editörü (slayt · afiş · sosyal)", group: "design" },
   { id: "docs", name: "Doküman", icon: FileText, title: "Blok tabanlı doküman (Markdown/HTML)", group: "content" },
   { id: "forms", name: "Anket", icon: ListChecks, title: "AI anket + bağımsız HTML form", group: "content" },
-  { id: "image", name: "Görüntü", icon: ImageIcon, title: "AI görsel üretimi (Pollinations)", group: "content" },
+  { id: "image", name: "Görüntü", icon: ImageIcon, title: "AI görsel üretimi (Pollinations)", group: "design" },
   { id: "notebook", name: "Defter", icon: BookOpen, title: "Kaynak-temelli sohbet + sesli özet", group: "content" },
 ];
 
