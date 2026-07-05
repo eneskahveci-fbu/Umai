@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Sparkles, X } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav } from "@/lib/surfaceNav";
 import { autoStudioSkill } from "@/lib/autoPilot";
@@ -10,13 +10,14 @@ import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
 import { deviceById, skillById, STUDIO_DIRECTIONS, type DeviceId } from "@/lib/studioConstants";
 import { designSystemById, designSystemPromptText } from "@/lib/designSystems";
 import type { StudioTemplate } from "@/lib/studioTemplates";
-import { StudioSwitcher } from "./StudioSwitcher";
+import { StudioTopBar } from "./StudioTopBar";
 import { StudioHome } from "./StudioHome";
 import { StudioWorkspace } from "./StudioWorkspace";
 import { DesignSystemModal } from "./DesignSystemModal";
 import { TemplateGallery } from "./TemplateGallery";
 import { ProjectsModal } from "./ProjectsModal";
 import { VariationPicker, type Variation } from "./VariationPicker";
+import { publishArtifact } from "@/lib/studioExport";
 
 export interface StudioMsg { role: "user" | "assistant"; text: string; }
 export interface StudioTweaks { fontScale: number; fontFamily: string; accent: string; }
@@ -161,17 +162,9 @@ export function StudioView() {
   /* Entegrasyon: tasarımı /api/publish ile bağımsız paylaşılabilir sayfaya çevir. */
   const publishDesign = async () => {
     if (!artifact) { addToast("Önce bir tasarım üret.", "error"); return; }
-    try {
-      const res = await fetch("/api/publish", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title || "Stüdyo tasarımı", type: "html", content: effectiveSrc }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.id) { addToast(data.error || "Yayınlama başarısız.", "error"); return; }
-      const url = `${window.location.origin}/a/${data.id}`;
-      try { await navigator.clipboard.writeText(url); } catch { /* yok say */ }
-      addToast("Yayınlandı — bağlantı kopyalandı.", "success");
-    } catch (e) { addToast((e as Error).message || "Yayınlama başarısız.", "error"); }
+    const url = await publishArtifact(title || "Stüdyo tasarımı", effectiveSrc);
+    if (url) addToast("Yayınlandı — bağlantı kopyalandı.", "success");
+    else addToast("Yayınlama başarısız.", "error");
   };
 
   /* Sürüm geçmişi: kaydedilen önceki üretime dön (Kaydet ile kalıcı olur). */
@@ -211,22 +204,15 @@ export function StudioView() {
   return (
     <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0">
       {/* Üst bar — mod seçici + başlık + kapat */}
-      <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line">
-        <div className="flex items-center gap-1.5 text-sm font-bold">
-          <Sparkles size={15} className="text-brand" /> Stüdyo
-        </div>
-        <StudioSwitcher active="studio" />
-        {view === "workspace" && (
-          <button onClick={newDesign} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink ml-1">+ Yeni</button>
-        )}
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Tasarım adı"
-          className="ml-auto hidden sm:block w-44 bg-transparent text-xs text-muted focus:text-ink border-b border-transparent focus:border-line outline-none px-1 py-0.5"
-        />
-        <button onClick={() => nav.close()} className="text-muted hover:text-ink p-1 rounded hover:bg-bgsoft ml-auto sm:ml-1" title="Kapat"><X size={16} /></button>
-      </div>
+      <StudioTopBar
+        icon={Sparkles}
+        label="Stüdyo"
+        activeSurface="studio"
+        showWorkActions
+        onNew={view === "workspace" ? newDesign : undefined}
+        onClose={() => nav.close()}
+        title={{ value: title, onChange: setTitle, placeholder: "Tasarım adı" }}
+      />
 
       {view === "home" ? (
         <StudioHome
