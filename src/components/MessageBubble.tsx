@@ -363,7 +363,7 @@ function CommandRow({ cmd }: { cmd: NonNullable<ChatMessage["commands"]>[number]
         {hasOutput && (open ? <ChevronUp size={12} className="text-muted/40 shrink-0 mt-0.5" /> : <ChevronDown size={12} className="text-muted/40 shrink-0 mt-0.5" />)}
       </button>
       {hasOutput && open && (
-        <pre className="mt-1 ml-5 px-2.5 py-1.5 rounded-lg bg-[#0a0a0d] border border-line/40 text-[11px] font-mono whitespace-pre-wrap break-all max-h-60 overflow-auto text-muted/80">
+        <pre className="mt-1 ml-5 px-2.5 py-1.5 rounded-lg bg-codebg border border-line/40 text-[11px] font-mono whitespace-pre-wrap break-all max-h-60 overflow-auto text-muted/80">
           {cmd.output}
         </pre>
       )}

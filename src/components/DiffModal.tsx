@@ -164,7 +164,7 @@ export function DiffModal() {
         )}
 
         {/* Diff body */}
-        <div className="flex-1 overflow-auto bg-[#0a0a0d] font-mono text-[12px] leading-relaxed">
+        <div className="flex-1 overflow-auto bg-codebg font-mono text-[12px] leading-relaxed">
           {lines.map((l, i) => (
             <div
               key={i}

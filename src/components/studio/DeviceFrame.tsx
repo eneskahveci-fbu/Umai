@@ -42,11 +42,11 @@ export function DeviceFrame({
   return (
     <div className="w-full h-full overflow-auto grid place-items-center p-4 sm:p-6">
       <div
-        className="relative shrink-0 rounded-[2.2rem] bg-[#0a0a0d] border-[10px] border-[#0a0a0d] shadow-2xl ring-1 ring-line/40"
+        className="relative shrink-0 rounded-[2.2rem] bg-codebg border-[10px] border-codebg shadow-2xl ring-1 ring-line/40"
         style={{ width: device.width, height: device.height ?? 844 }}
       >
         {/* Çentik */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/3 h-5 bg-[#0a0a0d] rounded-b-2xl z-10" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/3 h-5 bg-codebg rounded-b-2xl z-10" />
         <div className="w-full h-full rounded-[1.5rem] overflow-hidden bg-white">
           {iframe}
         </div>
