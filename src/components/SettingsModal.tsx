@@ -748,7 +748,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               {/* Önerilen ücretsiz sağlayıcılar — tek tıkla seç */}
               <div className="flex flex-wrap gap-1.5 mb-2.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted/45 w-full">Önerilen ücretsiz · açık kaynak</span>
-                {(["gemini", "groq", "nvidia", "cerebras", "openrouter"] as Provider[]).map((p) => (
+                {(["pollinations", "gemini", "groq", "nvidia", "cerebras", "openrouter"] as Provider[]).map((p) => (
                   <button
                     key={p}
                     onClick={() => { onProvider(p); setQuickResult(null); }}
