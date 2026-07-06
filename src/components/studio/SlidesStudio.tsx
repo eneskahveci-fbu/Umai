@@ -131,7 +131,7 @@ function SlideCanvas({ slide, theme }: { slide: Slide; theme: SlideTheme }) {
   );
 }
 
-export function SlidesStudio() {
+export function SlidesStudio({ embedded }: { embedded?: boolean } = {}) {
   const open = useStore((s) => s.slidesStudioOpen);
   const nav = useSurfaceNav();
   const config = useStore((s) => s.config);
@@ -302,26 +302,26 @@ export function SlidesStudio() {
 
   const savedDecks = config.slideDecks ?? [];
 
-  return (
-    <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-      {/* Üst bar — mod seçici + eylemler */}
-      <StudioTopBar
-        icon={Presentation}
-        label="Sunum"
-        activeSurface="slides"
-        showWorkActions={view === "work" && !!deck}
-        onNew={newDeck}
-        onClose={() => nav.close()}
-        title={deck ? { value: deck.title, onChange: (v) => patchDeck({ ...deck, title: v }), placeholder: "Sunum adı" } : undefined}
-        actions={
-          <>
-            <button onClick={saveDeck} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
-            <button onClick={exportHtml} title="Bağımsız HTML indir" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
-            <button onClick={printPdf} title="Yazdır / PDF" className="hidden sm:grid w-8 h-8 place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Printer size={15} /></button>
-            <button onClick={() => setPlayerOpen(true)} title="Sunumu başlat" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-[#111110] text-xs font-semibold hover:bg-branddim transition-colors"><MonitorPlay size={14} /> Sun</button>
-          </>
-        }
+  const slimActionsRow = view === "work" && deck && (
+    <div className="h-10 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
+      <button onClick={newDeck} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink shrink-0">+ Yeni</button>
+      <input
+        value={deck.title}
+        onChange={(e) => patchDeck({ ...deck, title: e.target.value })}
+        placeholder="Sunum adı"
+        className="ml-auto hidden md:block w-44 bg-transparent text-xs text-muted focus:text-ink border-b border-transparent focus:border-line outline-none px-1 py-0.5"
       />
+      <div className="flex items-center gap-1 shrink-0">
+        <button onClick={saveDeck} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+        <button onClick={exportHtml} title="Bağımsız HTML indir" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
+        <button onClick={printPdf} title="Yazdır / PDF" className="hidden sm:grid w-8 h-8 place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Printer size={15} /></button>
+        <button onClick={() => setPlayerOpen(true)} title="Sunumu başlat" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-[#111110] text-xs font-semibold hover:bg-branddim transition-colors"><MonitorPlay size={14} /> Sun</button>
+      </div>
+    </div>
+  );
+
+  const content = (
+    <>
 
       {view === "home" ? (
         /* ── Giriş: brief kartı ── */
@@ -549,6 +549,41 @@ export function SlidesStudio() {
         onExportTemplate={(d) => downloadTemplate({ kind: "deck", data: d }, d.title)}
         emptyLabel="Henüz kayıtlı sunum yok."
       />
+    </>
+  );
+
+  /* embedded: DesignHub zaten dış sarmalayıcıyı + üst çubuğu sağlıyor —
+     yalnız kendi title/eylem satırını (yalnız workspace'teyken) gösteririz. */
+  if (embedded) {
+    return (
+      <>
+        {slimActionsRow}
+        {content}
+      </>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      {/* Üst bar — mod seçici + eylemler */}
+      <StudioTopBar
+        icon={Presentation}
+        label="Sunum"
+        activeSurface="slides"
+        showWorkActions={view === "work" && !!deck}
+        onNew={newDeck}
+        onClose={() => nav.close()}
+        title={deck ? { value: deck.title, onChange: (v) => patchDeck({ ...deck, title: v }), placeholder: "Sunum adı" } : undefined}
+        actions={
+          <>
+            <button onClick={saveDeck} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+            <button onClick={exportHtml} title="Bağımsız HTML indir" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
+            <button onClick={printPdf} title="Yazdır / PDF" className="hidden sm:grid w-8 h-8 place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Printer size={15} /></button>
+            <button onClick={() => setPlayerOpen(true)} title="Sunumu başlat" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-[#111110] text-xs font-semibold hover:bg-branddim transition-colors"><MonitorPlay size={14} /> Sun</button>
+          </>
+        }
+      />
+      {content}
     </div>
   );
 }

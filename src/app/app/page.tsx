@@ -25,9 +25,7 @@ import { registerServiceWorker, watchConnection } from "@/lib/sw-register";
    mount edilmez → /app açılışı hafifler. Bir kez açıldıktan sonra mount kalır,
    içteki state (taslak tasarım, sohbet vs.) kapatınca kaybolmaz. */
 const SettingsModal = dynamic(() => import("@/components/SettingsModal").then((m) => m.SettingsModal), { ssr: false });
-const ImageStudio = dynamic(() => import("@/components/ImageStudio").then((m) => m.ImageStudio), { ssr: false });
-const DesignStudio = dynamic(() => import("@/components/DesignStudio").then((m) => m.DesignStudio), { ssr: false });
-const StudioView = dynamic(() => import("@/components/studio/StudioView").then((m) => m.StudioView), { ssr: false });
+const DesignHub = dynamic(() => import("@/components/studio/DesignHub").then((m) => m.DesignHub), { ssr: false });
 const SkillsPanel = dynamic(() => import("@/components/SkillsPanel").then((m) => m.SkillsPanel), { ssr: false });
 const LibraryModal = dynamic(() => import("@/components/LibraryModal").then((m) => m.LibraryModal), { ssr: false });
 
@@ -45,9 +43,11 @@ export default function AppPage() {
   const loadChats = useStore((s) => s.loadChats);
   const syncConfig = useStore((s) => s.syncConfig);
   const everSettings = useEverOpened(useStore((s) => s.settingsOpen));
-  const everImage = useEverOpened(useStore((s) => s.imageStudioOpen));
-  const everDesign = useEverOpened(useStore((s) => s.designStudioOpen));
-  const everStudio = useEverOpened(useStore((s) => s.studioOpen));
+  /* Tasarım grubu (Tasarım/Sunum/Tuval/Görüntü) TEK kalıcı kabukta (DesignHub) —
+     4 bayraktan biri ilk kez true olunca kabuk mount edilir ve kalır. */
+  const everDesignHub = useEverOpened(
+    useStore((s) => s.studioOpen || s.slidesStudioOpen || s.designStudioOpen || s.imageStudioOpen),
+  );
   const everSkills = useEverOpened(useStore((s) => s.skillsOpen));
   const everLibrary = useEverOpened(useStore((s) => s.libraryOpen));
   const kbOpen = useKeyboardOpen();
@@ -183,7 +183,7 @@ export default function AppPage() {
   useEffect(() => {
     const anyOpen = () => {
       const s = useStore.getState();
-      return s.settingsOpen || s.imageStudioOpen || s.designStudioOpen || s.studioOpen || s.skillsOpen || s.libraryOpen;
+      return s.settingsOpen || s.imageStudioOpen || s.designStudioOpen || s.studioOpen || s.slidesStudioOpen || s.skillsOpen || s.libraryOpen;
     };
     let armed = false;
     const unsub = useStore.subscribe(() => {
@@ -197,6 +197,7 @@ export default function AppPage() {
       else if (s.imageStudioOpen) s.setImageStudioOpen(false);
       else if (s.designStudioOpen) s.setDesignStudioOpen(false);
       else if (s.studioOpen) s.setStudioOpen(false);
+      else if (s.slidesStudioOpen) s.setSlidesStudioOpen(false);
       else if (s.skillsOpen) s.setSkillsOpen(false);
       else if (s.libraryOpen) s.setLibraryOpen(false);
     };
@@ -275,9 +276,7 @@ export default function AppPage() {
         <MobileTabBar />
 
         {everSettings && <SettingsModal />}
-        {everImage && <ImageStudio />}
-        {everDesign && <DesignStudio />}
-        {everStudio && <StudioView />}
+        {everDesignHub && <DesignHub />}
         {everLibrary && <LibraryModal />}
         <CommandPalette />
         <KeyboardShortcuts />

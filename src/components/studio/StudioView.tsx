@@ -46,7 +46,7 @@ function applyTweaks(html: string, t: StudioTweaks): string {
   return injectHeadStyle(html, rules.join(""), "craft-tweaks");
 }
 
-export function StudioView() {
+export function StudioView({ embedded }: { embedded?: boolean } = {}) {
   const open = useStore((s) => s.studioOpen);
   const nav = useSurfaceNav();
   const config = useStore((s) => s.config);
@@ -213,6 +213,85 @@ export function StudioView() {
     setView("home"); setArtifact(null); setMessages([]); setTweaks(DEFAULT_TWEAKS); setBrief(""); setTitle("");
   };
 
+  const workContent = view === "home" ? (
+    <StudioHome
+      brief={brief} setBrief={setBrief}
+      skillId={skillId} setSkillId={setSkillId}
+      directionId={directionId} setDirectionId={setDirectionId}
+      designSystemId={designSystemId} setDesignSystemId={setDesignSystemId}
+      onBrowseSystems={() => setDsModalOpen(true)}
+      onOpenTemplates={() => setTplOpen(true)}
+      onOpenProjects={() => setProjectsOpen(true)}
+      projectCount={(config.studioProjects ?? []).length}
+      busy={busy}
+      onGenerate={() => run(brief, false)}
+    />
+  ) : (
+    <StudioWorkspace
+      messages={messages}
+      busy={busy}
+      phase={phase}
+      artifact={artifact}
+      effectiveSrc={effectiveSrc}
+      device={deviceById(device)}
+      setDevice={setDevice}
+      reloadKey={reloadKey}
+      tweaks={tweaks}
+      setTweaks={setTweaks}
+      resetTweaks={() => setTweaks(DEFAULT_TWEAKS)}
+      title={title}
+      onFollowup={(t) => run(t, true)}
+      onStop={stop}
+      onSave={saveProject}
+      onOpenProjects={() => setProjectsOpen(true)}
+      animate={animate}
+      setAnimate={setAnimate}
+      onVariations={runVariations}
+      onPublish={publishDesign}
+      versions={currentVersions}
+      onRestoreVersion={restoreVersion}
+    />
+  );
+
+  const modals = (
+    <>
+      {dsModalOpen && (
+        <DesignSystemModal
+          activeId={designSystemId}
+          onSelect={(id) => { setDesignSystemId(id); setDsModalOpen(false); }}
+          onClose={() => setDsModalOpen(false)}
+        />
+      )}
+      {tplOpen && <TemplateGallery onApply={applyTemplate} onClose={() => setTplOpen(false)} />}
+      {projectsOpen && <ProjectsModal onOpen={openProject} onClose={() => setProjectsOpen(false)} />}
+      {variations && <VariationPicker variations={variations} busy={varBusy} onPick={applyVariation} onClose={() => setVariations(null)} />}
+    </>
+  );
+
+  /* embedded: DesignHub zaten dış sarmalayıcıyı + üst çubuğu (mod anahtarı +
+     kapat) sağlıyor — burada yalnız kendi title/"+ Yeni" kontrolünü ince bir
+     ikinci satır olarak (yalnız workspace'teyken) gösterip içerik + modalleri
+     döneriz. Hiçbir buton/özellik kaybolmuyor, yalnız üst çubuk tekilleşiyor. */
+  if (embedded) {
+    return (
+      <>
+        {view === "workspace" && (
+          <div className="h-10 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
+            <button onClick={newDesign} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink shrink-0">+ Yeni</button>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Tasarım adı"
+              className="ml-auto w-44 bg-transparent text-xs text-muted focus:text-ink border-b border-transparent focus:border-line outline-none px-1 py-0.5"
+            />
+          </div>
+        )}
+        {workContent}
+        {modals}
+      </>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0">
       {/* Üst bar — mod seçici + başlık + kapat */}
@@ -225,57 +304,8 @@ export function StudioView() {
         onClose={() => nav.close()}
         title={{ value: title, onChange: setTitle, placeholder: "Tasarım adı" }}
       />
-
-      {view === "home" ? (
-        <StudioHome
-          brief={brief} setBrief={setBrief}
-          skillId={skillId} setSkillId={setSkillId}
-          directionId={directionId} setDirectionId={setDirectionId}
-          designSystemId={designSystemId} setDesignSystemId={setDesignSystemId}
-          onBrowseSystems={() => setDsModalOpen(true)}
-          onOpenTemplates={() => setTplOpen(true)}
-          onOpenProjects={() => setProjectsOpen(true)}
-          projectCount={(config.studioProjects ?? []).length}
-          busy={busy}
-          onGenerate={() => run(brief, false)}
-        />
-      ) : (
-        <StudioWorkspace
-          messages={messages}
-          busy={busy}
-          phase={phase}
-          artifact={artifact}
-          effectiveSrc={effectiveSrc}
-          device={deviceById(device)}
-          setDevice={setDevice}
-          reloadKey={reloadKey}
-          tweaks={tweaks}
-          setTweaks={setTweaks}
-          resetTweaks={() => setTweaks(DEFAULT_TWEAKS)}
-          title={title}
-          onFollowup={(t) => run(t, true)}
-          onStop={stop}
-          onSave={saveProject}
-          onOpenProjects={() => setProjectsOpen(true)}
-          animate={animate}
-          setAnimate={setAnimate}
-          onVariations={runVariations}
-          onPublish={publishDesign}
-          versions={currentVersions}
-          onRestoreVersion={restoreVersion}
-        />
-      )}
-
-      {dsModalOpen && (
-        <DesignSystemModal
-          activeId={designSystemId}
-          onSelect={(id) => { setDesignSystemId(id); setDsModalOpen(false); }}
-          onClose={() => setDsModalOpen(false)}
-        />
-      )}
-      {tplOpen && <TemplateGallery onApply={applyTemplate} onClose={() => setTplOpen(false)} />}
-      {projectsOpen && <ProjectsModal onOpen={openProject} onClose={() => setProjectsOpen(false)} />}
-      {variations && <VariationPicker variations={variations} busy={varBusy} onPick={applyVariation} onClose={() => setVariations(null)} />}
+      {workContent}
+      {modals}
     </div>
   );
 }
