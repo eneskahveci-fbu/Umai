@@ -11,7 +11,7 @@ import {
   BookMarked, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
   Circle, CircleDot, Compass, FlaskConical, ListChecks, Microscope, Settings2,
   Code2, Copy, FileText, FolderOpen, GitBranch, GitCommit, Globe,
-  Loader2, Pencil, RefreshCw, Search, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, User, Users, Volume2, VolumeX, Wrench, X,
+  Loader2, Pencil, RefreshCw, Search, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, User, Users, Volume2, VolumeX, Wrench, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ChatMessage, SwarmState } from "@/lib/types";
@@ -653,6 +653,19 @@ function MessageBubbleImpl({
             <span className="inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-md bg-brand/10 border border-brand/20 text-brand/80 font-mono">
               <span>{agent.icon}</span>
               <span className="font-semibold">{agent.label}</span>
+            </span>
+          </div>
+        )}
+
+        {/* Kalite turu (fusion) rozeti — hangi taslak modellerinin birleştirildiğini gösterir */}
+        {message.fusionModels && message.fusionModels.length > 0 && (
+          <div className="flex items-center gap-2 mb-2">
+            <span
+              className="inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-md bg-brand/10 border border-brand/20 text-brand/80 font-mono"
+              title={`Taslaklar: ${message.fusionModels.join(", ")}`}
+            >
+              <Sparkles size={11} />
+              <span className="font-semibold">Fusion · {message.fusionModels.length} model</span>
             </span>
           </div>
         )}

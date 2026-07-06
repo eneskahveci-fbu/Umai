@@ -35,6 +35,9 @@ export interface ChatMessage {
   plan?: string;
   /** Ajan Ekibi (Swarm) ilerleme durumu — todo panelinde çizilir. */
   swarm?: SwarmState;
+  /** Kalite turu (fusion) bu yanıt için çalıştıysa kullanılan taslak
+      modellerinin adları — mesaj üzerinde kalıcı bir rozet olarak gösterilir. */
+  fusionModels?: string[];
   /** Ajanın bu turda terminalde çalıştırdığı komutlar — "todo" kutusunda
       canlı gösterilir (çıktı kutunun içinde, ayrı bir balon yok). */
   commands?: CommandRun[];
