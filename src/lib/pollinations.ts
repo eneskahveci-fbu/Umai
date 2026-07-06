@@ -2,8 +2,13 @@
    Metin (text.pollinations.ai) zaten varsayılan/fallback sağlayıcı olarak gömülü
    (constants.ts, fallback.ts). Bu modül kalan yetenekleri TEK yerden sunar:
    - Görsel üretimi: URL kurucusu + canlı model kataloğu (GET /models)
+   - Metin: canlı model kataloğu (GET /models) — Kalite turu'nun (boost.ts)
+     ücretsiz taslak kaynağı
    - Seslendirme (TTS): openai-audio modeli, ses seçimi, tarayıcı yedeği
    Anahtar gerekmez; URL'ler doğrudan <img>/<audio> ile yüklenir. */
+
+import { PRESETS, PROVIDER_MODELS } from "./constants";
+import type { ModelProfile } from "./types";
 
 export const POLLINATIONS_IMAGE_BASE = "https://image.pollinations.ai";
 export const POLLINATIONS_TEXT_BASE = "https://text.pollinations.ai";
@@ -64,6 +69,8 @@ export const IMAGE_MODEL_FALLBACK: ImageModelInfo[] = [
   { id: "flux-anime", label: IMAGE_MODEL_LABELS["flux-anime"] },
   { id: "flux-3d", label: IMAGE_MODEL_LABELS["flux-3d"] },
   { id: "any-dark", label: IMAGE_MODEL_LABELS["any-dark"] },
+  { id: "gptimage", label: IMAGE_MODEL_LABELS["gptimage"] },
+  { id: "kontext", label: IMAGE_MODEL_LABELS["kontext"] },
 ];
 
 let imageModelsCache: ImageModelInfo[] | null = null;
@@ -86,6 +93,59 @@ export async function fetchImageModels(): Promise<ImageModelInfo[]> {
   } catch {
     return IMAGE_MODEL_FALLBACK;
   }
+}
+
+/* ── Metin (Kalite turu'nun ücretsiz taslak kaynağı) ────────────────── */
+
+/* Bilinen/doğrulanmış ücretsiz metin modelleri (constants.ts'teki tek
+   kaynaktan — burada ikinci bir liste icat edilmiyor). Canlı katalog
+   çekilemezse bu güvenli yedeğe düşülür. */
+export const POLLINATIONS_TEXT_MODEL_FALLBACK: string[] = PROVIDER_MODELS.pollinations;
+
+let textModelsCache: string[] | null = null;
+
+/** Canlı METİN model kataloğu (GET text.pollinations.ai/models).
+    Ulaşılamazsa/boşsa küratörlü yedek listeye düşer; başarılı sonuç
+    oturum boyunca önbellekte. Kalite turu'nun (boost.ts) ücretsiz,
+    anahtarsız taslak kaynağı — statik listeyi elle büyütmek yerine
+    Pollinations'ta o an ne varsa onu kullanır. */
+export async function fetchTextModels(): Promise<string[]> {
+  if (textModelsCache) return textModelsCache;
+  try {
+    const res = await fetch(`${POLLINATIONS_TEXT_BASE}/models`, { headers: { Accept: "application/json" } });
+    if (!res.ok) return POLLINATIONS_TEXT_MODEL_FALLBACK;
+    const data: unknown = await res.json();
+    const raw = (data as { data?: unknown })?.data ?? data;
+    const ids = Array.isArray(raw)
+      ? raw
+          .map((m) => (typeof m === "string" ? m : (m as { id?: string; name?: string })?.id ?? (m as { name?: string })?.name))
+          .filter((x): x is string => typeof x === "string" && x.length > 0)
+      : [];
+    /* Görsel/ses/embedding modellerini ele — yalnız metin/sohbet modelleri kalsın. */
+    const filtered = ids.filter((id) => !/embed|whisper|tts|audio|image|dall-?e|stable-?diffusion|rerank/i.test(id));
+    const unique = Array.from(new Set(filtered.length ? filtered : ids));
+    if (!unique.length) return POLLINATIONS_TEXT_MODEL_FALLBACK;
+    textModelsCache = unique;
+    return textModelsCache;
+  } catch {
+    return POLLINATIONS_TEXT_MODEL_FALLBACK;
+  }
+}
+
+/** Verilen ücretsiz Pollinations metin modeli için sentetik bir `ModelProfile`
+    kurar (anahtarsız — `usableApiKey()` boş dizeyi zaten sorunsuz çözer,
+    varsayılan tek Pollinations girdisiyle aynı şekilde). Kalite turu'nda
+    (`pickDraftModels`) kullanıcının kendi listesinde çeşitlilik yoksa
+    ikinci/üçüncü taslak kaynağı olarak devreye girer. */
+export function pollinationsDraftProfile(modelName: string): ModelProfile {
+  return {
+    id: `pollinations:${modelName}`,
+    label: modelName,
+    provider: "pollinations",
+    baseUrl: PRESETS.pollinations.baseUrl,
+    model: modelName,
+    apiKey: "",
+  };
 }
 
 /* ── Seslendirme (TTS) ──────────────────────────────────────────────── */

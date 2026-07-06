@@ -6,14 +6,23 @@
    Saf parçalar (model seçimi, talimat kurucu) birim testlidir. */
 
 import type { ModelProfile } from "./types";
+import { pollinationsDraftProfile } from "./pollinations";
 
 /** Taslak üretecek modelleri seçer: aktif + (2 isteniyorsa) FARKLI bir model
-    (önce en güçlü, yoksa farklı sağlayıcıdan biri) — çeşitlilik kaliteyi artırır. */
+    (önce en güçlü, yoksa farklı sağlayıcıdan biri, yoksa Pollinations'ın
+    ücretsiz katalogundan farklı bir model) — çeşitlilik kaliteyi artırır.
+    `freeModelNames` verilirse (bkz. `pollinations.ts`'teki `fetchTextModels`),
+    kullanıcının KENDİ listesinde gerçek bir çeşitlilik yoksa (ör. yalnız tek
+    bir Pollinations girdisi varsa — varsayılan kurulum) ikinci taslak için
+    anahtarsız bir Pollinations modeli sentetik olarak eklenir; böylece
+    yalnız ücretsiz Pollinations kullanan biri de gerçek çoklu-model
+    birleştirmeden yararlanır, tek taslağa sessizce düşmez. */
 export function pickDraftModels(
   models: ModelProfile[],
   active: ModelProfile,
   count: 1 | 2,
   strongest?: ModelProfile | null,
+  freeModelNames?: string[],
 ): ModelProfile[] {
   const picks: ModelProfile[] = [active];
   if (count === 2) {
@@ -21,7 +30,13 @@ export function pickDraftModels(
       (strongest && strongest.id !== active.id ? strongest : undefined) ??
       models.find((m) => m.id !== active.id && m.provider !== active.provider) ??
       models.find((m) => m.id !== active.id);
-    if (alt) picks.push(alt);
+    if (alt) {
+      picks.push(alt);
+    } else {
+      const activePollinationsModel = active.provider === "pollinations" ? active.model : undefined;
+      const freeAlt = (freeModelNames ?? []).find((name) => name !== activePollinationsModel);
+      if (freeAlt) picks.push(pollinationsDraftProfile(freeAlt));
+    }
   }
   return picks;
 }
