@@ -42,6 +42,22 @@ describe("pickDraftModels", () => {
       expect(picks.map((x) => x.id)).toEqual(["a", "b"]);
     });
   });
+
+  describe("count 3 — üçüncü taslak her zaman ücretsiz Pollinations'tan", () => {
+    it("aktif + en güçlü + ücretsiz üçüncü model", () => {
+      const picks = pickDraftModels(models, models[0], 3, models[1], ["openai", "mistral"]);
+      expect(picks.map((x) => x.id)).toEqual(["a", "b", "pollinations:openai"]);
+    });
+    it("ikinci taslak zaten ücretsiz Pollinations'tan geldiyse üçüncüsü FARKLI bir modelden gelir", () => {
+      const solo = m("only", "pollinations");
+      const picks = pickDraftModels([solo], solo, 3, null, ["openai", "mistral", "deepseek"]);
+      expect(picks.map((x) => x.model)).toEqual(["only", "openai", "mistral"]);
+    });
+    it("freeModelNames tükenirse üçüncü taslak eklenmez (yalnız 2 kalır)", () => {
+      const picks = pickDraftModels(models, models[0], 3, models[1], []);
+      expect(picks.map((x) => x.id)).toEqual(["a", "b"]);
+    });
+  });
 });
 
 describe("buildBoostInstruction", () => {

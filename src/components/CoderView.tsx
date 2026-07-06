@@ -1626,8 +1626,10 @@ export function CoderView() {
     coderAbort = new AbortController();
 
     /* ✦ Faz 3 — Kalite güçlendirme: pilot "kalite" dediyse (araçsız, tekil
-       sohbet turlarında) arka planda 1-2 iç taslak üret; nihai yanıt bunları
-       eleştirip birleştirerek AKIŞLI yazılır. Ortalama model → üstün çıktı. */
+       sohbet turlarında) arka planda 1-3 iç taslak üret; nihai yanıt bunları
+       eleştirip birleştirerek AKIŞLI yazılır. Ortalama model → üstün çıktı.
+       Max eforda 3. taslak her zaman Pollinations'ın ücretsiz kataloğundan
+       gelir (ücretli kullanıcıyı 3. bir ücretli çağrıya zorlamaz). */
     let boostDrafts: string[] = [];
     const toolsWanted = store.toolsEnabled && (!!store.repo || !!(store.config.localMode && store.config.localBridgeUrl?.trim()));
     if (pilot?.quality && !useSwarm && !useResearch && !toolsWanted && !isContinuation) {
@@ -1635,7 +1637,7 @@ export function CoderView() {
         useStore.getState().updateLastThinking("✦ Kalite turu: iç taslak(lar) hazırlanıyor…");
         const freeModelNames = await fetchTextModels();
         const draftProfiles = pickDraftModels(
-          store.config.models, active, pilot.effort === "max" ? 2 : 1, store.strongestModel(), freeModelNames,
+          store.config.models, active, pilot.effort === "max" ? 3 : 1, store.strongestModel(), freeModelNames,
         );
         const withKeys = await Promise.all(draftProfiles.map(async (m) => ({
           baseUrl: m.baseUrl, model: m.model, provider: m.provider, apiKey: await usableApiKey(m),

@@ -1,6 +1,6 @@
 /* ✦ Model-güçlendirme boru hattı (Görünmez Zeka — Faz 3).
-   Otomatik Pilot "kalite" dediğinde: ana yanıt akmadan önce arka planda 1-2
-   İÇ TASLAK üretilir (max eforda iki FARKLI modelden), nihai yanıt bu
+   Otomatik Pilot "kalite" dediğinde: ana yanıt akmadan önce arka planda 1-3
+   İÇ TASLAK üretilir (max eforda üç FARKLI modelden), nihai yanıt bu
    taslakları eleştirip birleştirerek yazılır. Ortalama bir model bile
    platform zekasıyla üstün çıktı verir; kullanıcı yalnız sonucu görür.
    Saf parçalar (model seçimi, talimat kurucu) birim testlidir. */
@@ -8,36 +8,52 @@
 import type { ModelProfile } from "./types";
 import { pollinationsDraftProfile } from "./pollinations";
 
-/** Taslak üretecek modelleri seçer: aktif + (2 isteniyorsa) FARKLI bir model
-    (önce en güçlü, yoksa farklı sağlayıcıdan biri, yoksa Pollinations'ın
-    ücretsiz katalogundan farklı bir model) — çeşitlilik kaliteyi artırır.
-    `freeModelNames` verilirse (bkz. `pollinations.ts`'teki `fetchTextModels`),
-    kullanıcının KENDİ listesinde gerçek bir çeşitlilik yoksa (ör. yalnız tek
-    bir Pollinations girdisi varsa — varsayılan kurulum) ikinci taslak için
-    anahtarsız bir Pollinations modeli sentetik olarak eklenir; böylece
-    yalnız ücretsiz Pollinations kullanan biri de gerçek çoklu-model
-    birleştirmeden yararlanır, tek taslağa sessizce düşmez. */
+/** Taslak üretecek modelleri seçer: aktif + çeşitlilik için ek model(ler)
+    (önce en güçlü, yoksa farklı sağlayıcıdan biri) — çeşitlilik kaliteyi
+    artırır. `freeModelNames` verilirse (bkz. `pollinations.ts`'teki
+    `fetchTextModels`) iki yerde devreye girer:
+    - 2. taslak için kullanıcının KENDİ listesinde gerçek çeşitlilik yoksa
+      (ör. yalnız tek bir Pollinations girdisi varsa — varsayılan kurulum),
+      anahtarsız bir Pollinations modeli sentetik olarak eklenir; böylece
+      yalnız ücretsiz Pollinations kullanan biri de gerçek çoklu-model
+      birleştirmeden yararlanır, tek taslağa sessizce düşmez.
+    - 3. taslak İSTENDİĞİNDE HER ZAMAN Pollinations'ın ücretsiz katalogundan
+      (önceki taslaklarda kullanılmamış) bir model eklenir — ücretli
+      kullanıcıyı 3. bir ücretli API çağrısına zorlamadan "üçüncü görüş"
+      sağlar; bu üçüncü slot kullanıcının kendi config'ine hiç bakmaz. */
 export function pickDraftModels(
   models: ModelProfile[],
   active: ModelProfile,
-  count: 1 | 2,
+  count: 1 | 2 | 3,
   strongest?: ModelProfile | null,
   freeModelNames?: string[],
 ): ModelProfile[] {
   const picks: ModelProfile[] = [active];
-  if (count === 2) {
+  const usedPollinationsModels = new Set<string>(active.provider === "pollinations" ? [active.model] : []);
+
+  const addFreeDraft = (): boolean => {
+    const name = (freeModelNames ?? []).find((n) => !usedPollinationsModels.has(n));
+    if (!name) return false;
+    usedPollinationsModels.add(name);
+    picks.push(pollinationsDraftProfile(name));
+    return true;
+  };
+
+  if (count >= 2) {
     const alt =
       (strongest && strongest.id !== active.id ? strongest : undefined) ??
       models.find((m) => m.id !== active.id && m.provider !== active.provider) ??
       models.find((m) => m.id !== active.id);
     if (alt) {
       picks.push(alt);
+      if (alt.provider === "pollinations") usedPollinationsModels.add(alt.model);
     } else {
-      const activePollinationsModel = active.provider === "pollinations" ? active.model : undefined;
-      const freeAlt = (freeModelNames ?? []).find((name) => name !== activePollinationsModel);
-      if (freeAlt) picks.push(pollinationsDraftProfile(freeAlt));
+      addFreeDraft();
     }
   }
+
+  if (count >= 3) addFreeDraft();
+
   return picks;
 }
 
