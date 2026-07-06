@@ -809,16 +809,18 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 </div>
               )}
 
-              {/* Gelişmiş — ad · Base URL · model (custom seçilince otomatik açık) */}
+              {/* Gelişmiş — ad · Base URL · model (custom veya pollinations
+                 seçilince otomatik açık — Pollinations anahtarsız canlı model
+                 listesini hemen gösterir, kullanıcı elle açmak zorunda kalmaz) */}
               <button
                 type="button"
                 onClick={() => setAdvOpen((v) => !v)}
                 className="mt-2.5 flex items-center gap-1 text-[11px] font-semibold text-muted hover:text-ink transition-colors"
               >
-                <ChevronRight size={12} className={`transition-transform ${advOpen || provider === "custom" ? "rotate-90" : ""}`} />
+                <ChevronRight size={12} className={`transition-transform ${advOpen || provider === "custom" || provider === "pollinations" ? "rotate-90" : ""}`} />
                 Gelişmiş — görünen ad · Base URL · model seçimi
               </button>
-              {(advOpen || provider === "custom") && (
+              {(advOpen || provider === "custom" || provider === "pollinations") && (
                 <div className="grid gap-2 mt-2">
                   <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Görünen ad (opsiyonel)" className="input-mono" />
                   <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="Base URL" className="input-mono" />

@@ -1625,19 +1625,24 @@ export function CoderView() {
     setPendingSurvey(null); // önceki anketi temizle
     coderAbort = new AbortController();
 
-    /* ✦ Faz 3 — Kalite güçlendirme: pilot "kalite" dediyse (araçsız, tekil
-       sohbet turlarında) arka planda 1-3 iç taslak üret; nihai yanıt bunları
-       eleştirip birleştirerek AKIŞLI yazılır. Ortalama model → üstün çıktı.
-       Max eforda 3. taslak her zaman Pollinations'ın ücretsiz kataloğundan
-       gelir (ücretli kullanıcıyı 3. bir ücretli çağrıya zorlamaz). */
+    /* ✦ Faz 3 — Kalite güçlendirme: pilot "kalite" dediyse YA DA kullanıcı
+       "Kalite" çipini elle açtıysa (araçsız, tekil sohbet turlarında) arka
+       planda 1-3 iç taslak üret; nihai yanıt bunları eleştirip birleştirerek
+       AKIŞLI yazılır. Ortalama model → üstün çıktı. Max eforda 3. taslak her
+       zaman Pollinations'ın ücretsiz kataloğundan gelir (ücretli kullanıcıyı
+       3. bir ücretli çağrıya zorlamaz); elle açılan çip efor max olmasa bile
+       en az 2 model birleştirir — buton gerçekten bir şey yapar. Başarılı
+       füzyonun modelleri mesaja kalıcı bir rozet olarak iğnelenir. */
     let boostDrafts: string[] = [];
     const toolsWanted = store.toolsEnabled && (!!store.repo || !!(store.config.localMode && store.config.localBridgeUrl?.trim()));
-    if (pilot?.quality && !useSwarm && !useResearch && !toolsWanted && !isContinuation) {
+    const qualityForced = !!store.config.qualityMode;
+    if ((pilot?.quality || qualityForced) && !useSwarm && !useResearch && !toolsWanted && !isContinuation) {
       try {
         useStore.getState().updateLastThinking("✦ Kalite turu: iç taslak(lar) hazırlanıyor…");
         const freeModelNames = await fetchTextModels();
+        const draftCount = pilot?.effort === "max" ? 3 : qualityForced ? 2 : 1;
         const draftProfiles = pickDraftModels(
-          store.config.models, active, pilot.effort === "max" ? 3 : 1, store.strongestModel(), freeModelNames,
+          store.config.models, active, draftCount, store.strongestModel(), freeModelNames,
         );
         const withKeys = await Promise.all(draftProfiles.map(async (m) => ({
           baseUrl: m.baseUrl, model: m.model, provider: m.provider, apiKey: await usableApiKey(m),
@@ -1645,6 +1650,7 @@ export function CoderView() {
         boostDrafts = await generateDrafts({ userText: _lastUserText, models: withKeys, signal: coderAbort.signal });
         if (boostDrafts.length) {
           useStore.getState().updateLastThinking(`✦ Kalite turu: ${boostDrafts.length} taslak birleştiriliyor…`);
+          useStore.getState().setFusionModelsOnLast(draftProfiles.map((m) => m.model));
         }
       } catch { boostDrafts = []; /* güçlendirme başarısızsa normal akış */ }
     }

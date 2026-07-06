@@ -429,6 +429,7 @@ interface StoreState {
   pushMessage: (m: ChatMessage) => void;
   updateLastContent: (content: string) => void;
   updateLastThinking: (thinking: string) => void;
+  setFusionModelsOnLast: (models: string[]) => void;
   setPlanOnLast: (plan: string) => void;
   setSwarmOnLast: (swarm: import("./types").SwarmState) => void;
   addCommandRun: (command: string) => void;
@@ -1186,6 +1187,17 @@ export const useStore = create<StoreState>()((set, get) => ({
         const messages = c.messages.slice();
         if (messages.length) {
           messages[messages.length - 1] = { ...messages[messages.length - 1], thinking };
+        }
+        return { ...c, messages };
+      }),
+    })),
+  setFusionModelsOnLast: (models) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const messages = c.messages.slice();
+        if (messages.length) {
+          messages[messages.length - 1] = { ...messages[messages.length - 1], fusionModels: models };
         }
         return { ...c, messages };
       }),
