@@ -282,7 +282,7 @@ export function StudioView({ embedded }: { embedded?: boolean } = {}) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Tasarım adı"
-              className="ml-auto w-44 bg-transparent text-xs text-muted focus:text-ink border-b border-transparent focus:border-line outline-none px-1 py-0.5"
+              className="ml-auto hidden md:block w-44 bg-transparent text-xs text-muted focus:text-ink border-b border-transparent focus:border-line outline-none px-1 py-0.5"
             />
           </div>
         )}
