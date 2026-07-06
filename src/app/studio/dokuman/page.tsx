@@ -1,13 +1,13 @@
 "use client";
 
-import { DocsStudio } from "@/components/studio/DocsStudio";
+import { ContentHub } from "@/components/studio/ContentHub";
 import { SurfacePage } from "@/components/studio/SurfacePage";
 
-/* /studio/dokuman — Doküman Stüdyosu (brief → blok tabanlı doküman) rotası. */
+/* /studio/dokuman — İçerik grubu kabuğu, Doküman modu açık başlar. */
 export default function DocsPage() {
   return (
     <SurfacePage flag="docsStudioOpen">
-      <DocsStudio />
+      <ContentHub />
     </SurfacePage>
   );
 }

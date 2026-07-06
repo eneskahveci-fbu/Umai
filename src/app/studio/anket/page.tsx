@@ -1,13 +1,13 @@
 "use client";
 
-import { FormsStudio } from "@/components/studio/FormsStudio";
+import { ContentHub } from "@/components/studio/ContentHub";
 import { SurfacePage } from "@/components/studio/SurfacePage";
 
-/* /studio/anket — Anket Stüdyosu (brief → bağımsız HTML anketi) rotası. */
+/* /studio/anket — İçerik grubu kabuğu, Anket modu açık başlar. */
 export default function FormsPage() {
   return (
     <SurfacePage flag="formsStudioOpen">
-      <FormsStudio />
+      <ContentHub />
     </SurfacePage>
   );
 }

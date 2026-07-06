@@ -26,6 +26,7 @@ import { registerServiceWorker, watchConnection } from "@/lib/sw-register";
    içteki state (taslak tasarım, sohbet vs.) kapatınca kaybolmaz. */
 const SettingsModal = dynamic(() => import("@/components/SettingsModal").then((m) => m.SettingsModal), { ssr: false });
 const DesignHub = dynamic(() => import("@/components/studio/DesignHub").then((m) => m.DesignHub), { ssr: false });
+const ContentHub = dynamic(() => import("@/components/studio/ContentHub").then((m) => m.ContentHub), { ssr: false });
 const SkillsPanel = dynamic(() => import("@/components/SkillsPanel").then((m) => m.SkillsPanel), { ssr: false });
 const LibraryModal = dynamic(() => import("@/components/LibraryModal").then((m) => m.LibraryModal), { ssr: false });
 
@@ -47,6 +48,12 @@ export default function AppPage() {
      4 bayraktan biri ilk kez true olunca kabuk mount edilir ve kalır. */
   const everDesignHub = useEverOpened(
     useStore((s) => s.studioOpen || s.slidesStudioOpen || s.designStudioOpen || s.imageStudioOpen),
+  );
+  /* İçerik grubu (Doküman/Anket/Defter) aynı desenle TEK kalıcı kabukta
+     (ContentHub) — önceden bu 3'ü /app'te hiç mount edilmiyordu (yalnız
+     kendi rotalarından erişilebiliyordu), artık ilk açılışta kalıcı olur. */
+  const everContentHub = useEverOpened(
+    useStore((s) => s.docsStudioOpen || s.formsStudioOpen || s.notebookStudioOpen),
   );
   const everSkills = useEverOpened(useStore((s) => s.skillsOpen));
   const everLibrary = useEverOpened(useStore((s) => s.libraryOpen));
@@ -183,7 +190,8 @@ export default function AppPage() {
   useEffect(() => {
     const anyOpen = () => {
       const s = useStore.getState();
-      return s.settingsOpen || s.imageStudioOpen || s.designStudioOpen || s.studioOpen || s.slidesStudioOpen || s.skillsOpen || s.libraryOpen;
+      return s.settingsOpen || s.imageStudioOpen || s.designStudioOpen || s.studioOpen || s.slidesStudioOpen
+        || s.docsStudioOpen || s.formsStudioOpen || s.notebookStudioOpen || s.skillsOpen || s.libraryOpen;
     };
     let armed = false;
     const unsub = useStore.subscribe(() => {
@@ -198,6 +206,9 @@ export default function AppPage() {
       else if (s.designStudioOpen) s.setDesignStudioOpen(false);
       else if (s.studioOpen) s.setStudioOpen(false);
       else if (s.slidesStudioOpen) s.setSlidesStudioOpen(false);
+      else if (s.docsStudioOpen) s.setDocsStudioOpen(false);
+      else if (s.formsStudioOpen) s.setFormsStudioOpen(false);
+      else if (s.notebookStudioOpen) s.setNotebookStudioOpen(false);
       else if (s.skillsOpen) s.setSkillsOpen(false);
       else if (s.libraryOpen) s.setLibraryOpen(false);
     };
@@ -277,6 +288,7 @@ export default function AppPage() {
 
         {everSettings && <SettingsModal />}
         {everDesignHub && <DesignHub />}
+        {everContentHub && <ContentHub />}
         {everLibrary && <LibraryModal />}
         <CommandPalette />
         <KeyboardShortcuts />

@@ -48,7 +48,7 @@ export function buildNotebookSystem(sources: NotebookSource[]): string {
   );
 }
 
-export function NotebookStudio() {
+export function NotebookStudio({ embedded }: { embedded?: boolean } = {}) {
   const open = useStore((s) => s.notebookStudioOpen);
   const nav = useSurfaceNav();
   const config = useStore((s) => s.config);
@@ -181,27 +181,26 @@ export function NotebookStudio() {
 
   const saved = config.craftNotebooks ?? [];
 
-  return (
-    <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-      {/* Üst bar */}
-      <StudioTopBar
-        icon={BookOpen}
-        label="Defter"
-        activeSurface="notebook"
-        showWorkActions
-        onNew={newNb}
-        onClose={() => nav.close()}
-        title={{ value: title, onChange: setTitle, placeholder: "Defter adı" }}
-        actions={
-          <>
-            {saved.length > 0 && (
-              <button onClick={() => setSavedOpen(true)} title="Kayıtlı defterler" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
-            )}
-            <button onClick={saveNb} title="Defteri kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
-          </>
-        }
+  const slimActionsRow = (
+    <div className="h-10 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
+      <button onClick={newNb} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink shrink-0">+ Yeni</button>
+      <input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Defter adı"
+        className="ml-auto hidden md:block w-40 bg-transparent text-xs text-muted focus:text-ink border-b border-transparent focus:border-line outline-none px-1 py-0.5"
       />
+      <div className="flex items-center gap-1 shrink-0">
+        {saved.length > 0 && (
+          <button onClick={() => setSavedOpen(true)} title="Kayıtlı defterler" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
+        )}
+        <button onClick={saveNb} title="Defteri kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+      </div>
+    </div>
+  );
 
+  const content = (
+    <>
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
         {/* Kaynak paneli */}
         <div className={`shrink-0 lg:w-80 border-b lg:border-b-0 lg:border-r border-line/60 overflow-y-auto ${srcPanel ? "" : "hidden lg:block"}`}>
@@ -333,6 +332,39 @@ export function NotebookStudio() {
         onDelete={(n) => removeNb(n.id)}
         emptyLabel="Henüz kayıtlı defter yok."
       />
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <>
+        {slimActionsRow}
+        {content}
+      </>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      {/* Üst bar */}
+      <StudioTopBar
+        icon={BookOpen}
+        label="Defter"
+        activeSurface="notebook"
+        showWorkActions
+        onNew={newNb}
+        onClose={() => nav.close()}
+        title={{ value: title, onChange: setTitle, placeholder: "Defter adı" }}
+        actions={
+          <>
+            {saved.length > 0 && (
+              <button onClick={() => setSavedOpen(true)} title="Kayıtlı defterler" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
+            )}
+            <button onClick={saveNb} title="Defteri kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+          </>
+        }
+      />
+      {content}
     </div>
   );
 }

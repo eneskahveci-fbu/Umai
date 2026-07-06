@@ -28,7 +28,7 @@ const SUGGESTIONS = [
   "Çalışan nabız anketi: motivasyon, iş yükü, öneriler (anonim)",
 ];
 
-export function FormsStudio() {
+export function FormsStudio({ embedded }: { embedded?: boolean } = {}) {
   const open = useStore((s) => s.formsStudioOpen);
   const nav = useSurfaceNav();
   const config = useStore((s) => s.config);
@@ -131,25 +131,19 @@ export function FormsStudio() {
 
   const saved = config.craftForms ?? [];
 
-  return (
-    <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-      {/* Üst bar */}
-      <StudioTopBar
-        icon={ListChecks}
-        label="Anket"
-        activeSurface="forms"
-        showWorkActions={view === "work" && !!form}
-        onNew={() => { setForm(null); setView("home"); setBrief(""); }}
-        onClose={() => nav.close()}
-        actions={
-          <>
-            <button onClick={saveForm} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
-            <button onClick={exportHtml} title="Bağımsız HTML indir (sunucusuz anket)" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
-            <button onClick={() => void publish()} title="Yayınla — paylaşılabilir bağlantı" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-[#111110] text-xs font-semibold hover:bg-branddim transition-colors"><Globe size={13} /> <span className="hidden sm:inline">Yayınla</span></button>
-          </>
-        }
-      />
+  const slimActionsRow = view === "work" && form && (
+    <div className="h-10 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
+      <button onClick={() => { setForm(null); setView("home"); setBrief(""); }} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink shrink-0">+ Yeni</button>
+      <div className="ml-auto flex items-center gap-1 shrink-0">
+        <button onClick={saveForm} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+        <button onClick={exportHtml} title="Bağımsız HTML indir (sunucusuz anket)" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
+        <button onClick={() => void publish()} title="Yayınla — paylaşılabilir bağlantı" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-[#111110] text-xs font-semibold hover:bg-branddim transition-colors"><Globe size={13} /> <span className="hidden sm:inline">Yayınla</span></button>
+      </div>
+    </div>
+  );
 
+  const content = (
+    <>
       {view === "home" ? (
         <div className="flex-1 min-h-0 overflow-auto">
           <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-20 flex flex-col gap-5">
@@ -297,6 +291,37 @@ export function FormsStudio() {
         onExportTemplate={(f) => downloadTemplate({ kind: "form", data: f }, f.title)}
         emptyLabel="Henüz kayıtlı anket yok."
       />
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <>
+        {slimActionsRow}
+        {content}
+      </>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      {/* Üst bar */}
+      <StudioTopBar
+        icon={ListChecks}
+        label="Anket"
+        activeSurface="forms"
+        showWorkActions={view === "work" && !!form}
+        onNew={() => { setForm(null); setView("home"); setBrief(""); }}
+        onClose={() => nav.close()}
+        actions={
+          <>
+            <button onClick={saveForm} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+            <button onClick={exportHtml} title="Bağımsız HTML indir (sunucusuz anket)" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
+            <button onClick={() => void publish()} title="Yayınla — paylaşılabilir bağlantı" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-[#111110] text-xs font-semibold hover:bg-branddim transition-colors"><Globe size={13} /> <span className="hidden sm:inline">Yayınla</span></button>
+          </>
+        }
+      />
+      {content}
     </div>
   );
 }
