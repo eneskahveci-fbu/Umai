@@ -52,7 +52,7 @@ function imgUrl(prompt: string, model: string, w: number, h: number, seed: numbe
   return pollinationsImageUrl(prompt, { model, width: w, height: h, seed });
 }
 
-export function ImageStudio() {
+export function ImageStudio({ embedded }: { embedded?: boolean } = {}) {
   const open = useStore((s) => s.imageStudioOpen);
   const nav = useSurfaceNav();
   const addToast = useStore((s) => s.addToast);
@@ -236,22 +236,14 @@ export function ImageStudio() {
     } finally { setEnhancing(false); }
   };
 
-  return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-      {/* Üst bar */}
-      <StudioTopBar
-        icon={ImageIcon}
-        label="Görüntü"
-        activeSurface="image"
-        showWorkActions
-        onClose={() => nav.close()}
-        actions={msgs.length > 0 ? (
-          <button onClick={() => setMsgs([])} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line hover:border-brand/40 text-xs font-semibold transition-colors">
-            <Trash2 size={13} /> Temizle
-          </button>
-        ) : undefined}
-      />
+  const clearButton = msgs.length > 0 ? (
+    <button onClick={() => setMsgs([])} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line hover:border-brand/40 text-xs font-semibold transition-colors">
+      <Trash2 size={13} /> Temizle
+    </button>
+  ) : undefined;
 
+  const content = (
+    <>
       {/* Sohbet akışı */}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-5">
@@ -381,6 +373,36 @@ export function ImageStudio() {
           <button onClick={(e) => { e.stopPropagation(); void downloadUrl(lightbox); }} className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/10 text-white text-sm font-semibold hover:bg-white/20 transition-colors"><Download size={15} /> İndir</button>
         </div>
       )}
+    </>
+  );
+
+  /* embedded: DesignHub zaten dış sarmalayıcıyı + üst çubuğu sağlıyor —
+     yalnız "Temizle" eylemini (mesaj varsa) ince bir satırda gösteririz. */
+  if (embedded) {
+    return (
+      <>
+        {clearButton && (
+          <div className="h-10 shrink-0 flex items-center justify-end px-3 sm:px-4 border-b border-line/60">
+            {clearButton}
+          </div>
+        )}
+        {content}
+      </>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      {/* Üst bar */}
+      <StudioTopBar
+        icon={ImageIcon}
+        label="Görüntü"
+        activeSurface="image"
+        showWorkActions
+        onClose={() => nav.close()}
+        actions={clearButton}
+      />
+      {content}
     </div>
   );
 }

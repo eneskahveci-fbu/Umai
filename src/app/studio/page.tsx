@@ -1,13 +1,13 @@
 "use client";
 
-import { StudioView } from "@/components/studio/StudioView";
+import { DesignHub } from "@/components/studio/DesignHub";
 import { SurfacePage } from "@/components/studio/SurfacePage";
 
-/* /studio — Stüdyo (brief → AI tasarım) gerçek rotası. */
+/* /studio — Tasarım grubu (Tasarım/Sunum/Tuval/Görüntü) tek kabuğu. */
 export default function StudioPage() {
   return (
     <SurfacePage flag="studioOpen">
-      <StudioView />
+      <DesignHub />
     </SurfacePage>
   );
 }

@@ -1,13 +1,13 @@
 "use client";
 
-import { DesignStudio } from "@/components/DesignStudio";
+import { DesignHub } from "@/components/studio/DesignHub";
 import { SurfacePage } from "@/components/studio/SurfacePage";
 
-/* /studio/tuval — katman/tuval editörü (slayt · afiş · sosyal) gerçek rotası. */
+/* /studio/tuval — Tasarım grubu kabuğu, Tuval modu açık başlar. */
 export default function CanvasPage() {
   return (
     <SurfacePage flag="designStudioOpen">
-      <DesignStudio />
+      <DesignHub />
     </SurfacePage>
   );
 }

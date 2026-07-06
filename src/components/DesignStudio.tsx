@@ -312,7 +312,7 @@ function applyView(d: Design, spacing: number, scale: number, hue: number): Desi
   };
 }
 
-export function DesignStudio() {
+export function DesignStudio({ embedded }: { embedded?: boolean } = {}) {
   const open = useStore((s) => s.designStudioOpen);
   const nav = useSurfaceNav();
   const config = useStore((s) => s.config);
@@ -909,80 +909,82 @@ KURALLAR:
       : p.bgType === "color" ? { background: p.c1 }
         : { background: `linear-gradient(135deg, ${p.c1}, ${p.c2})` };
 
-  return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-      {/* Üst araç çubuğu */}
-      <div className="brand-rule glass shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5">
-        <span className="w-8 h-8 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0"><Sparkles size={16} /></span>
-        <StudioSwitcher active="canvas" />
-        {/* (a) Alt mod — Tuval (katman) | Kod (HTML/React). Mobilde ⋯ menüde. */}
-        <div className="hidden sm:flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
-          <button onClick={() => setDmode("canvas")} className={`px-2 py-1 rounded-md transition-colors ${dmode === "canvas" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`}>Tuval</button>
-          <button onClick={() => setDmode("code")} className={`px-2 py-1 rounded-md transition-colors ${dmode === "code" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`}>Kod</button>
-        </div>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tasarım adı…" className="hidden md:block ml-2 w-40 bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50" />
-        {dmode === "canvas" && (
-          <div className="hidden sm:flex items-center gap-0.5 ml-1 shrink-0">
-            <button onClick={doUndo} disabled={!hist.past.length} title="Geri al (Ctrl+Z)" className="w-8 h-8 grid place-items-center rounded-lg border border-line text-muted hover:text-ink disabled:opacity-30 transition-colors"><Undo2 size={14} /></button>
-            <button onClick={doRedo} disabled={!hist.future.length} title="Yinele (Ctrl+Y)" className="w-8 h-8 grid place-items-center rounded-lg border border-line text-muted hover:text-ink disabled:opacity-30 transition-colors"><Redo2 size={14} /></button>
-          </div>
-        )}
-
-        <div className="ml-auto flex items-center gap-1 sm:gap-1.5">
-          {/* Dışa aktar */}
-          <ExportMenu
-            triggerLabel="İndir"
-            busy={exporting}
-            disabled={exporting}
-            options={[
-              { key: "png", label: "PNG görsel", icon: <FileImage size={14} className="text-brand" />, onSelect: exportPng },
-              { key: "html", label: "Bağımsız HTML", icon: <FileCode size={14} className="text-brand" />, onSelect: exportHtml },
-              { key: "pdf", label: "PDF (yazdır)", icon: <FileText size={14} className="text-brand" />, onSelect: exportPdf },
-            ]}
-          />
-
-          <button onClick={save} className="btn-brand-glow flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-[#111110] text-xs font-bold"><Save size={13} /> <span className="hidden sm:inline">Kaydet</span></button>
-
-          {/* ⋯ ikincil eylemler (sade üst bar) */}
-          <div className="relative">
-            <button onClick={() => setStudioMenu((v) => !v)} title="Daha fazla" className={`w-8 h-8 grid place-items-center rounded-lg border transition-colors ${studioMenu || view !== "design" ? "border-brand/50 text-brand" : "border-line text-muted hover:text-ink"}`}><MoreHorizontal size={16} /></button>
-            {studioMenu && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setStudioMenu(false)} />
-                <div className="absolute right-0 mt-1.5 z-20 w-52 bg-surface border border-line rounded-xl shadow-2xl p-1 text-sm">
-                  {/* Mobilde üst bardan kaldırılanlar (⋯'den erişilir) */}
-                  <div className="sm:hidden">
-                    <button onClick={() => { setDmode((m) => (m === "code" ? "canvas" : "code")); setStudioMenu(false); }} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><FileCode size={14} className={dmode === "code" ? "text-brand" : "text-muted/60"} /> Kod modu</button>
-                    {dmode === "canvas" && (
-                      <div className="flex gap-1 px-2 pb-1">
-                        <button onClick={doUndo} disabled={!hist.past.length} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-line text-xs text-muted hover:text-ink disabled:opacity-30"><Undo2 size={13} /> Geri al</button>
-                        <button onClick={doRedo} disabled={!hist.future.length} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-line text-xs text-muted hover:text-ink disabled:opacity-30"><Redo2 size={13} /> Yinele</button>
-                      </div>
-                    )}
-                    <div className="h-px bg-line/60 my-1" />
-                  </div>
-                  <button onClick={() => { setView((v) => (v === "templates" ? "design" : "templates")); setStudioMenu(false); }} className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left ${view === "templates" ? "text-brand" : ""}`}><LayoutTemplate size={14} className="text-brand" /> Hazır şablonlar</button>
-                  <button onClick={() => { setView((v) => (v === "gallery" ? "design" : "gallery")); setStudioMenu(false); }} className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left ${view === "gallery" ? "text-brand" : ""}`}><span className="flex items-center gap-2"><LayoutGrid size={14} className="text-brand" /> Kayıtlı tasarımlar</span><span className="text-[10px] font-mono text-muted/60">{saved.length}</span></button>
-                  <div className="h-px bg-line/60 my-1" />
-                  <button onClick={() => setChatOpen((v) => !v)} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><MessageSquare size={14} className={chatOpen ? "text-brand" : "text-muted/60"} /> Sohbet paneli</button>
-                  <button onClick={() => setTweaksOpen((v) => !v)} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><Sliders size={14} className={tweaksOpen ? "text-brand" : "text-muted/60"} /> Tweaks paneli</button>
-                  <div className="h-px bg-line/60 my-1" />
-                  <div className="flex items-center justify-between gap-2 px-2.5 py-1.5">
-                    <span className="text-xs text-muted/70">Kalite</span>
-                    <select value={quality} onChange={(e) => setQuality(e.target.value as keyof typeof QUALITY)} className="bg-bgsoft border border-line rounded-lg px-2 py-1 text-xs outline-none focus:border-brand/50 cursor-pointer">
-                      {Object.entries(QUALITY).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                    </select>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          <button onClick={() => nav.close()} className="w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors"><X size={16} /></button>
-        </div>
+  /* Araç çubuğunun ortak kısmı — mod toggle/başlık/undo-redo/dışa aktar/
+     kaydet/⋯ menüsü. embedded'de de birebir aynı, yalnız dıştaki ikon-
+     rozeti + StudioSwitcher + kapat butonu DesignHub'a taşınıyor. */
+  const toolbarInner = (
+    <>
+      {/* (a) Alt mod — Tuval (katman) | Kod (HTML/React). Mobilde ⋯ menüde. */}
+      <div className="hidden sm:flex items-center bg-bgsoft border border-line rounded-lg p-0.5 text-xs font-semibold shrink-0">
+        <button onClick={() => setDmode("canvas")} className={`px-2 py-1 rounded-md transition-colors ${dmode === "canvas" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`}>Tuval</button>
+        <button onClick={() => setDmode("code")} className={`px-2 py-1 rounded-md transition-colors ${dmode === "code" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`}>Kod</button>
       </div>
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tasarım adı…" className="hidden md:block ml-2 w-40 bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50" />
+      {dmode === "canvas" && (
+        <div className="hidden sm:flex items-center gap-0.5 ml-1 shrink-0">
+          <button onClick={doUndo} disabled={!hist.past.length} title="Geri al (Ctrl+Z)" className="w-8 h-8 grid place-items-center rounded-lg border border-line text-muted hover:text-ink disabled:opacity-30 transition-colors"><Undo2 size={14} /></button>
+          <button onClick={doRedo} disabled={!hist.future.length} title="Yinele (Ctrl+Y)" className="w-8 h-8 grid place-items-center rounded-lg border border-line text-muted hover:text-ink disabled:opacity-30 transition-colors"><Redo2 size={14} /></button>
+        </div>
+      )}
 
-      <div className="flex-1 min-h-0 flex flex-col sm:flex-row overflow-hidden">
+      <div className="ml-auto flex items-center gap-1 sm:gap-1.5">
+        {/* Dışa aktar */}
+        <ExportMenu
+          triggerLabel="İndir"
+          busy={exporting}
+          disabled={exporting}
+          options={[
+            { key: "png", label: "PNG görsel", icon: <FileImage size={14} className="text-brand" />, onSelect: exportPng },
+            { key: "html", label: "Bağımsız HTML", icon: <FileCode size={14} className="text-brand" />, onSelect: exportHtml },
+            { key: "pdf", label: "PDF (yazdır)", icon: <FileText size={14} className="text-brand" />, onSelect: exportPdf },
+          ]}
+        />
+
+        <button onClick={save} className="btn-brand-glow flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-[#111110] text-xs font-bold"><Save size={13} /> <span className="hidden sm:inline">Kaydet</span></button>
+
+        {/* ⋯ ikincil eylemler (sade üst bar) */}
+        <div className="relative">
+          <button onClick={() => setStudioMenu((v) => !v)} title="Daha fazla" className={`w-8 h-8 grid place-items-center rounded-lg border transition-colors ${studioMenu || view !== "design" ? "border-brand/50 text-brand" : "border-line text-muted hover:text-ink"}`}><MoreHorizontal size={16} /></button>
+          {studioMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setStudioMenu(false)} />
+              <div className="absolute right-0 mt-1.5 z-20 w-52 bg-surface border border-line rounded-xl shadow-2xl p-1 text-sm">
+                {/* Mobilde üst bardan kaldırılanlar (⋯'den erişilir) */}
+                <div className="sm:hidden">
+                  <button onClick={() => { setDmode((m) => (m === "code" ? "canvas" : "code")); setStudioMenu(false); }} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><FileCode size={14} className={dmode === "code" ? "text-brand" : "text-muted/60"} /> Kod modu</button>
+                  {dmode === "canvas" && (
+                    <div className="flex gap-1 px-2 pb-1">
+                      <button onClick={doUndo} disabled={!hist.past.length} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-line text-xs text-muted hover:text-ink disabled:opacity-30"><Undo2 size={13} /> Geri al</button>
+                      <button onClick={doRedo} disabled={!hist.future.length} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-line text-xs text-muted hover:text-ink disabled:opacity-30"><Redo2 size={13} /> Yinele</button>
+                    </div>
+                  )}
+                  <div className="h-px bg-line/60 my-1" />
+                </div>
+                <button onClick={() => { setView((v) => (v === "templates" ? "design" : "templates")); setStudioMenu(false); }} className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left ${view === "templates" ? "text-brand" : ""}`}><LayoutTemplate size={14} className="text-brand" /> Hazır şablonlar</button>
+                <button onClick={() => { setView((v) => (v === "gallery" ? "design" : "gallery")); setStudioMenu(false); }} className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left ${view === "gallery" ? "text-brand" : ""}`}><span className="flex items-center gap-2"><LayoutGrid size={14} className="text-brand" /> Kayıtlı tasarımlar</span><span className="text-[10px] font-mono text-muted/60">{saved.length}</span></button>
+                <div className="h-px bg-line/60 my-1" />
+                <button onClick={() => setChatOpen((v) => !v)} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><MessageSquare size={14} className={chatOpen ? "text-brand" : "text-muted/60"} /> Sohbet paneli</button>
+                <button onClick={() => setTweaksOpen((v) => !v)} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-bgsoft transition-colors text-left"><Sliders size={14} className={tweaksOpen ? "text-brand" : "text-muted/60"} /> Tweaks paneli</button>
+                <div className="h-px bg-line/60 my-1" />
+                <div className="flex items-center justify-between gap-2 px-2.5 py-1.5">
+                  <span className="text-xs text-muted/70">Kalite</span>
+                  <select value={quality} onChange={(e) => setQuality(e.target.value as keyof typeof QUALITY)} className="bg-bgsoft border border-line rounded-lg px-2 py-1 text-xs outline-none focus:border-brand/50 cursor-pointer">
+                    {Object.entries(QUALITY).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                  </select>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        {!embedded && (
+          <button onClick={() => nav.close()} className="w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors"><X size={16} /></button>
+        )}
+      </div>
+    </>
+  );
+
+  const mainContent = (
+    <div className="flex-1 min-h-0 flex flex-col sm:flex-row overflow-hidden">
         {view === "templates" ? (
           <div className="flex-1 overflow-y-auto p-4 sm:p-6">
             <div className="mb-3">
@@ -1381,6 +1383,28 @@ KURALLAR:
           </>
         )}
       </div>
+  );
+
+  if (embedded) {
+    return (
+      <>
+        <div className="h-10 shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-3 sm:px-4 border-b border-line/60">
+          {toolbarInner}
+        </div>
+        {mainContent}
+      </>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      {/* Üst araç çubuğu */}
+      <div className="brand-rule glass shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5">
+        <span className="w-8 h-8 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0"><Sparkles size={16} /></span>
+        <StudioSwitcher active="canvas" />
+        {toolbarInner}
+      </div>
+      {mainContent}
     </div>
   );
 }

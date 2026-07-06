@@ -1,13 +1,13 @@
 "use client";
 
-import { ImageStudio } from "@/components/ImageStudio";
+import { DesignHub } from "@/components/studio/DesignHub";
 import { SurfacePage } from "@/components/studio/SurfacePage";
 
-/* /studio/gorsel — AI görsel üretimi gerçek rotası. */
+/* /studio/gorsel — Tasarım grubu kabuğu, Görüntü modu açık başlar. */
 export default function ImagePage() {
   return (
     <SurfacePage flag="imageStudioOpen">
-      <ImageStudio />
+      <DesignHub />
     </SurfacePage>
   );
 }
