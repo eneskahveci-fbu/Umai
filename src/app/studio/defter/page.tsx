@@ -1,13 +1,13 @@
 "use client";
 
-import { NotebookStudio } from "@/components/studio/NotebookStudio";
+import { ContentHub } from "@/components/studio/ContentHub";
 import { SurfacePage } from "@/components/studio/SurfacePage";
 
-/* /studio/defter — Defter (kaynak-temelli sohbet + sesli özet) rotası. */
+/* /studio/defter — İçerik grubu kabuğu, Defter modu açık başlar. */
 export default function NotebookPage() {
   return (
     <SurfacePage flag="notebookStudioOpen">
-      <NotebookStudio />
+      <ContentHub />
     </SurfacePage>
   );
 }

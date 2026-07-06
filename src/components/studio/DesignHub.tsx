@@ -6,9 +6,9 @@
    redo, TTS, katman düzenleme) HİÇ değişmedi — yalnız dış "4 ayrı tam-ekran +
    4 ayrı üst çubuk" katmanı kalkıyor. Her mod `embedded` prop'uyla kendi
    sarmalayıcısını/üst çubuğunu basmıyor, yalnız içeriğini döndürüyor; bir kez
-   açılan mod `hidden` ile gizlenir ama unmount edilmez (state kaybı yok) —
-   `app/page.tsx`'teki mevcut "ever açıldı mı" deseninin aynısı. İçerik grubu
-   (Doküman/Anket/Defter) bundan ayrı, kendi rotalarında kalmaya devam ediyor. */
+   açılan mod unmount edilmez (state kaybı yok) — `app/page.tsx`'teki mevcut
+   "ever açıldı mı" deseninin aynısı. İçerik grubu (Doküman/Anket/Defter)
+   için aynı desenin eşleniği: `ContentHub.tsx`. */
 
 import { useState } from "react";
 import { X } from "lucide-react";

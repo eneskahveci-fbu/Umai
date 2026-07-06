@@ -40,7 +40,7 @@ export function safeFileName(s: string, fallback: string): string {
   return (s || "").replace(/[^\wğüşöçıİĞÜŞÖÇ -]/g, "").trim() || fallback;
 }
 
-export function DocsStudio() {
+export function DocsStudio({ embedded }: { embedded?: boolean } = {}) {
   const open = useStore((s) => s.docsStudioOpen);
   const nav = useSurfaceNav();
   const config = useStore((s) => s.config);
@@ -173,25 +173,19 @@ export function DocsStudio() {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-      {/* Üst bar */}
-      <StudioTopBar
-        icon={FileText}
-        label="Doküman"
-        activeSurface="docs"
-        showWorkActions={view === "work" && !!doc}
-        onNew={() => { setDoc(null); setView("home"); setBrief(""); }}
-        onClose={() => nav.close()}
-        actions={
-          <>
-            <button onClick={saveDoc} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
-            <button onClick={() => doc && download(`${safeFileName(doc.title, "dokuman")}.md`, docToMarkdown(doc), "text/markdown;charset=utf-8")} title="Markdown indir" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
-            <button onClick={() => doc && download(`${safeFileName(doc.title, "dokuman")}.html`, docToHtml(doc), "text/html;charset=utf-8")} title="Bağımsız HTML indir (yazdır → PDF)" className="hidden sm:grid w-8 h-8 place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FileCode size={15} /></button>
-          </>
-        }
-      />
+  const slimActionsRow = view === "work" && doc && (
+    <div className="h-10 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
+      <button onClick={() => { setDoc(null); setView("home"); setBrief(""); }} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink shrink-0">+ Yeni</button>
+      <div className="ml-auto flex items-center gap-1 shrink-0">
+        <button onClick={saveDoc} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+        <button onClick={() => doc && download(`${safeFileName(doc.title, "dokuman")}.md`, docToMarkdown(doc), "text/markdown;charset=utf-8")} title="Markdown indir" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
+        <button onClick={() => doc && download(`${safeFileName(doc.title, "dokuman")}.html`, docToHtml(doc), "text/html;charset=utf-8")} title="Bağımsız HTML indir (yazdır → PDF)" className="hidden sm:grid w-8 h-8 place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FileCode size={15} /></button>
+      </div>
+    </div>
+  );
 
+  const content = (
+    <>
       {view === "home" ? (
         <div className="flex-1 min-h-0 overflow-auto">
           <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-20 flex flex-col gap-5">
@@ -311,6 +305,37 @@ export function DocsStudio() {
         onExportTemplate={(d) => downloadTemplate({ kind: "doc", data: d }, d.title)}
         emptyLabel="Henüz kayıtlı doküman yok."
       />
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <>
+        {slimActionsRow}
+        {content}
+      </>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      {/* Üst bar */}
+      <StudioTopBar
+        icon={FileText}
+        label="Doküman"
+        activeSurface="docs"
+        showWorkActions={view === "work" && !!doc}
+        onNew={() => { setDoc(null); setView("home"); setBrief(""); }}
+        onClose={() => nav.close()}
+        actions={
+          <>
+            <button onClick={saveDoc} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+            <button onClick={() => doc && download(`${safeFileName(doc.title, "dokuman")}.md`, docToMarkdown(doc), "text/markdown;charset=utf-8")} title="Markdown indir" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
+            <button onClick={() => doc && download(`${safeFileName(doc.title, "dokuman")}.html`, docToHtml(doc), "text/html;charset=utf-8")} title="Bağımsız HTML indir (yazdır → PDF)" className="hidden sm:grid w-8 h-8 place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FileCode size={15} /></button>
+          </>
+        }
+      />
+      {content}
     </div>
   );
 }
