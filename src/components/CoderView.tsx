@@ -101,6 +101,7 @@ import { detectSensitive } from "@/lib/pii";
 import { friendlyError } from "@/lib/friendlyError";
 import { autoEffort, autoSwarm, decidePilot, type PilotDecision } from "@/lib/autoPilot";
 import { pickDraftModels, buildBoostInstruction, generateDrafts } from "@/lib/boost";
+import { fetchTextModels } from "@/lib/pollinations";
 import { importSkillFromUrl } from "@/lib/skillImport";
 import { retrieve } from "@/lib/retrieval";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
@@ -1632,8 +1633,9 @@ export function CoderView() {
     if (pilot?.quality && !useSwarm && !useResearch && !toolsWanted && !isContinuation) {
       try {
         useStore.getState().updateLastThinking("✦ Kalite turu: iç taslak(lar) hazırlanıyor…");
+        const freeModelNames = await fetchTextModels();
         const draftProfiles = pickDraftModels(
-          store.config.models, active, pilot.effort === "max" ? 2 : 1, store.strongestModel(),
+          store.config.models, active, pilot.effort === "max" ? 2 : 1, store.strongestModel(), freeModelNames,
         );
         const withKeys = await Promise.all(draftProfiles.map(async (m) => ({
           baseUrl: m.baseUrl, model: m.model, provider: m.provider, apiKey: await usableApiKey(m),

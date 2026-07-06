@@ -19,6 +19,29 @@ describe("pickDraftModels", () => {
   it("tek model varsa ikinci taslak eklenmez", () => {
     expect(pickDraftModels([models[0]], models[0], 2).length).toBe(1);
   });
+
+  describe("freeModelNames (Pollinations ücretsiz yedek)", () => {
+    const solo = m("only", "pollinations");
+    it("kullanıcının listesinde çeşitlilik yoksa ücretsiz Pollinations modelinden ikinci taslak eklenir", () => {
+      const picks = pickDraftModels([solo], solo, 2, null, ["openai", "mistral"]);
+      expect(picks).toHaveLength(2);
+      expect(picks[1].provider).toBe("pollinations");
+      expect(picks[1].id).toBe("pollinations:openai");
+    });
+    it("aktif model zaten o Pollinations modeliyse aynısı tekrar seçilmez", () => {
+      const active = { ...solo, model: "openai" };
+      const picks = pickDraftModels([active], active, 2, null, ["openai", "mistral"]);
+      expect(picks[1].model).toBe("mistral");
+    });
+    it("freeModelNames boşsa/verilmezse tek taslakta kalır (geriye dönük uyumlu)", () => {
+      expect(pickDraftModels([solo], solo, 2, null, []).length).toBe(1);
+      expect(pickDraftModels([solo], solo, 2).length).toBe(1);
+    });
+    it("kullanıcının kendi listesinde gerçek çeşitlilik varsa freeModelNames'e hiç bakılmaz", () => {
+      const picks = pickDraftModels(models, models[0], 2, models[1], ["openai"]);
+      expect(picks.map((x) => x.id)).toEqual(["a", "b"]);
+    });
+  });
 });
 
 describe("buildBoostInstruction", () => {
