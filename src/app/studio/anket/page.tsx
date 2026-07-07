@@ -1,13 +1,13 @@
 "use client";
 
-import { ContentHub } from "@/components/studio/ContentHub";
+import { StudioHub } from "@/components/studio/StudioHub";
 import { SurfacePage } from "@/components/studio/SurfacePage";
 
-/* /studio/anket — İçerik grubu kabuğu, Anket modu açık başlar. */
+/* /studio/anket — tek stüdyo kabuğu — Anket modu açık başlar. */
 export default function FormsPage() {
   return (
     <SurfacePage flag="formsStudioOpen">
-      <ContentHub />
+      <StudioHub />
     </SurfacePage>
   );
 }

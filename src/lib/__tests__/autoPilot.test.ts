@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decidePilot, autoEffort, autoWeb, autoResearch } from "../autoPilot";
+import { decidePilot, autoEffort, autoWeb, autoResearch, autoFusion } from "../autoPilot";
 
 const ctx = { hasRepo: true };
 
@@ -71,5 +71,22 @@ describe("autoStudioSkill", () => {
   it("belirsiz brief → null (varsayılana düşer)", async () => {
     const { autoStudioSkill } = await import("../autoPilot");
     expect(autoStudioSkill("güzel bir şey yap")).toBe(null);
+  });
+});
+
+describe("autoFusion — füzyon yalnız üretim işlerinde", () => {
+  it("site/uygulama üretim isteklerinde tetiklenir", () => {
+    expect(autoFusion("bana modern bir portfolyo sitesi yap, koyu tema olsun")).toBe(true);
+    expect(autoFusion("yapılacaklar listesi uygulaması oluştur react ile")).toBe(true);
+    expect(autoFusion("landing sayfası tasarla: kahve dükkanı için")).toBe(true);
+  });
+  it("normal sohbet/soru-cevapta tetiklenmez", () => {
+    expect(autoFusion("merhaba nasılsın?")).toBe(false);
+    expect(autoFusion("bu sitede neden hata alıyorum sence?")).toBe(false);
+    expect(autoFusion("bugün dolar kaç TL?")).toBe(false);
+    expect(autoFusion("python nedir kısaca açıkla")).toBe(false);
+  });
+  it("çok kısa metinde tetiklenmez", () => {
+    expect(autoFusion("site yap")).toBe(false);
   });
 });

@@ -13,6 +13,9 @@ export interface PilotDecision {
   research: boolean;
   /** Taslak→öz-eleştiri→düzeltme (ortalama modeli zekileştirir). */
   quality: boolean;
+  /** Çoklu-model FÜZYON (3 taslak → hakem → sentez) — yalnız ÜRETİM işlerinde
+      (site/uygulama/arayüz/kod üretimi). Normal sohbette çalışmaz. */
+  fusion: boolean;
   /** Çok parçalı ağır iş → ajan ekibi (planlayıcı+paralel işçiler). */
   swarm: boolean;
   /** Durum rozeti tooltip'i için kısa Türkçe etiketler. */
@@ -77,21 +80,37 @@ export function autoQuality(text: string, effort: Effort): boolean {
   return t.length > 400 && /\b(rapor|makale|doküman|dokümantasyon|tasarla|planla|öneri|strateji)\b/i.test(t);
 }
 
+/* Füzyon (3 taslak → hakem → sentez) yalnız ÜRETİM işlerinde: bir site/
+   uygulama/arayüz/kod ÜRETMESİ istendiğinde. Hem üretim nesnesi hem üretim
+   fiili aranır → "bu sitede hata var mı?" gibi sohbet cümleleri tetiklemez. */
+const FUSION_NOUN =
+  /(web ?sitesi|\bsite\b|landing|sayfa|uygulama|\bapp\b|arayüz|\bui\b|dashboard|panel|component|bileşen|\bform\b|portfolyo|portföy|oyun|\bgame\b|e-?ticaret|blog|\bapi\b|\bbot\b|script|eklenti|extension|tema|widget|editör|hesaplayıcı|kod)/i;
+const FUSION_VERB =
+  /(yap|oluştur|kur|kodla|tasarla|üret|geliştir|inşa|yaz|hazırla|çıkar|build|create|implement|develop|make)/i;
+
+export function autoFusion(text: string): boolean {
+  const t = (text || "").trim();
+  if (t.length < 24) return false;
+  return FUSION_NOUN.test(t) && FUSION_VERB.test(t);
+}
+
 /** Tek karar noktası — CoderView gönderim anında çağırır. */
 export function decidePilot(text: string, ctx: { hasRepo: boolean }): PilotDecision {
   const effort = autoEffort(text);
   const research = autoResearch(text);
   const web = research || autoWeb(text);
   const quality = autoQuality(text, effort);
+  const fusion = autoFusion(text);
   const swarm = ctx.hasRepo && autoSwarm(text);
   const reasons: string[] = [];
   const effortLabel: Record<Effort, string> = { low: "hızlı", medium: "dengeli", high: "yüksek efor", max: "maksimum efor" };
   reasons.push(effortLabel[effort]);
   if (web && !research) reasons.push("web");
   if (research) reasons.push("derin araştırma");
-  if (quality) reasons.push("kalite turu");
+  if (fusion) reasons.push("füzyon (3 model + hakem)");
+  else if (quality) reasons.push("kalite turu");
   if (swarm) reasons.push("ajan ekibi");
-  return { effort, web, research, quality, swarm, reasons };
+  return { effort, web, research, quality, fusion, swarm, reasons };
 }
 
 /* Stüdyo için otomatik çıktı türü (skill) seçimi — brief'ten. Open Design/

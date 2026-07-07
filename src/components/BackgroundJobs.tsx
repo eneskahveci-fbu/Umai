@@ -1,18 +1,29 @@
 "use client";
 
 /* Görev Kuyruğu — Otonom Ajan'ın yüzen panosu + çalıştırıcısı.
-   Kullanıcı "arka planda çalıştır" der → iş kuyruğa girer. Bu bileşen /app'te
-   TEK kez mount edilir: kuyruğu sırayla işler (streamChat ile), ilerlemeyi
-   canlı gösterir, bitince ses + bildirim verir. Uygulama AÇIKKEN çalışır
-   (herhangi bir yüzeyde); sekme kapanırsa iş yenilemede tekrar kuyruğa döner. */
+   Kullanıcı "arka planda çalıştır" der → iş kuyruğa girer. ÖNCE sunucu-taraflı
+   yürütme denenir (/api/jobs): iş Vercel fonksiyonunda `after()` ile yanıttan
+   sonra da sürer ve sonucu Supabase'e yazılır → TARAYICI KAPANSA DA BİTER
+   (Claude'un arka plan görevleri gibi). Sunucu yoksa (giriş yok / tablo yok)
+   eski yerel moda düşülür: sekme açıkken streamChat ile çalışır.
+   Sunucudaki işler 6 sn'de bir + sekme görünür olunca senkronlanır. */
 
 import { useEffect, useRef, useState } from "react";
 import { Bot, Check, ChevronDown, Copy, Loader2, MessageSquarePlus, Trash2, X, AlertTriangle } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav } from "@/lib/surfaceNav";
 import { streamChat } from "@/lib/genChat";
+import { resolveKey } from "@/lib/studioGen";
+import { buildFallbackChain } from "@/lib/fallback";
 import { playReady, playError, notifyReady } from "@/lib/sounds";
 import { JOB_SYSTEM, buildJobMessages, nextRunnableJob, jobCounts, latestHeading, type BackgroundJob } from "@/lib/jobs";
+
+/* Sunucu görev satırı (GET /api/jobs yanıtı). */
+interface RemoteJobRow {
+  id: string; goal: string; title: string; status: string;
+  result?: string | null; error?: string | null;
+  created_at: string; updated_at: string;
+}
 
 /* ── Çalıştırıcı: kuyruktaki işleri sırayla yürütür ────────────────────── */
 function useJobRunner() {
@@ -27,9 +38,38 @@ function useJobRunner() {
 
     runningRef.current = true;
     const id = next.id;
-    updateJob(id, { status: "running", steps: [{ text: "Başlatılıyor…", at: Date.now() }] });
 
     (async () => {
+      /* 1) SUNUCU-taraflı dene: kabul edilirse iş artık sunucuda —
+         yerel kuyruk serbest kalır, senkron (useRemoteSync) sonucu getirir. */
+      try {
+        const resolved = await resolveKey();
+        if (resolved) {
+          const cfg = useStore.getState().config;
+          const r = await fetch("/api/jobs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jobId: id, goal: next.goal,
+              baseUrl: resolved.baseUrl, model: resolved.model,
+              apiKey: resolved.apiKey, provider: resolved.provider,
+              fallbacks: buildFallbackChain(cfg.models, cfg.activeModelId),
+            }),
+          });
+          const d = await r.json().catch(() => ({} as { server?: boolean }));
+          if (r.ok && d.server) {
+            updateJob(id, {
+              status: "running", remote: true,
+              steps: [{ text: "Sunucuda çalışıyor — tarayıcıyı kapatabilirsin.", at: Date.now() }],
+            });
+            runningRef.current = false;
+            return;
+          }
+        }
+      } catch { /* sunucu yolu başarısız → yerel moda düş */ }
+
+      /* 2) YEREL mod (eski davranış): sekme açıkken akışla çalıştır. */
+      updateJob(id, { status: "running", steps: [{ text: "Başlatılıyor…", at: Date.now() }] });
       try {
         let lastHeading = "";
         const full = await streamChat({
@@ -66,6 +106,46 @@ function useJobRunner() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobs]);
+}
+
+/* ── Sunucu senkronu: uzak işlerin sonucunu getirir ────────────────────── */
+function useRemoteSync() {
+  useEffect(() => {
+    const sync = async () => {
+      try {
+        const r = await fetch("/api/jobs");
+        const d = await r.json().catch(() => ({} as { server?: boolean; jobs?: RemoteJobRow[] }));
+        if (!d.server || !Array.isArray(d.jobs)) return;
+        const st = useStore.getState();
+        for (const row of d.jobs) {
+          const local = st.backgroundJobs.find((j) => j.id === row.id);
+          const finished = row.status === "done" || row.status === "error";
+          if (local) {
+            if (finished && local.status === "running") {
+              st.updateJob(row.id, {
+                status: row.status as BackgroundJob["status"],
+                result: row.result ?? undefined,
+                error: row.error ?? undefined,
+                remote: true,
+              });
+              if (row.status === "done") { playReady(); void notifyReady("✓ Görev tamamlandı", row.title); }
+              else playError();
+            }
+          }
+          /* Yerelde hiç yoksa (başka cihazda başlatılmış olabilir) karışma —
+             panel yalın kalsın; kullanıcı o cihazın panelinde görür. */
+        }
+      } catch { /* çevrimdışı vb. — sessiz */ }
+    };
+    void sync(); // açılışta: tarayıcı kapalıyken biten işleri getir
+    const iv = setInterval(() => {
+      const anyRemote = useStore.getState().backgroundJobs.some((j) => j.remote && j.status === "running");
+      if (anyRemote && document.visibilityState === "visible") void sync();
+    }, 6000);
+    const onVis = () => { if (document.visibilityState === "visible") void sync(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { clearInterval(iv); document.removeEventListener("visibilitychange", onVis); };
+  }, []);
 }
 
 /* ── Tek iş satırı ─────────────────────────────────────────────────────── */
@@ -148,8 +228,15 @@ function JobRow({ job, onRemove }: { job: BackgroundJob; onRemove: (id: string) 
 /* ── Yüzen pano ────────────────────────────────────────────────────────── */
 export function BackgroundJobs() {
   useJobRunner();
+  useRemoteSync();
   const jobs = useStore((s) => s.backgroundJobs);
-  const removeJob = useStore((s) => s.removeJob);
+  const removeJobLocal = useStore((s) => s.removeJob);
+  /* Uzak işi kaldırırken sunucudan da düşür (panel ↔ Supabase tutarlı). */
+  const removeJob = (id: string) => {
+    const j = useStore.getState().backgroundJobs.find((x) => x.id === id);
+    if (j?.remote) void fetch(`/api/jobs?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => undefined);
+    removeJobLocal(id);
+  };
   const clearFinishedJobs = useStore((s) => s.clearFinishedJobs);
   const [open, setOpen] = useState(false);
 
@@ -188,7 +275,8 @@ export function BackgroundJobs() {
               {jobs.map((j) => <JobRow key={j.id} job={j} onRemove={removeJob} />)}
             </div>
             <div className="px-3.5 py-2 border-t border-line/50 text-[10px] text-muted/50 shrink-0 leading-snug">
-              Görevler uygulama açıkken çalışır. Sekmeyi kapatırsan yarım kalan iş, geri döndüğünde kaldığı yerden sürer.
+              Görevler sunucuda çalışır — tarayıcıyı kapatsan da tamamlanır, döndüğünde sonuç burada olur.
+              (Sunucu kullanılamazsa iş sekme açıkken yerelde çalışır.)
             </div>
           </div>
         </>
