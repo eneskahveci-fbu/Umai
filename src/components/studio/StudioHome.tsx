@@ -1,27 +1,31 @@
 "use client";
 
+/* ═══════════════════════════════════════════════════════════════════════
+   STUDIO HOME — Open Design Platform Giriş Ekranı
+   ═══════════════════════════════════════════════════════════════════════
+   Önceki yapı: 7 araç çipi (Sunum/Doküman/Anket/Görsel/Defter)
+   Yeni yapı: 3 araç çipi (Görüntü/Doküman/Defter) — Slays ve Tuval
+   artık OpenDesignStudio içinde.
+   ═══════════════════════════════════════════════════════════════════════ */
+
 import { ArrowUp, BookOpen, FileText, Image as ImageIcon, FolderOpen, ListChecks, Loader2, Presentation, Sparkles } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { skillsByCategory, STUDIO_DIRECTIONS } from "@/lib/studioConstants";
 import { allDesignSystems } from "@/lib/designSystems";
 import { setSurfaceHandoff, useSurfaceNav, type Surface } from "@/lib/surfaceNav";
 
-/* Hub çipleri: aynı brief'i tek dokunuşla başka stüdyo aracına taşır
-   (Sunum/Doküman/Anket/Görsel/Defter) — "tek sayfadan her şey" hissi. */
+/* Güncellenmiş araç çipleri — Slays ve Tuval kaldırıldı (OpenDesignStudio içinde) */
 const TOOL_CHIPS: { id: Surface; name: string; icon: typeof Sparkles }[] = [
-  { id: "slides", name: "Sunum", icon: Presentation },
+  { id: "image", name: "Görsel", icon: ImageIcon },
   { id: "docs", name: "Doküman", icon: FileText },
   { id: "forms", name: "Anket", icon: ListChecks },
-  { id: "image", name: "Görsel", icon: ImageIcon },
   { id: "notebook", name: "Defter", icon: BookOpen },
 ];
 
 const selectCls =
   "flex-1 min-w-0 bg-bgsoft border border-line rounded-lg px-2.5 py-2 text-xs outline-none focus:border-brand/60 cursor-pointer";
 
-/* Stüdyo giriş ekranı — Open Design / Claude Design sadeliği: tek brief kartı,
-   tür/sistem/yön kompakt seçicilerle kartın içinde. Varsayılan ✦ Otomatik tür
-   (brief'ten craft seçer); ayrıntı ızgaraları yok. Mobil-öncelikli. */
+/* Open Design Platform giriş ekranı */
 export function StudioHome({
   brief, setBrief,
   skillId, setSkillId,
@@ -44,27 +48,34 @@ export function StudioHome({
   const config = useStore((s) => s.config);
   const systems = allDesignSystems(config);
   const nav = useSurfaceNav();
+
   const goTool = (id: Surface) => {
     const b = brief.trim();
     if (b) setSurfaceHandoff(id, b);
     nav.go(id);
   };
+
   return (
     <div className="flex-1 min-h-0 overflow-auto">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-20 flex flex-col gap-5">
         <div className="text-center">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-balance">Ne tasarlayalım?</h1>
-          <p className="text-muted text-sm mt-1.5 text-balance">Bir brief yaz — türü, düzeni ve gerisini craft halleder.</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-balance">
+            Open Design Platform
+          </h1>
+          <p className="text-muted text-sm mt-1.5 text-balance">
+            Slayt, afiş, sosyal medya, tuval — hepsi tek workspace'te.
+            Brief yaz, gerisini craft halleder.
+          </p>
         </div>
 
-        {/* Brief kartı: metin + kompakt seçiciler + üret, hepsi tek yüzeyde. */}
+        {/* Brief kartı */}
         <div className="rounded-2xl border border-line bg-surface elev-2 focus-within:border-brand/50 transition-colors">
           <textarea
             value={brief}
             onChange={(e) => setBrief(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onGenerate(); } }}
             rows={4}
-            placeholder="Örn: SaaS analitik aracı için landing sayfası — koyu tema, fiyatlandırma bölümü… ya da '5 slaytlık yatırımcı sunumu'."
+            placeholder="Örn: 'SaaS analitik aracı için landing sayfası — koyu tema' ya da '5 slaytlık yatırımcı sunumu' ya da 'Kahve dükkânı için Instagram afişi'"
             className="w-full bg-transparent resize-none outline-none px-4 pt-3.5 text-sm placeholder:text-muted/70 min-h-[104px]"
           />
           <div className="flex flex-wrap items-center gap-1.5 px-3 pb-3 pt-1">
@@ -117,9 +128,11 @@ export function StudioHome({
           </div>
         </div>
 
-        {/* Aynı brief'i başka araca taşı — tek stüdyo, tek sayfa hissi. */}
+        {/* Araç çipleri — Slays ve Tuval artık OpenDesignStudio içinde */}
         <div className="flex items-center justify-center gap-1.5 flex-wrap">
-          <span className="text-[11px] text-muted/50">{brief.trim() ? "Bu brief ile:" : "Diğer araçlar:"}</span>
+          <span className="text-[11px] text-muted/50">
+            {brief.trim() ? "Bu brief ile:" : "Diğer araçlar:"}
+          </span>
           {TOOL_CHIPS.map((t) => {
             const Icon = t.icon;
             return (
@@ -134,7 +147,14 @@ export function StudioHome({
           })}
         </div>
 
-        {/* Sessiz bağlantılar — kalabalık yok, ihtiyacı olan bulur. */}
+        {/* Bilgi notu */}
+        <div className="text-center text-[11px] text-muted/40 mt-2">
+          <span className="font-semibold">Open Design</span> —
+          Slayt, afiş, sosyal medya ve tuval artık tek workspace'te.
+          Dilediğin formatta üret, dilediğin formata dönüştür.
+        </div>
+
+        {/* Sessiz bağlantılar */}
         <div className="flex items-center justify-center gap-4 text-xs text-muted/80">
           <button onClick={onOpenTemplates} className="inline-flex items-center gap-1.5 hover:text-ink transition-colors">
             <Sparkles size={13} className="text-brand" /> Hazır şablonlar

@@ -1,13 +1,18 @@
 "use client";
 
-import { StudioHub } from "@/components/studio/StudioHub";
-import { SurfacePage } from "@/components/studio/SurfacePage";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-/* /studio/sunum — Tasarım grubu kabuğu, Sunum modu açık başlar. */
-export default function SlidesPage() {
+/* /studio/sunum → /studio'ya yönlendir (birleşik platform).
+   Kullanıcı eski linkle gelirse sessizce ana sayfaya atlar. */
+export default function SlidesRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/studio");
+  }, [router]);
   return (
-    <SurfacePage flag="slidesStudioOpen">
-      <StudioHub />
-    </SurfacePage>
+    <div className="h-screen grid place-items-center bg-bg text-muted/60 text-sm">
+      Yönlendiriliyor…
+    </div>
   );
 }
