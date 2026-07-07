@@ -25,6 +25,8 @@ export interface BackgroundJob {
   result?: string;
   /** Hata durumunda mesaj. */
   error?: string;
+  /** SUNUCUDA çalışıyor (tarayıcı kapansa da biter; /api/jobs senkronlar). */
+  remote?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -36,10 +38,11 @@ export function deriveJobTitle(goal: string): string {
   return first.length > 60 ? first.slice(0, 57).trimEnd() + "…" : first;
 }
 
-/** Kuyrukta çalışmayı bekleyen İLK işi döndürür (yoksa null). Aynı anda tek iş
-    çalışır: zaten "running" bir iş varsa yenisini başlatma. */
+/** Kuyrukta çalışmayı bekleyen İLK işi döndürür (yoksa null). Tarayıcıda aynı
+    anda TEK iş çalışır; SUNUCUDA çalışanlar (remote) sayılmaz — sunucu her işi
+    kendi fonksiyonunda paralel yürütür, yerel kuyruk onları beklemez. */
 export function nextRunnableJob(jobs: BackgroundJob[]): BackgroundJob | null {
-  if (jobs.some((j) => j.status === "running")) return null;
+  if (jobs.some((j) => j.status === "running" && !j.remote)) return null;
   return jobs.find((j) => j.status === "queued") ?? null;
 }
 

@@ -1,13 +1,13 @@
 "use client";
 
-import { DesignHub } from "@/components/studio/DesignHub";
+import { StudioHub } from "@/components/studio/StudioHub";
 import { SurfacePage } from "@/components/studio/SurfacePage";
 
 /* /studio/tuval — Tasarım grubu kabuğu, Tuval modu açık başlar. */
 export default function CanvasPage() {
   return (
     <SurfacePage flag="designStudioOpen">
-      <DesignHub />
+      <StudioHub />
     </SurfacePage>
   );
 }

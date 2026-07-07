@@ -136,3 +136,42 @@ create trigger subscriptions_set_updated_at
 --        • Redirect URLs'e ekle: https://craft-coder.vercel.app/auth/callback
 --   3) E-posta onayı kullanıyorsan SMTP'yi yapılandır (yoksa onay maili gitmez).
 -- ─────────────────────────────────────────────────────────────────────────
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- ARKA PLAN GÖREVLERİ (Otonom Ajan — sunucu-taraflı yürütme)
+-- Görev sunucuda çalışır ve sonucu buraya yazılır → kullanıcı tarayıcıyı
+-- kapatsa da iş tamamlanır; geri dönünce panelde hazır bulur.
+-- ─────────────────────────────────────────────────────────────────────────
+create table if not exists public.background_jobs (
+  id          text primary key,
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  goal        text not null,
+  title       text not null default 'Görev',
+  status      text not null default 'running',  -- running | done | error
+  result      text,
+  error       text,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists background_jobs_user_idx on public.background_jobs (user_id, created_at desc);
+
+alter table public.background_jobs enable row level security;
+
+drop policy if exists "kendi görevleri - select" on public.background_jobs;
+create policy "kendi görevleri - select"
+  on public.background_jobs for select using (auth.uid() = user_id);
+drop policy if exists "kendi görevleri - insert" on public.background_jobs;
+create policy "kendi görevleri - insert"
+  on public.background_jobs for insert with check (auth.uid() = user_id);
+drop policy if exists "kendi görevleri - update" on public.background_jobs;
+create policy "kendi görevleri - update"
+  on public.background_jobs for update using (auth.uid() = user_id);
+drop policy if exists "kendi görevleri - delete" on public.background_jobs;
+create policy "kendi görevleri - delete"
+  on public.background_jobs for delete using (auth.uid() = user_id);
+
+drop trigger if exists background_jobs_set_updated_at on public.background_jobs;
+create trigger background_jobs_set_updated_at
+  before update on public.background_jobs
+  for each row execute function public.set_updated_at();

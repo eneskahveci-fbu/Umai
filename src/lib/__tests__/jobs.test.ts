@@ -69,3 +69,13 @@ describe("latestHeading", () => {
     expect(latestHeading("düz metin")).toBe(null);
   });
 });
+
+describe("nextRunnableJob — sunucuda (remote) çalışanlar kuyruğu kilitlemez", () => {
+  it("remote running varken sıradaki queued iş yine başlatılabilir", () => {
+    const r = nextRunnableJob([job({ id: "a", status: "running", remote: true } as Partial<BackgroundJob>), job({ id: "b", status: "queued" })]);
+    expect(r?.id).toBe("b");
+  });
+  it("yerel running varken beklenir (eski davranış korunur)", () => {
+    expect(nextRunnableJob([job({ id: "a", status: "running" }), job({ id: "b", status: "queued" })])).toBe(null);
+  });
+});

@@ -34,6 +34,10 @@ interface OrchestrateRequest {
   skills?: SkillLike[];
   searchContext?: string;
   repoCtx?: RepoReadCtx;
+  /* Çok-sağlayıcılı oto-fallback (chat route ile aynı kontrat): birincil model
+     hata verirse (kota/erişim/5xx) sıradaki ücretsiz aday denenir → "Orkestrasyon
+     hatası" yerine ekip bir sonraki modelle çalışmaya devam eder. */
+  fallbacks?: { provider?: Provider; baseUrl?: string; model?: string; apiKey?: string }[];
   /* İstemci /api/chat ile aynı gövdeyi yollar; orkestrasyonda işçiler zaten
      salt-okunurdur (yazma aracı yok) ama tutarlılık için kontrat eksiksiz. */
   requireWriteApproval?: boolean;
@@ -119,9 +123,10 @@ async function streamModel(
     method: "POST", headers: cfg.headers, body: JSON.stringify(body), signal,
   });
   if (!res.ok || !res.body) {
+    /* Akış başlamadan hata → fırlat ki aday zinciri (withFallback) sıradaki
+       modeli denesin. Akış başladıktan sonra kesilirse olduğu yerde biter. */
     const detail = await res.text().catch(() => "");
-    send(`\n\n**Birleştirme hatası ${res.status}:** ${detail.slice(0, 200)}`);
-    return;
+    throw new Error(`Model hatası ${res.status}: ${detail.slice(0, 200)}`);
   }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -223,7 +228,38 @@ export async function POST(req: Request) {
     return new Response("Güvensiz baseUrl — yalnızca genel (public) adresler kabul edilir.", { status: 400 });
   }
 
-  const cfg: Cfg = { baseUrl, model, provider, headers: buildHeaders(provider, apiKey, req), effort: body.effort };
+  /* Aday zinciri (chat route ile aynı mantık): birincil + istemcinin ücretsiz
+     fallback'leri. Geçersizler elenir (uç yok / anahtar gereken sağlayıcıda
+     anahtar yok); aynı uç teklerleştirilir. Tüm ekip çağrıları bu zincirden
+     "yapışkan" biçimde geçer: bir aday çalışınca sonraki çağrılar onunla sürer. */
+  const KEYLESS = new Set<string>(["pollinations", "ollama"]);
+  const seenCand = new Set<string>([`${provider}|${baseUrl}|${model}`]);
+  const candList: { provider: Provider; baseUrl: string; model: string; apiKey: string }[] = [
+    { provider, baseUrl, model, apiKey },
+  ];
+  for (const f of body.fallbacks ?? []) {
+    const cp = (f.provider ?? "custom") as Provider;
+    const cb = (f.baseUrl ?? "").replace(/\/$/, "");
+    const cm = f.model ?? "";
+    const ck = f.apiKey ?? "";
+    if (!cb || !cm) continue;
+    if (!KEYLESS.has(cp) && !ck) continue;
+    const key = `${cp}|${cb}|${cm}`;
+    if (seenCand.has(key)) continue;
+    seenCand.add(key);
+    candList.push({ provider: cp, baseUrl: cb, model: cm, apiKey: ck });
+  }
+  if (process.env.NODE_ENV === "production") {
+    for (const c of candList) {
+      if (!isSafeRemoteUrl(c.baseUrl)) {
+        return new Response("Güvensiz baseUrl — yalnızca genel (public) adresler kabul edilir.", { status: 400 });
+      }
+    }
+  }
+  const cfgs: Cfg[] = candList.map((c) => ({
+    baseUrl: c.baseUrl, model: c.model, provider: c.provider,
+    headers: buildHeaders(c.provider, c.apiKey, req), effort: body.effort,
+  }));
   /* Kullanıcı bağlamı (stil + hafıza + skills + arama) /api/chat ile aynı kaynaktan
      → nihai cevap (birleştirici / tek-ajan) bu kurallara uyar. */
   const baseSys = (body.systemPrompt || DEFAULT_SYSTEM_PROMPT) + buildContextSections({
@@ -234,10 +270,25 @@ export async function POST(req: Request) {
   });
 
   /* Paylaşılan bağlam: son birkaç mesaj (dosya içerikleri istemci tarafından
-     zaten mesajlara enjekte edilmiş olur). Çok uzamasın diye son 6 mesaj. */
+     zaten mesajlara enjekte edilmiş olur). Çok uzamasın diye son 6 mesaj.
+     Görselli mesajların içeriği DİZİ gelir (image_url parçaları) — String()
+     "[object Object]" üretirdi; metin parçaları ayıklanır, görsel not düşülür. */
+  const flatContent = (c: unknown): string => {
+    if (typeof c === "string") return c;
+    if (Array.isArray(c)) {
+      return c
+        .map((p) => {
+          const part = p as { type?: string; text?: string };
+          return part.type === "text" ? (part.text ?? "") : "[ekli görsel]";
+        })
+        .join(" ")
+        .trim();
+    }
+    return "";
+  };
   const history = (body.messages || []).filter((m) => m.role === "user" || m.role === "assistant");
-  const shared = history.slice(-6).map((m) => ({ role: m.role, content: String(m.content).slice(0, 8000) }));
-  const userTask = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
+  const shared = history.slice(-6).map((m) => ({ role: m.role, content: flatContent(m.content).slice(0, 8000) }));
+  const userTask = flatContent([...history].reverse().find((m) => m.role === "user")?.content ?? "");
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -252,6 +303,25 @@ export async function POST(req: Request) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
       const done = () => { controller.enqueue(encoder.encode(`data: [DONE]\n\n`)); controller.close(); };
 
+      /* Yapışkan aday zinciri: bir çağrı hata verirse sıradaki modele geç;
+         çalışan aday bulunınca sonraki tüm ekip çağrıları oradan başlar.
+         İşçiler paraleldir — cfgIdx yarışı zararsızdır (en kötü fazladan deneme). */
+      let cfgIdx = 0;
+      const withFallback = async <T,>(fn: (c: Cfg) => Promise<T>): Promise<T> => {
+        let lastErr: Error | null = null;
+        for (let i = cfgIdx; i < cfgs.length; i++) {
+          try {
+            const r = await fn(cfgs[i]);
+            cfgIdx = i;
+            return r;
+          } catch (e) {
+            if ((e as Error)?.name === "AbortError") throw e;
+            lastErr = e as Error;
+          }
+        }
+        throw lastErr ?? new Error("Hiçbir model yanıt vermedi.");
+      };
+
       try {
         /* ── 1) PLANLAMA ── */
         sendEvent({ swarm_event: { phase: "planning", agents: [] } });
@@ -264,16 +334,16 @@ export async function POST(req: Request) {
           `Görev küçükse veya bölmeye değmezse TEK görev döndür. ` +
           `SADECE şu JSON ile yanıt ver, başka hiçbir şey yazma:\n` +
           `{"tasks":[{"title":"kısa başlık","role":"kodlayıcı","instruction":"o ajana net, bağımsız talimat"}]}`;
-        const planRaw = await callModel(cfg, [
+        const planRaw = await withFallback((c) => callModel(c, [
           { role: "system", content: planSys },
           ...shared,
           { role: "user", content: `İstek:\n${String(userTask).slice(0, 4000)}\n\nBunu paralel alt görevlere böl ve JSON döndür.` },
-        ], signal);
+        ], signal));
         const tasks = parseTasks(planRaw);
 
         /* ── Tek görev / plan başarısız → doğrudan tek ajanla cevapla ── */
         if (tasks.length <= 1) {
-          await streamModel(cfg, [{ role: "system", content: baseSys }, ...shared], send, signal);
+          await withFallback((c) => streamModel(c, [{ role: "system", content: baseSys }, ...shared], send, signal));
           done();
           return;
         }
@@ -303,8 +373,8 @@ export async function POST(req: Request) {
               /* repoCtx varsa işçi salt-okunur araçlarla repoyu kendi gezer
                  (tam alt-ajan paritesi); yoksa düz çağrı. */
               const r = repoCtx
-                ? await runReadOnlyAgent(cfg, wmsgs, repoCtx, signal)
-                : await callModel(cfg, wmsgs, signal);
+                ? await withFallback((c) => runReadOnlyAgent(c, wmsgs, repoCtx, signal))
+                : await withFallback((c) => callModel(c, wmsgs, signal));
               agents[i].status = "done";
               sendEvent({ swarm_event: { phase: "working", agents } });
               return r;
@@ -326,11 +396,11 @@ export async function POST(req: Request) {
         const combined = tasks
           .map((t, i) => `### ${ROLE_ICON[t.role] ?? "⚙️"} ${t.title} (${t.role})\n${results[i]}`)
           .join("\n\n");
-        await streamModel(cfg, [
+        await withFallback((c) => streamModel(c, [
           { role: "system", content: synthSys },
           ...shared,
           { role: "user", content: `Alt ajanların sonuçları aşağıda. Bunları birleştirip orijinal isteğe nihai cevabı ver:\n\n${combined}` },
-        ], send, signal);
+        ], send, signal));
 
         sendEvent({ swarm_event: { phase: "done", agents } });
         done();
