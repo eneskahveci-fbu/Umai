@@ -175,3 +175,32 @@ drop trigger if exists background_jobs_set_updated_at on public.background_jobs;
 create trigger background_jobs_set_updated_at
   before update on public.background_jobs
   for each row execute function public.set_updated_at();
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- YAYINLANAN ARTIFACT'LAR (/api/publish → /a/<id>)
+-- Not: Bu tablo üretimde zaten kullanılıyordu ama şema dosyasında eksikti;
+-- geleceğe dönük tam kaynak olması için eklendi (idempotent).
+-- ─────────────────────────────────────────────────────────────────────────
+create table if not exists public.published_artifacts (
+  id          text primary key,
+  user_id     uuid references auth.users(id) on delete set null,
+  title       text not null default 'Artifact',
+  type        text not null default 'html',   -- html | svg | mermaid
+  content     text not null,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.published_artifacts enable row level security;
+
+-- Herkes okuyabilir (paylaşım amaçlı, /a/<id> herkese açık).
+drop policy if exists "yayın - select" on public.published_artifacts;
+create policy "yayın - select"
+  on public.published_artifacts for select using (true);
+-- Girişli/girişsiz herkes yayınlayabilir (hız sınırı API katmanında).
+drop policy if exists "yayın - insert" on public.published_artifacts;
+create policy "yayın - insert"
+  on public.published_artifacts for insert with check (true);
+-- Yalnız sahibi silebilir.
+drop policy if exists "yayın - delete" on public.published_artifacts;
+create policy "yayın - delete"
+  on public.published_artifacts for delete using (auth.uid() = user_id);
