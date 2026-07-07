@@ -845,6 +845,16 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   >
                     {loadingModels ? "Modeller yükleniyor…" : fetchedModels.length > 0 ? `↻ Modelleri yenile (${fetchedModels.length})` : "↻ Anahtarla modelleri getir"}
                   </button>
+                  {provider === "pollinations" && fetchedModels.length > 0 && (
+                    <p className="text-[10.5px] text-muted/60 leading-relaxed">
+                      Liste Pollinations kataloğundan CANLI gelir ({fetchedModels.length} ad).
+                      {fetchedModels.length <= 5 && (
+                        <> Pollinations şu an anonim kullanımda tek çekirdek model sunuyor (takma adlarıyla) —
+                        daha fazla ücretsiz model için yukarıdan Gemini / Groq / OpenRouter gibi
+                        ücretsiz-katmanlı bir sağlayıcıya anahtar ekleyebilirsin.</>
+                      )}
+                    </p>
+                  )}
                 </div>
               )}
             </div>

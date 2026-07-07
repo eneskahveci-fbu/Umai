@@ -64,17 +64,25 @@ export async function POST(req: Request) {
   let data: unknown;
   try { data = await upstream.json(); } catch { return Response.json({ error: "Sağlayıcı yanıtı çözümlenemedi." }, { status: 502 }); }
 
-  /* OpenAI biçimi: { data: [{ id }, ...] }. Bazı sağlayıcılar düz dizi döndürür. */
+  /* OpenAI biçimi: { data: [{ id }, ...] }. Bazı sağlayıcılar düz dizi döndürür.
+     Pollinations kataloğunda `aliases` da geçerli model adlarıdır (ör.
+     openai-fast'in takma adı "openai") — hepsi seçilebilir olsun diye düzleştirilir. */
   const raw = (data as { data?: unknown })?.data ?? data;
   const ids = Array.isArray(raw)
-    ? raw
-        .map((m) => (typeof m === "string" ? m : (m as { id?: string; name?: string })?.id ?? (m as { name?: string })?.name))
-        .filter((x): x is string => typeof x === "string" && x.length > 0)
+    ? raw.flatMap((m) => {
+        if (typeof m === "string") return [m];
+        const o = m as { id?: string; name?: string; aliases?: unknown };
+        const main = o.id ?? o.name;
+        const aliases = body.provider === "pollinations" && Array.isArray(o.aliases)
+          ? o.aliases.filter((a): a is string => typeof a === "string")
+          : [];
+        return [main, ...aliases];
+      }).filter((x): x is string => typeof x === "string" && x.length > 0)
     : [];
 
-  /* Kod/sohbet modellerini öne al, gömme (embedding) / görsel modellerini ele. */
+  /* Kod/sohbet modellerini öne al, gömme (embedding) / ses / görsel modellerini ele. */
   const filtered = ids.filter(
-    (id) => !/embed|whisper|tts|moderation|image|dall-?e|stable-?diffusion|rerank/i.test(id),
+    (id) => !/embed|whisper|tts|audio|moderation|image|dall-?e|stable-?diffusion|rerank/i.test(id),
   );
   const models = Array.from(new Set(filtered.length ? filtered : ids)).sort((a, b) =>
     a.toLowerCase().localeCompare(b.toLowerCase()),
