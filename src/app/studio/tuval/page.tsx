@@ -1,13 +1,18 @@
 "use client";
 
-import { StudioHub } from "@/components/studio/StudioHub";
-import { SurfacePage } from "@/components/studio/SurfacePage";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-/* /studio/tuval — Tasarım grubu kabuğu, Tuval modu açık başlar. */
-export default function CanvasPage() {
+/* /studio/tuval → /studio'ya yönlendir (birleşik platform).
+   Kullanıcı eski linkle gelirse sessizce ana sayfaya atlar. */
+export default function CanvasRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/studio");
+  }, [router]);
   return (
-    <SurfacePage flag="designStudioOpen">
-      <StudioHub />
-    </SurfacePage>
+    <div className="h-screen grid place-items-center bg-bg text-muted/60 text-sm">
+      Yönlendiriliyor…
+    </div>
   );
 }
