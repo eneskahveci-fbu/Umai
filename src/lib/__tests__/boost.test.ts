@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickDraftModels, buildBoostInstruction } from "../boost";
+import { pickDraftModels, buildBoostInstruction, fillSelfConsistency, parseJudge, DRAFT_TEMPS } from "../boost";
 import type { ModelProfile } from "../types";
 
 const m = (id: string, provider: string): ModelProfile =>
@@ -70,5 +70,53 @@ describe("buildBoostInstruction", () => {
   it("uzun taslakları 5000 karaktere kırpar", () => {
     const s = buildBoostInstruction(["x".repeat(9000)]);
     expect(s.length).toBeLessThan(6000);
+  });
+});
+
+describe("fillSelfConsistency — tek modelde bile 3 gerçek taslak", () => {
+  const active = m("aktif", "pollinations");
+  it("eksik slotları aktif modelin farklı sıcaklıklı kopyalarıyla doldurur", () => {
+    const slots = fillSelfConsistency([active], active, 3);
+    expect(slots).toHaveLength(3);
+    expect(slots[1].profile.model).toBe(active.model);
+    expect(new Set(slots.map((s) => s.temperature)).size).toBeGreaterThan(1);
+    expect(slots[1].profile.id).not.toBe(slots[2].profile.id); // kimlikler benzersiz
+  });
+  it("yeterli model varsa dolgu yapmaz, sıcaklıkları sırayla atar", () => {
+    const picks = [m("a", "gemini"), m("b", "groq"), m("c", "pollinations")];
+    const slots = fillSelfConsistency(picks, picks[0], 3);
+    expect(slots.map((s) => s.profile.id)).toEqual(["a", "b", "c"]);
+    expect(slots.map((s) => s.temperature)).toEqual(DRAFT_TEMPS);
+  });
+  it("count'tan fazla pick gelirse kırpar", () => {
+    const picks = [m("a", "x"), m("b", "y"), m("c", "z")];
+    expect(fillSelfConsistency(picks, picks[0], 2)).toHaveLength(2);
+  });
+});
+
+describe("parseJudge — hakem kararı ayıklama", () => {
+  it("düz JSON kararını okur", () => {
+    expect(parseJudge('{"best": 2, "guidance": "taslak 1 daha kısa"}', 3)).toEqual({ best: 2, guidance: "taslak 1 daha kısa" });
+  });
+  it("kod çiti + fazla metne dayanıklıdır", () => {
+    const j = parseJudge('Karar:\n```json\n{"best": 1, "guidance": "x"}\n```\nBitti.', 3);
+    expect(j?.best).toBe(1);
+  });
+  it("aralık dışı/bozuk kararda null döner", () => {
+    expect(parseJudge('{"best": 9, "guidance": "x"}', 3)).toBeNull();
+    expect(parseJudge("json yok", 3)).toBeNull();
+    expect(parseJudge('{"best": "iki"}', 3)).toBeNull();
+  });
+});
+
+describe("buildBoostInstruction — hakem kararıyla", () => {
+  it("hakem varsa omurga talimatı ekler", () => {
+    const s2 = buildBoostInstruction(["a".repeat(50), "b".repeat(50)], { best: 2, guidance: "ilkinden başlığı al" });
+    expect(s2).toContain("HAKEM KARARI");
+    expect(s2).toContain("2. taslak");
+    expect(s2).toContain("ilkinden başlığı al");
+  });
+  it("hakem yoksa eski davranış (geriye dönük uyumlu)", () => {
+    expect(buildBoostInstruction(["x".repeat(50)])).not.toContain("HAKEM");
   });
 });

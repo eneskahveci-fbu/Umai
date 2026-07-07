@@ -100,7 +100,7 @@ import { buildContextSections } from "@/lib/prompt";
 import { detectSensitive } from "@/lib/pii";
 import { friendlyError } from "@/lib/friendlyError";
 import { autoEffort, autoSwarm, decidePilot, type PilotDecision } from "@/lib/autoPilot";
-import { pickDraftModels, buildBoostInstruction, generateDrafts } from "@/lib/boost";
+import { pickDraftModels, buildBoostInstruction, generateDrafts, fillSelfConsistency, judgeDrafts } from "@/lib/boost";
 import { fetchTextModels } from "@/lib/pollinations";
 import { importSkillFromUrl } from "@/lib/skillImport";
 import { retrieve } from "@/lib/retrieval";
@@ -1634,25 +1634,41 @@ export function CoderView() {
        en az 2 model birleştirir — buton gerçekten bir şey yapar. Başarılı
        füzyonun modelleri mesaja kalıcı bir rozet olarak iğnelenir. */
     let boostDrafts: string[] = [];
+    let boostJudge: import("@/lib/boost").DraftJudge | null = null;
     const toolsWanted = store.toolsEnabled && (!!store.repo || !!(store.config.localMode && store.config.localBridgeUrl?.trim()));
     const qualityForced = !!store.config.qualityMode;
-    if ((pilot?.quality || qualityForced) && !useSwarm && !useResearch && !toolsWanted && !isContinuation) {
+    /* FÜZYON yalnız üretim işlerinde (pilot.fusion) ya da kullanıcı Kalite/Füzyon
+       çipini elle açtıysa. Normal sohbet turlarında ekstra taslak çağrısı YOK. */
+    if ((pilot?.fusion || qualityForced) && !useSwarm && !useResearch && !toolsWanted && !isContinuation) {
       try {
-        useStore.getState().updateLastThinking("✦ Kalite turu: iç taslak(lar) hazırlanıyor…");
+        useStore.getState().updateLastThinking("✦ Füzyon: 3 iç taslak hazırlanıyor…");
         const freeModelNames = await fetchTextModels();
-        const draftCount = pilot?.effort === "max" ? 3 : qualityForced ? 2 : 1;
         const draftProfiles = pickDraftModels(
-          store.config.models, active, draftCount, store.strongestModel(), freeModelNames,
+          store.config.models, active, 3, store.strongestModel(), freeModelNames,
         );
-        const withKeys = await Promise.all(draftProfiles.map(async (m) => ({
-          baseUrl: m.baseUrl, model: m.model, provider: m.provider, apiKey: await usableApiKey(m),
+        /* Farklı model kalmadıysa aynı modelin farklı sıcaklıklı kopyaları
+           (öz-tutarlılık) — anahtarsız tek-model kurulumda bile 3 gerçek taslak. */
+        const slots = fillSelfConsistency(draftProfiles, active, 3);
+        const withKeys = await Promise.all(slots.map(async (s) => ({
+          baseUrl: s.profile.baseUrl, model: s.profile.model, provider: s.profile.provider,
+          apiKey: await usableApiKey(s.profile), temperature: s.temperature,
         })));
         boostDrafts = await generateDrafts({ userText: _lastUserText, models: withKeys, signal: coderAbort.signal });
-        if (boostDrafts.length) {
-          useStore.getState().updateLastThinking(`✦ Kalite turu: ${boostDrafts.length} taslak birleştiriliyor…`);
-          useStore.getState().setFusionModelsOnLast(draftProfiles.map((m) => m.model));
+        if (boostDrafts.length >= 2) {
+          /* HAKEM: en iyi taslağı seç + diğerlerinden alınacakları not et —
+             sentez bu karara göre en iyi taslağı omurga yapar. */
+          useStore.getState().updateLastThinking("✦ Hakem: taslaklar karşılaştırılıyor…");
+          boostJudge = await judgeDrafts({
+            userText: _lastUserText, drafts: boostDrafts,
+            model: { baseUrl: active.baseUrl, model: active.model, provider: active.provider, apiKey: reqKey },
+            signal: coderAbort.signal,
+          });
         }
-      } catch { boostDrafts = []; /* güçlendirme başarısızsa normal akış */ }
+        if (boostDrafts.length) {
+          useStore.getState().updateLastThinking(`✦ Füzyon: ${boostDrafts.length} taslak${boostJudge ? " + hakem kararı" : ""} birleştiriliyor…`);
+          useStore.getState().setFusionModelsOnLast(slots.slice(0, boostDrafts.length).map((s) => s.profile.model));
+        }
+      } catch { boostDrafts = []; boostJudge = null; /* güçlendirme başarısızsa normal akış */ }
     }
     const abortCtl = coderAbort;
 
@@ -1675,7 +1691,7 @@ export function CoderView() {
     /* Çok-geçişli kalite modu: taslak → öz-eleştiri → düzeltme döngüsünü tek
        yanıt içinde uygulat (yalnızca nihai sürümü göster). */
     if (boostDrafts.length > 0) {
-      finalSystemPrompt += buildBoostInstruction(boostDrafts);
+      finalSystemPrompt += buildBoostInstruction(boostDrafts, boostJudge);
     } else if (store.config.qualityMode || pilot?.quality) {
       finalSystemPrompt +=
         "\n\n[KALİTE MODU] Yanıtını üç aşamada üret ama YALNIZCA son sürümü göster: " +
@@ -1851,8 +1867,12 @@ export function CoderView() {
         });
         /* Cycle through models on 429: try each for up to 2 attempts before moving on.
            Order: selected → openai → mistral → llama (least to most likely available) */
+        /* Pollinations eski API'sinde artık tek anonim model var (openai-fast;
+           takma adı openai) — mistral/llama 404 döndürüyor, kuyruktan çıkarıldı.
+           Görselli mesajda da aynı uca gidilir; model görseli desteklemiyorsa
+           sunucu-proxy fallback zinciri devreye girer. */
         const startModel = active.model === "openai-fast" ? "openai" : active.model;
-        const POL_FALLBACKS = ["openai", "mistral", "llama"].filter((m) => m !== startModel);
+        const POL_FALLBACKS = ["openai"].filter((m) => m !== startModel);
         const polQueue = [startModel, ...POL_FALLBACKS];
         let polModel = polQueue.shift()!;
         let polAttempt = 0;
@@ -2255,12 +2275,26 @@ export function CoderView() {
     const agent = detected ?? activeAgent;
     const userText = detected ? stripCommand(text) : text;
 
+    /* Dosya ekleri (DeepSeek dosya yükleme davranışı): içerik NET çerçeveyle
+       mesaja gömülür — model bunun kullanıcının YÜKLEDİĞİ dosya olduğunu,
+       repoda aramaması gerektiğini ve yanıtı bu içeriğe dayandıracağını bilir. */
+    const FILE_CHAR_CAP = 24000;
     let fullText = userText;
     if (attachedFiles.length > 0) {
       const ctx = attachedFiles
-        .map((f) => `\`${f.path}\`:\n\`\`\`${getExt(f.path)}\n${f.content.slice(0, 12000)}\n\`\`\``)
+        .map((f) => {
+          const cut = f.content.length > FILE_CHAR_CAP;
+          return `### 📎 ${f.path}\n\`\`\`${getExt(f.path)}\n${f.content.slice(0, FILE_CHAR_CAP)}${cut ? `\n… (dosya uzun — ilk ${FILE_CHAR_CAP.toLocaleString("tr-TR")} karakter gösteriliyor)` : ""}\n\`\`\``;
+        })
         .join("\n\n");
-      fullText = ctx + (userText ? "\n\n" + userText : "");
+      fullText =
+        `[EKLİ DOSYALAR — kullanıcı bu dosyaları sohbete yükledi. İçerikleri TAM olarak aşağıda; ` +
+        `bunlar repoda DEĞİL, araçlarla arama/okuma YAPMA. Yanıtını doğrudan bu içeriğe dayandır.]\n\n${ctx}\n\n` +
+        `[KULLANICININ MESAJI]\n${userText || "Ekli dosyaları incele ve kısaca özetle."}`;
+    } else if (!userText && pendingImages.length > 0) {
+      /* Yalnız görsel gönderimi: boş metin bazı sağlayıcılarda reddedilir;
+         ayrıca modele net bir görev verir. */
+      fullText = "Ekteki görseli incele ve açıkla.";
     }
 
     store.pushMessage({
@@ -3061,10 +3095,10 @@ export function CoderView() {
                 </div>
               )}
 
-              <input ref={fileRef} type="file" multiple accept=".txt,.md,.js,.ts,.tsx,.jsx,.py,.json,.yaml,.yml,.toml,.html,.css,.sql,.sh,.go,.rs,.java,.c,.cpp,.h,.rb,.php,.pdf,.ipynb" className="hidden"
+              <input ref={fileRef} type="file" multiple accept=".txt,.md,.markdown,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.json,.jsonl,.yaml,.yml,.toml,.html,.htm,.css,.scss,.sql,.sh,.bash,.go,.rs,.java,.kt,.swift,.dart,.c,.cpp,.h,.hpp,.rb,.php,.pdf,.ipynb,.csv,.tsv,.xml,.svg,.log,.ini,.conf,.env,.tex,.srt,.vtt,.vue,.svelte,.lua,.pl,.r,.scala,.gradle,.properties,.bat,.ps1,text/plain" className="hidden"
                 onChange={(e) => { for (const f of Array.from(e.target.files ?? [])) readFileIntoInput(f); e.target.value = ""; }} />
-              <input ref={imgRef} type="file" accept="image/*" className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) readFileIntoInput(f); e.target.value = ""; }} />
+              <input ref={imgRef} type="file" multiple accept="image/*" className="hidden"
+                onChange={(e) => { for (const f of Array.from(e.target.files ?? [])) readFileIntoInput(f); e.target.value = ""; }} />
 
               {/* Textarea — geniş, butonsuz */}
               <div className="flex items-end gap-2 bg-surface/95 backdrop-blur-sm elev-2 border border-line rounded-2xl px-4 py-3 sm:py-2.5 focus-within:border-brand/50 focus-within:shadow-[0_0_0_3px_rgba(200,168,126,0.12)] transition-all">

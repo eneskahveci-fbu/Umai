@@ -223,14 +223,13 @@ export const PROVIDER_MODELS: Record<Provider, string[]> = {
     "mistralai/Mixtral-8x7B-Instruct-v0.1",
   ],
   xai: ["grok-4", "grok-3", "grok-3-mini"],
+  /* Pollinations eski metin API'si tekilleşti: anonim katmanda yalnız
+     openai-fast (takma adları: openai, gpt-oss) yanıt veriyor; mistral/llama
+     gibi eski adlar artık 404. Canlı doğru liste fetchTextModels'ten gelir
+     (lib/pollinations.ts) — burası yalnız çevrimdışı yedek. */
   pollinations: [
     "openai",
-    "openai-large",
     "openai-fast",
-    "qwen-coder",
-    "deepseek",
-    "mistral",
-    "llama",
   ],
   github: [
     "gpt-4o",

@@ -1,24 +1,23 @@
 "use client";
 
-/* Tasarım grubu kabuğu — Tasarım/Sunum/Tuval/Görüntü'yü TEK bir kalıcı
-   ekranda birleştirir (Claude Design'a benzer: tek üst çubuk + within-screen
-   mod geçişi). 4 modun kendi iç mantığı (sohbet şekli, üretim akışı, undo/
-   redo, TTS, katman düzenleme) HİÇ değişmedi — yalnız dış "4 ayrı tam-ekran +
-   4 ayrı üst çubuk" katmanı kalkıyor. Her mod `embedded` prop'uyla kendi
-   sarmalayıcısını/üst çubuğunu basmıyor, yalnız içeriğini döndürüyor; bir kez
-   açılan mod unmount edilmez (state kaybı yok) — `app/page.tsx`'teki mevcut
-   "ever açıldı mı" deseninin aynısı. İçerik grubu (Doküman/Anket/Defter)
-   için aynı desenin eşleniği: `ContentHub.tsx`. */
+/* TEK stüdyo kabuğu — 7 modun tamamı (Tasarım/Sunum/Tuval/Görüntü/Doküman/
+   Anket/Defter) tek kalıcı ekranda. Önceki DesignHub + ContentHub ikilisi
+   birleştirildi: tek üst çubuk, tek kapat, tek mod anahtarı — gruplar arası
+   geçişte bile hiçbir modun state'i kaybolmaz (bir kez açılan mod unmount
+   edilmez). Modların iç mantığı değişmedi; yalnız dış kabuk sadeleşti. */
 
 import { useState } from "react";
 import { X } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { useSurfaceNav } from "@/lib/surfaceNav";
+import { useSurfaceNav, type Surface } from "@/lib/surfaceNav";
 import { StudioSwitcher } from "./StudioSwitcher";
 import { StudioView } from "./StudioView";
 import { SlidesStudio } from "./SlidesStudio";
 import { ImageStudio } from "../ImageStudio";
 import { DesignStudio } from "../DesignStudio";
+import { DocsStudio } from "./DocsStudio";
+import { FormsStudio } from "./FormsStudio";
+import { NotebookStudio } from "./NotebookStudio";
 
 function useEverOpened(open: boolean) {
   const [ever, setEver] = useState(open);
@@ -26,24 +25,34 @@ function useEverOpened(open: boolean) {
   return ever || open;
 }
 
-export function DesignHub() {
+export function StudioHub() {
   const nav = useSurfaceNav();
   const studioOpen = useStore((s) => s.studioOpen);
   const slidesOpen = useStore((s) => s.slidesStudioOpen);
   const canvasOpen = useStore((s) => s.designStudioOpen);
   const imageOpen = useStore((s) => s.imageStudioOpen);
+  const docsOpen = useStore((s) => s.docsStudioOpen);
+  const formsOpen = useStore((s) => s.formsStudioOpen);
+  const notebookOpen = useStore((s) => s.notebookStudioOpen);
 
   const everStudio = useEverOpened(studioOpen);
   const everSlides = useEverOpened(slidesOpen);
   const everCanvas = useEverOpened(canvasOpen);
   const everImage = useEverOpened(imageOpen);
+  const everDocs = useEverOpened(docsOpen);
+  const everForms = useEverOpened(formsOpen);
+  const everNotebook = useEverOpened(notebookOpen);
 
-  if (!studioOpen && !slidesOpen && !canvasOpen && !imageOpen) return null;
+  if (!studioOpen && !slidesOpen && !canvasOpen && !imageOpen && !docsOpen && !formsOpen && !notebookOpen) return null;
+
+  const active: Surface =
+    studioOpen ? "studio" : slidesOpen ? "slides" : canvasOpen ? "canvas" :
+    imageOpen ? "image" : docsOpen ? "docs" : formsOpen ? "forms" : "notebook";
 
   return (
     <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0">
       <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line">
-        <StudioSwitcher active={studioOpen ? "studio" : slidesOpen ? "slides" : canvasOpen ? "canvas" : "image"} />
+        <StudioSwitcher active={active} />
         <button
           onClick={() => nav.close()}
           className="ml-auto w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors shrink-0"
@@ -54,6 +63,9 @@ export function DesignHub() {
       {everSlides && <SlidesStudio embedded />}
       {everCanvas && <DesignStudio embedded />}
       {everImage && <ImageStudio embedded />}
+      {everDocs && <DocsStudio embedded />}
+      {everForms && <FormsStudio embedded />}
+      {everNotebook && <NotebookStudio embedded />}
     </div>
   );
 }

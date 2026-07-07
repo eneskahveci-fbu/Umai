@@ -25,8 +25,7 @@ import { registerServiceWorker, watchConnection } from "@/lib/sw-register";
    mount edilmez → /app açılışı hafifler. Bir kez açıldıktan sonra mount kalır,
    içteki state (taslak tasarım, sohbet vs.) kapatınca kaybolmaz. */
 const SettingsModal = dynamic(() => import("@/components/SettingsModal").then((m) => m.SettingsModal), { ssr: false });
-const DesignHub = dynamic(() => import("@/components/studio/DesignHub").then((m) => m.DesignHub), { ssr: false });
-const ContentHub = dynamic(() => import("@/components/studio/ContentHub").then((m) => m.ContentHub), { ssr: false });
+const StudioHub = dynamic(() => import("@/components/studio/StudioHub").then((m) => m.StudioHub), { ssr: false });
 const SkillsPanel = dynamic(() => import("@/components/SkillsPanel").then((m) => m.SkillsPanel), { ssr: false });
 const LibraryModal = dynamic(() => import("@/components/LibraryModal").then((m) => m.LibraryModal), { ssr: false });
 
@@ -44,16 +43,13 @@ export default function AppPage() {
   const loadChats = useStore((s) => s.loadChats);
   const syncConfig = useStore((s) => s.syncConfig);
   const everSettings = useEverOpened(useStore((s) => s.settingsOpen));
-  /* Tasarım grubu (Tasarım/Sunum/Tuval/Görüntü) TEK kalıcı kabukta (DesignHub) —
-     4 bayraktan biri ilk kez true olunca kabuk mount edilir ve kalır. */
-  const everDesignHub = useEverOpened(
-    useStore((s) => s.studioOpen || s.slidesStudioOpen || s.designStudioOpen || s.imageStudioOpen),
-  );
-  /* İçerik grubu (Doküman/Anket/Defter) aynı desenle TEK kalıcı kabukta
-     (ContentHub) — önceden bu 3'ü /app'te hiç mount edilmiyordu (yalnız
-     kendi rotalarından erişilebiliyordu), artık ilk açılışta kalıcı olur. */
-  const everContentHub = useEverOpened(
-    useStore((s) => s.docsStudioOpen || s.formsStudioOpen || s.notebookStudioOpen),
+  /* Stüdyonun 7 modu TEK kalıcı kabukta (StudioHub) — herhangi bir bayrak
+     ilk kez true olunca kabuk mount edilir ve kalır; gruplar arası geçişte
+     bile hiçbir modun state'i kaybolmaz. */
+  const everStudioHub = useEverOpened(
+    useStore((s) =>
+      s.studioOpen || s.slidesStudioOpen || s.designStudioOpen || s.imageStudioOpen ||
+      s.docsStudioOpen || s.formsStudioOpen || s.notebookStudioOpen),
   );
   const everSkills = useEverOpened(useStore((s) => s.skillsOpen));
   const everLibrary = useEverOpened(useStore((s) => s.libraryOpen));
@@ -287,8 +283,7 @@ export default function AppPage() {
         <MobileTabBar />
 
         {everSettings && <SettingsModal />}
-        {everDesignHub && <DesignHub />}
-        {everContentHub && <ContentHub />}
+        {everStudioHub && <StudioHub />}
         {everLibrary && <LibraryModal />}
         <CommandPalette />
         <KeyboardShortcuts />
