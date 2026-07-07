@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_URL } from "@/lib/supabase/config";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +11,9 @@ export const dynamic = "force-dynamic";
    doğrulanır; yalnızca kendi hesabını silebilir. SUPABASE_SERVICE_ROLE_KEY env'i
    tanımlı değilse 501 ile nazikçe reddeder (site bozulmaz). */
 export async function POST(request: Request) {
+  /* Kaba kuvvet/istismara karşı: hesap silme denemesi dakikada en çok 5. */
+  const __rl = rateLimit(request, "account-delete", 5, 60_000);
+  if (__rl) return __rl;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey) {
     return NextResponse.json(
