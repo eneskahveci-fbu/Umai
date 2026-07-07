@@ -1,20 +1,29 @@
 "use client";
 
-/* TEK stüdyo kabuğu — 7 modun tamamı (Tasarım/Sunum/Tuval/Görüntü/Doküman/
-   Anket/Defter) tek kalıcı ekranda. Önceki DesignHub + ContentHub ikilisi
-   birleştirildi: tek üst çubuk, tek kapat, tek mod anahtarı — gruplar arası
-   geçişte bile hiçbir modun state'i kaybolmaz (bir kez açılan mod unmount
-   edilmez). Modların iç mantığı değişmedi; yalnız dış kabuk sadeleşti. */
+/* ═══════════════════════════════════════════════════════════════════════
+   STUDIO HUB — Birleşik Tasarım Platformu (Open Design)
+   ═══════════════════════════════════════════════════════════════════════
+   Önceki 7 mod (Tasarım/Sunum/Tuval/Görüntü/Doküman/Anket/Defter)
+   artık tek bir "Open Design Studio" altında birleştirildi.
+
+   Yeni yapı:
+   - OpenDesignStudio: slayt, afiş, sosyal, story, tuval, deck
+   - DocsStudio: doküman oluşturma
+   - FormsStudio: anket/form oluşturma
+   - ImageStudio: görsel üretimi
+   - NotebookStudio: defter
+
+   Tasarım grubu (slayt+tuval+görsel) tek bileşende,
+   içerik grubu (doküman+anket+defter) ayrı modlarda.
+   ═══════════════════════════════════════════════════════════════════════ */
 
 import { useState } from "react";
 import { X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav, type Surface } from "@/lib/surfaceNav";
 import { StudioSwitcher } from "./StudioSwitcher";
-import { StudioView } from "./StudioView";
-import { SlidesStudio } from "./SlidesStudio";
+import { OpenDesignStudio } from "./OpenDesignStudio";
 import { ImageStudio } from "../ImageStudio";
-import { DesignStudio } from "../DesignStudio";
 import { DocsStudio } from "./DocsStudio";
 import { FormsStudio } from "./FormsStudio";
 import { NotebookStudio } from "./NotebookStudio";
@@ -24,6 +33,19 @@ function useEverOpened(open: boolean) {
   if (open && !ever) setEver(true);
   return ever || open;
 }
+
+/* Yüzey haritası: "studio" artık OpenDesignStudio'yu çağırır.
+   SlidesStudio ve DesignStudio ORTADAN KALDIRILDI — ikisi de
+   OpenDesignStudio içinde birleşti. */
+const SURFACE_MAP: Record<Surface, React.ComponentType<{ embedded?: boolean }>> = {
+  studio: OpenDesignStudio,
+  slides: OpenDesignStudio,  // ← birleşti
+  canvas: OpenDesignStudio,  // ← birleşti
+  image: ImageStudio,
+  docs: DocsStudio,
+  forms: FormsStudio,
+  notebook: NotebookStudio,
+};
 
 export function StudioHub() {
   const nav = useSurfaceNav();
@@ -43,14 +65,21 @@ export function StudioHub() {
   const everForms = useEverOpened(formsOpen);
   const everNotebook = useEverOpened(notebookOpen);
 
-  if (!studioOpen && !slidesOpen && !canvasOpen && !imageOpen && !docsOpen && !formsOpen && !notebookOpen) return null;
+  if (!studioOpen && !slidesOpen && !canvasOpen && !imageOpen && !docsOpen && !formsOpen && !notebookOpen) {
+    return null;
+  }
 
   const active: Surface =
     studioOpen ? "studio" : slidesOpen ? "slides" : canvasOpen ? "canvas" :
     imageOpen ? "image" : docsOpen ? "docs" : formsOpen ? "forms" : "notebook";
 
+  // Open Design stüdyoları (studio/slides/canvas) hepsi aynı bileşeni kullanır
+  const isOpenDesign = active === "studio" || active === "slides" || active === "canvas";
+  const ActiveComponent = SURFACE_MAP[active];
+
   return (
     <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0">
+      {/* Üst çubuk */}
       <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line">
         <StudioSwitcher active={active} />
         <button
@@ -59,9 +88,11 @@ export function StudioHub() {
           title="Kapat"
         ><X size={16} /></button>
       </div>
-      {everStudio && <StudioView embedded />}
-      {everSlides && <SlidesStudio embedded />}
-      {everCanvas && <DesignStudio embedded />}
+
+      {/* İçerik — hepsi mount edilir, state korunur */}
+      {everStudio && active === "studio" && <OpenDesignStudio embedded />}
+      {everSlides && active === "slides" && <OpenDesignStudio embedded />}
+      {everCanvas && active === "canvas" && <OpenDesignStudio embedded />}
       {everImage && <ImageStudio embedded />}
       {everDocs && <DocsStudio embedded />}
       {everForms && <FormsStudio embedded />}
