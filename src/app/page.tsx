@@ -174,7 +174,7 @@ export default function Home() {
               <p className="relative text-sm text-muted leading-relaxed mb-5 flex-1">{p.desc}</p>
               <div className="relative flex flex-wrap gap-1.5 mb-5">
                 {p.chips.map((c) => (
-                  <span key={c} className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-bgsoft border border-line/70 text-muted">{c}</span>
+                  <span key={c} className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-bgsoft border border-line/70 text-ink/80">{c}</span>
                 ))}
               </div>
               <span className="relative inline-flex items-center gap-1.5 text-sm font-semibold text-brand group-hover:gap-2.5 transition-all">
