@@ -125,17 +125,7 @@ export function CommandPalette() {
         router.push("/studio");
         setOpen(false);
       },
-      keywords: ["studyo", "stüdyo", "studio", "tasarim", "design", "web", "sunum"],
-    },
-    {
-      id: "open-slides",
-      label: "Sunum Stüdyosu'nu aç (brief → slayt destesi)",
-      icon: <Presentation size={16} />,
-      action: () => {
-        router.push("/studio/sunum");
-        setOpen(false);
-      },
-      keywords: ["sunum", "slayt", "slides", "deck", "presentation", "sunu"],
+      keywords: ["studyo", "stüdyo", "studio", "tasarim", "design", "web", "sunum", "slayt", "tuval", "afis", "poster", "sosyal"],
     },
     {
       id: "open-docs",
@@ -166,16 +156,6 @@ export function CommandPalette() {
         setOpen(false);
       },
       keywords: ["defter", "notebook", "kaynak", "arastirma", "araştırma", "notebooklm", "ozet", "özet"],
-    },
-    {
-      id: "open-canvas",
-      label: "Tuval'i aç (slayt · afiş · sosyal)",
-      icon: <LayoutTemplate size={16} />,
-      action: () => {
-        router.push("/studio/tuval");
-        setOpen(false);
-      },
-      keywords: ["tuval", "canvas", "slayt", "afis", "poster", "katman"],
     },
     {
       id: "open-image",
