@@ -7,6 +7,7 @@
 
 import type { ModelProfile } from "./types";
 import { pollinationsDraftProfile } from "./pollinations";
+import type { FallbackCandidate } from "./fallback";
 
 /** Taslak üretecek modelleri seçer: aktif + çeşitlilik için ek model(ler)
     (önce en güçlü, yoksa farklı sağlayıcıdan biri) — çeşitlilik kaliteyi
@@ -27,7 +28,21 @@ export function pickDraftModels(
   count: 1 | 2 | 3,
   strongest?: ModelProfile | null,
   freeModelNames?: string[],
+  /** Manuel Fusion modu: kullanıcının Ayarlar → Fusion'da seçtiği model id'leri
+      (bkz. `Config.fusionModelIds`). Verilip en az biri `models`'te bulunursa
+      çeşitlilik sezgisi devre dışı kalır — taslaklar DOĞRUDAN bu modellerden
+      üretilir (sırayla, `count`'a kırpılır). Eşleşme yoksa (ör. seçili modeller
+      silinmiş) otomatik sezgiye zarifçe düşülür. */
+  manualModelIds?: string[],
 ): ModelProfile[] {
+  if (manualModelIds && manualModelIds.length > 0) {
+    const manualPicks = manualModelIds
+      .map((id) => models.find((m) => m.id === id))
+      .filter((m): m is ModelProfile => !!m)
+      .slice(0, count);
+    if (manualPicks.length > 0) return manualPicks;
+  }
+
   const picks: ModelProfile[] = [active];
   const usedPollinationsModels = new Set<string>(active.provider === "pollinations" ? [active.model] : []);
 
@@ -165,20 +180,44 @@ async function draftOnce(
   return full.trim();
 }
 
-/** Taslakları PARALEL üretir; her biri 45 sn ile sınırlı, başarısızlar sessizce
-    elenir (boş dizi dönebilir — çağıran normal akışa devam eder). */
+function candidateKey(m: { provider: string; baseUrl: string; model: string }): string {
+  return `${m.provider}|${m.baseUrl}|${m.model}`;
+}
+
+/** Taslakları PARALEL üretir; her biri 45 sn ile sınırlı. Bir taslak modeli
+    hata verirse (kota/erişim/5xx) VE `fallbacks` sağlanmışsa, o slot için
+    (bir kez) sıradaki uygun aday (bkz. `fallback.ts`'teki `buildFallbackChain`)
+    denenir — "kredi biterse otomatik yedek" davranışı. Yine de başarısız
+    olanlar sessizce elenir (boş dizi dönebilir — çağıran normal akışa devam eder). */
 export async function generateDrafts(opts: {
   userText: string;
   models: { baseUrl: string; model: string; provider: string; apiKey: string; temperature?: number }[];
+  /** Bir taslak modeli başarısız olursa denenecek yedek aday havuzu. */
+  fallbacks?: FallbackCandidate[];
   signal?: AbortSignal;
 }): Promise<string[]> {
-  const withTimeout = (m: (typeof opts.models)[number]) => {
+  const attempt = async (m: (typeof opts.models)[number]) => {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 45_000);
     opts.signal?.addEventListener("abort", () => ctrl.abort(), { once: true });
-    return draftOnce(m, opts.userText, ctrl.signal).finally(() => clearTimeout(t));
+    try {
+      return await draftOnce(m, opts.userText, ctrl.signal);
+    } finally {
+      clearTimeout(t);
+    }
   };
-  const results = await Promise.allSettled(opts.models.map(withTimeout));
+
+  const withFallback = async (m: (typeof opts.models)[number]): Promise<string> => {
+    try {
+      return await attempt(m);
+    } catch (e) {
+      const alt = (opts.fallbacks ?? []).find((c) => candidateKey(c) !== candidateKey(m));
+      if (!alt) throw e;
+      return await attempt({ ...alt, temperature: m.temperature });
+    }
+  };
+
+  const results = await Promise.allSettled(opts.models.map(withFallback));
   return results
     .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
     .map((r) => r.value)

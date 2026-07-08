@@ -1643,8 +1643,12 @@ export function CoderView() {
       try {
         useStore.getState().updateLastThinking("✦ Füzyon: 3 iç taslak hazırlanıyor…");
         const freeModelNames = await fetchTextModels();
+        /* Manuel Fusion modunda kullanıcının Ayarlar → Fusion'da seçtiği model
+           id'leri kullanılır; "otomatik" (varsayılan) modda çeşitlilik sezgisi
+           çalışmaya devam eder (bkz. pickDraftModels). */
+        const manualFusionIds = store.config.fusionMode === "manual" ? store.config.fusionModelIds : undefined;
         const draftProfiles = pickDraftModels(
-          store.config.models, active, 3, store.strongestModel(), freeModelNames,
+          store.config.models, active, 3, store.strongestModel(), freeModelNames, manualFusionIds,
         );
         /* Farklı model kalmadıysa aynı modelin farklı sıcaklıklı kopyaları
            (öz-tutarlılık) — anahtarsız tek-model kurulumda bile 3 gerçek taslak. */
@@ -1653,7 +1657,10 @@ export function CoderView() {
           baseUrl: s.profile.baseUrl, model: s.profile.model, provider: s.profile.provider,
           apiKey: await usableApiKey(s.profile), temperature: s.temperature,
         })));
-        boostDrafts = await generateDrafts({ userText: _lastUserText, models: withKeys, signal: coderAbort.signal });
+        /* Taslak modellerinden biri kota/erişim hatası verirse (kredi bittiyse)
+           otomatik bir sonraki uygun modele düşülür — bkz. generateDrafts. */
+        const fusionFallbacks = buildFallbackChain(store.config.models, active.id);
+        boostDrafts = await generateDrafts({ userText: _lastUserText, models: withKeys, fallbacks: fusionFallbacks, signal: coderAbort.signal });
         if (boostDrafts.length >= 2) {
           /* HAKEM: en iyi taslağı seç + diğerlerinden alınacakları not et —
              sentez bu karara göre en iyi taslağı omurga yapar. */

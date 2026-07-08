@@ -43,6 +43,25 @@ describe("pickDraftModels", () => {
     });
   });
 
+  describe("manualModelIds (Fusion Ayarları → Manuel mod)", () => {
+    it("verilirse çeşitlilik sezgisi yerine doğrudan seçili modelleri sırayla kullanır", () => {
+      const picks = pickDraftModels(models, models[0], 2, models[1], undefined, ["c", "b"]);
+      expect(picks.map((x) => x.id)).toEqual(["c", "b"]);
+    });
+    it("count'a kırpar", () => {
+      const picks = pickDraftModels(models, models[0], 1, undefined, undefined, ["b", "c"]);
+      expect(picks.map((x) => x.id)).toEqual(["b"]);
+    });
+    it("hiçbiri models'te bulunamazsa (silinmiş) otomatik sezgiye zarifçe düşer", () => {
+      const picks = pickDraftModels(models, models[0], 2, models[1], undefined, ["silinmis-1", "silinmis-2"]);
+      expect(picks.map((x) => x.id)).toEqual(["a", "b"]);
+    });
+    it("boş dizi verilirse otomatik sezgi kullanılır (geriye dönük uyumlu)", () => {
+      const picks = pickDraftModels(models, models[0], 2, models[1], undefined, []);
+      expect(picks.map((x) => x.id)).toEqual(["a", "b"]);
+    });
+  });
+
   describe("count 3 — üçüncü taslak her zaman ücretsiz Pollinations'tan", () => {
     it("aktif + en güçlü + ücretsiz üçüncü model", () => {
       const picks = pickDraftModels(models, models[0], 3, models[1], ["openai", "mistral"]);

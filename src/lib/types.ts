@@ -263,6 +263,9 @@ export interface StudioProject {
   versions?: string[];
   createdAt: number;
   updatedAt: number;
+  /** Open Design Stüdyosu'nun tam sayfa/katman verisi (yalnız o stüdyo okur/yazar;
+      `types.ts` döngüsel bağımlılığa girmesin diye kasıtlı olarak tiplenmemiş). */
+  openDesignData?: unknown;
 }
 
 /** Sunum Stüdyosu — slayt düzenleri (Google Slides'tan ilhamla, craft yorumu). */
@@ -486,6 +489,12 @@ export interface Config {
       katastrofik kalıplara (rm -rf /, fork bomb, mkfs, curl|sh…) karşı engellenir
       ve sonuç ajana geri bildirilir. false ⇒ kapalı. */
   commandGuard?: boolean;
+  /** Fusion taslak modeli seçimi: "auto" (varsayılan) craft en uygun 1-3 modeli
+      kendisi seçer; "manual" kullanıcının `fusionModelIds`'te seçtiği modelleri
+      kullanır (herhangi bir kullanıcı seçebilir — admin şartı yok). */
+  fusionMode?: "auto" | "manual";
+  /** Manuel Fusion modunda taslak üretecek `models` id'leri (en fazla 3). */
+  fusionModelIds?: string[];
 }
 
 export interface RepoState {
