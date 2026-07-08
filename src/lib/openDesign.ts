@@ -6,9 +6,8 @@
    olabilir ama aynı tasarım sistemi, tema ve marka kurallarını paylaşır.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { clamp01 } from "./design";
-import type { Layer, ImgLayer, Align } from "./design";
-import type { Slide, SlideDeck, SlideLayout } from "./types";
+import type { Align, ImgLayer, Layer } from "./design";
+import type { Slide, SlideDeck } from "./types";
 
 /* ── Platform formatları ──────────────────────────────────────────── */
 
