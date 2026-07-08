@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, Loader2, Sparkles, X } from "lucide-react";
 import { diffLines } from "diff";
 import { useStore } from "@/lib/store";
 import { highlightLines, type Token } from "@/lib/highlight";
 import { quickComplete } from "@/lib/quickComplete";
 import { buildUnifiedDiff, DIFF_SUMMARY_SYSTEM } from "@/lib/commitMsg";
+import { useModalA11y } from "@/lib/useModalA11y";
 
 interface DiffLine {
   type: "ctx" | "add" | "del";
@@ -90,6 +91,9 @@ export function DiffModal() {
     return () => { cancelled = true; };
   }, [diff]);
 
+  const modalRef = useRef<HTMLDivElement>(null);
+  useModalA11y(modalRef, !!diff, () => setDiff(null));
+
   if (!diff) return null;
 
   const added = lines.filter((l) => l.type === "add").length;
@@ -112,13 +116,17 @@ export function DiffModal() {
       onClick={() => setDiff(null)}
     >
       <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="diff-modal-title"
         className="w-full max-w-4xl h-[80vh] bg-surface border border-line rounded-2xl shadow-2xl shadow-black/40 flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-line/60 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <h2 className="font-bold text-sm">Diff Görünümü</h2>
+            <h2 id="diff-modal-title" className="font-bold text-sm">Diff Görünümü</h2>
             {diff.path && (
               <code className="text-xs font-mono px-2 py-0.5 rounded-md bg-bgsoft border border-line/60 text-muted truncate">
                 {diff.path}
@@ -148,6 +156,7 @@ export function DiffModal() {
             </button>
             <button
               onClick={() => setDiff(null)}
+              aria-label="Kapat"
               className="w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
             >
               <X size={14} />

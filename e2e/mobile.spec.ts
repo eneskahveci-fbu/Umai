@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { hasAuthState, AUTH_STATE_PATH } from "./fixtures/auth";
+import { expectNoSeriousA11yViolations } from "./fixtures/a11y";
 
 /* Mobil alt sekme (4 öğe) + Araçlar sheet'i + Ayarlar modalı + genel
    üst-üste-binme kontrolü. Kimlik gerektirir — bkz. global-setup.ts. */
@@ -18,6 +19,7 @@ test.describe("Mobil alt sekme + Araçlar/Ayarlar", () => {
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     );
     expect(overflow).toBe(false);
+    await expectNoSeriousA11yViolations(page);
   });
 
   test("Araçlar → alttan açılan liste (Doküman/Anket/Defter/Görüntü)", async ({ page }) => {
@@ -42,5 +44,6 @@ test.describe("Mobil alt sekme + Araçlar/Ayarlar", () => {
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     );
     expect(overflow).toBe(false);
+    await expectNoSeriousA11yViolations(page);
   });
 });
