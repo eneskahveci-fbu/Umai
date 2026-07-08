@@ -8,6 +8,7 @@
 
 import type { Align, ImgLayer, Layer } from "./design";
 import type { Slide, SlideDeck } from "./types";
+import { deckToHtml, escapeHtml } from "./slides";
 
 /* ── Platform formatları ──────────────────────────────────────────── */
 
@@ -308,4 +309,39 @@ export function convertDeckToCanvas(deck: SlideDeck): ProjectCanvasPage[] {
 /** Tüm canvas sayfalarından deck üret. */
 export function convertCanvasToDeck(pages: ProjectCanvasPage[], title?: string): SlideDeck {
   return canvasPagesToDeck(pages, title);
+}
+
+/* ── Bağımsız HTML dışa aktarma (indir/yazdır/yayınla) ────────────────── */
+
+function canvasPageToHtml(page: ProjectCanvasPage, title: string): string {
+  const fmt = formatById(page.format);
+  const bg = page.design.bgType === "gradient"
+    ? `linear-gradient(135deg, ${page.design.c1}, ${page.design.c2})`
+    : page.design.c1;
+  const layers = (page.design.layers ?? [])
+    .map((l) => `<div style="position:absolute;left:${l.x * 100}%;top:${l.y * 100}%;transform:translate(-50%,-50%);font-size:${l.size}px;color:${l.color};font-weight:${l.weight};text-align:${l.align};font-family:${l.font};white-space:pre-wrap;max-width:80%;">${escapeHtml(l.text)}</div>`)
+    .join("\n");
+  return `<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(title || page.name)}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body { display: flex; align-items: center; justify-content: center; background: #111110; }
+  .page { position: relative; width: min(100vw, ${fmt.width}px); aspect-ratio: ${fmt.width} / ${fmt.height}; background: ${bg}; overflow: hidden; }
+</style>
+</head>
+<body>
+  <div class="page">${layers}</div>
+</body>
+</html>`;
+}
+
+/** Sayfayı (canvas veya deck) bağımsız HTML belgesine çevirir — indirme,
+    yazdırma/PDF ve yayınlama (paylaşılabilir bağlantı) tek kaynaktan beslenir. */
+export function pageToHtml(page: ProjectPage, title: string): string {
+  return isDeckPage(page) ? deckToHtml(page.deck) : canvasPageToHtml(page, title);
 }
