@@ -11,7 +11,7 @@ import {
   BookMarked, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
   Circle, CircleDot, Compass, FlaskConical, ListChecks, Microscope, Settings2,
   Code2, Copy, FileText, FolderOpen, GitBranch, GitCommit, Globe,
-  Loader2, Pencil, RefreshCw, Search, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, User, Users, Volume2, VolumeX, Wrench, X,
+  Loader2, Pencil, RefreshCw, Search, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, Users, Volume2, VolumeX, Wrench, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ChatMessage, SwarmState } from "@/lib/types";
@@ -551,13 +551,10 @@ function MessageBubbleImpl({
        asistan mesajındaki "Terminal" todo kutusunda görünür (AI bağlamında kalır). */
     if (message.content.startsWith("**Terminal çıktısı**")) return null;
     return (
-      <div className="group/msg flex gap-3 py-3 animate-fade-in">
-        {/* Kullanıcı avatarı — solda, asistan ✦ ile simetrik (Claude Code'dan
-            uyarlanan düz transkript düzeni; craft teması/avatarı korunur). */}
-        <div className="shrink-0 w-7 h-7 rounded-full bg-bgsoft border border-line grid place-items-center text-muted mt-0.5 shadow-sm">
-          <User size={14} />
-        </div>
-        <div className="flex-1 min-w-0 pt-0.5">
+      <div className="group/msg flex justify-end py-3 animate-fade-in">
+        {/* Klasik sohbet balonu — kullanıcı sağda, avatarsız (asistan solda
+            avatarlı düz-metin akışı olarak kalır, bkz. aşağıdaki blok). */}
+        <div className="max-w-[75%] min-w-0 flex flex-col items-end">
           {/* Images */}
           {message.images?.map((img, i) => (
             // eslint-disable-next-line @next/next/no-img-element
@@ -578,7 +575,7 @@ function MessageBubbleImpl({
                 className="w-full bg-surface border border-line rounded-2xl p-3 text-sm resize-none outline-none focus:border-brand/50 min-h-[60px]"
                 rows={3}
               />
-              <div className="flex gap-2 justify-start">
+              <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => setEditing(false)}
                   className="text-xs px-3 py-1.5 rounded-xl border border-line text-muted hover:text-ink transition-colors"
@@ -599,7 +596,7 @@ function MessageBubbleImpl({
                 {message.content}
               </div>
               {/* Hover actions */}
-              <div className="flex items-center gap-0.5 mt-1.5 justify-start [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 transition-opacity duration-150">
+              <div className="flex items-center gap-0.5 mt-1.5 justify-end [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 transition-opacity duration-150">
                 <button onClick={copyMessage} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink px-2 py-1 rounded-lg hover:bg-bgsoft transition-colors">
                   {copied ? <Check size={11} /> : <Copy size={11} />}
                 </button>

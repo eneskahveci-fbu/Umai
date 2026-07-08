@@ -1,13 +1,17 @@
 "use client";
 
-/* Mobil alt gezinme çubuğu (yalnız sm altı) — iki öğe: Sohbet · Stüdyo.
-   Stüdyo'nun 7 modu (Tasarım/Sunum/Doküman/Anket/Tuval/Görüntü/Defter) tek
-   tıkla erişilemez değil: içeri girince StudioSwitcher (kompakt açılır
-   liste) tümüne ulaştırır — ayrı sekmeler burada gereksiz karmaşa
-   yaratıyordu. Aktif sekme marka renginde; safe-area alt boşluğu korunur. */
+/* Mobil alt gezinme çubuğu (yalnız sm altı) — dört öğe: Sohbet · Stüdyo ·
+   Araçlar · Ayarlar. Stüdyo'nun 7 modu (Tasarım/Sunum/Doküman/Anket/Tuval/
+   Görüntü/Defter) tek tıkla erişilemez değil: içeri girince StudioSwitcher
+   (kompakt açılır liste) tümüne ulaştırır. "Araçlar" ve "Ayarlar" birer
+   rotaya gitmez — sırasıyla alttan-açılan kısa liste (`MobileToolsSheet`)
+   ve mevcut Ayarlar modalını (`setSettingsOpen`) açan aksiyon düğmeleridir.
+   Aktif sekme marka renginde; safe-area alt boşluğu korunur. */
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { MessageSquare, Sparkles } from "lucide-react";
+import { MessageSquare, Settings, Sparkles, Wrench } from "lucide-react";
+import { useStore } from "@/lib/store";
+import { MobileToolsSheet } from "./MobileToolsSheet";
 
 /* Sanal klavye açık mı? (mobil) — visualViewport küçülmesiyle algılanır.
    Alt bar klavye açıkken gizlenir; sayfalar alt boşluğu buna göre sıfırlar. */
@@ -24,38 +28,51 @@ export function useKeyboardOpen(): boolean {
   return open;
 }
 
-const TABS = [
-  { href: "/app", label: "Sohbet", icon: MessageSquare },
-  { href: "/studio", label: "Stüdyo", icon: Sparkles },
-];
+type Tab =
+  | { kind: "link"; href: string; label: string; icon: typeof MessageSquare }
+  | { kind: "action"; label: string; icon: typeof MessageSquare; onClick: () => void };
 
 export function MobileTabBar() {
   const router = useRouter();
   const pathname = usePathname() ?? "";
   const kbOpen = useKeyboardOpen();
+  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
+  const [toolsOpen, setToolsOpen] = useState(false);
+
+  const TABS: Tab[] = [
+    { kind: "link", href: "/app", label: "Sohbet", icon: MessageSquare },
+    { kind: "link", href: "/studio", label: "Stüdyo", icon: Sparkles },
+    { kind: "action", label: "Araçlar", icon: Wrench, onClick: () => setToolsOpen(true) },
+    { kind: "action", label: "Ayarlar", icon: Settings, onClick: () => setSettingsOpen(true) },
+  ];
+
   if (kbOpen) return null;
   return (
-    <nav
-      className="sm:hidden fixed inset-x-0 bottom-0 z-[70] glass border-t border-line flex items-stretch"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      aria-label="Alt gezinme"
-    >
-      {TABS.map(({ href, label, icon: Icon }) => {
-        const active = href === "/studio" ? pathname.startsWith("/studio") : pathname === href;
-        return (
-          <button
-            key={href}
-            onClick={() => { if (!active) router.push(href); }}
-            className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${
-              active ? "text-brand" : "text-muted hover:text-ink"
-            }`}
-            aria-current={active ? "page" : undefined}
-          >
-            <Icon size={17} />
-            {label}
-          </button>
-        );
-      })}
-    </nav>
+    <>
+      <nav
+        className="sm:hidden fixed inset-x-0 bottom-0 z-[70] glass border-t border-line flex items-stretch"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        aria-label="Alt gezinme"
+      >
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          const active = tab.kind === "link" && (tab.href === "/studio" ? pathname.startsWith("/studio") : pathname === tab.href);
+          return (
+            <button
+              key={tab.label}
+              onClick={() => { if (tab.kind === "link") { if (!active) router.push(tab.href); } else { tab.onClick(); } }}
+              className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${
+                active ? "text-brand" : "text-muted hover:text-ink"
+              }`}
+              aria-current={active ? "page" : undefined}
+            >
+              <Icon size={17} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </nav>
+      <MobileToolsSheet open={toolsOpen} onClose={() => setToolsOpen(false)} />
+    </>
   );
 }

@@ -15,7 +15,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import {
-  Download, ExternalLink, FileText, Layers, Loader2, Plus, Save, Send, Settings2, Sparkles, Square, Trash2, User, LayoutTemplate, MessageSquare, GripVertical
+  Download, ExternalLink, FileText, FolderOpen, Layers, Loader2, Plus, Save, Send, Settings2, Share2, Sparkles, Square, Trash2, User, LayoutTemplate, MessageSquare, GripVertical, X
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav } from "@/lib/surfaceNav";
@@ -24,17 +24,18 @@ import { autoStudioSkill } from "@/lib/autoPilot";
 import { type DeviceId } from "@/lib/studioConstants";
 import type { StudioProject } from "@/lib/types";
 import {
-  CANVAS_FORMATS, type CanvasFormat, type OpenDesignProject, type ProjectPage, isCanvasPage, isDeckPage, newProject, newCanvasPage, newDeckPage, formatById, convertCanvasToSlide
+  CANVAS_FORMATS, type CanvasFormat, type OpenDesignProject, type ProjectPage, isCanvasPage, isDeckPage, newProject, newCanvasPage, newDeckPage, formatById, convertCanvasToSlide, pageToHtml
 } from "@/lib/openDesign";
 import type { Slide } from "@/lib/types";
 import {
   slideImageSrc, slideThemeById, type SlideTheme
 } from "@/lib/slides";
 import { ExportMenu } from "./ExportMenu";
+import { StudioTopBar } from "./StudioTopBar";
+import { SavedItemsModal } from "./SavedItemsModal";
+import { downloadHtml, openInTab, printPdf, publishArtifact } from "@/lib/studioExport";
 
 /* ── Yardımcılar ──────────────────────────────────────────────────── */
-
-const uid = () => Math.random().toString(36).slice(2, 9);
 
 const PHASE_LABEL: Record<StudioPhase, string> = {
   planning: "Planlanıyor…",
@@ -192,7 +193,7 @@ function EmptyCanvas() {
         </span>
         <p className="text-sm font-semibold text-ink">Tasarım alanı boş</p>
         <p className="text-xs text-muted/70">
-          Soldaki sohbete brief yazarak başla veya şablondan seç.
+          ✦ Sohbeti aç ve brief yaz — örn. &ldquo;minimal bir SaaS afişi&rdquo;.
         </p>
       </div>
     </div>
@@ -528,6 +529,7 @@ export interface OpenDesignMsg {
 export function OpenDesignStudio({ embedded }: { embedded?: boolean } = {}) {
   const nav = useSurfaceNav();
   const config = useStore((s) => s.config);
+  const saveConfig = useStore((s) => s.saveConfig);
   const addToast = useStore((s) => s.addToast);
 
   // Proje durumu
@@ -539,7 +541,10 @@ export function OpenDesignStudio({ embedded }: { embedded?: boolean } = {}) {
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState<StudioPhase | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const [sidebarOpen, setSidebarOpen] = useState<"chat" | "right" | null>("chat");
+  /* Varsayılan kapalı: mobilde tam-ekran overlay'e dönüştüğü için "açık başlar"
+     davranışı ekran boyutundan bağımsız tutuluyor (bkz. plan — matchMedia'ya gerek yok). */
+  const [sidebarOpen, setSidebarOpen] = useState<"chat" | "right" | null>(null);
+  const [savedOpen, setSavedOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   // Cihaz seçimi
@@ -645,32 +650,64 @@ export function OpenDesignStudio({ embedded }: { embedded?: boolean } = {}) {
   /* ── Kaydet ────────────────────────────────────────────────────── */
 
   const saveProject = useCallback(() => {
-    const store = useStore.getState();
     const existing = config.studioProjects ?? [];
     const proj: StudioProject = {
       id: project.id,
       name: project.name,
       brief: messages.find((m) => m.role === "user")?.text ?? "",
-      html: "", // Canvas content will be rendered
+      html: "",
       designSystemId: "craft",
       skillId: null,
       directionId: null,
       createdAt: project.createdAt,
       updatedAt: Date.now(),
+      openDesignData: project,
     };
-    store.saveConfig({
+    saveConfig({
       ...config,
       studioProjects: [proj, ...existing.filter((p) => p.id !== project.id)].slice(0, 40),
     });
     addToast("Proje kaydedildi.", "success");
-  }, [project, config, messages, addToast]);
+  }, [project, config, messages, saveConfig, addToast]);
+
+  /* ── Projelerim (kaydet/aç) ────────────────────────────────────── */
+
+  const savedProjects = config.studioProjects ?? [];
+
+  const openSavedProject = useCallback((p: StudioProject) => {
+    const data = p.openDesignData as OpenDesignProject | undefined;
+    if (!data || !Array.isArray(data.pages) || data.pages.length === 0) {
+      addToast("Bu proje eski bir sürümden — verisi okunamadı.", "error");
+      return;
+    }
+    setProject(data);
+    setActivePageIndex(0);
+    setMessages([]);
+    setSavedOpen(false);
+  }, [addToast]);
+
+  const removeSavedProject = useCallback((p: StudioProject) => {
+    saveConfig({ ...config, studioProjects: (config.studioProjects ?? []).filter((x) => x.id !== p.id) });
+  }, [config, saveConfig]);
 
   /* ── Dışa Aktar ────────────────────────────────────────────────── */
 
-  const handleExport = useCallback((format: string) => {
+  const handleExport = useCallback(async (format: "html" | "pdf" | "tab" | "publish") => {
     if (!activePage) return;
-    addToast(`${format.toUpperCase()} dışa aktarılıyor…`, "info");
-  }, [activePage, addToast]);
+    const html = pageToHtml(activePage, project.name);
+    if (format === "html") {
+      downloadHtml(html, project.name);
+      addToast("HTML indirildi.", "success");
+    } else if (format === "pdf") {
+      if (!printPdf(html)) addToast("Yazdırma penceresi açılamadı — pop-up engelleyiciyi kontrol et.", "error");
+    } else if (format === "tab") {
+      if (!openInTab(html)) addToast("Yeni sekme açılamadı — pop-up engelleyiciyi kontrol et.", "error");
+    } else {
+      const url = await publishArtifact(project.name, html);
+      if (url) addToast("Bağlantı panoya kopyalandı.", "success");
+      else addToast("Yayınlama başarısız oldu.", "error");
+    }
+  }, [activePage, project.name, addToast]);
 
   /* ── Yeni Proje ────────────────────────────────────────────────── */
 
@@ -681,140 +718,169 @@ export function OpenDesignStudio({ embedded }: { embedded?: boolean } = {}) {
     addToast("Yeni proje oluşturuldu.", "info");
   }, [addToast]);
 
-  return (
-    <div className="flex-1 min-h-0 flex flex-col">
-      {/* Üst Araç Çubuğu */}
-      <div className="h-11 shrink-0 flex items-center gap-2 px-3 border-b border-line">
-        {/* Sol: Yeni proje + Kaydet */}
-        <button
-          onClick={newProjectAction}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-line text-muted hover:text-ink transition-colors"
-          title="Yeni proje"
-        >
-          <Plus size={13} /> Yeni
-        </button>
-        <button
-          onClick={saveProject}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-line text-muted hover:text-ink transition-colors"
-          title="Projeyi kaydet"
-        >
-          <Save size={13} /> Kaydet
-        </button>
-
-        <div className="h-5 w-px bg-line mx-1" />
-
-        {/* Orta: Fusion toggle */}
-        <button
-          onClick={() => setFusionEnabled((f) => !f)}
-          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-            fusionEnabled
-              ? "border-brand bg-brand/10 text-brand"
-              : "border-line text-muted hover:text-ink"
-          }`}
-          title="Fusion: 3 model + hakem ile üretim"
-        >
-          <Sparkles size={12} /> Fusion {fusionEnabled ? "Açık" : "Kapalı"}
-        </button>
-
-        {/* Sağ: Dışa aktar */}
-        <div className="ml-auto flex items-center gap-1">
-          <ExportMenu
-            triggerLabel="Dışa aktar"
-            disabled={!activePage}
-            options={[
-              { key: "html", label: "HTML indir", icon: <Download size={14} className="text-brand" />, onSelect: () => handleExport("html") },
-              { key: "pdf", label: "PDF (yazdır)", icon: <FileText size={14} className="text-brand" />, onSelect: () => handleExport("pdf") },
-              { key: "tab", label: "Yeni sekmede aç", icon: <ExternalLink size={14} className="text-brand" />, onSelect: () => handleExport("tab") },
-            ]}
-          />
-        </div>
-      </div>
-
-      {/* Ana İçerik: 3 sütun */}
-      <div className="flex-1 min-h-0 flex">
-        {/* Sol Panel: AI Sohbet (toggle) */}
-        {sidebarOpen === "chat" && (
-          <aside className="w-80 shrink-0 border-r border-line flex flex-col min-h-0">
-            <ChatPanel
-              messages={messages}
-              busy={busy}
-              phase={phase}
-              onFollowup={(t) => runGenerate(t, true)}
-              onStop={stop}
-            />
-          </aside>
-        )}
-
-        {/* Orta: Tuval */}
-        <main className="flex-1 min-h-0 flex flex-col bg-bgsoft/30">
-          {/* Cihaz seçici */}
-          <div className="h-9 shrink-0 flex items-center gap-2 px-3 border-b border-line">
-            <div className="flex items-center bg-bgsoft border border-line/60 rounded-lg p-0.5 text-xs">
-              {(["web", "iphone", "pixel"] as DeviceId[]).map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setDevice(d)}
-                  className={`px-2.5 py-1 rounded-md transition-colors ${
-                    device === d ? "bg-brand/15 text-brand font-semibold" : "text-muted hover:text-ink"
-                  }`}
-                >
-                  {d === "web" ? "🖥️" : d === "iphone" ? "📱" : "📲"} {d}
-                </button>
-              ))}
-            </div>
-            <div className="ml-auto flex items-center gap-1 text-[10px] text-muted/50">
-              {activePage && isCanvasPage(activePage) && (
-                <span>{formatById(activePage.format).name} — {formatById(activePage.format).width}×{formatById(activePage.format).height}</span>
-              )}
-            </div>
-          </div>
-
-          {/* Tuval alanı */}
-          <div className="flex-1 min-h-0">
-            <CanvasPreview
-              project={project}
-              activePageIndex={activePageIndex}
-              reloadKey={reloadKey}
-              device={device}
-            />
-          </div>
-        </main>
-
-        {/* Sağ Panel: Katmanlar + Format (toggle) */}
-        {sidebarOpen === "right" && (
-          <aside className="w-64 shrink-0 border-l border-line flex flex-col min-h-0">
-            <RightPanel
-              project={project}
-              activePageIndex={activePageIndex}
-              setActivePageIndex={setActivePageIndex}
-              setProject={setProject}
-            />
-          </aside>
-        )}
-      </div>
-
-      {/* Alt Panel: Sayfa Gezgini */}
-      <PageStrip
-        project={project}
-        activePageIndex={activePageIndex}
-        setActivePageIndex={setActivePageIndex}
-      />
-
-      {/* Sol/Sağ panel toggle butonları */}
+  /* Kaydet/Projelerim/Fusion/Dışa-aktar/panel-toggle — hem gömülü ince satırda
+     hem de bağımsız StudioTopBar'ın `actions` yuvasında AYNI düğmeler kullanılır
+     (tek kaynak, iki sarmalayıcı — Docs/Anket/Defter ile aynı desen). */
+  const actionButtons = (
+    <>
       <button
-        onClick={() => setSidebarOpen((s) => s === "chat" ? null : "chat")}
-        className="fixed left-2 top-16 z-40 p-2 rounded-lg bg-surface border border-line shadow-lg text-muted hover:text-ink transition-colors"
+        onClick={() => setSidebarOpen((s) => (s === "chat" ? null : "chat"))}
         title="AI Sohbet"
-      >
-        <MessageSquare size={16} />
-      </button>
+        className={`w-8 h-8 grid place-items-center rounded-lg transition-colors ${sidebarOpen === "chat" ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
+      ><MessageSquare size={15} /></button>
       <button
-        onClick={() => setSidebarOpen((s) => s === "right" ? null : "right")}
-        className="fixed right-2 top-16 z-40 p-2 rounded-lg bg-surface border border-line shadow-lg text-muted hover:text-ink transition-colors"
+        onClick={() => setSidebarOpen((s) => (s === "right" ? null : "right"))}
         title="Katmanlar & Format"
-      >
-        <Layers size={16} />
-      </button>
+        className={`w-8 h-8 grid place-items-center rounded-lg transition-colors ${sidebarOpen === "right" ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
+      ><Layers size={15} /></button>
+      <button onClick={saveProject} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+      <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
+      <button
+        onClick={() => setFusionEnabled((f) => !f)}
+        title="Fusion: 3 model + hakem ile üretim"
+        className={`w-8 h-8 grid place-items-center rounded-lg transition-colors ${fusionEnabled ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
+      ><Sparkles size={15} /></button>
+      <ExportMenu
+        triggerLabel="Dışa aktar"
+        disabled={!activePage}
+        options={[
+          { key: "html", label: "HTML indir", icon: <Download size={14} className="text-brand" />, onSelect: () => void handleExport("html") },
+          { key: "pdf", label: "PDF (yazdır)", icon: <FileText size={14} className="text-brand" />, onSelect: () => void handleExport("pdf") },
+          { key: "tab", label: "Yeni sekmede aç", icon: <ExternalLink size={14} className="text-brand" />, onSelect: () => void handleExport("tab") },
+          { key: "publish", label: "Yayınla (bağlantı)", icon: <Share2 size={14} className="text-brand" />, onSelect: () => void handleExport("publish"), separatorBefore: true },
+        ]}
+      />
+    </>
+  );
+
+  const slimActionsRow = (
+    <div className="h-10 shrink-0 flex items-center gap-1 px-3 sm:px-4 border-b border-line/60 overflow-x-auto no-scrollbar">
+      <button onClick={newProjectAction} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink shrink-0">+ Yeni</button>
+      <div className="ml-auto flex items-center gap-1 shrink-0">{actionButtons}</div>
+    </div>
+  );
+
+  const content = (
+    <>
+      <div className="flex-1 min-h-0 flex flex-col">
+        {/* Ana İçerik: 3 sütun (mobilde sol/sağ panel tam-ekran overlay) */}
+        <div className="flex-1 min-h-0 flex relative">
+          {sidebarOpen === "chat" && (
+            <div className="fixed inset-0 z-40 pt-[env(safe-area-inset-top)] sm:static sm:z-auto sm:pt-0 sm:w-80 sm:shrink-0 sm:border-r border-line flex flex-col min-h-0 bg-bg sm:bg-transparent">
+              <div className="sm:hidden h-11 shrink-0 flex items-center gap-2 px-3 border-b border-line">
+                <span className="text-xs font-bold flex items-center gap-1.5"><MessageSquare size={13} className="text-brand" /> AI Sohbet</span>
+                <button onClick={() => setSidebarOpen(null)} className="ml-auto w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-ink"><X size={16} /></button>
+              </div>
+              <ChatPanel
+                messages={messages}
+                busy={busy}
+                phase={phase}
+                onFollowup={(t) => runGenerate(t, true)}
+                onStop={stop}
+              />
+            </div>
+          )}
+
+          {/* Orta: Tuval */}
+          <main className="flex-1 min-h-0 flex flex-col bg-bgsoft/30">
+            {/* Cihaz seçici (mobilde gizli — tuval doğal cihaz genişliğini kullanır) */}
+            <div className="h-9 shrink-0 flex items-center gap-2 px-3 border-b border-line">
+              <div className="hidden sm:flex items-center bg-bgsoft border border-line/60 rounded-lg p-0.5 text-xs">
+                {(["web", "iphone", "pixel"] as DeviceId[]).map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setDevice(d)}
+                    className={`px-2.5 py-1 rounded-md transition-colors ${
+                      device === d ? "bg-brand/15 text-brand font-semibold" : "text-muted hover:text-ink"
+                    }`}
+                  >
+                    {d === "web" ? "🖥️" : d === "iphone" ? "📱" : "📲"} {d}
+                  </button>
+                ))}
+              </div>
+              <div className="ml-auto flex items-center gap-1 text-[10px] text-muted/50">
+                {activePage && isCanvasPage(activePage) && (
+                  <span>{formatById(activePage.format).name} — {formatById(activePage.format).width}×{formatById(activePage.format).height}</span>
+                )}
+              </div>
+            </div>
+
+            {/* Tuval alanı */}
+            <div className="flex-1 min-h-0">
+              <CanvasPreview
+                project={project}
+                activePageIndex={activePageIndex}
+                reloadKey={reloadKey}
+                device={device}
+              />
+            </div>
+          </main>
+
+          {sidebarOpen === "right" && (
+            <div className="fixed inset-0 z-40 pt-[env(safe-area-inset-top)] sm:static sm:z-auto sm:pt-0 sm:w-64 sm:shrink-0 sm:border-l border-line flex flex-col min-h-0 bg-bg sm:bg-transparent">
+              <div className="sm:hidden h-11 shrink-0 flex items-center gap-2 px-3 border-b border-line">
+                <span className="text-xs font-bold flex items-center gap-1.5"><Layers size={13} className="text-brand" /> Katmanlar & Format</span>
+                <button onClick={() => setSidebarOpen(null)} className="ml-auto w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-ink"><X size={16} /></button>
+              </div>
+              <RightPanel
+                project={project}
+                activePageIndex={activePageIndex}
+                setActivePageIndex={setActivePageIndex}
+                setProject={setProject}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Alt Panel: Sayfa Gezgini */}
+        <PageStrip
+          project={project}
+          activePageIndex={activePageIndex}
+          setActivePageIndex={setActivePageIndex}
+        />
+      </div>
+
+      <SavedItemsModal
+        open={savedOpen}
+        onClose={() => setSavedOpen(false)}
+        title="Projelerim"
+        icon={LayoutTemplate}
+        items={savedProjects}
+        getKey={(p) => p.id}
+        renderRow={(p) => (
+          <>
+            <div className="text-sm font-semibold truncate">{p.name}</div>
+            <div className="text-[11px] text-muted/60">{new Date(p.updatedAt).toLocaleDateString("tr-TR")}</div>
+          </>
+        )}
+        onOpen={openSavedProject}
+        onDelete={removeSavedProject}
+        emptyLabel="Henüz kayıtlı proje yok."
+      />
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <>
+        {slimActionsRow}
+        {content}
+      </>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      <StudioTopBar
+        icon={LayoutTemplate}
+        label="Tasarım"
+        activeSurface="studio"
+        showWorkActions
+        onNew={newProjectAction}
+        onClose={() => nav.close()}
+        actions={actionButtons}
+      />
+      {content}
     </div>
   );
 }

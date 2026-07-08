@@ -24,6 +24,7 @@ import {
   Plus,
   Search,
   Server,
+  Sparkles,
   Sun,
   Trash2,
   User,
@@ -48,7 +49,7 @@ import { ProUpgrade } from "@/components/ProUpgrade";
 import { AnalyticsSettings } from "@/components/AnalyticsSettings";
 import { createClient } from "@/lib/supabase/client";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, ALL_TOOL_CATALOG } from "@/lib/constants";
-import { buildFallbackChain } from "@/lib/fallback";
+import { buildFallbackChain, KEYLESS_PROVIDERS } from "@/lib/fallback";
 import { calculateCost, formatCost } from "@/lib/pricing";
 import { quickComplete } from "@/lib/quickComplete";
 import { fetchUserRepos } from "@/lib/github";
@@ -57,9 +58,9 @@ import { friendlyError } from "@/lib/friendlyError";
 import { pickReplacementModel } from "@/lib/modelPicker";
 import type { Provider, ResponseStyle } from "@/lib/types";
 
-export type SettingsTab = "model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim";
+export type SettingsTab = "model" | "github" | "general" | "fusion" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim";
 
-export const SETTINGS_TAB_KEYS: SettingsTab[] = ["model", "github", "general", "advanced", "mcp", "hooks", "hesap", "extensions", "plan", "hakkinda", "kullanim"];
+export const SETTINGS_TAB_KEYS: SettingsTab[] = ["model", "github", "general", "fusion", "advanced", "mcp", "hooks", "hesap", "extensions", "plan", "hakkinda", "kullanim"];
 
 /* routeMode: /settings gerçek rotası olarak render — store bayrağı yok sayılır,
    kapatma /app'e döner, sekme değişimi onTabChange ile URL'e yansır.
@@ -172,8 +173,9 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
 
   /* Keyword index — typing in the search box jumps to whichever tab
      contains the matching keyword (first hit wins). */
-  const SEARCH_INDEX: Record<"model" | "github" | "general" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim", string[]> = {
+  const SEARCH_INDEX: Record<"model" | "github" | "general" | "fusion" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim", string[]> = {
     hesap:    ["hesap", "account", "e-posta", "email", "giriş", "çıkış", "oturum", "admin"],
+    fusion:   ["fusion", "füzyon", "taslak", "draft", "hakem", "judge", "kalite", "quality", "birleştir", "model seç", "yedek", "fallback", "kota", "kredi", "credit"],
     kullanim: ["kullanım", "usage", "analitik", "analytics", "token", "maliyet", "cost", "istatistik", "grafik", "pano"],
     plan:     ["plan", "pro", "abonelik", "yükselt", "upgrade", "ödeme", "fatura", "stripe", "premium"],
     hakkinda: ["hakkında", "about", "sürüm", "version", "gizlilik", "şartlar", "lisans", "iletişim", "destek"],
@@ -201,7 +203,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     setPrevSearch(search);
     if (search.trim() && matchingTabs.size > 0) {
       const adminOnly = new Set(["advanced", "mcp", "hooks"]);
-      const first = (["model", "github", "extensions", "general", "kullanim", "plan", "hakkinda", "advanced", "mcp", "hooks", "hesap"] as const)
+      const first = (["model", "fusion", "github", "extensions", "general", "kullanim", "plan", "hakkinda", "advanced", "mcp", "hooks", "hesap"] as const)
         .find((k) => matchingTabs.has(k) && (isAdmin || !adminOnly.has(k)));
       if (first && first !== tab) changeTab(first);
     }
@@ -593,6 +595,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     { key: "github", label: "Git", icon: GitBranch, admin: false },
     { key: "extensions", label: "Eklentiler", icon: Blocks, admin: false },
     { key: "general", label: "Temel", icon: SlidersHorizontal, admin: false },
+    { key: "fusion", label: "Fusion", icon: Sparkles, admin: false },
     { key: "kullanim", label: "Kullanım", icon: BarChart3, admin: false },
     { key: "plan", label: "Plan", icon: Crown, admin: false },
     { key: "advanced", label: "Gelişmiş", icon: Wrench, admin: true },
@@ -1592,6 +1595,90 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   </div>
                 ))}
               </div>
+            </div>
+          </section>
+        )}
+
+        {/* FUSION — herkese açık (admin şartı yok): taslak modeli seçimi. */}
+        {tab === "fusion" && (
+          <section className="flex flex-col gap-5">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted/45 -mb-2">Fusion</div>
+            <div className="premium-card rounded-xl p-4">
+              <h4 className="text-sm font-bold mb-1.5 flex items-center gap-1.5"><Sparkles size={14} className="text-brand" /> Fusion nedir?</h4>
+              <p className="text-xs text-muted leading-relaxed mb-3">
+                Kalite gerektiren üretim isteklerinde arka planda 1-3 İÇ TASLAK üretilir,
+                bir hakem en iyisini seçer, nihai yanıt bu taslaklar birleştirilerek yazılır —
+                sen yalnızca sonucu görürsün. Bu ayar taslakları HANGİ modellerin üreteceğini belirler.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => saveConfig({ ...config, fusionMode: "auto" })}
+                  className={`flex-1 py-2.5 px-3 rounded-lg border text-sm font-semibold transition-colors text-left ${
+                    (config.fusionMode ?? "auto") === "auto" ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
+                  }`}
+                >
+                  Otomatik
+                  <span className="block text-[11px] font-normal text-muted/60 mt-0.5">craft en uygun modelleri kendi seçer</span>
+                </button>
+                <button
+                  onClick={() => saveConfig({ ...config, fusionMode: "manual" })}
+                  className={`flex-1 py-2.5 px-3 rounded-lg border text-sm font-semibold transition-colors text-left ${
+                    config.fusionMode === "manual" ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
+                  }`}
+                >
+                  Manuel
+                  <span className="block text-[11px] font-normal text-muted/60 mt-0.5">kendi modellerini seç (en fazla 3)</span>
+                </button>
+              </div>
+            </div>
+
+            {config.fusionMode === "manual" && (
+              <div className="premium-card rounded-xl p-4">
+                <h4 className="text-sm font-bold mb-1">Taslak modelleri</h4>
+                <p className="text-xs text-muted mb-3">{(config.fusionModelIds ?? []).length}/3 seçili.</p>
+                {config.models.length === 0 ? (
+                  <p className="text-xs text-muted/60">Önce Model sekmesinden en az bir model ekle.</p>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    {config.models.map((m) => {
+                      const selectedIds = config.fusionModelIds ?? [];
+                      const selected = selectedIds.includes(m.id);
+                      const atLimit = selectedIds.length >= 3;
+                      const free = KEYLESS_PROVIDERS.has(m.provider);
+                      return (
+                        <label
+                          key={m.id}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-xl border transition-colors ${
+                            selected ? "border-brand/40 bg-brand/8" : "border-line bg-bgsoft"
+                          } ${!selected && atLimit ? "opacity-40 cursor-not-allowed" : "cursor-pointer hover:border-brand/40"}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            disabled={!selected && atLimit}
+                            onChange={() => {
+                              const next = selected ? selectedIds.filter((id) => id !== m.id) : [...selectedIds, m.id].slice(0, 3);
+                              saveConfig({ ...config, fusionModelIds: next });
+                            }}
+                            className="accent-brand shrink-0"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="text-sm font-semibold block truncate">{m.label}</span>
+                            <span className="text-[11px] text-muted/60">{m.provider}{free ? " · ücretsiz" : ""}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="premium-card rounded-xl p-4">
+              <p className="text-xs text-muted leading-relaxed">
+                Seçtiğin bir modelde kredi/kota biterse craft otomatik olarak bir sonraki en
+                güçlü ücretsiz/uygun modele geçer — üretim yarıda kalmaz.
+              </p>
             </div>
           </section>
         )}
