@@ -245,36 +245,6 @@ export function canvasPagesToDeck(pages: ProjectCanvasPage[], title?: string): S
   };
 }
 
-/* ── Fusion desteği ────────────────────────────────────────────────── */
-
-export interface FusionDraft {
-  id: string;
-  projectId: string;
-  pageIndex: number;
-  content: string;
-  model: string;
-  temperature: number;
-  createdAt: number;
-}
-
-export interface FusionResult {
-  drafts: FusionDraft[];
-  judgeBest: number;
-  judgeGuidance: string;
-  finalContent: string;
-  modelsUsed: string[];
-}
-
-/** Fusion için taslak üretim parametreleri. */
-export interface FusionOptions {
-  project: OpenDesignProject;
-  pageIndex: number;
-  brief: string;
-  draftCount: 1 | 2 | 3;
-  designSystemPrompt?: string;
-  craftRules?: string;
-}
-
 /* ── Cross-mode dönüştürme ────────────────────────────────────────── */
 
 export type ConversionMode = "canvas-to-deck" | "deck-to-canvas" | "slide-to-canvas" | "canvas-to-slide";

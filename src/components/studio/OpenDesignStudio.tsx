@@ -24,7 +24,7 @@ import { autoStudioSkill } from "@/lib/autoPilot";
 import { type DeviceId } from "@/lib/studioConstants";
 import type { StudioProject } from "@/lib/types";
 import {
-  CANVAS_FORMATS, type CanvasFormat, type OpenDesignProject, type ProjectPage, isCanvasPage, isDeckPage, newProject, newCanvasPage, newDeckPage, formatById, convertCanvasToSlide, pageToHtml
+  CANVAS_FORMATS, type CanvasFormat, type OpenDesignProject, type ProjectPage, isCanvasPage, isDeckPage, newProject, newCanvasPage, newDeckPage, formatById, pageToHtml
 } from "@/lib/openDesign";
 import type { Slide } from "@/lib/types";
 import {
@@ -34,6 +34,10 @@ import { ExportMenu } from "./ExportMenu";
 import { StudioTopBar } from "./StudioTopBar";
 import { SavedItemsModal } from "./SavedItemsModal";
 import { downloadHtml, openInTab, printPdf, publishArtifact } from "@/lib/studioExport";
+import { pickDraftModels, fillSelfConsistency, generateDrafts, judgeDrafts, buildBoostInstruction, type DraftJudge } from "@/lib/boost";
+import { buildFallbackChain } from "@/lib/fallback";
+import { resolveModelApiKey } from "@/lib/secureKeys";
+import { fetchTextModels } from "@/lib/pollinations";
 
 /* ── Yardımcılar ──────────────────────────────────────────────────── */
 
@@ -44,6 +48,10 @@ const PHASE_LABEL: Record<StudioPhase, string> = {
   done: "Hazır",
   error: "Hata",
 };
+
+/* Cihaz önizlemesi — tasarımın gerçek en-boy oranını DEĞİŞTİRMEZ, yalnız
+   render genişliğini bir telefon viewport'una sığdırır (web = sınırsız). */
+const DEVICE_MAX_WIDTH: Record<DeviceId, number | null> = { web: null, iphone: 390, pixel: 412 };
 
 /* ── Sol Panel: AI Sohbet ─────────────────────────────────────────── */
 
@@ -147,9 +155,11 @@ function CanvasPreview({
   // Canvas modu — tuval önizleme
   const fmt = formatById(page.format);
   const design = page.design;
+  const deviceCap = DEVICE_MAX_WIDTH[device];
+  const maxWidth = deviceCap ? Math.min(fmt.width, deviceCap) : fmt.width;
   return (
     <div className="h-full flex items-center justify-center p-4">
-      <div className="relative" style={{ width: "100%", maxWidth: fmt.width, aspectRatio: `${fmt.width}/${fmt.height}` }}>
+      <div className="relative" style={{ width: "100%", maxWidth, aspectRatio: `${fmt.width}/${fmt.height}` }}>
         <div
           className="w-full h-full rounded-xl overflow-hidden shadow-2xl shadow-black/20"
           style={{
@@ -371,15 +381,16 @@ function FormatPanel({
     });
   };
 
-  const convertPage = (index: number, targetFormat: CanvasFormat) => {
+  /* Aktif sayfanın formatını değiştirir (yalnız canvas sayfaları — deck'in
+     kendi formatı yok). Katman konumları (x/y) normalize (0-1) olduğundan
+     oranlı kalır; yazı boyutu (`size`) piksel-mutlak olduğundan çok farklı
+     genişlikler arasında geçişte oranı bozulabilir — bilinen sınırlama. */
+  const changeFormat = (index: number, format: CanvasFormat) => {
     const p = project.pages[index];
-    if (!p) return;
-    if (isCanvasPage(p)) {
-      const converted = convertCanvasToSlide(p);
-      const newPages = [...project.pages];
-      newPages[index] = converted;
-      setProject({ ...project, pages: newPages, updatedAt: Date.now() });
-    }
+    if (!p || !isCanvasPage(p) || p.format === format) return;
+    const newPages = [...project.pages];
+    newPages[index] = { ...p, format };
+    setProject({ ...project, pages: newPages });
   };
 
   return (
@@ -391,7 +402,9 @@ function FormatPanel({
           {CANVAS_FORMATS.filter((f) => f.id !== "deck").map((f) => (
             <button
               key={f.id}
-              className={`px-2 py-1.5 rounded-lg text-[11px] text-left transition-colors ${
+              onClick={() => changeFormat(activePageIndex, f.id)}
+              disabled={!isCanvasPage(page)}
+              className={`px-2 py-1.5 rounded-lg text-[11px] text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                 isCanvasPage(page) && page.format === f.id
                   ? "bg-brand/15 text-brand border border-brand/30"
                   : "bg-bgsoft border border-line/60 text-muted hover:text-ink"
@@ -580,7 +593,8 @@ export function OpenDesignStudio({ embedded }: { embedded?: boolean } = {}) {
     abortRef.current = ac;
 
     try {
-      // Fusion modunda 3 taslak üretilir
+      // Fusion modunda 3 taslak üretilir + hakem seçer; sonuç sentez talimatı olarak eklenir
+      let boostInstruction: string | undefined;
       if (fusionEnabled) {
         setPhase("generating");
         setMessages((m) => {
@@ -588,12 +602,48 @@ export function OpenDesignStudio({ embedded }: { embedded?: boolean } = {}) {
           c[c.length - 1] = { role: "assistant", text: "✦ Fusion: 3 model ile taslak üretiliyor…" };
           return c;
         });
+        try {
+          const store = useStore.getState();
+          const active = store.strongestModel() ?? store.activeModel();
+          if (active) {
+            const freeModelNames = await fetchTextModels();
+            const manualFusionIds = store.config.fusionMode === "manual" ? store.config.fusionModelIds : undefined;
+            const draftProfiles = pickDraftModels(store.config.models, active, 3, store.strongestModel(), freeModelNames, manualFusionIds);
+            const slots = fillSelfConsistency(draftProfiles, active, 3);
+            const withKeys = await Promise.all(slots.map(async (s) => ({
+              baseUrl: s.profile.baseUrl, model: s.profile.model, provider: s.profile.provider,
+              apiKey: await resolveModelApiKey(s.profile, store.config.providerKeys), temperature: s.temperature,
+            })));
+            const fusionFallbacks = buildFallbackChain(store.config.models, active.id);
+            const drafts = await generateDrafts({ userText: brief, models: withKeys, fallbacks: fusionFallbacks, signal: ac.signal });
+            if (drafts.length) {
+              let judge: DraftJudge | null = null;
+              if (drafts.length >= 2) {
+                const activeKey = await resolveModelApiKey(active, store.config.providerKeys);
+                judge = await judgeDrafts({
+                  userText: brief, drafts,
+                  model: { baseUrl: active.baseUrl, model: active.model, provider: active.provider, apiKey: activeKey },
+                  signal: ac.signal,
+                });
+              }
+              boostInstruction = buildBoostInstruction(drafts, judge);
+              setMessages((m) => {
+                const c = [...m];
+                c[c.length - 1] = { role: "assistant", text: `✦ Fusion: ${drafts.length} taslak${judge ? " + hakem kararı" : ""} birleştiriliyor…` };
+                return c;
+              });
+            }
+          }
+        } catch {
+          /* Fusion taslak/hakem başarısızsa sessizce normal üretime düş. */
+        }
       }
 
       const result = await generateArtifact({
         brief,
         skillId: autoStudioSkill(brief) ?? "landing",
         directionId: "minimal",
+        boostInstruction,
         onDelta: (txt) => setMessages((m) => {
           const c = [...m];
           c[c.length - 1] = { role: "assistant", text: txt || "Tasarım üretiliyor…" };

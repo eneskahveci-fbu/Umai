@@ -147,6 +147,20 @@ async function mapConfigSecrets(
 export const encryptConfigSecrets = (cfg: Config) => mapConfigSecrets(cfg, encryptField);
 export const decryptConfigSecrets = (cfg: Config) => mapConfigSecrets(cfg, decryptField);
 
+/* Bir model profili için kullanılabilir (çözülmüş) API anahtarını üretir:
+   modelin kendi anahtarı yoksa sağlayıcı-bazlı `providerKeys`'e düşer, şifreliyse
+   çözer. Çözülemezse boş döner (ASLA şifreli blob döndürmez — sağlayıcıya
+   'enc:1:…' gitmesin). Saf/yan etkisiz — çağıran kendi hata bildirimini yapar. */
+export async function resolveModelApiKey(
+  model: { apiKey?: string; provider: string },
+  providerKeys?: Partial<Record<string, string>>,
+): Promise<string> {
+  let k = model.apiKey || providerKeys?.[model.provider] || "";
+  if (!k) return "";
+  k = await decryptField(k);
+  return isEncrypted(k) ? "" : k;
+}
+
 /* Config'te şifrelenmemiş (düz metin) bir gizli alan var mı? (migrasyon tetiği) */
 export function hasPlaintextSecret(cfg: Config): boolean {
   const vals = [
