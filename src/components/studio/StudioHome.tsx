@@ -63,7 +63,7 @@ export function StudioHome({
             Open Design Platform
           </h1>
           <p className="text-muted text-sm mt-1.5 text-balance">
-            Slayt, afiş, sosyal medya, tuval — hepsi tek workspace'te.
+            Slayt, afiş, sosyal medya, tuval — hepsi tek çalışma alanında.
             Brief yaz, gerisini craft halleder.
           </p>
         </div>
@@ -150,7 +150,7 @@ export function StudioHome({
         {/* Bilgi notu */}
         <div className="text-center text-[11px] text-muted/40 mt-2">
           <span className="font-semibold">Open Design</span> —
-          Slayt, afiş, sosyal medya ve tuval artık tek workspace'te.
+          Slayt, afiş, sosyal medya ve tuval artık tek çalışma alanında.
           Dilediğin formatta üret, dilediğin formata dönüştür.
         </div>
 
