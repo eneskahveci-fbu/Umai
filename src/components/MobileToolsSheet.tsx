@@ -3,8 +3,10 @@
 /* Mobil "Araçlar" alt-sekmesinin açtığı kısa liste — masaüstündeki
    `SidebarTools.tsx` açılır listesinin mobil eşleniği (aynı 3 araç +
    Görüntü). Kendi durumunu `MobileTabBar` tutar, bu yalnız görünümdür. */
+import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import { BookOpen, FileText, ImageIcon, ListChecks, X } from "lucide-react";
+import { useModalA11y } from "@/lib/useModalA11y";
 
 const TOOLS: { href: string; label: string; desc: string; icon: typeof FileText }[] = [
   { href: "/studio/dokuman", label: "Doküman", desc: "blok tabanlı yazım", icon: FileText },
@@ -15,9 +17,12 @@ const TOOLS: { href: string; label: string; desc: string; icon: typeof FileText 
 
 export function MobileToolsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
+  const ref = useRef<HTMLDivElement>(null);
+  useModalA11y(ref, open, onClose);
   if (!open) return null;
   return (
     <div
+      ref={ref}
       className="sm:hidden fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm animate-modal-bg"
       onClick={onClose}
       role="dialog"
@@ -31,7 +36,7 @@ export function MobileToolsSheet({ open, onClose }: { open: boolean; onClose: ()
       >
         <div className="flex items-center justify-between mb-2 px-1">
           <h2 className="text-sm font-bold">Araçlar</h2>
-          <button onClick={onClose} className="w-7 h-7 grid place-items-center rounded-lg text-muted hover:text-ink"><X size={14} /></button>
+          <button onClick={onClose} aria-label="Kapat" className="w-7 h-7 grid place-items-center rounded-lg text-muted hover:text-ink"><X size={14} /></button>
         </div>
         <div className="space-y-0.5">
           {TOOLS.map((t) => {

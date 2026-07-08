@@ -12,6 +12,7 @@ import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MobileTabBar, useKeyboardOpen } from "@/components/MobileTabBar";
 import { BackgroundJobs } from "@/components/BackgroundJobs";
+import { trackEvent } from "@/lib/analytics";
 
 export type SurfaceFlag =
   | "studioOpen" | "slidesStudioOpen" | "docsStudioOpen" | "formsStudioOpen"
@@ -38,6 +39,7 @@ export function SurfacePage({ flag, children }: {
     };
     const set = setters[flag];
     set(true);
+    trackEvent("surface_open", flag);
     return () => set(false);
   }, [flag]);
 

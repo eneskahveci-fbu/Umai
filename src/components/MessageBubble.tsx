@@ -597,11 +597,11 @@ function MessageBubbleImpl({
               </div>
               {/* Hover actions */}
               <div className="flex items-center gap-0.5 mt-1.5 justify-end [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 transition-opacity duration-150">
-                <button onClick={copyMessage} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink px-2 py-1 rounded-lg hover:bg-bgsoft transition-colors">
+                <button onClick={copyMessage} aria-label="Kopyala" className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink px-2 py-1 rounded-lg hover:bg-bgsoft transition-colors">
                   {copied ? <Check size={11} /> : <Copy size={11} />}
                 </button>
                 {onEdit && (
-                  <button onClick={startEdit} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink px-2 py-1 rounded-lg hover:bg-bgsoft transition-colors">
+                  <button onClick={startEdit} aria-label="Düzenle" className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink px-2 py-1 rounded-lg hover:bg-bgsoft transition-colors">
                     <Pencil size={11} />
                   </button>
                 )}
@@ -610,6 +610,7 @@ function MessageBubbleImpl({
                     <button
                       onClick={() => onSwitchVersion(Math.max(0, (message.branchIndex ?? 0) - 1))}
                       disabled={(message.branchIndex ?? 0) === 0}
+                      aria-label="Önceki sürüm"
                       className="p-0.5 rounded hover:bg-bgsoft disabled:opacity-30 transition-colors"
                     >
                       <ChevronLeft size={12} />
@@ -620,6 +621,7 @@ function MessageBubbleImpl({
                     <button
                       onClick={() => onSwitchVersion(Math.min(message.branches!.length - 1, (message.branchIndex ?? 0) + 1))}
                       disabled={(message.branchIndex ?? 0) === message.branches.length - 1}
+                      aria-label="Sonraki sürüm"
                       className="p-0.5 rounded hover:bg-bgsoft disabled:opacity-30 transition-colors"
                     >
                       <ChevronRight size={12} />

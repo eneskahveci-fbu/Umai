@@ -103,6 +103,7 @@ import { autoEffort, autoSwarm, decidePilot, type PilotDecision } from "@/lib/au
 import { pickDraftModels, buildBoostInstruction, generateDrafts, fillSelfConsistency, judgeDrafts } from "@/lib/boost";
 import { fetchTextModels } from "@/lib/pollinations";
 import { importSkillFromUrl } from "@/lib/skillImport";
+import { trackEvent } from "@/lib/analytics";
 import { retrieve } from "@/lib/retrieval";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { CRAFT_OPERATING_MANUAL } from "@/lib/constants";
@@ -1674,6 +1675,7 @@ export function CoderView() {
         if (boostDrafts.length) {
           useStore.getState().updateLastThinking(`✦ Füzyon: ${boostDrafts.length} taslak${boostJudge ? " + hakem kararı" : ""} birleştiriliyor…`);
           useStore.getState().setFusionModelsOnLast(slots.slice(0, boostDrafts.length).map((s) => s.profile.model));
+          trackEvent("fusion_used", undefined, { draftCount: boostDrafts.length, hasJudge: !!boostJudge });
         }
       } catch { boostDrafts = []; boostJudge = null; /* güçlendirme başarısızsa normal akış */ }
     }
@@ -2276,6 +2278,7 @@ export function CoderView() {
     hookRunsRef.current = 0; // yeni kullanıcı mesajı → afterEdit döngü sayacını sıfırla
     verifyRunsRef.current = 0; // otonom doğrulama tur sayacını da sıfırla
     if (store.config.soundEnabled) import("@/lib/sounds").then((m) => m.playSend());
+    trackEvent("chat_message_sent");
 
     /* slash command algıla */
     const detected = findAgentByCommand(text);

@@ -62,6 +62,7 @@ export function StudioTopBar({
         onClick={onClose}
         className={`${showWorkActions ? "" : "ml-auto"} w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors shrink-0`}
         title="Kapat"
+        aria-label="Kapat"
       ><X size={16} /></button>
     </div>
   );

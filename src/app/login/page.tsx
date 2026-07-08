@@ -195,7 +195,7 @@ export default function LoginPage() {
           <div className="space-y-4">
             {/* Email */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted/80 uppercase tracking-wider">E-posta</label>
+              <label className="text-xs font-semibold text-muted uppercase tracking-wider">E-posta</label>
               <div className="relative">
                 <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted/50 pointer-events-none" />
                 <input
@@ -214,7 +214,7 @@ export default function LoginPage() {
 
             {/* Password */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted/80 uppercase tracking-wider">Şifre</label>
+              <label className="text-xs font-semibold text-muted uppercase tracking-wider">Şifre</label>
               <div className="relative">
                 <KeyRound size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted/50 pointer-events-none" />
                 <input
@@ -227,7 +227,13 @@ export default function LoginPage() {
                   minLength={8}
                   className={`w-full bg-bgsoft border rounded-xl pl-10 pr-11 py-3 text-sm outline-none transition-colors placeholder:text-muted/35 ${fieldErrors.password ? "border-red/60 focus:border-red" : "border-line focus:border-brand"}`}
                 />
-                <button type="button" onClick={() => setShowPass((v) => !v)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted/50 hover:text-muted transition-colors" tabIndex={-1}>
+                <button
+                  type="button"
+                  onClick={() => setShowPass((v) => !v)}
+                  aria-label={showPass ? "Şifreyi gizle" : "Şifreyi göster"}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted/50 hover:text-muted transition-colors"
+                  tabIndex={-1}
+                >
                   {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
@@ -248,7 +254,7 @@ export default function LoginPage() {
             {/* Divider */}
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px bg-line/60" />
-              <span className="text-xs text-muted/50">veya</span>
+              <span className="text-xs text-muted">veya</span>
               <div className="flex-1 h-px bg-line/60" />
             </div>
 
@@ -305,7 +311,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-muted/50 mt-5 leading-relaxed">
+        <p className="text-center text-xs text-muted mt-5 leading-relaxed">
           Devam ederek{" "}
           <Link href="/terms" className="hover:text-brand transition-colors">Kullanım Şartları</Link>{" "}
           ve{" "}

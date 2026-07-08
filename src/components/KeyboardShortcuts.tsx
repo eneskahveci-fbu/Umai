@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Command, Keyboard, Monitor, X } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { useModalA11y } from "@/lib/useModalA11y";
 
 interface Shortcut { keys: string[]; label: string; }
 
@@ -75,6 +76,9 @@ export function KeyboardShortcuts() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  const modalRef = useRef<HTMLDivElement>(null);
+  useModalA11y(modalRef, open, () => setOpen(false));
+
   if (!open) return null;
 
   const resolveKey = (k: string) => {
@@ -88,6 +92,10 @@ export function KeyboardShortcuts() {
       onClick={() => setOpen(false)}
     >
       <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="shortcuts-modal-title"
         className="w-full max-w-lg bg-surface border border-line rounded-2xl shadow-2xl shadow-black/40 max-h-[88dvh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
@@ -96,7 +104,7 @@ export function KeyboardShortcuts() {
             <div className="w-7 h-7 rounded-lg bg-brand/10 border border-brand/20 grid place-items-center">
               <Keyboard size={14} className="text-brand" />
             </div>
-            <h2 className="font-bold text-base">Klavye Kısayolları</h2>
+            <h2 id="shortcuts-modal-title" className="font-bold text-base">Klavye Kısayolları</h2>
           </div>
           <div className="flex items-center gap-2">
             {/* Mac / Windows toggle */}
@@ -114,6 +122,7 @@ export function KeyboardShortcuts() {
             </button>
             <button
               onClick={() => setOpen(false)}
+              aria-label="Kapat"
               className="w-7 h-7 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
             >
               <X size={14} />
