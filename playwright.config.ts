@@ -9,6 +9,13 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 10_000 },
   fullyParallel: true,
+  /* Kimlik gerektiren spec'ler (mobile/chat/studio/settings-fusion) TEK bir
+     paylaşılan test hesabının storageState'ini yeniden kullanır (bkz.
+     global-setup.ts) — farklı worker'larda eşzamanlı config yazmaları
+     (ör. Stüdyo kaydet + Fusion ayarı) aynı hesapta yarışa girmesin diye
+     tek worker'da, sırayla çalıştırılır. */
+  workers: 1,
+  globalSetup: "./e2e/global-setup.ts",
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "list" : [["list"], ["html", { open: "never" }]],
@@ -16,6 +23,12 @@ export default defineConfig({
     baseURL: process.env.E2E_BASE_URL || "http://localhost:3000",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    /* HTTPS_PROXY tanımlıysa tarayıcı da onu kullanır (Playwright bunu
+       otomatik okumaz) — localhost/dev sunucusu trafiği atlanır (bypass),
+       yalnız dışarı çıkan istekler (Supabase vb.) proxy'den geçer. */
+    proxy: (process.env.HTTPS_PROXY || process.env.https_proxy)
+      ? { server: (process.env.HTTPS_PROXY || process.env.https_proxy)!, bypass: "localhost,127.0.0.1" }
+      : undefined,
   },
   projects: [
     {
