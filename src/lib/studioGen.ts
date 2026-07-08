@@ -24,6 +24,9 @@ export interface GenerateOptions {
   comment?: string;
   /** Hareketli/animasyonlu çıktı (CSS animasyonları). */
   animate?: boolean;
+  /** Fusion: `boost.ts`'in `buildBoostInstruction()`'ından gelen gizli-taslak
+      sentez talimatı — verilmişse sistem promptunun en sonuna eklenir. */
+  boostInstruction?: string;
   onDelta?: (text: string) => void;
   onPhase?: (p: StudioPhase) => void;
   signal?: AbortSignal;
@@ -73,7 +76,7 @@ export async function resolveKey(): Promise<{ baseUrl: string; model: string; ap
   return { baseUrl: active.baseUrl, model: active.model, apiKey, provider: active.provider };
 }
 
-export function buildStudioSystem(opts: Pick<GenerateOptions, "skillId" | "directionId" | "designSystemPrompt" | "prevHtml" | "comment" | "animate">): string {
+export function buildStudioSystem(opts: Pick<GenerateOptions, "skillId" | "directionId" | "designSystemPrompt" | "prevHtml" | "comment" | "animate" | "boostInstruction">): string {
   /* Kompozisyon sırası (Open Design dersi): marka sözleşmesi ÖNCE ve otoriter,
      zanaat kuralları sonra (çakışmada marka kazanır), tür talimatı en sonda. */
   let sys = STUDIO_SYSTEM_BASE;
@@ -87,6 +90,7 @@ export function buildStudioSystem(opts: Pick<GenerateOptions, "skillId" | "direc
   if (dir) sys += `\n\n[Tasarım yönü — ${dir.name}]: ${dir.hint}`;
   if (opts.prevHtml?.trim()) sys += `\n\n[Mevcut tasarım — değişiklik isteniyorsa bunu TEMEL al]:\n${opts.prevHtml.slice(0, 9000)}`;
   if (opts.comment?.trim()) sys += `\n\n[Hedefli düzenleme — kullanıcı önizlemede şu öğeyi işaretledi]: ${opts.comment.trim()}`;
+  if (opts.boostInstruction) sys += opts.boostInstruction;
   return sys;
 }
 
