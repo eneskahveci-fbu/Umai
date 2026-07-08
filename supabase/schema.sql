@@ -204,3 +204,29 @@ create policy "yayın - insert"
 drop policy if exists "yayın - delete" on public.published_artifacts;
 create policy "yayın - delete"
   on public.published_artifacts for delete using (auth.uid() = user_id);
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- ÜRÜN ANALİTİĞİ (admin-only agregat görünüm — bkz. SettingsModal → Kullanım)
+-- Kullanıcı yalnız KENDİ olayını YAZABİLİR (insert-only). Okuma politikası
+-- YOK — istemciden hiç kimse (sahibi dahil) okuyamaz; agregatlar yalnızca
+-- service-role ile (/api/admin/analytics, admin e-postasına kilitli) hesaplanır.
+-- Kişisel kullanım panosu (AnalyticsSettings.tsx) zaten yerel sohbet
+-- geçmişinden hesaplanıyor — bu tablo YALNIZ toplu ürün analitiği içindir.
+-- ─────────────────────────────────────────────────────────────────────────
+create table if not exists public.analytics_events (
+  id          bigint generated always as identity primary key,
+  user_id     uuid references auth.users(id) on delete set null,
+  event_name  text not null,
+  surface     text,
+  metadata    jsonb not null default '{}'::jsonb,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists analytics_events_created_at_idx on public.analytics_events (created_at desc);
+create index if not exists analytics_events_name_idx on public.analytics_events (event_name);
+
+alter table public.analytics_events enable row level security;
+
+drop policy if exists "analitik - insert" on public.analytics_events;
+create policy "analitik - insert"
+  on public.analytics_events for insert with check (auth.uid() = user_id);

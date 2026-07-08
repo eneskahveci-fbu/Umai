@@ -47,6 +47,7 @@ import { AccountSettings } from "@/components/AccountSettings";
 import { ExtensionsSettings } from "@/components/ExtensionsSettings";
 import { ProUpgrade } from "@/components/ProUpgrade";
 import { AnalyticsSettings } from "@/components/AnalyticsSettings";
+import { AdminAnalytics } from "@/components/AdminAnalytics";
 import { createClient } from "@/lib/supabase/client";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, ALL_TOOL_CATALOG } from "@/lib/constants";
 import { buildFallbackChain, KEYLESS_PROVIDERS } from "@/lib/fallback";
@@ -679,7 +680,12 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
 
         {tab === "extensions" && <ExtensionsSettings />}
 
-        {tab === "kullanim" && <AnalyticsSettings />}
+        {tab === "kullanim" && (
+          <>
+            <AnalyticsSettings />
+            {isAdmin && <AdminAnalytics />}
+          </>
+        )}
 
         {tab === "plan" && (
           <section className="space-y-4">
