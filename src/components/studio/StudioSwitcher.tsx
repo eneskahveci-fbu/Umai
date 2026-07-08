@@ -149,7 +149,7 @@ export function StudioSwitcher({ active }: { active: Surface }) {
             <div className="h-px bg-line my-1" />
             <div className="px-2.5 py-2 text-[10px] text-muted/50 leading-relaxed">
               <span className="font-semibold text-muted/70">Open Design Platform</span> —
-              Slayt, afiş, sosyal medya ve tuval artık tek workspace'te.
+              Slayt, afiş, sosyal medya ve tuval artık tek çalışma alanında.
             </div>
           </div>
         </>

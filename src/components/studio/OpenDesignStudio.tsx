@@ -19,7 +19,7 @@ import {
   History, Layers, Link2, Loader2, Plus, Printer, RefreshCw, Save,
   Send, Settings2, Shuffle, SlidersHorizontal, Sparkles, Square,
   Trash2, Undo2, Redo2, User, Wand2, X, ZoomIn, ZoomOut,
-  Image as ImageIcon, LayoutTemplate, Presentation,
+  Image as ImageIcon, LayoutTemplate, MessageSquare, Presentation,
   ChevronDown, GripVertical, Eye, EyeOff, Lock, Unlock,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -377,10 +377,10 @@ function FormatPanel({
     const newPage = isDeckPage(page)
       ? newDeckPage(`Sayfa ${project.pages.length + 1}`)
       : newCanvasPage(newPageFormat, `Sayfa ${project.pages.length + 1}`);
+    /* updatedAt damgası kaydetme anında vurulur (render saf kalır). */
     setProject({
       ...project,
       pages: [...project.pages, newPage],
-      updatedAt: Date.now(),
     });
   };
 
@@ -390,7 +390,6 @@ function FormatPanel({
     setProject({
       ...project,
       pages: newPages,
-      updatedAt: Date.now(),
     });
   };
 
@@ -676,6 +675,9 @@ export function OpenDesignStudio({ embedded }: { embedded?: boolean } = {}) {
       name: project.name,
       brief: messages.find((m) => m.role === "user")?.text ?? "",
       html: "", // Canvas content will be rendered
+      designSystemId: "craft",
+      skillId: null,
+      directionId: null,
       createdAt: project.createdAt,
       updatedAt: Date.now(),
     };
@@ -771,7 +773,7 @@ export function OpenDesignStudio({ embedded }: { embedded?: boolean } = {}) {
           {/* Cihaz seçici */}
           <div className="h-9 shrink-0 flex items-center gap-2 px-3 border-b border-line">
             <div className="flex items-center bg-bgsoft border border-line/60 rounded-lg p-0.5 text-xs">
-              {(["web", "tablet", "mobile"] as DeviceId[]).map((d) => (
+              {(["web", "iphone", "pixel"] as DeviceId[]).map((d) => (
                 <button
                   key={d}
                   onClick={() => setDevice(d)}
@@ -779,7 +781,7 @@ export function OpenDesignStudio({ embedded }: { embedded?: boolean } = {}) {
                     device === d ? "bg-brand/15 text-brand font-semibold" : "text-muted hover:text-ink"
                   }`}
                 >
-                  {d === "web" ? "🖥️" : d === "tablet" ? "📱" : "📲"} {d}
+                  {d === "web" ? "🖥️" : d === "iphone" ? "📱" : "📲"} {d}
                 </button>
               ))}
             </div>
