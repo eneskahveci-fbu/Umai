@@ -1,159 +1,49 @@
 "use client";
 
-/* ═══════════════════════════════════════════════════════════════════════
-   STUDIO SWITCHER — Birleşik Tasarım Platformu
-   ═══════════════════════════════════════════════════════════════════════
-   Önceki 7 mod artık 4'e indirildi:
-
-   🎨 TASARIM GRUBU (hepsi OpenDesignStudio içinde):
-     • Tasarım — slayt, afiş, sosyal, story, tuval (tek workspace)
-     • Görüntü — AI görsel üretimi
-
-   📝 İÇERİK GRUBU:
-     • Doküman — blok tabanlı doküman
-     • Anket — AI anket + form
-     • Defter — kaynak-temelli sohbet
-
-   StudioSwitcher artık "Tasarım" seçildiğinde OpenDesignStudio'yu
-   çağırır. SlidesStudio ve DesignStudio KALDIRILDI.
-   ═══════════════════════════════════════════════════════════════════════ */
-
-import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import {
-  BookOpen, Check, ChevronDown, FileText, Image as ImageIcon,
-  LayoutTemplate, ListChecks, Sparkles,
-} from "lucide-react";
+import { Image as ImageIcon, Sparkles } from "lucide-react";
 import { useSurfaceNav, type Surface } from "@/lib/surfaceNav";
 
-/* Yeni yüzey listesi — 4 ana mod */
-export const STUDIO_SURFACES: {
-  id: Surface;
-  name: string;
-  icon: LucideIcon;
-  title: string;
-  group: "design" | "content";
-}[] = [
-  {
-    id: "studio",
-    name: "Tasarım Stüdyosu",
-    icon: Sparkles,
-    title: "Slayt · Afiş · Sosyal · Tuval — tek workspace",
-    group: "design",
-  },
-  {
-    id: "image",
-    name: "Görüntü",
-    icon: ImageIcon,
-    title: "AI görsel üretimi (Pollinations)",
-    group: "design",
-  },
-  {
-    id: "docs",
-    name: "Doküman",
-    icon: FileText,
-    title: "Blok tabanlı doküman (Markdown/HTML)",
-    group: "content",
-  },
-  {
-    id: "forms",
-    name: "Anket",
-    icon: ListChecks,
-    title: "AI anket + bağımsız HTML form",
-    group: "content",
-  },
-  {
-    id: "notebook",
-    name: "Defter",
-    icon: BookOpen,
-    title: "Kaynak-temelli sohbet + sesli özet",
-    group: "content",
-  },
+/* Stüdyo mod anahtarı — TEK SAYFA felsefesi (kullanıcı anketi, Tem 2026):
+   stüdyoda yalnız iki mod kaldı: Tasarım (Open Design tek tuval — slayt,
+   afiş, sosyal, story, sunum destesi hepsi orada) ve Görüntü (AI görsel).
+   İçerik araçları (Doküman/Anket/Defter) stüdyodan çıktı → Sidebar'daki
+   "Araçlar" satırından açılır. Dropdown kalktı; iki düğmelik sade şerit. */
+
+export const STUDIO_SURFACES: { id: Surface; name: string; icon: LucideIcon; title: string }[] = [
+  { id: "studio", name: "Tasarım", icon: Sparkles, title: "Slayt · Afiş · Sosyal · Tuval — tek tuval" },
+  { id: "image", name: "Görüntü", icon: ImageIcon, title: "AI görsel üretimi (Pollinations)" },
 ];
 
-/* Artık kullanılmayan eski yüzeyler — geriye uyumluluk için映射 */
+/* Eski yüzey adları — geriye uyumluluk (slides/canvas → studio). */
 export const LEGACY_SURFACE_MAP: Record<string, Surface> = {
-  slides: "studio",   // SlidesStudio → OpenDesignStudio
-  canvas: "studio",   // DesignStudio → OpenDesignStudio
-};
-
-const GROUP_LABELS: Record<"design" | "content", string> = {
-  design: "Tasarım",
-  content: "İçerik",
+  slides: "studio",
+  canvas: "studio",
 };
 
 export function StudioSwitcher({ active }: { active: Surface }) {
   const nav = useSurfaceNav();
-  const [open, setOpen] = useState(false);
-
-  // legacy surface mapping
-  const normalized = LEGACY_SURFACE_MAP[active] ?? active;
-  const current = STUDIO_SURFACES.find((s) => s.id === normalized) ?? STUDIO_SURFACES[0];
-  const CurrentIcon = current.icon;
+  const normalized = (LEGACY_SURFACE_MAP[active] ?? active) as Surface;
 
   return (
-    <div className="relative shrink-0">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className="flex items-center gap-1.5 min-w-[120px] px-2.5 py-1.5 rounded-lg border border-brand/30 bg-brand/10 text-brand text-xs font-semibold transition-colors hover:border-brand/50"
-      >
-        <CurrentIcon size={13} className="shrink-0" />
-        <span className="truncate">{current.name}</span>
-        <ChevronDown size={13} className={`ml-auto shrink-0 text-brand/70 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 mt-1.5 z-20 w-72 bg-surface border border-line rounded-xl shadow-2xl p-1 text-sm">
-            {(["design", "content"] as const).map((group, gi) => (
-              <div key={group}>
-                {gi > 0 && <div className="h-px bg-line my-1" />}
-                <div className="px-2.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted/45">
-                  {GROUP_LABELS[group]}
-                </div>
-                {STUDIO_SURFACES.filter((s) => s.group === group).map((s) => {
-                  const on = s.id === normalized;
-                  const Icon = s.icon;
-                  return (
-                    <button
-                      key={s.id}
-                      onClick={() => {
-                        setOpen(false);
-                        if (!on) nav.go(s.id);
-                      }}
-                      aria-current={on ? "page" : undefined}
-                      className={`w-full flex items-start gap-2.5 px-2.5 py-2 rounded-lg transition-colors text-left ${
-                        on ? "bg-brand/10" : "hover:bg-bgsoft"
-                      }`}
-                    >
-                      <Icon size={15} className={`shrink-0 mt-0.5 ${on ? "text-brand" : "text-muted"}`} />
-                      <span className="min-w-0">
-                        <span className={`block font-semibold text-xs ${on ? "text-brand" : "text-ink"}`}>
-                          {s.name}
-                        </span>
-                        <span className="block text-[11px] text-muted/80 leading-snug mt-0.5">
-                          {s.title}
-                        </span>
-                      </span>
-                      {on && <Check size={13} className="text-brand shrink-0 mt-0.5 ml-auto" />}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-
-            {/* Bilgi notu */}
-            <div className="h-px bg-line my-1" />
-            <div className="px-2.5 py-2 text-[10px] text-muted/50 leading-relaxed">
-              <span className="font-semibold text-muted/70">Open Design Platform</span> —
-              Slayt, afiş, sosyal medya ve tuval artık tek çalışma alanında.
-            </div>
-          </div>
-        </>
-      )}
+    <div className="flex items-center bg-bgsoft border border-line/60 rounded-lg p-0.5 text-xs font-semibold shrink-0">
+      {STUDIO_SURFACES.map((s) => {
+        const on = s.id === normalized;
+        const Icon = s.icon;
+        return (
+          <button
+            key={s.id}
+            onClick={() => { if (!on) nav.go(s.id); }}
+            title={s.title}
+            aria-current={on ? "page" : undefined}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+              on ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"
+            }`}
+          >
+            <Icon size={13} /> {s.name}
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -1,24 +1,16 @@
 "use client";
 
-/* ═══════════════════════════════════════════════════════════════════════
-   STUDIO HUB — Birleşik Tasarım Platformu (Open Design)
-   ═══════════════════════════════════════════════════════════════════════
-   Önceki 7 mod (Tasarım/Sunum/Tuval/Görüntü/Doküman/Anket/Defter)
-   artık tek bir "Open Design Studio" altında birleştirildi.
-
-   Yeni yapı:
-   - OpenDesignStudio: slayt, afiş, sosyal, story, tuval, deck
-   - DocsStudio: doküman oluşturma
-   - FormsStudio: anket/form oluşturma
-   - ImageStudio: görsel üretimi
-   - NotebookStudio: defter
-
-   Tasarım grubu (slayt+tuval+görsel) tek bileşende,
-   içerik grubu (doküman+anket+defter) ayrı modlarda.
-   ═══════════════════════════════════════════════════════════════════════ */
+/* TEK stüdyo kabuğu — kullanıcı anketi (Tem 2026) sonrası yapı:
+   - Stüdyo = TEK SAYFA tasarım tuvali (OpenDesignStudio: slayt, afiş,
+     sosyal, story, tuval, sunum destesi) + Görüntü (AI görsel).
+   - İçerik araçları (Doküman/Anket/Defter) stüdyo anahtarından ÇIKTI;
+     Sidebar'daki "Araçlar" satırından açılır ama aynı kabukta yaşar
+     (rotaları korunur, state kaybolmaz).
+   Üst çubuk: tasarım modlarında 2-düğmeli anahtar; içerik aracındayken
+   aracın adı görünür. */
 
 import { useState } from "react";
-import { X } from "lucide-react";
+import { BookOpen, FileText, ListChecks, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav, type Surface } from "@/lib/surfaceNav";
 import { StudioSwitcher } from "./StudioSwitcher";
@@ -34,17 +26,10 @@ function useEverOpened(open: boolean) {
   return ever || open;
 }
 
-/* Yüzey haritası: "studio" artık OpenDesignStudio'yu çağırır.
-   SlidesStudio ve DesignStudio ORTADAN KALDIRILDI — ikisi de
-   OpenDesignStudio içinde birleşti. */
-const SURFACE_MAP: Record<Surface, React.ComponentType<{ embedded?: boolean }>> = {
-  studio: OpenDesignStudio,
-  slides: OpenDesignStudio,  // ← birleşti
-  canvas: OpenDesignStudio,  // ← birleşti
-  image: ImageStudio,
-  docs: DocsStudio,
-  forms: FormsStudio,
-  notebook: NotebookStudio,
+const CONTENT_LABEL: Partial<Record<Surface, { name: string; icon: typeof FileText }>> = {
+  docs: { name: "Doküman", icon: FileText },
+  forms: { name: "Anket", icon: ListChecks },
+  notebook: { name: "Defter", icon: BookOpen },
 };
 
 export function StudioHub() {
@@ -57,31 +42,31 @@ export function StudioHub() {
   const formsOpen = useStore((s) => s.formsStudioOpen);
   const notebookOpen = useStore((s) => s.notebookStudioOpen);
 
-  const everStudio = useEverOpened(studioOpen);
-  const everSlides = useEverOpened(slidesOpen);
-  const everCanvas = useEverOpened(canvasOpen);
+  const designOpen = studioOpen || slidesOpen || canvasOpen;
+  const everDesign = useEverOpened(designOpen);
   const everImage = useEverOpened(imageOpen);
   const everDocs = useEverOpened(docsOpen);
   const everForms = useEverOpened(formsOpen);
   const everNotebook = useEverOpened(notebookOpen);
 
-  if (!studioOpen && !slidesOpen && !canvasOpen && !imageOpen && !docsOpen && !formsOpen && !notebookOpen) {
-    return null;
-  }
+  if (!designOpen && !imageOpen && !docsOpen && !formsOpen && !notebookOpen) return null;
 
   const active: Surface =
-    studioOpen ? "studio" : slidesOpen ? "slides" : canvasOpen ? "canvas" :
-    imageOpen ? "image" : docsOpen ? "docs" : formsOpen ? "forms" : "notebook";
+    designOpen ? "studio" : imageOpen ? "image" :
+    docsOpen ? "docs" : formsOpen ? "forms" : "notebook";
 
-  // Open Design stüdyoları (studio/slides/canvas) hepsi aynı bileşeni kullanır
-  const isOpenDesign = active === "studio" || active === "slides" || active === "canvas";
-  const ActiveComponent = SURFACE_MAP[active];
+  const content = CONTENT_LABEL[active];
 
   return (
     <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0">
-      {/* Üst çubuk */}
       <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line">
-        <StudioSwitcher active={active} />
+        {content ? (
+          <div className="flex items-center gap-1.5 text-sm font-bold">
+            <content.icon size={15} className="text-brand" /> {content.name}
+          </div>
+        ) : (
+          <StudioSwitcher active={active} />
+        )}
         <button
           onClick={() => nav.close()}
           className="ml-auto w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors shrink-0"
@@ -89,10 +74,14 @@ export function StudioHub() {
         ><X size={16} /></button>
       </div>
 
-      {/* İçerik — hepsi mount edilir, state korunur */}
-      {everStudio && active === "studio" && <OpenDesignStudio embedded />}
-      {everSlides && active === "slides" && <OpenDesignStudio embedded />}
-      {everCanvas && active === "canvas" && <OpenDesignStudio embedded />}
+      {/* Bir kez açılan mod mount kalır — state kaybolmaz. OpenDesign kendi
+          bayrağını kontrol etmediğinden görünürlüğü CSS ile yönetilir
+          (display:contents → yerleşimi bozmadan gizle/göster). */}
+      {everDesign && (
+        <div className={designOpen ? "contents" : "hidden"}>
+          <OpenDesignStudio embedded />
+        </div>
+      )}
       {everImage && <ImageStudio embedded />}
       {everDocs && <DocsStudio embedded />}
       {everForms && <FormsStudio embedded />}
