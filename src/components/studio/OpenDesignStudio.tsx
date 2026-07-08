@@ -13,47 +13,24 @@
    • Cross-format: herhangi bir sayfayı diğerine dönüştür
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
-  ArrowLeftRight, Copy, Download, ExternalLink, FileText, FolderOpen,
-  History, Layers, Link2, Loader2, Plus, Printer, RefreshCw, Save,
-  Send, Settings2, Shuffle, SlidersHorizontal, Sparkles, Square,
-  Trash2, Undo2, Redo2, User, Wand2, X, ZoomIn, ZoomOut,
-  Image as ImageIcon, LayoutTemplate, MessageSquare, Presentation,
-  ChevronDown, GripVertical, Eye, EyeOff, Lock, Unlock,
+  Download, ExternalLink, FileText, Layers, Loader2, Plus, Save, Send, Settings2, Sparkles, Square, Trash2, User, LayoutTemplate, MessageSquare, GripVertical
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav } from "@/lib/surfaceNav";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
 import { autoStudioSkill } from "@/lib/autoPilot";
-import { CRAFT_RULES } from "@/lib/studioCraft";
-import { skillById, directionById, STUDIO_DIRECTIONS, type DeviceId } from "@/lib/studioConstants";
-import { designSystemById, designSystemPromptText } from "@/lib/designSystems";
-import type { Artifact, StudioProject } from "@/lib/types";
+import { type DeviceId } from "@/lib/studioConstants";
+import type { StudioProject } from "@/lib/types";
 import {
-  CANVAS_FORMATS, type CanvasFormat, type OpenDesignProject,
-  type ProjectPage, type ProjectMode, type ProjectCanvasPage,
-  isCanvasPage, isDeckPage,
-  newProject, newCanvasPage, newDeckPage,
-  formatById, canvasPageFromSlide, slideFromCanvasPage,
-  deckToCanvasPages, canvasPagesToDeck,
-  convertCanvasToSlide, convertSlideToCanvas,
+  CANVAS_FORMATS, type CanvasFormat, type OpenDesignProject, type ProjectPage, isCanvasPage, isDeckPage, newProject, newCanvasPage, newDeckPage, formatById, convertCanvasToSlide
 } from "@/lib/openDesign";
+import type { Slide } from "@/lib/types";
 import {
-  type Align, type Design, type Layer,
-  clamp01, nudge, pushHist, undoHist, redoHist, emptyHist, type HistState,
-} from "@/lib/design";
-import type { Slide, SlideDeck } from "@/lib/types";
-import {
-  deckToHtml, newSlide, newSlideId, SLIDE_LAYOUTS, SLIDE_THEMES,
-  slideImageSrc, slideThemeById, type SlideTheme, MAX_SLIDES,
+  slideImageSrc, slideThemeById, type SlideTheme
 } from "@/lib/slides";
-import { generateDeck, rewriteSlide } from "@/lib/slidesGen";
-import { downloadHtml, printPdf, openInTab } from "@/lib/studioExport";
-import { publishArtifact } from "@/lib/studioExport";
-import { DeviceFrame } from "./DeviceFrame";
 import { ExportMenu } from "./ExportMenu";
-import { StudioSwitcher } from "./StudioSwitcher";
 
 /* ── Yardımcılar ──────────────────────────────────────────────────── */
 
