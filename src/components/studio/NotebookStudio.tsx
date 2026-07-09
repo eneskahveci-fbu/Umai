@@ -183,7 +183,7 @@ export function NotebookStudio() {
   const saved = config.craftNotebooks ?? [];
 
   const slimActionsRow = (
-    <div className="h-10 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
+    <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
       <button onClick={newNb} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink shrink-0">+ Yeni</button>
       <input
         value={title}

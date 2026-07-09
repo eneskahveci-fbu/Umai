@@ -174,7 +174,7 @@ export function DocsStudio() {
   };
 
   const slimActionsRow = view === "work" && doc && (
-    <div className="h-10 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
+    <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
       <button onClick={() => { setDoc(null); setView("home"); setBrief(""); }} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink shrink-0">+ Yeni</button>
       <div className="ml-auto flex items-center gap-1 shrink-0">
         {saved.length > 0 && (

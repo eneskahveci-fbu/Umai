@@ -369,6 +369,20 @@ export interface CraftNotebook {
   updatedAt: number;
 }
 
+/** Görüntü Stüdyosu'nda kaydedilen tek bir oturum — sohbet akışı (prompt +
+    üretilen görsel URL'leri) tekrar açılabilir olsun diye. URL'ler
+    deterministik (Pollinations seed'e bağlı) olduğundan görsel verisinin
+    kendisi değil yalnızca URL'ler saklanır — hafif. */
+export interface CraftImageSession {
+  id: string;
+  title: string;
+  model: string;
+  format: string;
+  msgs: { id: string; role: "user" | "assistant"; text?: string; model?: string; items?: { id: string; url: string; w: number; h: number }[] }[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 /** Tasarım Stüdyosu'nda kaydedilen tek bir tasarım (HTML/CSS/JS). */
 export interface SavedDesign {
   id: string;
@@ -484,6 +498,8 @@ export interface Config {
   craftForms?: CraftForm[];
   /** Defter: kaydedilen kaynak defterleri. */
   craftNotebooks?: CraftNotebook[];
+  /** Görüntü Stüdyosu: kaydedilen üretim oturumları. */
+  craftImages?: CraftImageSession[];
   /** Seslendirme (TTS) için tercih edilen Pollinations sesi (varsayılan: nova). */
   ttsVoice?: string;
   mcpServers?: McpServer[];
