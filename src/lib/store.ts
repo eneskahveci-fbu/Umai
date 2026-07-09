@@ -389,15 +389,9 @@ interface StoreState {
   setSettingsOpen: (b: boolean) => void;
   imageStudioOpen: boolean;
   setImageStudioOpen: (b: boolean) => void;
-  designStudioOpen: boolean;
-  setDesignStudioOpen: (b: boolean) => void;
-  /** Yeni Stüdyo (Open Design tarzı brief→önizleme deneyimi). Klasik DesignStudio
-      "Gelişmiş tuval" olarak erişilebilir kalır. */
+  /** Stüdyo (Open Design tarzı brief→önizleme deneyimi, tek tuval). */
   studioOpen: boolean;
   setStudioOpen: (b: boolean) => void;
-  /** Sunum Stüdyosu (Google Slides'tan ilhamla; yapılandırılmış slayt desteleri). */
-  slidesStudioOpen: boolean;
-  setSlidesStudioOpen: (b: boolean) => void;
   /** Doküman Stüdyosu (Notion'dan ilhamla; blok tabanlı doküman). */
   docsStudioOpen: boolean;
   setDocsStudioOpen: (b: boolean) => void;
@@ -998,12 +992,8 @@ export const useStore = create<StoreState>()((set, get) => ({
   setSettingsOpen: (b) => set({ settingsOpen: b }),
   imageStudioOpen: false,
   setImageStudioOpen: (b) => set({ imageStudioOpen: b }),
-  designStudioOpen: false,
-  setDesignStudioOpen: (b) => set({ designStudioOpen: b }),
   studioOpen: false,
   setStudioOpen: (b) => set({ studioOpen: b }),
-  slidesStudioOpen: false,
-  setSlidesStudioOpen: (b) => set({ slidesStudioOpen: b }),
   docsStudioOpen: false,
   setDocsStudioOpen: (b) => set({ docsStudioOpen: b }),
   formsStudioOpen: false,
