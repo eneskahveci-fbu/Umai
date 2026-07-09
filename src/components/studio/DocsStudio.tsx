@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  ArrowDown, ArrowUp, Download, FileCode, FileText, FolderOpen, Loader2,
+  ArrowDown, ArrowUp, Download, FileCode, FileText, FolderOpen, Link2, Loader2,
   Plus, Save, Sparkles, Trash2, Wand2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -15,6 +15,7 @@ import {
   MAX_DOC_BLOCKS, newBlock,
 } from "@/lib/docs";
 import { downloadTemplate, pickTemplateFile } from "@/lib/templateShare";
+import { docEmbeddingText, findRelated, withFreshEmbeddings } from "@/lib/relatedItems";
 
 /* Doküman Stüdyosu — Notion'dan İLHAM alan craft yorumu (klon değil):
    doküman = düzenlenebilir blok listesi. AI taslağı JSON bloklar olarak üretir;
@@ -282,6 +283,14 @@ export function DocsStudio({ embedded }: { embedded?: boolean } = {}) {
                 {contBusy ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />} Devam et
               </button>
             </div>
+
+            {/* "İlgili" (Obsidian-lite) — yalnız kayıtlı bir doküman açıkken ve
+                karşılaştıracak başka kayıtlı doküman varsa gösterilir. */}
+            {saved.some((d) => d.id === doc.id) && saved.length > 1 && (
+              <div className="mt-6 border-t border-line/60 pt-4">
+                <RelatedDocs docs={saved} currentId={doc.id} onOpen={openDoc} onSave={(next) => saveConfig({ ...config, craftDocs: next })} />
+              </div>
+            )}
           </div>
         </div>
       ) : null}
@@ -336,6 +345,63 @@ export function DocsStudio({ embedded }: { embedded?: boolean } = {}) {
         }
       />
       {content}
+    </div>
+  );
+}
+
+/* "İlgili dokümanlar" — açık dokümana anlamca en yakın 3-5 kayıtlı dokümanı
+   gösterir (rag.ts'in tarayıcı-içi gömme modeli üzerinden, sunucuya veri
+   gitmeden). Yalnız doküman kaydedilmişken ve içerik değiştiğinde hesaplanır. */
+function RelatedDocs({
+  docs, currentId, onOpen, onSave,
+}: {
+  docs: CraftDoc[];
+  currentId: string;
+  onOpen: (d: CraftDoc) => void;
+  onSave: (next: CraftDoc[]) => void;
+}) {
+  const [state, setState] = useState<"loading" | "ready" | "empty">("loading");
+  const [related, setRelated] = useState<{ item: CraftDoc; score: number }[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setState("loading");
+      const fresh = await withFreshEmbeddings(docs, (d) => d.blocks.length, docEmbeddingText);
+      if (fresh.some((d, i) => d !== docs[i])) onSave(fresh);
+      if (cancelled) return;
+      const target = fresh.find((d) => d.id === currentId);
+      if (!target?.embedding?.length) { setState("empty"); return; }
+      const hits = findRelated(currentId, target.embedding, fresh, 5).filter((h) => h.score > 0.35);
+      setRelated(hits);
+      setState(hits.length ? "ready" : "empty");
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docs, currentId]);
+
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted/50 mb-1.5">
+        <Link2 size={11} /> İlgili
+      </div>
+      {state === "loading" && <p className="text-[11px] text-muted/40">Aranıyor…</p>}
+      {state === "empty" && <p className="text-[11px] text-muted/40">İlgili doküman bulunamadı.</p>}
+      {state === "ready" && (
+        <div className="space-y-0.5">
+          {related.map(({ item, score }) => (
+            <button
+              key={item.id}
+              onClick={() => onOpen(item)}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-muted hover:text-ink hover:bg-bgsoft/60 transition-colors"
+            >
+              <FileText size={11} className="shrink-0 opacity-40" />
+              <span className="flex-1 text-[12.5px] truncate">{item.title}</span>
+              <span className="text-[9px] font-mono text-muted/40 shrink-0">{Math.round(score * 100)}%</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

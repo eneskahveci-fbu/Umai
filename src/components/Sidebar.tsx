@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SidebarTools } from "./SidebarTools";
 import {
@@ -12,6 +12,7 @@ import {
   FolderOpen,
   FolderPlus,
   Layers,
+  Link2,
   MessageSquare,
   Moon,
   Pencil,
@@ -30,6 +31,7 @@ import {
 import { useStore } from "@/lib/store";
 import { PROJECT_TEMPLATES, projectColorHex } from "@/lib/constants";
 import type { Chat } from "@/lib/types";
+import { chatEmbeddingText, findRelated, withFreshEmbeddings } from "@/lib/relatedItems";
 import { AuthButton } from "./AuthButton";
 import { AccordionSection } from "./Accordion";
 
@@ -77,6 +79,7 @@ export function Sidebar() {
   const copyChatMarkdown = useStore((s) => s.copyChatMarkdown);
   const tagChat = useStore((s) => s.tagChat);
   const pinChat = useStore((s) => s.pinChat);
+  const updateChatEmbeddings = useStore((s) => s.updateChatEmbeddings);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const router = useRouter();
   const sidebarOpen = useStore((s) => s.sidebarOpen);
@@ -548,6 +551,19 @@ export function Sidebar() {
             </div>
           )}
         </AccordionSection>
+
+        {/* "İlgili" (Obsidian-lite) — yalnız aktif bir sohbet ve karşılaştıracak
+            başka sohbet varsa gösterilir. Panel açılınca (lazy mount) hesaplanır. */}
+        {currentId && history.length > 1 && (
+          <AccordionSection id="related" title="İlgili" icon={<Link2 size={11} />}>
+            <RelatedChats
+              chats={history}
+              currentId={currentId}
+              onOpen={selectChat}
+              onEmbeddings={updateChatEmbeddings}
+            />
+          </AccordionSection>
+        )}
       </div>
 
       {/* Bottom */}
@@ -567,6 +583,66 @@ export function Sidebar() {
         <DevCredit />
       </div>
     </aside>
+  );
+}
+
+/* "İlgili" listesi — mevcut sohbete anlamca en yakın 3-5 sohbeti gösterir
+   (rag.ts'in tarayıcı-içi gömme modeli üzerinden, sunucuya veri gitmeden).
+   Yalnız AccordionSection açıkken mount olur, böylece gereksiz yere
+   çalışmaz. */
+function RelatedChats({
+  chats, currentId, onOpen, onEmbeddings,
+}: {
+  chats: Chat[];
+  currentId: string;
+  onOpen: (id: string) => void;
+  onEmbeddings: (updates: { id: string; embedding: number[]; embeddingVersion: number }[]) => void;
+}) {
+  const [state, setState] = useState<"loading" | "ready" | "empty">("loading");
+  const [related, setRelated] = useState<{ item: Chat; score: number }[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setState("loading");
+      const fresh = await withFreshEmbeddings(chats, (c) => c.messages.length, chatEmbeddingText);
+      const changed = fresh
+        .map((c, i) => ({ c, i }))
+        .filter(({ c, i }) => c !== chats[i]);
+      if (changed.length) {
+        onEmbeddings(changed.map(({ c }) => ({ id: c.id, embedding: c.embedding!, embeddingVersion: c.embeddingVersion! })));
+      }
+      if (cancelled) return;
+      const target = fresh.find((c) => c.id === currentId);
+      if (!target?.embedding?.length) { setState("empty"); return; }
+      const hits = findRelated(currentId, target.embedding, fresh, 5).filter((h) => h.score > 0.35);
+      setRelated(hits);
+      setState(hits.length ? "ready" : "empty");
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chats, currentId]);
+
+  if (state === "loading") {
+    return <p className="text-[11px] text-muted/40 px-2 py-1.5">Aranıyor…</p>;
+  }
+  if (state === "empty") {
+    return <p className="text-[11px] text-muted/40 px-2 py-1.5">İlgili sohbet bulunamadı.</p>;
+  }
+  return (
+    <div className="space-y-0.5">
+      {related.map(({ item, score }) => (
+        <button
+          key={item.id}
+          onClick={() => onOpen(item.id)}
+          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-muted hover:text-ink hover:bg-bgsoft/60 transition-colors"
+        >
+          <Link2 size={11} className="shrink-0 opacity-40" />
+          <span className="flex-1 text-[12px] truncate">{item.title}</span>
+          <span className="text-[9px] font-mono text-muted/40 shrink-0">{Math.round(score * 100)}%</span>
+        </button>
+      ))}
+    </div>
   );
 }
 
