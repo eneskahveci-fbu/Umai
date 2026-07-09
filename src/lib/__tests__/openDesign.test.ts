@@ -23,4 +23,26 @@ describe("pageToHtml", () => {
     expect(html).toContain("Başlık");
     expect(html).toContain("class=\"slide\"");
   });
+
+  it("aiArtifact doluysa katmanlar yerine artifact içeriğini döndürür", () => {
+    const page = newCanvasPage("poster", "Afiş");
+    page.design.layers.push({
+      id: "l1", text: "Bu görünmemeli", x: 0.5, y: 0.5,
+      size: 40, color: "#fff", weight: 700, align: "center", font: "sans-serif",
+    });
+    page.aiArtifact = { type: "html", content: "<h1>AI üretimi</h1>" };
+    const html = pageToHtml(page, "Test Projesi");
+    expect(html).toContain("AI üretimi");
+    expect(html).not.toContain("Bu görünmemeli");
+  });
+
+  it("aiArtifact yoksa mevcut katman-tabanlı üretime düşer", () => {
+    const page = newCanvasPage("poster", "Afiş");
+    page.design.layers.push({
+      id: "l1", text: "Katman metni", x: 0.5, y: 0.5,
+      size: 40, color: "#fff", weight: 700, align: "center", font: "sans-serif",
+    });
+    const html = pageToHtml(page, "Test Projesi");
+    expect(html).toContain("Katman metni");
+  });
 });
