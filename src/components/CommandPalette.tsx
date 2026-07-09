@@ -14,10 +14,8 @@ import {
   Activity,
   Bot,
   Sparkles,
-  LayoutTemplate,
   Image as ImageIcon,
   ListChecks,
-  Presentation,
   Zap,
 } from "lucide-react";
 import { useStore } from "@/lib/store";

@@ -127,11 +127,10 @@ function ChatPanel({
 /* ── Orta Panel: Tuval / Önizleme ─────────────────────────────────── */
 
 function CanvasPreview({
-  project, activePageIndex, reloadKey, device,
+  project, activePageIndex, device,
 }: {
   project: OpenDesignProject;
   activePageIndex: number;
-  reloadKey: number;
   device: DeviceId;
 }) {
   const page = project.pages[activePageIndex];
@@ -240,6 +239,7 @@ function SlideCanvas({ slide, theme }: { slide: Slide; theme: SlideTheme }) {
       case "end":
         return (
           <div style={{ position: "relative", height: "100%", display: "grid", alignContent: "center", justifyItems: "start", zIndex: 1 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             {img && <img src={img} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.22, zIndex: -1 }} />}
             <h1 style={{ fontFamily: theme.headingFont, fontSize: "4.4cqw", lineHeight: 1.1, letterSpacing: "-0.02em", margin: 0 }}>{slide.title}</h1>
             {slide.subtitle && <p style={{ color: theme.muted, fontSize: "1.8cqw", marginTop: "1.4cqw", maxWidth: "60ch" }}>{slide.subtitle}</p>}
@@ -275,11 +275,10 @@ function SlideCanvas({ slide, theme }: { slide: Slide; theme: SlideTheme }) {
 /* ── Sağ Panel: Katmanlar + Format + Tweaks ───────────────────────── */
 
 function RightPanel({
-  project, activePageIndex, setActivePageIndex, setProject,
+  project, activePageIndex, setProject,
 }: {
   project: OpenDesignProject;
   activePageIndex: number;
-  setActivePageIndex: (i: number) => void;
   setProject: (p: OpenDesignProject) => void;
 }) {
   const [tab, setTab] = useState<"layers" | "format" | "tweaks">("layers");
@@ -556,7 +555,6 @@ export function OpenDesignStudio() {
   const [messages, setMessages] = useState<OpenDesignMsg[]>([]);
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState<StudioPhase | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
   /* Varsayılan kapalı: mobilde tam-ekran overlay'e dönüştüğü için "açık başlar"
      davranışı ekran boyutundan bağımsız tutuluyor (bkz. plan — matchMedia'ya gerek yok). */
   const [sidebarOpen, setSidebarOpen] = useState<"chat" | "right" | null>(null);
@@ -667,7 +665,6 @@ export function OpenDesignStudio() {
         setProject({ ...project, pages: newPages, updatedAt: Date.now() });
       }
 
-      setReloadKey((k) => k + 1);
       setMessages((m) => {
         const c = [...m];
         c[c.length - 1] = {
@@ -859,7 +856,6 @@ export function OpenDesignStudio() {
               <CanvasPreview
                 project={project}
                 activePageIndex={activePageIndex}
-                reloadKey={reloadKey}
                 device={device}
               />
             </div>
@@ -874,7 +870,6 @@ export function OpenDesignStudio() {
               <RightPanel
                 project={project}
                 activePageIndex={activePageIndex}
-                setActivePageIndex={setActivePageIndex}
                 setProject={setProject}
               />
             </div>
