@@ -62,6 +62,10 @@ export function NotebookStudio() {
   const [urlInput, setUrlInput] = useState("");
   const [fetching, setFetching] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  /* Sesli özet üretimi `busy`'den AYRI izlenir — normal bir soru sorulurken
+     "Sesli özet" butonu ilgisiz şekilde grileşmesin (yalnız kendi üretimi
+     sırasında disabled olsun). */
+  const [narrating, setNarrating] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
   const [srcPanel, setSrcPanel] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -105,7 +109,7 @@ export function NotebookStudio() {
 
   const ask = async (question?: string) => {
     const q = (question ?? input).trim();
-    if (!q || busy) return;
+    if (!q || busy || narrating) return;
     if (!enabledCount) { addToast("Önce en az bir kaynak ekle.", "info"); return; }
     setInput("");
     setBusy(true);
@@ -132,8 +136,8 @@ export function NotebookStudio() {
   const audioSummary = async () => {
     if (speaking) { stopTts(); setSpeaking(false); return; }
     if (!enabledCount) { addToast("Önce en az bir kaynak ekle.", "info"); return; }
-    if (busy) return;
-    setBusy(true);
+    if (busy || narrating) return;
+    setNarrating(true);
     const history: NbMsg[] = [...msgs, { role: "user", content: "🔊 Sesli özet istendi" }];
     setMsgs([...history, { role: "assistant", content: "" }]);
     try {
@@ -149,7 +153,7 @@ export function NotebookStudio() {
       }
     } catch (e) {
       addToast(`Özet üretilemedi: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
-    } finally { setBusy(false); }
+    } finally { setNarrating(false); }
   };
 
   const saveNb = () => {
@@ -246,8 +250,8 @@ export function NotebookStudio() {
 
             {/* Sesli özet */}
             <div className="flex items-center gap-1.5">
-              <button onClick={() => void audioSummary()} disabled={busy && !speaking} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${speaking ? "border-brand/50 text-brand bg-brand/10" : "border-line text-muted hover:text-ink hover:border-brand/40"} disabled:opacity-40`}>
-                {speaking ? <VolumeX size={14} /> : <Volume2 size={14} />} {speaking ? "Durdur" : "Sesli özet"}
+              <button onClick={() => void audioSummary()} disabled={(busy || narrating) && !speaking} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${speaking ? "border-brand/50 text-brand bg-brand/10" : "border-line text-muted hover:text-ink hover:border-brand/40"} disabled:opacity-40`}>
+                {narrating ? <Loader2 size={14} className="animate-spin" /> : speaking ? <VolumeX size={14} /> : <Volume2 size={14} />} {speaking ? "Durdur" : "Sesli özet"}
               </button>
               <select
                 value={config.ttsVoice || "nova"}
@@ -303,7 +307,7 @@ export function NotebookStudio() {
                 placeholder={enabledCount ? "Kaynaklara soru sor… (Enter = gönder)" : "Önce kaynak ekle…"}
                 className="flex-1 bg-bgsoft border border-line rounded-2xl px-3.5 py-2.5 text-sm outline-none focus:border-brand/50 resize-none max-h-32"
               />
-              <button onClick={() => void ask()} disabled={busy || !input.trim() || !enabledCount} className="shrink-0 w-10 h-10 grid place-items-center rounded-xl bg-brand text-[#111110] disabled:opacity-40 transition-opacity" title="Gönder">
+              <button onClick={() => void ask()} disabled={busy || narrating || !input.trim() || !enabledCount} className="shrink-0 w-10 h-10 grid place-items-center rounded-xl bg-brand text-[#111110] disabled:opacity-40 transition-opacity" title="Gönder">
                 {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
               </button>
             </div>
