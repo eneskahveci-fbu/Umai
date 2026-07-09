@@ -53,7 +53,7 @@ export function StudioTopBar({
               className="ml-auto hidden md:block w-44 bg-transparent text-xs text-muted focus:text-ink border-b border-transparent focus:border-line outline-none px-1 py-0.5"
             />
           )}
-          <div className={`flex items-center gap-1 shrink-0 ${title ? "ml-auto md:ml-1" : "ml-auto"}`}>
+          <div className={`flex items-center gap-1 shrink-0 overflow-x-auto no-scrollbar ${title ? "ml-auto md:ml-1" : "ml-auto"}`}>
             {actions}
           </div>
         </>

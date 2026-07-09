@@ -181,10 +181,16 @@ export function DocsStudio() {
           <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
         )}
         <button onClick={saveDoc} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+        <button
+          onClick={() => pickTemplateFile((t) => { if (t.kind === "doc") openDoc(t.data); else addToast("Bu dosya bir doküman şablonu değil.", "error"); }, (m) => addToast(m, "error"))}
+          title="Şablon içe aktar (.json)"
+          className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"
+        ><Download size={15} className="rotate-180" /></button>
         <ExportMenu
           options={[
             { key: "md", label: "Markdown indir", icon: <Download size={14} className="text-brand" />, onSelect: () => doc && download(`${safeFileName(doc.title, "dokuman")}.md`, docToMarkdown(doc), "text/markdown;charset=utf-8") },
             { key: "html", label: "Bağımsız HTML indir", icon: <FileCode size={14} className="text-brand" />, onSelect: () => doc && download(`${safeFileName(doc.title, "dokuman")}.html`, docToHtml(doc), "text/html;charset=utf-8") },
+            { key: "template", label: "Şablon olarak dışa aktar (.json)", icon: <Sparkles size={14} className="text-brand" />, onSelect: () => doc && downloadTemplate({ kind: "doc", data: doc }, doc.title), separatorBefore: true },
           ]}
         />
       </div>
