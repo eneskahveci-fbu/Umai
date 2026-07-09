@@ -6,8 +6,6 @@ import {
   Sparkles, Trash2, Volume2, VolumeX,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { useSurfaceNav } from "@/lib/surfaceNav";
-import { StudioTopBar } from "./StudioTopBar";
 import { SavedItemsModal } from "./SavedItemsModal";
 import type { CraftNotebook, NotebookSource } from "@/lib/types";
 import { streamChat } from "@/lib/genChat";
@@ -48,9 +46,8 @@ export function buildNotebookSystem(sources: NotebookSource[]): string {
   );
 }
 
-export function NotebookStudio({ embedded }: { embedded?: boolean } = {}) {
+export function NotebookStudio() {
   const open = useStore((s) => s.notebookStudioOpen);
-  const nav = useSurfaceNav();
   const config = useStore((s) => s.config);
   const saveConfig = useStore((s) => s.saveConfig);
   const addToast = useStore((s) => s.addToast);
@@ -335,36 +332,10 @@ export function NotebookStudio({ embedded }: { embedded?: boolean } = {}) {
     </>
   );
 
-  if (embedded) {
-    return (
-      <>
-        {slimActionsRow}
-        {content}
-      </>
-    );
-  }
-
   return (
-    <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-      {/* Üst bar */}
-      <StudioTopBar
-        icon={BookOpen}
-        label="Defter"
-        activeSurface="notebook"
-        showWorkActions
-        onNew={newNb}
-        onClose={() => nav.close()}
-        title={{ value: title, onChange: setTitle, placeholder: "Defter adı" }}
-        actions={
-          <>
-            {saved.length > 0 && (
-              <button onClick={() => setSavedOpen(true)} title="Kayıtlı defterler" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
-            )}
-            <button onClick={saveNb} title="Defteri kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
-          </>
-        }
-      />
+    <>
+      {slimActionsRow}
       {content}
-    </div>
+    </>
   );
 }
