@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, Loader2, Send, Sparkles, Trash2, Wand2, X } from "lucide-react";
+import { Download, FolderOpen, Images, Loader2, Save, Send, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { consumeSurfaceHandoff } from "@/lib/surfaceNav";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import { buildFallbackChain } from "@/lib/fallback";
 import { fetchImageModels, IMAGE_MODEL_FALLBACK, pollinationsImageUrl, type ImageModelInfo } from "@/lib/pollinations";
+import { SavedItemsModal } from "./studio/SavedItemsModal";
+import type { CraftImageSession } from "@/lib/types";
 
 /* Görüntü Stüdyosu — Qwen Studio benzeri sohbet akışı, ücretsiz & anahtarsız.
    Konuşarak görsel üret (Pollinations image, keyless): prompt yaz → asistan
@@ -55,6 +57,7 @@ export function ImageStudio() {
   const open = useStore((s) => s.imageStudioOpen);
   const addToast = useStore((s) => s.addToast);
   const config = useStore((s) => s.config);
+  const saveConfig = useStore((s) => s.saveConfig);
 
   /* Eklenen modeller arasından görüntü üretebilenler (BYOK). Kullanıcı kendi
      anahtarıyla bu sağlayıcının görüntü modelini Görüntü Stüdyosu'nda kullanır. */
@@ -78,6 +81,8 @@ export function ImageStudio() {
   const [format, setFormat] = useState("1:1");
   const [count, setCount] = useState(1);
   const [msgs, setMsgs] = useState<ImgMsg[]>([]);
+  const [sessionId, setSessionId] = useState<string>(() => `img_${Date.now().toString(36)}`);
+  const [savedOpen, setSavedOpen] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [freeModels, setFreeModels] = useState<ImageModelInfo[]>(IMAGE_MODEL_FALLBACK);
@@ -234,8 +239,52 @@ export function ImageStudio() {
     } finally { setEnhancing(false); }
   };
 
+  const saved = config.craftImages ?? [];
+
+  /* Oturumu kaydet — görsellerin kendisi değil yalnızca (deterministik)
+     URL'leri saklanır, Docs/Forms/Notebook'un kaydetme deseniyle tutarlı. */
+  const saveSession = () => {
+    const firstPrompt = msgs.find((m) => m.role === "user")?.text?.trim();
+    const title = firstPrompt?.slice(0, 48) || "Görüntü oturumu";
+    const session: CraftImageSession = {
+      id: sessionId,
+      title,
+      model,
+      format,
+      msgs: msgs.map((m) => ({
+        id: m.id, role: m.role, text: m.text, model: m.model,
+        items: m.items?.filter((it) => it.url && !it.loading && !it.error).map((it) => ({ id: it.id, url: it.url, w: it.w, h: it.h })),
+      })),
+      createdAt: saved.find((s) => s.id === sessionId)?.createdAt ?? Date.now(),
+      updatedAt: Date.now(),
+    };
+    saveConfig({ ...config, craftImages: [session, ...saved.filter((s) => s.id !== sessionId)].slice(0, 30) });
+    addToast("Oturum kaydedildi.", "success");
+  };
+
+  const openSession = (s: CraftImageSession) => {
+    setSessionId(s.id);
+    setModel(s.model);
+    setFormat(s.format);
+    setMsgs(s.msgs.map((m) => ({
+      id: m.id, role: m.role, text: m.text, model: m.model,
+      items: m.items?.map((it) => ({ ...it, loading: false, error: false })),
+    })));
+    setSavedOpen(false);
+  };
+
+  const deleteSession = (s: CraftImageSession) => {
+    saveConfig({ ...config, craftImages: saved.filter((x) => x.id !== s.id) });
+  };
+
+  const newSession = () => {
+    setSessionId(`img_${Date.now().toString(36)}`);
+    setMsgs([]);
+    setPrompt("");
+  };
+
   const clearButton = msgs.length > 0 ? (
-    <button onClick={() => setMsgs([])} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line hover:border-brand/40 text-xs font-semibold transition-colors">
+    <button onClick={newSession} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line hover:border-brand/40 text-xs font-semibold transition-colors">
       <Trash2 size={13} /> Temizle
     </button>
   ) : undefined;
@@ -375,15 +424,40 @@ export function ImageStudio() {
   );
 
   /* DesignHub (StudioHub) zaten dış sarmalayıcıyı + üst çubuğu sağlıyor —
-     yalnız "Temizle" eylemini (mesaj varsa) ince bir satırda gösteririz. */
+     yalnız ince bir eylem satırı gösteririz (diğer stüdyolarla tutarlı:
+     sol "+ Yeni", sağ Kaydet/Projelerim/Temizle). */
   return (
     <>
-      {clearButton && (
-        <div className="h-10 shrink-0 flex items-center justify-end px-3 sm:px-4 border-b border-line/60">
+      <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
+        <button onClick={newSession} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink shrink-0">+ Yeni</button>
+        <div className="ml-auto flex items-center gap-1 shrink-0">
+          {saved.length > 0 && (
+            <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
+          )}
+          {msgs.length > 0 && (
+            <button onClick={saveSession} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+          )}
           {clearButton}
         </div>
-      )}
+      </div>
       {content}
+      <SavedItemsModal<CraftImageSession>
+        open={savedOpen}
+        onClose={() => setSavedOpen(false)}
+        title="Projelerim"
+        icon={Images}
+        items={saved}
+        getKey={(s) => s.id}
+        renderRow={(s) => (
+          <>
+            <p className="text-xs font-semibold truncate">{s.title}</p>
+            <p className="text-[10px] text-muted/50">{new Date(s.updatedAt).toLocaleDateString("tr-TR")}</p>
+          </>
+        )}
+        onOpen={openSession}
+        onDelete={deleteSession}
+        emptyLabel="Henüz kaydedilmiş oturum yok."
+      />
     </>
   );
 }
