@@ -18,7 +18,9 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: process.env.CI ? "list" : [["list"], ["html", { open: "never" }]],
+  /* HTML rapor CI'da da üretilir — GitHub Actions artifact'ı olarak yüklenir,
+     başarısız bir e2e'nin trace/screenshot'ını incelemenin tek yolu budur. */
+  reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: process.env.E2E_BASE_URL || "http://localhost:3000",
     trace: "on-first-retry",

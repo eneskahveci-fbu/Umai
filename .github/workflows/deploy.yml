@@ -1,10 +1,11 @@
 name: Deploy to Vercel
 
+# Yalnız ELLE tetiklenir: canonical dağıtım yolu GitLab main → Vercel'dir
+# (bkz. CLAUDE.md). Bu workflow otomatik push tetikleyicisiyle çalışsaydı
+# GitHub aynasındaki her push'ta ÇAKIŞAN, rakip bir Vercel dağıtımı
+# oluşturur — bu yüzden push tetikleyicisi kasıtlı olarak kaldırıldı.
+# Acil durumda (GitLab erişilemezse) elle tetiklemek için burada kalıyor.
 on:
-  push:
-    branches:
-      - main
-      - claude/festive-pasteur-VuZeW
   workflow_dispatch:
 
 jobs:
