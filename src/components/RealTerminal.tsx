@@ -519,7 +519,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
               <a href="https://webcontainer.io/enterprise" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
                 webcontainer.io
               </a>
-              {" "}üzerinden al → Ayarlar → Gelişmiş.{" "}
+              {" "}üzerinden al → Ayarlar → Geliştirici.{" "}
               <strong className="text-white/60">Ya da kendi sunucunu bağla (Ayarlar → Terminal).</strong>
             </p>
             <div className="flex items-center justify-center gap-2 flex-wrap">

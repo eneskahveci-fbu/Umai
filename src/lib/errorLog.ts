@@ -1,7 +1,7 @@
 /* Hata-sıfır programı (Faz 4): istemci tarafı hafif hata günlüğü.
    window.onerror + unhandledrejection yakalanır, son 20 kayıt sessionStorage'da
    tutulur (oturumluk; kişisel veri/telemetri GÖNDERİLMEZ — yalnız cihazda).
-   Ayarlar → Gelişmiş'teki "Son hatalar" panelciği okur. */
+   Ayarlar → Geliştirici'deki "Son hatalar" panelciği okur. */
 
 export interface ClientError {
   ts: number;

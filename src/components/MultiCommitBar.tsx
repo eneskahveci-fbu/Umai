@@ -85,7 +85,7 @@ export function MultiCommitBar({
 
   const writeSandbox = async () => {
     if (!wcSupported()) { addToast("Tarayıcı sandbox'ı desteklemiyor", "error"); return; }
-    if (needsApiKey() && !apiKey.trim()) { addToast("Sandbox API key gerekli (Ayarlar → Gelişmiş)", "error"); return; }
+    if (needsApiKey() && !apiKey.trim()) { addToast("Sandbox API key gerekli (Ayarlar → Geliştirici)", "error"); return; }
     if (toCommit.length === 0) return;
     setWritingSandbox(true);
     try {
