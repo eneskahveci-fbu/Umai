@@ -162,7 +162,7 @@ export function CodeBlock({
               {pyRunning ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />} Çalıştır
             </button>
           )}
-          <button onClick={showDiff} className="flex items-center gap-1 hover:text-brand transition-colors" title="Editörde açık dosya ile karşılaştır">
+          <button onClick={showDiff} className="flex items-center gap-1 hover:text-brand transition-colors" title="Editörde açık dosya ile karşılaştır (salt-okunur — değişiklik uygulamaz, yalnız kopyalayabilirsin)">
             <GitCompareArrows size={12} /> Diff
           </button>
           <button onClick={saveSnippet} className="flex items-center gap-1 hover:text-brand transition-colors" title="Snippet kütüphanesine kaydet">
