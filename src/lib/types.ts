@@ -50,6 +50,10 @@ export interface ChatMessage {
   branches?: ChatMessage[][];
   /** Aktif dalın indeksi. */
   branchIndex?: number;
+  /** LLM/araç hatası nedeniyle üretilen bir yanıt — MessageBubble bunu
+      normal metinden görsel olarak ayırır (kırmızı vurgu + belirgin
+      tekrar-dene eylemi). */
+  isError?: boolean;
 }
 
 export interface SwarmAgentState {

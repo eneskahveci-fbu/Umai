@@ -833,6 +833,9 @@ export function CoderView() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
   const prevLenRef = useRef(0);
+  /* En son dipte iken görülen mesaj sayısı — yukarı kaydırılınca "kaç yeni
+     mesaj geldi" rozetini hesaplamak için. */
+  const lastSeenCountRef = useRef(0);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const onMessagesScroll = () => {
     const el = scrollRef.current;
@@ -843,6 +846,7 @@ export function CoderView() {
   };
   const scrollToBottom = () => {
     stickRef.current = true;
+    lastSeenCountRef.current = messages.length;
     setShowScrollDown(false);
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -887,13 +891,17 @@ export function CoderView() {
     const grew = messages.length > prevLenRef.current;
     prevLenRef.current = messages.length;
     if (grew) stickRef.current = true;
-    if (stickRef.current) endRef.current?.scrollIntoView({ behavior: grew ? "smooth" : "auto" });
+    if (stickRef.current) {
+      lastSeenCountRef.current = messages.length;
+      endRef.current?.scrollIntoView({ behavior: grew ? "smooth" : "auto" });
+    }
   }, [messages.length, lastMessageContent]);
 
   /* Sohbet değişince en alta yapış + scroll (yeni sohbet hep dipten başlasın). */
   useEffect(() => {
     stickRef.current = true;
     prevLenRef.current = messages.length;
+    lastSeenCountRef.current = messages.length;
     endRef.current?.scrollIntoView({ behavior: "auto" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId]);
@@ -2271,7 +2279,7 @@ export function CoderView() {
         useStore.getState().addToast("En güçlü model yanıt vermedi (kredi/anahtar?), aktif modele dönülüyor…", "info");
         await callApi(overrideAgent, { ...opts, noStrongest: true });
       } else {
-        useStore.getState().updateLastContent(`**Hata:** ${friendlyError((err as Error).message)}`);
+        useStore.getState().updateLastContent(`**Hata:** ${friendlyError((err as Error).message)}`, { isError: true });
         void runHooks(false, "error");
       }
     } finally {
@@ -3103,7 +3111,8 @@ export function CoderView() {
           >
             <div className="max-w-3xl mx-auto px-5 relative">
 
-              {/* En alta in butonu (kullanıcı yukarı kaydırdıysa) */}
+              {/* En alta in butonu (kullanıcı yukarı kaydırdıysa) — kaç yeni
+                  mesaj geldiğini gösteren küçük bir rozet ile. */}
               {showScrollDown && messages.length > 0 && (
                 <button
                   onClick={scrollToBottom}
@@ -3111,6 +3120,11 @@ export function CoderView() {
                   className="absolute -top-12 left-1/2 -translate-x-1/2 z-10 w-9 h-9 rounded-full bg-surface border border-line shadow-lg grid place-items-center text-muted hover:text-ink hover:border-brand/40 transition-colors animate-fade-in"
                 >
                   <ArrowDown size={16} />
+                  {messages.length > lastSeenCountRef.current && (
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-brand text-bg text-[10px] font-bold grid place-items-center">
+                      {messages.length - lastSeenCountRef.current}
+                    </span>
+                  )}
                 </button>
               )}
 
@@ -3239,6 +3253,17 @@ export function CoderView() {
                     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
                   }}
                   onPaste={(e) => {
+                    /* Panodan görsel (ekran görüntüsü/kopyalanan resim) — dosya
+                       seçiciyle AYNI yolu (readFileIntoInput) kullanır. */
+                    const imageItems = Array.from(e.clipboardData.items).filter((it) => it.type.startsWith("image/"));
+                    if (imageItems.length) {
+                      e.preventDefault();
+                      for (const item of imageItems) {
+                        const file = item.getAsFile();
+                        if (file) readFileIntoInput(file);
+                      }
+                      return;
+                    }
                     /* Claude tarzı: çok uzun yapıştırma composer'ı şişirmesin —
                        otomatik metin eki olur (bağlama aynı şekilde girer). */
                     const text = e.clipboardData.getData("text");

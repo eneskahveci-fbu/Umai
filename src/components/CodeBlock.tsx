@@ -21,12 +21,15 @@ export function CodeBlock({
   const [collapsed, setCollapsed] = useState(false);
   const [pyOut, setPyOut] = useState<{ output: string; error?: string } | null>(null);
   const [pyRunning, setPyRunning] = useState(false);
+  /* Kullanıcı elle katla/aç düğmesine bastıysa, akış sırasında gelen her yeni
+     token'da otomatik yeniden-katlama onun tercihini ezmesin. */
+  const userToggledRef = useRef(false);
 
   useEffect(() => {
     const text = preRef.current?.textContent ?? "";
     const lines = text === "" ? 0 : text.split("\n").length;
     setLineCount(lines);
-    if (lines > COLLAPSE_LINE_THRESHOLD) setCollapsed(true);
+    if (!userToggledRef.current && lines > COLLAPSE_LINE_THRESHOLD) setCollapsed(true);
   }, [children]);
 
   const codeChild = Array.isArray(children) ? children[0] : children;
@@ -193,7 +196,7 @@ export function CodeBlock({
         )}
         {lineCount > COLLAPSE_LINE_THRESHOLD && (
           <button
-            onClick={() => setCollapsed((v) => !v)}
+            onClick={() => { userToggledRef.current = true; setCollapsed((v) => !v); }}
             className="absolute left-1/2 -translate-x-1/2 bottom-2 flex items-center gap-1.5 text-[11px] px-3 py-1 rounded-full bg-bgsoft/90 border border-line/60 text-muted hover:text-ink hover:bg-bgsoft backdrop-blur transition-colors shadow-sm"
           >
             {collapsed

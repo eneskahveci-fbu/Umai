@@ -8,7 +8,7 @@ import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import {
-  BookMarked, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
+  AlertCircle, BookMarked, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
   Circle, CircleDot, Compass, FlaskConical, ListChecks, Microscope, Settings2,
   Code2, Copy, FileText, FolderOpen, GitBranch, GitCommit, Globe,
   Loader2, Pencil, RefreshCw, Search, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, Users, Volume2, VolumeX, Wrench, X,
@@ -194,7 +194,7 @@ function ToolCallCard({
             {call.result && (
               <button
                 onClick={() => setOpen((o) => !o)}
-                className="opacity-0 group-hover/tool:opacity-100 transition-opacity flex items-center gap-0.5 text-[10px] text-muted/40 hover:text-muted/70 px-1 py-0.5 rounded"
+                className="[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/tool:opacity-100 transition-opacity flex items-center gap-0.5 text-[10px] text-muted/40 hover:text-muted/70 px-1 py-0.5 rounded"
               >
                 {open ? <ChevronUp size={9} /> : <ChevronDown size={9} />}
               </button>
@@ -732,23 +732,38 @@ function MessageBubbleImpl({
 
         {/* Content */}
         {message.content ? (
-          <div className="prose-chat">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkMath, remarkSplitFileLang]}
-              rehypePlugins={[rehypeHighlight, rehypeKatex]}
-              components={{
-                pre: CodeBlock,
-                /* Geniş tablolar taşmasın — yatay kaydırmalı sarmalayıcı. */
-                table: (props) => (
-                  <div className="table-wrap">
-                    <table {...props} />
-                  </div>
-                ),
-              }}
-            >
-              {message.content}
-            </ReactMarkdown>
-            {streamingNow && <span className="caret" />}
+          <div className={message.isError ? "rounded-xl border border-red/20 bg-red/5 px-3 py-2.5" : undefined}>
+            {message.isError && (
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-red mb-1.5">
+                <AlertCircle size={12} /> Hata
+              </div>
+            )}
+            <div className="prose-chat">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkMath, remarkSplitFileLang]}
+                rehypePlugins={[rehypeHighlight, rehypeKatex]}
+                components={{
+                  pre: CodeBlock,
+                  /* Geniş tablolar taşmasın — yatay kaydırmalı sarmalayıcı. */
+                  table: (props) => (
+                    <div className="table-wrap">
+                      <table {...props} />
+                    </div>
+                  ),
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+              {streamingNow && <span className="caret" />}
+            </div>
+            {message.isError && showRegenerate && onRegenerate && (
+              <button
+                onClick={onRegenerate}
+                className="mt-2 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red/10 text-red hover:bg-red/20 font-semibold text-xs transition-colors"
+              >
+                <RefreshCw size={11} /> Tekrar dene
+              </button>
+            )}
           </div>
         ) : streamingNow && !message.thinking && !message.toolCalls?.length ? (
           <span className="inline-flex items-center gap-1 py-1 text-muted/50" aria-label="Yazıyor">
@@ -777,14 +792,14 @@ function MessageBubbleImpl({
         {/* Action row */}
         {message.content && (
           <div className="flex items-center gap-0.5 mt-2 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 transition-opacity duration-150">
-            <button onClick={copyMessage} aria-label={copied ? "Kopyalandı" : "Kopyala"} title={copied ? "Kopyalandı" : "Kopyala"} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-1.5 rounded-lg hover:bg-bgsoft transition-colors">
+            <button onClick={copyMessage} aria-label={copied ? "Kopyalandı" : "Kopyala"} title={copied ? "Kopyalandı" : "Kopyala"} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-2.5 rounded-lg hover:bg-bgsoft transition-colors">
               {copied ? <Check size={12} /> : <Copy size={12} />}
             </button>
-            <button onClick={toggleSpeak} aria-label={speakingTts ? "Durdur" : "Seslendir"} title={speakingTts ? "Durdur" : "Yanıtı seslendir (Pollinations)"} className={`flex items-center gap-1 text-[11px] p-1.5 rounded-lg hover:bg-bgsoft transition-colors ${speakingTts ? "text-brand" : "text-muted/50 hover:text-ink"}`}>
+            <button onClick={toggleSpeak} aria-label={speakingTts ? "Durdur" : "Seslendir"} title={speakingTts ? "Durdur" : "Yanıtı seslendir (Pollinations)"} className={`flex items-center gap-1 text-[11px] p-2.5 rounded-lg hover:bg-bgsoft transition-colors ${speakingTts ? "text-brand" : "text-muted/50 hover:text-ink"}`}>
               {speakingTts ? <VolumeX size={12} /> : <Volume2 size={12} />}
             </button>
             {showRegenerate && onRegenerate && (
-              <button onClick={onRegenerate} aria-label="Yeniden oluştur" title="Yeniden oluştur" className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-1.5 rounded-lg hover:bg-bgsoft transition-colors">
+              <button onClick={onRegenerate} aria-label="Yeniden oluştur" title="Yeniden oluştur" className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-2.5 rounded-lg hover:bg-bgsoft transition-colors">
                 <RefreshCw size={12} />
               </button>
             )}
@@ -794,7 +809,7 @@ function MessageBubbleImpl({
                 <div className="w-px h-3 bg-line/50 mx-0.5" />
                 <button
                   onClick={() => rateMessage(chatId, index, message.rating === "up" ? null : "up")}
-                  className={`p-1.5 rounded-lg transition-colors ${message.rating === "up" ? "text-green bg-green/10" : "text-muted/40 hover:text-green hover:bg-bgsoft"}`}
+                  className={`p-2.5 rounded-lg transition-colors ${message.rating === "up" ? "text-green bg-green/10" : "text-muted/40 hover:text-green hover:bg-bgsoft"}`}
                   aria-label="Beğen"
                   title="Beğen"
                 >
@@ -802,7 +817,7 @@ function MessageBubbleImpl({
                 </button>
                 <button
                   onClick={() => rateMessage(chatId, index, message.rating === "down" ? null : "down")}
-                  className={`p-1.5 rounded-lg transition-colors ${message.rating === "down" ? "text-red bg-red/10" : "text-muted/40 hover:text-red hover:bg-bgsoft"}`}
+                  className={`p-2.5 rounded-lg transition-colors ${message.rating === "down" ? "text-red bg-red/10" : "text-muted/40 hover:text-red hover:bg-bgsoft"}`}
                   aria-label="Beğenme"
                   title="Beğenme"
                 >
@@ -811,7 +826,7 @@ function MessageBubbleImpl({
                 <div className="w-px h-3 bg-line/50 mx-0.5" />
                 <button
                   onClick={openSkillSave}
-                  className="flex items-center gap-1 text-[11px] text-muted/40 hover:text-brand hover:bg-bgsoft p-1.5 rounded-lg transition-colors"
+                  className="flex items-center gap-1 text-[11px] text-muted/40 hover:text-brand hover:bg-bgsoft p-2.5 rounded-lg transition-colors"
                   aria-label="Skill olarak kaydet"
                   title="Skill olarak kaydet"
                 >
