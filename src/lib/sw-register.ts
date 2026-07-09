@@ -7,13 +7,24 @@ export function registerServiceWorker() {
 
   /* Yeni sürüm dağıtıldığında OTOMATİK geç: yeni SW kontrolü devraldığında
      sayfayı BİR KEZ yenile. Yalnızca sayfa zaten bir SW tarafından kontrol
-     ediliyorsa kurulur → ilk ziyarette gereksiz reload olmaz; "refreshing"
-     bayrağı reload döngüsünü engeller. Böylece "deploy ettim ama eski sürüm
-     görünüyor" sorunu yapısal olarak biter. */
+     ediliyorsa kurulur → ilk ziyarette gereksiz reload olmaz.
+     `refreshing` bayrağı TEK bir sayfa yüklemesi içinde ikinci bir reload'u
+     engeller ama reload'un KENDİSİ sayfayı sıfırdan çalıştırdığından bu
+     bayrak da sıfırlanır — art arda birden fazla controllerchange (ör. kısa
+     sürede birkaç dağıtımın üst üste yakalanması) reload'ları ARASINDA
+     hayatta kalan bir sessionStorage damgasıyla ek olarak sınırlanır, bu
+     yüzden hiçbir koşulda "saniyede bir yenilenme" döngüsü oluşamaz. */
+  const RELOAD_GUARD_KEY = "craftai_sw_reload_at";
+  const RELOAD_COOLDOWN_MS = 10_000;
   let refreshing = false;
   if (navigator.serviceWorker.controller) {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (refreshing) return;
+      try {
+        const last = Number(sessionStorage.getItem(RELOAD_GUARD_KEY) || 0);
+        if (Date.now() - last < RELOAD_COOLDOWN_MS) return;
+        sessionStorage.setItem(RELOAD_GUARD_KEY, String(Date.now()));
+      } catch { /* sessionStorage erişilemezse eski davranışa düş */ }
       refreshing = true;
       window.location.reload();
     });
