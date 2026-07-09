@@ -196,7 +196,7 @@ export function AccountSettings() {
             ));
           })()}
         </div>
-        <p className="text-[10px] text-muted/45 mt-1.5">Tam yedek indirmek/geri yüklemek için: Ayarlar → Temel → Yedek.</p>
+        <p className="text-[10px] text-muted/45 mt-1.5">Tam yedek indirmek/geri yüklemek için: Ayarlar → Genel → Yedek.</p>
       </div>
 
       {/* Görünen ad */}
