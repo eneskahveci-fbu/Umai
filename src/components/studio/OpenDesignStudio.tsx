@@ -15,11 +15,13 @@
 
 import { useCallback, useRef, useState } from "react";
 import {
-  Download, ExternalLink, FileText, FolderOpen, Layers, Loader2, Plus, Save, Send, Settings2, Share2, Sparkles, Square, Trash2, User, LayoutTemplate, MessageSquare, GripVertical, X
+  ChevronLeft, ChevronRight, Download, ExternalLink, FileText, FolderOpen, Layers, Loader2, Plus, Save, Send, Settings2, Share2, Sparkles, Square, Trash2, User, LayoutTemplate, MessageSquare, GripVertical, X
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav } from "@/lib/surfaceNav";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
+import { generateDeck } from "@/lib/slidesGen";
+import { buildArtifactSrcDoc } from "@/lib/artifactDoc";
 import { autoStudioSkill } from "@/lib/autoPilot";
 import { type DeviceId } from "@/lib/studioConstants";
 import type { StudioProject } from "@/lib/types";
@@ -134,24 +136,43 @@ function CanvasPreview({
   device: DeviceId;
 }) {
   const page = project.pages[activePageIndex];
+  const [slideIdx, setSlideIdx] = useState(0);
+
   if (!page) return <EmptyCanvas />;
 
   if (isDeckPage(page)) {
-    // Deck modu — slayt önizleme
+    // Deck modu — slayt önizleme + slaytlar arası gezinme
     const deck = page.deck;
-    const slide = deck.slides[0];
+    const slide = deck.slides[slideIdx] ?? deck.slides[0];
     if (!slide) return <EmptyCanvas />;
     const theme = slideThemeById(deck.themeId);
     return (
-      <div className="h-full flex items-center justify-center p-4">
+      <div className="h-full flex flex-col items-center justify-center p-4 gap-3">
         <div className="w-full max-w-4xl">
           <SlideCanvas slide={slide} theme={theme} />
         </div>
+        {deck.slides.length > 1 && (
+          <div className="flex items-center gap-3 text-xs text-muted shrink-0">
+            <button
+              onClick={() => setSlideIdx((i) => Math.max(0, i - 1))}
+              disabled={slideIdx === 0}
+              className="w-7 h-7 grid place-items-center rounded-lg border border-line disabled:opacity-30 hover:bg-bgsoft transition-colors"
+              aria-label="Önceki slayt"
+            ><ChevronLeft size={14} /></button>
+            <span>{slideIdx + 1} / {deck.slides.length}</span>
+            <button
+              onClick={() => setSlideIdx((i) => Math.min(deck.slides.length - 1, i + 1))}
+              disabled={slideIdx === deck.slides.length - 1}
+              className="w-7 h-7 grid place-items-center rounded-lg border border-line disabled:opacity-30 hover:bg-bgsoft transition-colors"
+              aria-label="Sonraki slayt"
+            ><ChevronRight size={14} /></button>
+          </div>
+        )}
       </div>
     );
   }
 
-  // Canvas modu — tuval önizleme
+  // Canvas modu — AI artifact varsa sandbox iframe, yoksa katman tuvali
   const fmt = formatById(page.format);
   const design = page.design;
   const deviceCap = DEVICE_MAX_WIDTH[device];
@@ -159,35 +180,44 @@ function CanvasPreview({
   return (
     <div className="h-full flex items-center justify-center p-4">
       <div className="relative" style={{ width: "100%", maxWidth, aspectRatio: `${fmt.width}/${fmt.height}` }}>
-        <div
-          className="w-full h-full rounded-xl overflow-hidden shadow-2xl shadow-black/20"
-          style={{
-            background: design.bgType === "gradient"
-              ? `linear-gradient(135deg, ${design.c1}, ${design.c2})`
-              : design.c1,
-          }}
-        >
-          {design.layers.map((layer) => (
-            <div
-              key={layer.id}
-              className="absolute select-none"
-              style={{
-                left: `${layer.x * 100}%`,
-                top: `${layer.y * 100}%`,
-                transform: "translate(-50%, -50%)",
-                fontSize: `${layer.size}px`,
-                color: layer.color,
-                fontWeight: layer.weight,
-                textAlign: layer.align,
-                fontFamily: layer.font,
-                whiteSpace: "pre-wrap",
-                maxWidth: "80%",
-              }}
-            >
-              {layer.text}
-            </div>
-          ))}
-        </div>
+        {page.aiArtifact ? (
+          <iframe
+            title={page.name}
+            srcDoc={buildArtifactSrcDoc(page.aiArtifact.type, page.aiArtifact.content)}
+            sandbox="allow-scripts allow-modals"
+            className="w-full h-full rounded-xl shadow-2xl shadow-black/20 border-0 bg-white"
+          />
+        ) : (
+          <div
+            className="w-full h-full rounded-xl overflow-hidden shadow-2xl shadow-black/20"
+            style={{
+              background: design.bgType === "gradient"
+                ? `linear-gradient(135deg, ${design.c1}, ${design.c2})`
+                : design.c1,
+            }}
+          >
+            {design.layers.map((layer) => (
+              <div
+                key={layer.id}
+                className="absolute select-none"
+                style={{
+                  left: `${layer.x * 100}%`,
+                  top: `${layer.y * 100}%`,
+                  transform: "translate(-50%, -50%)",
+                  fontSize: `${layer.size}px`,
+                  color: layer.color,
+                  fontWeight: layer.weight,
+                  textAlign: layer.align,
+                  fontFamily: layer.font,
+                  whiteSpace: "pre-wrap",
+                  maxWidth: "80%",
+                }}
+              >
+                {layer.text}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -509,12 +539,15 @@ function PageStrip({
         <button
           key={page.id}
           onClick={() => setActivePageIndex(i)}
-          className={`shrink-0 w-16 h-14 rounded-lg border-2 transition-all text-[10px] font-medium flex flex-col items-center justify-center gap-0.5 ${
+          className={`relative shrink-0 w-16 h-14 rounded-lg border-2 transition-all text-[10px] font-medium flex flex-col items-center justify-center gap-0.5 ${
             i === activePageIndex
               ? "border-brand bg-brand/10 text-brand shadow-sm"
               : "border-line/60 bg-bgsoft text-muted hover:border-brand/30"
           }`}
         >
+          {isCanvasPage(page) && page.aiArtifact && (
+            <Sparkles size={10} className="absolute top-1 right-1 text-brand" aria-hidden />
+          )}
           {isCanvasPage(page) ? (
             <>
               <span className="text-sm">{formatById(page.format).icon}</span>
@@ -594,6 +627,33 @@ export function OpenDesignStudio() {
     abortRef.current = ac;
 
     try {
+      // Deste (deck) sayfası aktifse ayrı, yapılandırılmış bir üretim yoluna gir
+      // (canvas'ın serbest-HTML artifact üretiminden farklı — SlidesStudio'nun
+      // kullandığı AYNI generateDeck() ile brief'ten SlideDeck üretilir).
+      if (activePage && isDeckPage(activePage)) {
+        setPhase("generating");
+        const deck = await generateDeck({
+          brief,
+          slideCount: 6,
+          onDelta: (txt) => setMessages((m) => {
+            const c = [...m];
+            c[c.length - 1] = { role: "assistant", text: txt || "Sunum üretiliyor…" };
+            return c;
+          }),
+          signal: ac.signal,
+        });
+        setPhase("done");
+        const newPages = [...project.pages];
+        newPages[activePageIndex] = { ...activePage, deck, name: brief.slice(0, 40), updatedAt: Date.now() };
+        setProject({ ...project, pages: newPages, updatedAt: Date.now() });
+        setMessages((m) => {
+          const c = [...m];
+          c[c.length - 1] = { role: "assistant", text: "Sunumu oluşturdum." };
+          return c;
+        });
+        return;
+      }
+
       // Fusion modunda 3 taslak üretilir + hakem seçer; sonuç sentez talimatı olarak eklenir
       let boostInstruction: string | undefined;
       if (fusionEnabled) {
@@ -659,6 +719,7 @@ export function OpenDesignStudio() {
         const newPages = [...project.pages];
         newPages[activePageIndex] = {
           ...activePage,
+          aiArtifact: { type: result.artifact.type, content: result.artifact.content },
           name: brief.slice(0, 40),
           updatedAt: Date.now(),
         };
@@ -854,6 +915,7 @@ export function OpenDesignStudio() {
             {/* Tuval alanı */}
             <div className="flex-1 min-h-0">
               <CanvasPreview
+                key={project.pages[activePageIndex]?.id}
                 project={project}
                 activePageIndex={activePageIndex}
                 device={device}
