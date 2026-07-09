@@ -7,8 +7,9 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import type { Align, ImgLayer, Layer } from "./design";
-import type { Slide, SlideDeck } from "./types";
+import type { Artifact, Slide, SlideDeck } from "./types";
 import { deckToHtml, escapeHtml } from "./slides";
+import { buildArtifactSrcDoc } from "./artifactDoc";
 
 /* ── Platform formatları ──────────────────────────────────────────── */
 
@@ -62,6 +63,11 @@ export interface ProjectCanvasPage {
     layers: Layer[];
     images?: ImgLayer[];
   };
+  /** AI'ın ürettiği tam artifact (html/svg/mermaid) — doluysa CanvasPreview/
+      pageToHtml `layers`'ı DEĞİL bunu render eder. Şu an hiçbir manuel
+      katman-düzenleme UI'ı olmadığından temizlenmesi gerekmiyor; ileride
+      layer-mutasyon eklenirse bu alanın da temizlenmesi gerekecek. */
+  aiArtifact?: { type: Artifact["type"]; content: string };
   name: string;
   createdAt: number;
   updatedAt: number;
@@ -284,6 +290,7 @@ export function convertCanvasToDeck(pages: ProjectCanvasPage[], title?: string):
 /* ── Bağımsız HTML dışa aktarma (indir/yazdır/yayınla) ────────────────── */
 
 function canvasPageToHtml(page: ProjectCanvasPage, title: string): string {
+  if (page.aiArtifact) return buildArtifactSrcDoc(page.aiArtifact.type, page.aiArtifact.content);
   const fmt = formatById(page.format);
   const bg = page.design.bgType === "gradient"
     ? `linear-gradient(135deg, ${page.design.c1}, ${page.design.c2})`
