@@ -222,7 +222,7 @@ export function Sidebar() {
           {c.tags[0]}
         </span>
       )}
-      <div className="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0">
+      <div className="flex items-center gap-0.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 transition-opacity shrink-0">
         <ActionIcon title={c.pinned ? "Sabitlemeyi kaldır" : "Sabitle"} onClick={(e) => { e.stopPropagation(); pinChat(c.id, !c.pinned); }}>
           <Pin size={10} className={c.pinned ? "text-brand" : ""} />
         </ActionIcon>
@@ -241,7 +241,7 @@ export function Sidebar() {
         <ActionIcon title="Kopyala (Markdown)" onClick={(e) => { e.stopPropagation(); void copyChatMarkdown(c.id); }}>
           <Copy size={10} />
         </ActionIcon>
-        <ActionIcon title="Sil" danger onClick={(e) => { e.stopPropagation(); deleteChat(c.id); }}>
+        <ActionIcon title="Sil" danger onClick={(e) => { e.stopPropagation(); if (confirm(`"${c.title || "Bu sohbet"}" silinsin mi? Bu işlem geri alınamaz.`)) deleteChat(c.id); }}>
           <Trash2 size={10} />
         </ActionIcon>
       </div>
