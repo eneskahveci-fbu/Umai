@@ -114,6 +114,10 @@ export interface Chat {
   totalOutTokens?: number;
   tags?: string[];
   pinned?: boolean;
+  /** "İlgili" (bkz. relatedItems.ts) — istemci taraflı önbelleklenmiş gömme
+      vektörü + hesaplandığı andaki mesaj sayısı (bayatlığı algılamak için). */
+  embedding?: number[];
+  embeddingVersion?: number;
 }
 
 export type Provider =
@@ -315,6 +319,10 @@ export interface CraftDoc {
   brief?: string;
   createdAt: number;
   updatedAt: number;
+  /** "İlgili" (bkz. relatedItems.ts) — istemci taraflı önbelleklenmiş gömme
+      vektörü + hesaplandığı andaki blok sayısı (bayatlığı algılamak için). */
+  embedding?: number[];
+  embeddingVersion?: number;
 }
 
 /** Anket Stüdyosu — Google Forms'tan ilhamla (craft yorumu). */
