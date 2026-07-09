@@ -428,7 +428,7 @@ interface StoreState {
   updateChatEmbeddings: (updates: { id: string; embedding: number[]; embeddingVersion: number }[]) => void;
   current: () => Chat | null;
   pushMessage: (m: ChatMessage) => void;
-  updateLastContent: (content: string) => void;
+  updateLastContent: (content: string, opts?: { isError?: boolean }) => void;
   updateLastThinking: (thinking: string) => void;
   setFusionModelsOnLast: (models: string[]) => void;
   setPlanOnLast: (plan: string) => void;
@@ -1180,13 +1180,17 @@ export const useStore = create<StoreState>()((set, get) => ({
       ),
     })),
 
-  updateLastContent: (content) =>
+  updateLastContent: (content, opts) =>
     set((s) => ({
       chats: s.chats.map((c) => {
         if (c.id !== s.currentId) return c;
         const messages = c.messages.slice();
         if (messages.length) {
-          messages[messages.length - 1] = { ...messages[messages.length - 1], content };
+          messages[messages.length - 1] = {
+            ...messages[messages.length - 1],
+            content,
+            ...(opts?.isError ? { isError: true } : {}),
+          };
         }
         return { ...c, messages };
       }),
