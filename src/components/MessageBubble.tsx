@@ -777,17 +777,15 @@ function MessageBubbleImpl({
         {/* Action row */}
         {message.content && (
           <div className="flex items-center gap-0.5 mt-2 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 transition-opacity duration-150">
-            <button onClick={copyMessage} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink px-2 py-1.5 rounded-lg hover:bg-bgsoft transition-colors">
+            <button onClick={copyMessage} aria-label={copied ? "Kopyalandı" : "Kopyala"} title={copied ? "Kopyalandı" : "Kopyala"} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-1.5 rounded-lg hover:bg-bgsoft transition-colors">
               {copied ? <Check size={12} /> : <Copy size={12} />}
-              <span>{copied ? "Kopyalandı" : "Kopyala"}</span>
             </button>
-            <button onClick={toggleSpeak} className={`flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg hover:bg-bgsoft transition-colors ${speakingTts ? "text-brand" : "text-muted/50 hover:text-ink"}`} title="Yanıtı seslendir (Pollinations)">
+            <button onClick={toggleSpeak} aria-label={speakingTts ? "Durdur" : "Seslendir"} title={speakingTts ? "Durdur" : "Yanıtı seslendir (Pollinations)"} className={`flex items-center gap-1 text-[11px] p-1.5 rounded-lg hover:bg-bgsoft transition-colors ${speakingTts ? "text-brand" : "text-muted/50 hover:text-ink"}`}>
               {speakingTts ? <VolumeX size={12} /> : <Volume2 size={12} />}
-              <span>{speakingTts ? "Durdur" : "Seslendir"}</span>
             </button>
             {showRegenerate && onRegenerate && (
-              <button onClick={onRegenerate} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink px-2 py-1.5 rounded-lg hover:bg-bgsoft transition-colors">
-                <RefreshCw size={12} /><span>Yeniden</span>
+              <button onClick={onRegenerate} aria-label="Yeniden oluştur" title="Yeniden oluştur" className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-1.5 rounded-lg hover:bg-bgsoft transition-colors">
+                <RefreshCw size={12} />
               </button>
             )}
 
@@ -797,6 +795,7 @@ function MessageBubbleImpl({
                 <button
                   onClick={() => rateMessage(chatId, index, message.rating === "up" ? null : "up")}
                   className={`p-1.5 rounded-lg transition-colors ${message.rating === "up" ? "text-green bg-green/10" : "text-muted/40 hover:text-green hover:bg-bgsoft"}`}
+                  aria-label="Beğen"
                   title="Beğen"
                 >
                   <ThumbsUp size={12} />
@@ -804,6 +803,7 @@ function MessageBubbleImpl({
                 <button
                   onClick={() => rateMessage(chatId, index, message.rating === "down" ? null : "down")}
                   className={`p-1.5 rounded-lg transition-colors ${message.rating === "down" ? "text-red bg-red/10" : "text-muted/40 hover:text-red hover:bg-bgsoft"}`}
+                  aria-label="Beğenme"
                   title="Beğenme"
                 >
                   <ThumbsDown size={12} />
@@ -811,7 +811,8 @@ function MessageBubbleImpl({
                 <div className="w-px h-3 bg-line/50 mx-0.5" />
                 <button
                   onClick={openSkillSave}
-                  className="flex items-center gap-1 text-[11px] text-muted/40 hover:text-brand hover:bg-bgsoft px-2 py-1.5 rounded-lg transition-colors"
+                  className="flex items-center gap-1 text-[11px] text-muted/40 hover:text-brand hover:bg-bgsoft p-1.5 rounded-lg transition-colors"
+                  aria-label="Skill olarak kaydet"
                   title="Skill olarak kaydet"
                 >
                   <BookMarked size={12} />
