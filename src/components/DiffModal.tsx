@@ -126,7 +126,7 @@ export function DiffModal() {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-line/60 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <h2 id="diff-modal-title" className="font-bold text-sm">Diff Görünümü</h2>
+            <h2 id="diff-modal-title" className="font-bold text-sm">Diff (salt-okunur)</h2>
             {diff.path && (
               <code className="text-xs font-mono px-2 py-0.5 rounded-md bg-bgsoft border border-line/60 text-muted truncate">
                 {diff.path}
@@ -213,7 +213,7 @@ export function DiffModal() {
         </div>
 
         <div className="px-5 py-2.5 border-t border-line/60 text-[11px] text-muted/50 text-center shrink-0">
-          Yeni kodu kopyalayıp orijinal dosyana yapıştırarak uygula
+          Bu yalnızca bir karşılaştırma — değişiklik otomatik uygulanmaz. Yeni kodu kopyalayıp orijinal dosyana yapıştırarak uygula.
         </div>
       </div>
     </div>

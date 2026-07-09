@@ -275,6 +275,82 @@ function ModeChip({ icon, label, active, onClick }: { icon: React.ReactNode; lab
   );
 }
 
+interface StatusBadgeInfo {
+  key: string;
+  icon: React.ReactNode;
+  label: string;
+  title: string;
+  className: string;
+}
+
+/* Alt durum çubuğu — aynı anda 9'a kadar rozet render olabildiğinden (dar
+   ekranda satır kırıyordu), tek özet + sayaç pil'ine toplanır; tam liste
+   tık'ta açılır. "Hassas veri?" bir uyarı olduğundan (rutin bir mod/durum
+   değil) özetin DIŞINDA, her zaman görünür kalır. */
+function StatusBar({
+  safeMode, web, autoPilot, pilotReasons, autoSwarm, swarmMode, researchMode,
+  toolsEnabled, learningMode, activeAgentLabel, sensitiveHits,
+}: {
+  safeMode?: boolean;
+  web?: boolean;
+  autoPilot?: boolean;
+  pilotReasons?: string[];
+  autoSwarm?: boolean;
+  swarmMode: boolean;
+  researchMode: boolean;
+  toolsEnabled: boolean;
+  learningMode?: boolean;
+  activeAgentLabel?: string;
+  sensitiveHits: string[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  const badges: StatusBadgeInfo[] = [];
+  if (safeMode) badges.push({ key: "safe", icon: <ShieldCheck size={12} />, label: "Güvenli", title: "Salt-okunur: ajan hiçbir değişiklik yapamaz", className: "text-yellow" });
+  if (web) badges.push({ key: "web", icon: <Globe size={12} />, label: "Web", title: "Web araması: en güncel veri internetten çekilir", className: "text-brand" });
+  if (autoPilot !== false) {
+    badges.push({
+      key: "oto", icon: <Sparkles size={12} className="animate-breathe" />, label: "Oto",
+      title: pilotReasons?.length ? `Bu mesajda: ${pilotReasons.join(" · ")}` : "Otomatik Pilot: eforu, web aramayı, araştırmayı, kaliteyi ve ajan ekibini craft seçer",
+      className: "text-brand/80",
+    });
+  } else if (autoSwarm !== false && !swarmMode) {
+    badges.push({ key: "oto-ajan", icon: <Sparkles size={12} />, label: "Oto-ajan", title: "Otomatik ajan açık: ihtiyaca göre tek ajan veya ajan ekibi kendiliğinden çalışır", className: "text-muted/70" });
+  }
+  if (swarmMode) badges.push({ key: "ekip", icon: <Users size={12} />, label: "Ekip", title: "Ajan Ekibi: planlayıcı → paralel uzman işçiler → birleştirici", className: "text-brand" });
+  if (researchMode) badges.push({ key: "arastirma", icon: <Search size={12} />, label: "Araştırma", title: "Derin Araştırma: çok-kaynaklı web araması → atıflı rapor", className: "text-brand" });
+  if (toolsEnabled) badges.push({ key: "tools", icon: null, label: "Tools", title: "Tool-use açık", className: "text-green/80" });
+  if (learningMode) badges.push({ key: "ogrenme", icon: <GraduationCap size={12} />, label: "Öğrenme", title: "Öğrenme Modu: adım adım eğitsel açıklama", className: "text-brand" });
+  if (activeAgentLabel) badges.push({ key: "agent", icon: null, label: activeAgentLabel, title: "Aktif slash komutu", className: "text-brand" });
+
+  return (
+    <div className="flex items-center gap-1.5 text-[11px] text-muted/50 shrink-0">
+      {badges.length > 0 && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          title={expanded ? "Daralt" : "Tüm aktif modları göster"}
+          className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+        >
+          <span className={`flex items-center gap-1 font-medium ${badges[0].className}`} title={badges[0].title}>
+            {badges[0].icon} {badges[0].label}
+          </span>
+          {badges.length > 1 && (
+            <span className="text-muted/40 font-mono">{expanded ? "−" : `+${badges.length - 1}`}</span>
+          )}
+        </button>
+      )}
+      {expanded && badges.slice(1).map((b) => (
+        <span key={b.key} className={`flex items-center gap-1 font-medium ${b.className}`} title={b.title}>{b.icon} {b.label}</span>
+      ))}
+      {sensitiveHits.length > 0 && (
+        <span className="flex items-center gap-1 text-yellow font-medium" title={`Mesajında hassas veri olabilir (${sensitiveHits.join(", ")}). API anahtarlarını/kart bilgilerini sohbete yazma.`}>
+          <ShieldCheck size={12} /> Hassas veri?
+        </span>
+      )}
+    </div>
+  );
+}
+
 const THINKING_LEVELS = [
   { key: "auto",   label: "Oto",    short: "Oto" },
   { key: "low",    label: "Düşük",  short: "Düşük" },
@@ -3229,40 +3305,19 @@ export function CoderView() {
 
               {/* Alt durum çubuğu */}
               <div className="flex flex-wrap items-center justify-end gap-y-1 mt-2 px-0.5">
-
-                <div className="flex items-center gap-1.5 text-[11px] text-muted/50 shrink-0">
-                  {config.safeMode && (
-                    <span className="flex items-center gap-1 text-yellow font-medium" title="Salt-okunur: ajan hiçbir değişiklik yapamaz">
-                      <ShieldCheck size={12} /> Güvenli
-                    </span>
-                  )}
-                  {lastPilot?.web && <span className="flex items-center gap-1 text-brand font-medium" title="Web araması: en güncel veri internetten çekilir"><Globe size={12} /> Web</span>}
-                  {/* ✦ Oto — Otomatik Pilot tek göstergesi: efor/web/araştırma/
-                     kalite/ekip kararlarını craft mesajına göre kendisi verir. */}
-                  {config.autoPilot !== false && (
-                    <span
-                      className="flex items-center gap-1 text-brand/80 font-medium"
-                      title={lastPilot ? `Bu mesajda: ${lastPilot.reasons.join(" · ")}` : "Otomatik Pilot: eforu, web aramayı, araştırmayı, kaliteyi ve ajan ekibini craft seçer"}
-                    >
-                      <Sparkles size={12} className="animate-breathe" /> Oto
-                    </span>
-                  )}
-                  {config.autoPilot === false && config.autoSwarm !== false && !swarmMode && (
-                    <span className="flex items-center gap-1 text-muted/70 font-medium" title="Otomatik ajan açık: ihtiyaca göre tek ajan veya ajan ekibi kendiliğinden çalışır">
-                      <Sparkles size={12} className="text-brand/70" /> Oto-ajan
-                    </span>
-                  )}
-                  {swarmMode && <span className="flex items-center gap-1 text-brand font-medium" title="Ajan Ekibi: planlayıcı → paralel uzman işçiler → birleştirici"><Users size={12} /> Ekip</span>}
-                  {researchMode && <span className="flex items-center gap-1 text-brand font-medium" title="Derin Araştırma: çok-kaynaklı web araması → atıflı rapor"><Search size={12} /> Araştırma</span>}
-                  {toolsEnabled && <span className="text-green/80 font-medium">Tools</span>}
-                  {config.learningMode && <span className="flex items-center gap-1 text-brand font-medium" title="Öğrenme Modu: adım adım eğitsel açıklama"><GraduationCap size={12} /> Öğrenme</span>}
-                  {activeAgent && <span className="text-brand font-medium">{activeAgent.command}</span>}
-                  {sensitiveHits.length > 0 && (
-                    <span className="flex items-center gap-1 text-yellow font-medium" title={`Mesajında hassas veri olabilir (${sensitiveHits.join(", ")}). API anahtarlarını/kart bilgilerini sohbete yazma.`}>
-                      <ShieldCheck size={12} /> Hassas veri?
-                    </span>
-                  )}
-                </div>
+                <StatusBar
+                  safeMode={config.safeMode}
+                  web={lastPilot?.web}
+                  autoPilot={config.autoPilot}
+                  pilotReasons={lastPilot?.reasons}
+                  autoSwarm={config.autoSwarm}
+                  swarmMode={swarmMode}
+                  researchMode={researchMode}
+                  toolsEnabled={toolsEnabled}
+                  learningMode={config.learningMode}
+                  activeAgentLabel={activeAgent?.command}
+                  sensitiveHits={sensitiveHits}
+                />
               </div>
             </div>
           </div>
