@@ -368,6 +368,10 @@ interface StoreState {
   // skills
   skillsOpen: boolean;
   setSkillsOpen: (b: boolean) => void;
+
+  // editör (IDE) paneli — CommandPalette'in de erişebilmesi için global
+  editorOpen: boolean;
+  setEditorOpen: (b: boolean) => void;
   addSkill: (s: Omit<Skill, "id" | "createdAt" | "usageCount">) => void;
   updateSkill: (id: string, patch: Partial<Skill>) => void;
   /** Otomatik bellek: damıtılmış kalıcı bilgileri "auto_memory" skill'ine
@@ -885,6 +889,9 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
   skillsOpen: false,
   setSkillsOpen: (b) => set({ skillsOpen: b }),
+
+  editorOpen: false,
+  setEditorOpen: (b) => set({ editorOpen: b }),
 
   addSkill: (s) => {
     const config = get().config;

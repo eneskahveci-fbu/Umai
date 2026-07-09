@@ -17,8 +17,10 @@ import {
   Image as ImageIcon,
   ListChecks,
   Zap,
+  Code2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { useModalA11y } from "@/lib/useModalA11y";
 import type { TreeNode } from "@/lib/types";
 
 interface PaletteAction {
@@ -56,6 +58,7 @@ export function CommandPalette() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   const actions: PaletteAction[] = [
     {
@@ -176,6 +179,16 @@ export function CommandPalette() {
       keywords: ["skills", "skill", "egitim", "eğitim", "kural", "agent"],
     },
     {
+      id: "open-editor",
+      label: "Editör (IDE)",
+      icon: <Code2 size={16} />,
+      action: () => {
+        useStore.getState().setEditorOpen(true);
+        setOpen(false);
+      },
+      keywords: ["editor", "editör", "ide", "kod", "dosya"],
+    },
+    {
       id: "activity-log",
       label: "Etkinlik günlüğü",
       icon: <Activity size={16} />,
@@ -247,13 +260,10 @@ export function CommandPalette() {
     }
   }
 
-  /* Focus the input after the palette opens (genuine post-render side effect). */
-  useEffect(() => {
-    if (open) {
-      const t = setTimeout(() => inputRef.current?.focus(), 50);
-      return () => clearTimeout(t);
-    }
-  }, [open]);
+  /* Focus-trap + Escape-ile-kapama + odak-dönüşü — SettingsModal/SkillsPanel
+     ile aynı a11y deseni. İlk odaklanan eleman zaten arama input'u olduğundan
+     ayrı bir manuel focus efekti gerekmiyor. */
+  useModalA11y(modalRef, open, () => setOpen(false));
 
   // Global Ctrl+K listener
   useEffect(() => {
@@ -281,9 +291,8 @@ export function CommandPalette() {
       if (filtered[selectedIndex]) {
         filtered[selectedIndex].run();
       }
-    } else if (e.key === "Escape") {
-      setOpen(false);
     }
+    /* Escape artık useModalA11y tarafından (document seviyesinde) ele alınıyor. */
   };
 
   // Scroll selected into view
@@ -302,6 +311,10 @@ export function CommandPalette() {
       onClick={() => setOpen(false)}
     >
       <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Komut paleti"
         className="w-full max-w-lg mx-4 bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
