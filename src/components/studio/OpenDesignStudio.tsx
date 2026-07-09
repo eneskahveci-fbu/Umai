@@ -15,7 +15,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import {
-  ChevronLeft, ChevronRight, Download, ExternalLink, FileText, FolderOpen, Layers, Loader2, Plus, Save, Send, Settings2, Share2, Sparkles, Square, Trash2, User, LayoutTemplate, MessageSquare, GripVertical, X
+  ChevronLeft, ChevronRight, Download, ExternalLink, FileText, FolderOpen, Layers, Loader2, Plus, RefreshCw, Save, Send, Settings2, Share2, Sparkles, Square, Trash2, User, LayoutTemplate, MessageSquare, GripVertical, Volume2, VolumeX, X
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav } from "@/lib/surfaceNav";
@@ -30,8 +30,9 @@ import {
 } from "@/lib/openDesign";
 import type { Slide } from "@/lib/types";
 import {
-  slideImageSrc, slideThemeById, type SlideTheme
+  slideImageSrc, slideThemeById, SLIDE_THEMES, slideNarration, type SlideTheme
 } from "@/lib/slides";
+import { rewriteSlide } from "@/lib/slidesGen";
 import { ExportMenu } from "./ExportMenu";
 import { StudioTopBar } from "./StudioTopBar";
 import { SavedItemsModal } from "./SavedItemsModal";
@@ -39,7 +40,7 @@ import { downloadHtml, openInTab, printPdf, publishArtifact } from "@/lib/studio
 import { pickDraftModels, fillSelfConsistency, generateDrafts, judgeDrafts, buildBoostInstruction, type DraftJudge } from "@/lib/boost";
 import { buildFallbackChain } from "@/lib/fallback";
 import { resolveModelApiKey } from "@/lib/secureKeys";
-import { fetchTextModels } from "@/lib/pollinations";
+import { fetchTextModels, playTts, stopTts } from "@/lib/pollinations";
 
 /* ── Yardımcılar ──────────────────────────────────────────────────── */
 
@@ -129,14 +130,15 @@ function ChatPanel({
 /* ── Orta Panel: Tuval / Önizleme ─────────────────────────────────── */
 
 function CanvasPreview({
-  project, activePageIndex, device,
+  project, activePageIndex, device, slideIdx, setSlideIdx,
 }: {
   project: OpenDesignProject;
   activePageIndex: number;
   device: DeviceId;
+  slideIdx: number;
+  setSlideIdx: (updater: (i: number) => number) => void;
 }) {
   const page = project.pages[activePageIndex];
-  const [slideIdx, setSlideIdx] = useState(0);
 
   if (!page) return <EmptyCanvas />;
 
@@ -305,11 +307,12 @@ function SlideCanvas({ slide, theme }: { slide: Slide; theme: SlideTheme }) {
 /* ── Sağ Panel: Katmanlar + Format + Tweaks ───────────────────────── */
 
 function RightPanel({
-  project, activePageIndex, setProject,
+  project, activePageIndex, setProject, activeSlideIdx,
 }: {
   project: OpenDesignProject;
   activePageIndex: number;
   setProject: (p: OpenDesignProject) => void;
+  activeSlideIdx: number;
 }) {
   const [tab, setTab] = useState<"layers" | "format" | "tweaks">("layers");
   const page = project.pages[activePageIndex];
@@ -351,7 +354,7 @@ function RightPanel({
           <FormatPanel project={project} setProject={setProject} activePageIndex={activePageIndex} />
         )}
         {tab === "tweaks" && (
-          <TweaksPanel project={project} setProject={setProject} activePageIndex={activePageIndex} />
+          <TweaksPanel project={project} setProject={setProject} activePageIndex={activePageIndex} activeSlideIdx={activeSlideIdx} />
         )}
       </div>
     </div>
@@ -510,13 +513,17 @@ const TWEAK_FONTS = [
 ];
 
 function TweaksPanel({
-  project, setProject, activePageIndex,
+  project, setProject, activePageIndex, activeSlideIdx,
 }: {
   project: OpenDesignProject;
   setProject: (p: OpenDesignProject) => void;
   activePageIndex: number;
+  activeSlideIdx: number;
 }) {
   const page = project.pages[activePageIndex];
+  if (page && isDeckPage(page)) {
+    return <DeckTweaksPanel project={project} setProject={setProject} activePageIndex={activePageIndex} activeSlideIdx={activeSlideIdx} />;
+  }
   if (!page || !isCanvasPage(page)) {
     return <p className="text-xs text-muted/60 text-center py-4">İnce ayarlar sadece tuval modunda görünür.</p>;
   }
@@ -590,6 +597,110 @@ function TweaksPanel({
   );
 }
 
+/* Deste (deck) sayfaları için ayarlar — tema seçici, AKTİF slaytı yeniden
+   yazma (rewriteSlide) ve seslendirme (slideNarration + Pollinations TTS).
+   activeSlideIdx üst bileşenden gelir — CanvasPreview'ın gezinme okları ve
+   buradaki eylemler AYNI slaydı hedefler. */
+function DeckTweaksPanel({
+  project, setProject, activePageIndex, activeSlideIdx,
+}: {
+  project: OpenDesignProject;
+  setProject: (p: OpenDesignProject) => void;
+  activePageIndex: number;
+  activeSlideIdx: number;
+}) {
+  const config = useStore((s) => s.config);
+  const page = project.pages[activePageIndex];
+  const deckPage = page && isDeckPage(page) ? page : null;
+  const [instruction, setInstruction] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+
+  const setTheme = useCallback((themeId: string) => {
+    if (!deckPage) return;
+    const newPages = [...project.pages];
+    newPages[activePageIndex] = { ...deckPage, deck: { ...deckPage.deck, themeId } };
+    setProject({ ...project, pages: newPages, updatedAt: Date.now() });
+  }, [project, activePageIndex, deckPage, setProject]);
+
+  if (!deckPage) return null;
+  const deck = deckPage.deck;
+  const slide = deck.slides[activeSlideIdx];
+
+  const doRewrite = async () => {
+    if (!slide || busy) return;
+    setBusy(true);
+    try {
+      const rewritten = await rewriteSlide({ deck, index: activeSlideIdx, instruction });
+      const newSlides = [...deck.slides];
+      newSlides[activeSlideIdx] = { ...rewritten, id: slide.id };
+      const newPages = [...project.pages];
+      newPages[activePageIndex] = { ...deckPage, deck: { ...deck, slides: newSlides, updatedAt: Date.now() } };
+      setProject({ ...project, pages: newPages, updatedAt: Date.now() });
+      setInstruction("");
+    } catch { /* sessizce geç — kullanıcı tekrar deneyebilir */ }
+    finally { setBusy(false); }
+  };
+
+  const toggleNarrate = () => {
+    if (speaking) { stopTts(); setSpeaking(false); return; }
+    if (!slide) return;
+    setSpeaking(true);
+    playTts(slideNarration(slide), config.ttsVoice || "nova", () => setSpeaking(false));
+  };
+
+  if (!slide) {
+    return <p className="text-xs text-muted/60 text-center py-4">Bu destede henüz slayt yok.</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[10px] text-muted/50 mb-2">Sunum ayarları (slayt {activeSlideIdx + 1}/{deck.slides.length})</p>
+      <div>
+        <span className="text-xs text-muted block mb-1.5">Tema</span>
+        <div className="grid grid-cols-2 gap-1.5">
+          {SLIDE_THEMES.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTheme(t.id)}
+              className={`px-2 py-1.5 rounded-lg text-[11px] text-left border transition-colors ${
+                deck.themeId === t.id
+                  ? "bg-brand/15 text-brand border-brand/30"
+                  : "bg-bgsoft border-line/60 text-muted hover:text-ink"
+              }`}
+            >{t.name}</button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <span className="text-xs text-muted block mb-1.5">Bu slaytı yeniden yaz</span>
+        <textarea
+          value={instruction}
+          onChange={(e) => setInstruction(e.target.value)}
+          rows={2}
+          placeholder="ör. daha kısa yap, örnek ekle…"
+          className="w-full bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs resize-none outline-none focus:border-brand/50"
+        />
+        <button
+          onClick={() => void doRewrite()}
+          disabled={busy}
+          className="mt-1.5 w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg bg-brand/10 text-brand hover:bg-brand/20 disabled:opacity-40 text-xs font-semibold transition-colors"
+        >
+          {busy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Yeniden yaz
+        </button>
+      </div>
+      <button
+        onClick={toggleNarrate}
+        className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+          speaking ? "border-brand/50 text-brand bg-brand/10" : "border-line text-muted hover:text-ink hover:border-brand/40"
+        }`}
+      >
+        {speaking ? <VolumeX size={12} /> : <Volume2 size={12} />} {speaking ? "Durdur" : "Bu slaytı seslendir"}
+      </button>
+    </div>
+  );
+}
+
 /* ── Alt Panel: Sayfa Gezgini ─────────────────────────────────────── */
 
 function PageStrip({
@@ -650,7 +761,12 @@ export function OpenDesignStudio() {
   const [project, setProject] = useState<OpenDesignProject>(() =>
     newProject("Yeni Tasarım", "canvas", "slide")
   );
-  const [activePageIndex, setActivePageIndex] = useState(0);
+  const [activePageIndex, setActivePageIndexRaw] = useState(0);
+  /* Deck sayfası içinde AKTİF olarak görüntülenen slayt — CanvasPreview'ın
+     gezinme okları VE RightPanel'in deck kontrolleri (tema/yeniden yaz/TTS)
+     AYNI indeksi paylaşır. Sayfa değişince sıfırlanır. */
+  const [activeSlideIdx, setActiveSlideIdx] = useState(0);
+  const setActivePageIndex = (i: number) => { setActivePageIndexRaw(i); setActiveSlideIdx(0); };
   const [messages, setMessages] = useState<OpenDesignMsg[]>([]);
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState<StudioPhase | null>(null);
@@ -985,6 +1101,8 @@ export function OpenDesignStudio() {
                 project={project}
                 activePageIndex={activePageIndex}
                 device={device}
+                slideIdx={activeSlideIdx}
+                setSlideIdx={setActiveSlideIdx}
               />
             </div>
           </main>
@@ -999,6 +1117,7 @@ export function OpenDesignStudio() {
                 project={project}
                 activePageIndex={activePageIndex}
                 setProject={setProject}
+                activeSlideIdx={activeSlideIdx}
               />
             </div>
           )}
