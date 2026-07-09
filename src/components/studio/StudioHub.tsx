@@ -64,10 +64,10 @@ export function StudioHub() {
         ><X size={16} /></button>
       </div>
 
-      {everImage && <ImageStudio embedded />}
-      {everDocs && <DocsStudio embedded />}
-      {everForms && <FormsStudio embedded />}
-      {everNotebook && <NotebookStudio embedded />}
+      {everImage && <ImageStudio />}
+      {everDocs && <DocsStudio />}
+      {everForms && <FormsStudio />}
+      {everNotebook && <NotebookStudio />}
     </div>
   );
 }
