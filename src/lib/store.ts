@@ -425,6 +425,9 @@ interface StoreState {
   renameChat: (id: string, title: string) => void;
   tagChat: (id: string, tags: string[]) => void;
   pinChat: (id: string, pinned: boolean) => void;
+  /** "İlgili" (bkz. relatedItems.ts) — yeni hesaplanan gömme vektörlerini
+      önbelleğe yazar. Yalnız yerel (cihaz-içi) önbellektir; sunucuya gitmez. */
+  updateChatEmbeddings: (updates: { id: string; embedding: number[]; embeddingVersion: number }[]) => void;
   current: () => Chat | null;
   pushMessage: (m: ChatMessage) => void;
   updateLastContent: (content: string) => void;
@@ -1153,6 +1156,18 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   pinChat: (id, pinned) => {
     set((s) => ({ chats: s.chats.map((c) => (c.id === id ? { ...c, pinned } : c)) }));
+    saveLocalChats(get().chats);
+  },
+
+  updateChatEmbeddings: (updates) => {
+    if (!updates.length) return;
+    const byId = new Map(updates.map((u) => [u.id, u]));
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        const u = byId.get(c.id);
+        return u ? { ...c, embedding: u.embedding, embeddingVersion: u.embeddingVersion } : c;
+      }),
+    }));
     saveLocalChats(get().chats);
   },
 
