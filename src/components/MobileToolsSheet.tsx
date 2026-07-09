@@ -1,18 +1,19 @@
 "use client";
 
 /* Mobil "Araçlar" alt-sekmesinin açtığı kısa liste — masaüstündeki
-   `SidebarTools.tsx` açılır listesinin mobil eşleniği (aynı 3 araç +
-   Görüntü). Kendi durumunu `MobileTabBar` tutar, bu yalnız görünümdür. */
+   `SidebarTools.tsx` açılır listesinin mobil eşleniği (aynı 3 araç).
+   Görüntü burada YOK: Stüdyo sekmesi → StudioSwitcher'dan zaten erişilebilir,
+   ikinci bir yol açmak yalnız kafa karıştırır. Kendi durumunu `MobileTabBar`
+   tutar, bu yalnız görünümdür. */
 import { useRef } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, FileText, ImageIcon, ListChecks, X } from "lucide-react";
+import { BookOpen, FileText, ListChecks, X } from "lucide-react";
 import { useModalA11y } from "@/lib/useModalA11y";
 
 const TOOLS: { href: string; label: string; desc: string; icon: typeof FileText }[] = [
   { href: "/studio/dokuman", label: "Doküman", desc: "blok tabanlı yazım", icon: FileText },
   { href: "/studio/anket", label: "Anket", desc: "AI anket + HTML form", icon: ListChecks },
   { href: "/studio/defter", label: "Defter", desc: "kaynaklı sohbet + sesli özet", icon: BookOpen },
-  { href: "/studio/gorsel", label: "Görüntü", desc: "AI görsel üretimi", icon: ImageIcon },
 ];
 
 export function MobileToolsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {

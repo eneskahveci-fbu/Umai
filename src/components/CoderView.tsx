@@ -2496,7 +2496,7 @@ export function CoderView() {
                hesaplarda Tools/Güvenli/Kalite/Ekip/Araştırma otomatik yönetilir
                (Tools: repo bağlanınca kendiliğinden açılır; kalan dördü
                Otomatik Pilot'ın mesaj-bazlı kararına bağlıdır); Öğrenme Modu
-               Ayarlar → Temel'den standing tercih olarak açılabilir. */}
+               Ayarlar → Genel'den standing tercih olarak açılabilir. */}
             {moreTab === "modes" && isAdmin && (
               <div className="px-1.5 pb-1 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
                 {config.autoPilot !== false && (

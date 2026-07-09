@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { SidebarTools } from "./SidebarTools";
 import {
   Check,
@@ -26,6 +26,7 @@ import {
   Sun,
   Tag,
   Trash2,
+  Wrench,
   X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -80,8 +81,8 @@ export function Sidebar() {
   const tagChat = useStore((s) => s.tagChat);
   const pinChat = useStore((s) => s.pinChat);
   const updateChatEmbeddings = useStore((s) => s.updateChatEmbeddings);
-  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const router = useRouter();
+  const pathname = usePathname() ?? "";
   const sidebarOpen = useStore((s) => s.sidebarOpen);
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
   const addProject = useStore((s) => s.addProject);
@@ -293,9 +294,31 @@ export function Sidebar() {
 
         <div className="px-2 pb-3 space-y-1 shrink-0 border-t border-line/60 pt-3">
           <button
-            onClick={() => setSettingsOpen(true)}
-            title="Ayarlar (Ctrl+,)"
+            onClick={() => router.push("/studio")}
+            title="Stüdyo"
+            className={`w-full h-9 rounded-xl border grid place-items-center transition-colors ${
+              pathname.startsWith("/studio")
+                ? "border-brand/40 bg-brand/10 text-brand"
+                : "border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink"
+            }`}
+          >
+            <Sparkles size={14} />
+          </button>
+          <button
+            onClick={() => setSidebarOpen(true)}
+            title="Araçlar"
             className="w-full h-9 rounded-xl border border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink grid place-items-center transition-colors"
+          >
+            <Wrench size={14} />
+          </button>
+          <button
+            onClick={() => router.push("/settings")}
+            title="Ayarlar (Ctrl+,)"
+            className={`w-full h-9 rounded-xl border grid place-items-center transition-colors ${
+              pathname === "/settings"
+                ? "border-brand/40 bg-brand/10 text-brand"
+                : "border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink"
+            }`}
           >
             <Settings size={14} />
           </button>
@@ -338,7 +361,12 @@ export function Sidebar() {
         </button>
         <button
           onClick={() => router.push("/studio")}
-          className="group premium-card w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-ink/80 hover:text-ink hover:border-brand/40 transition-all hover:-translate-y-0.5"
+          aria-current={pathname.startsWith("/studio") ? "page" : undefined}
+          className={`group premium-card w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:-translate-y-0.5 ${
+            pathname.startsWith("/studio")
+              ? "border-brand/40 bg-brand/10 text-ink"
+              : "text-ink/80 hover:text-ink hover:border-brand/40"
+          }`}
         >
           <Sparkles size={15} className="text-brand transition-transform duration-200 group-hover:scale-110 group-hover:rotate-6" /> Stüdyo
           <span className="ml-auto text-[9px] font-bold uppercase tracking-wider text-brand/70 bg-brand/10 px-1.5 py-0.5 rounded">Tasarım · Görsel</span>
@@ -572,7 +600,12 @@ export function Sidebar() {
           <div className="flex gap-1.5">
             <button
               onClick={() => router.push("/settings")}
-              className="flex-1 flex items-center gap-2.5 px-3 py-2 rounded-xl border border-line/60 hover:border-brand/40 hover:bg-bgsoft text-sm text-muted hover:text-ink transition-colors"
+              aria-current={pathname === "/settings" ? "page" : undefined}
+              className={`flex-1 flex items-center gap-2.5 px-3 py-2 rounded-xl border text-sm transition-colors ${
+                pathname === "/settings"
+                  ? "border-brand/40 bg-brand/10 text-ink"
+                  : "border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink"
+              }`}
             >
               <Settings size={14} /> Ayarlar
             </button>

@@ -1,16 +1,16 @@
 "use client";
 
 /* Mobil alt gezinme çubuğu (yalnız sm altı) — dört öğe: Sohbet · Stüdyo ·
-   Araçlar · Ayarlar. Stüdyo'nun 7 modu (Tasarım/Sunum/Doküman/Anket/Tuval/
-   Görüntü/Defter) tek tıkla erişilemez değil: içeri girince StudioSwitcher
-   (kompakt açılır liste) tümüne ulaştırır. "Araçlar" ve "Ayarlar" birer
-   rotaya gitmez — sırasıyla alttan-açılan kısa liste (`MobileToolsSheet`)
-   ve mevcut Ayarlar modalını (`setSettingsOpen`) açan aksiyon düğmeleridir.
+   Araçlar · Ayarlar. Stüdyo'nun modları (Tasarım/Görüntü) tek tıkla erişilemez
+   değil: içeri girince StudioSwitcher (kompakt açılır liste) tümüne ulaştırır.
+   "Araçlar" birer rotaya gitmez — alttan-açılan kısa liste (`MobileToolsSheet`)
+   açan bir aksiyon düğmesidir. "Ayarlar" ise gerçek `/settings` rotasına gider
+   (Sidebar'ın masaüstündeki iki düğmesiyle aynı hizada — bkz. Sidebar.tsx),
+   böylece diğer üç sekmeyle aynı aktif-vurgu deseni otomatik çalışır.
    Aktif sekme marka renginde; safe-area alt boşluğu korunur. */
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { MessageSquare, Settings, Sparkles, Wrench } from "lucide-react";
-import { useStore } from "@/lib/store";
 import { MobileToolsSheet } from "./MobileToolsSheet";
 
 /* Sanal klavye açık mı? (mobil) — visualViewport küçülmesiyle algılanır.
@@ -36,14 +36,13 @@ export function MobileTabBar() {
   const router = useRouter();
   const pathname = usePathname() ?? "";
   const kbOpen = useKeyboardOpen();
-  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const [toolsOpen, setToolsOpen] = useState(false);
 
   const TABS: Tab[] = [
     { kind: "link", href: "/app", label: "Sohbet", icon: MessageSquare },
     { kind: "link", href: "/studio", label: "Stüdyo", icon: Sparkles },
     { kind: "action", label: "Araçlar", icon: Wrench, onClick: () => setToolsOpen(true) },
-    { kind: "action", label: "Ayarlar", icon: Settings, onClick: () => setSettingsOpen(true) },
+    { kind: "link", href: "/settings", label: "Ayarlar", icon: Settings },
   ];
 
   if (kbOpen) return null;
