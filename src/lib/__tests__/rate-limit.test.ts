@@ -29,4 +29,24 @@ describe("checkLimit", () => {
     expect(checkLimit(r, "scopeA", 1, 60_000)?.status).toBe(429);
     expect(checkLimit(r, "scopeB", 1, 60_000)).toBeNull();
   });
+
+  it("sahte x-forwarded-for zincirinin en soldaki parçasına aldanmaz", () => {
+    /* İstemci kendi IP'sini zincirin başına ekleyebilir ("1.2.3.4, <gerçek>")
+       ama Vercel'in altyapısı gerçek bağlanan IP'yi HER ZAMAN en sona ekler.
+       Aynı gerçek IP'den farklı sahte ön-eklerle gelen istekler AYNI bucket'ı
+       paylaşmalı — limit atlatılamamalı. */
+    const real = "203.0.113.9";
+    const a = fakeReq(`1.2.3.4, ${real}`);
+    const b = fakeReq(`5.6.7.8, ${real}`);
+    checkLimit(a, "t3", 1, 60_000);
+    expect(checkLimit(b, "t3", 1, 60_000)?.status).toBe(429);
+  });
+
+  it("farklı gerçek IP'ler (aynı sahte ön-ek olsa da) ayrı bucket'larda kalır", () => {
+    const a = fakeReq("1.2.3.4, 203.0.113.9");
+    const b = fakeReq("1.2.3.4, 203.0.113.10");
+    checkLimit(a, "t4", 1, 60_000);
+    expect(checkLimit(a, "t4", 1, 60_000)?.status).toBe(429);
+    expect(checkLimit(b, "t4", 1, 60_000)).toBeNull();
+  });
 });
