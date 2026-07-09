@@ -1,20 +1,17 @@
 "use client";
 
-/* TEK stüdyo kabuğu — kullanıcı anketi (Tem 2026) sonrası yapı:
-   - Stüdyo = TEK SAYFA tasarım tuvali (OpenDesignStudio: slayt, afiş,
-     sosyal, story, tuval, sunum destesi) + Görüntü (AI görsel).
-   - İçerik araçları (Doküman/Anket/Defter) stüdyo anahtarından ÇIKTI;
-     Sidebar'daki "Araçlar" satırından açılır ama aynı kabukta yaşar
-     (rotaları korunur, state kaybolmaz).
-   Üst çubuk: tasarım modlarında 2-düğmeli anahtar; içerik aracındayken
-   aracın adı görünür. */
+/* Görüntü + içerik araçları (Doküman/Anket/Defter) kabuğu — kullanıcı
+   anketi (Tem 2026) sonrası yapı. Tasarım (OpenDesignStudio) artık kendi
+   `/studio` rotasında DOĞRUDAN render edilir, bu kabuktan geçmez; bu
+   bileşen yalnız `/studio/gorsel`, `/studio/dokuman`, `/studio/anket`,
+   `/studio/defter` rotalarının kabuğudur. Üst çubuk: Görüntü'de 2-düğmeli
+   Tasarım/Görüntü anahtarı; içerik aracındayken aracın adı görünür. */
 
 import { useState } from "react";
 import { BookOpen, FileText, ListChecks, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav, type Surface } from "@/lib/surfaceNav";
 import { StudioSwitcher } from "./StudioSwitcher";
-import { OpenDesignStudio } from "./OpenDesignStudio";
 import { ImageStudio } from "../ImageStudio";
 import { DocsStudio } from "./DocsStudio";
 import { FormsStudio } from "./FormsStudio";
@@ -34,26 +31,19 @@ const CONTENT_LABEL: Partial<Record<Surface, { name: string; icon: typeof FileTe
 
 export function StudioHub() {
   const nav = useSurfaceNav();
-  const studioOpen = useStore((s) => s.studioOpen);
-  const slidesOpen = useStore((s) => s.slidesStudioOpen);
-  const canvasOpen = useStore((s) => s.designStudioOpen);
   const imageOpen = useStore((s) => s.imageStudioOpen);
   const docsOpen = useStore((s) => s.docsStudioOpen);
   const formsOpen = useStore((s) => s.formsStudioOpen);
   const notebookOpen = useStore((s) => s.notebookStudioOpen);
 
-  const designOpen = studioOpen || slidesOpen || canvasOpen;
-  const everDesign = useEverOpened(designOpen);
   const everImage = useEverOpened(imageOpen);
   const everDocs = useEverOpened(docsOpen);
   const everForms = useEverOpened(formsOpen);
   const everNotebook = useEverOpened(notebookOpen);
 
-  if (!designOpen && !imageOpen && !docsOpen && !formsOpen && !notebookOpen) return null;
+  if (!imageOpen && !docsOpen && !formsOpen && !notebookOpen) return null;
 
-  const active: Surface =
-    designOpen ? "studio" : imageOpen ? "image" :
-    docsOpen ? "docs" : formsOpen ? "forms" : "notebook";
+  const active: Surface = imageOpen ? "image" : docsOpen ? "docs" : formsOpen ? "forms" : "notebook";
 
   const content = CONTENT_LABEL[active];
 
@@ -74,14 +64,6 @@ export function StudioHub() {
         ><X size={16} /></button>
       </div>
 
-      {/* Bir kez açılan mod mount kalır — state kaybolmaz. OpenDesign kendi
-          bayrağını kontrol etmediğinden görünürlüğü CSS ile yönetilir
-          (display:contents → yerleşimi bozmadan gizle/göster). */}
-      {everDesign && (
-        <div className={designOpen ? "contents" : "hidden"}>
-          <OpenDesignStudio embedded />
-        </div>
-      )}
       {everImage && <ImageStudio embedded />}
       {everDocs && <DocsStudio embedded />}
       {everForms && <FormsStudio embedded />}

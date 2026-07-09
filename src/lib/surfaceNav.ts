@@ -65,10 +65,8 @@ export function useSurfaceNav() {
     // Overlay modunda store bayraklarını güncelle
     const s = useStore.getState();
     s.setStudioOpen(which === "studio" || which === "slides" || which === "canvas");
-    s.setSlidesStudioOpen(false);  // ← Artık gerekli değil, ama geriye uyumluluk
     s.setDocsStudioOpen(which === "docs");
     s.setFormsStudioOpen(which === "forms");
-    s.setDesignStudioOpen(false); // ← Artık gerekli değil, ama geriye uyumluluk
     s.setImageStudioOpen(which === "image");
     s.setNotebookStudioOpen(which === "notebook");
   };
@@ -80,10 +78,8 @@ export function useSurfaceNav() {
     }
     const s = useStore.getState();
     s.setStudioOpen(false);
-    s.setSlidesStudioOpen(false);
     s.setDocsStudioOpen(false);
     s.setFormsStudioOpen(false);
-    s.setDesignStudioOpen(false);
     s.setImageStudioOpen(false);
     s.setNotebookStudioOpen(false);
   };
