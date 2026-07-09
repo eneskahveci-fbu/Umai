@@ -198,17 +198,26 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     return hits;
   })();
   /* Auto-jump to the first matching tab when the search text changes —
-     adjusted during render rather than in a state-syncing effect. */
+     adjusted during render rather than in a state-syncing effect. Kısa bir
+     vurgulama flaşı (searchJump), arama sonucu geldiğini elle tıklamadan
+     ayırt etmek için — sekme içeriği alan-seviyesinde indekslenmiyor,
+     bu yüzden yalnız hedef sekmenin kendisi kısaca vurgulanıyor. */
   const [prevSearch, setPrevSearch] = useState(search);
+  const [searchJump, setSearchJump] = useState(false);
   if (search !== prevSearch) {
     setPrevSearch(search);
     if (search.trim() && matchingTabs.size > 0) {
       const adminOnly = new Set(["advanced", "mcp", "hooks"]);
       const first = (["model", "fusion", "github", "extensions", "general", "kullanim", "plan", "hakkinda", "advanced", "mcp", "hooks", "hesap"] as const)
         .find((k) => matchingTabs.has(k) && (isAdmin || !adminOnly.has(k)));
-      if (first && first !== tab) changeTab(first);
+      if (first && first !== tab) { changeTab(first); setSearchJump(true); }
     }
   }
+  useEffect(() => {
+    if (!searchJump) return;
+    const t = setTimeout(() => setSearchJump(false), 1200);
+    return () => clearTimeout(t);
+  }, [searchJump]);
   const [provider, setProvider] = useState<Provider>("hf");
   const [label, setLabel] = useState("");
   const [baseUrl, setBaseUrl] = useState(PRESETS.hf.baseUrl);
@@ -652,7 +661,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   onClick={() => { changeTab(key); setMobileDetail(true); }}
                   className={`relative w-full flex items-center gap-3 sm:gap-2.5 px-3 py-3 sm:py-2 rounded-xl sm:rounded-lg text-[15px] sm:text-sm font-medium transition-colors text-left ${
                     active ? "sm:bg-brand/12 sm:text-brand bg-bgsoft text-ink" : "text-ink sm:text-muted hover:text-ink hover:bg-bgsoft sm:hover:bg-surface"
-                  }`}
+                  } ${active && searchJump ? "ring-2 ring-brand/50" : ""}`}
                 >
                   <Icon size={18} className="shrink-0 text-brand sm:text-current" />
                   <span className="truncate flex-1">{label}</span>

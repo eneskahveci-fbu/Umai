@@ -746,7 +746,8 @@ export function CoderView() {
   const [resolvingAction, setResolvingAction] = useState<string | null>(null);
   /* ask_user anketi: ajan soru sorduğunda gösterilir; cevaplanınca temizlenir. */
   const [pendingSurvey, setPendingSurvey] = useState<SurveyQuestion[] | null>(null);
-  const [editorOpen, setEditorOpen] = useState(false);
+  const editorOpen = useStore((s) => s.editorOpen);
+  const setEditorOpen = useStore((s) => s.setEditorOpen);
   /* Çoklu dosya sekmeleri: editörde açık tutulan dosyalar + aktif olanın
      kaydedilmemiş durumu (sekme geçişinde veri kaybını önlemek için). */
   const [openTabs, setOpenTabs] = useState<EditorFile[]>([]);
@@ -756,7 +757,7 @@ export function CoderView() {
   const [gitPanelOpen, setGitPanelOpen] = useState(false);
 
   /* Dosyayı editörde aç: sekme yoksa ekle, varsa içeriğini güncelle, aktif yap. */
-  const openInEditor = (f: EditorFile) => {
+  const openInEditor = useCallback((f: EditorFile) => {
     setEditorFile(f);
     setEditorOpen(true);
     setActiveDirty(false);
@@ -767,7 +768,7 @@ export function CoderView() {
       next[i] = f;
       return next;
     });
-  };
+  }, [setEditorOpen]);
   /* Sekmeye geç — aktif sekmede kaydedilmemiş değişiklik varsa onay iste. */
   const selectTab = (path: string) => {
     if (path === editorFile?.path) return;
@@ -1177,7 +1178,7 @@ export function CoderView() {
       }
       openInEditor({ path, content, language: detectLanguage(path) });
     } catch { /* dosya henüz okunamadıysa sessiz geç */ }
-  }, []);
+  }, [openInEditor]);
 
   /* ── Anlamsal (RAG) arama ──────────────────────────────────────────
      İlk kullanımda depo metin dosyalarını (sınırlı sayıda) çekip gömme
@@ -2530,7 +2531,7 @@ export function CoderView() {
             <Plus size={16} />
           </button>
           <button
-            onClick={() => setEditorOpen((v) => !v)}
+            onClick={() => setEditorOpen(!editorOpen)}
             title={editorOpen ? "Editörü kapat" : "Editör (IDE)"}
             aria-pressed={editorOpen}
             className={`w-8 h-8 rounded-lg grid place-items-center transition-colors shrink-0 ${

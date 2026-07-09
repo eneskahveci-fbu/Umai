@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { useModalA11y } from "@/lib/useModalA11y";
 import { PROJECT_COLORS, projectColorHex } from "@/lib/constants";
 
 type Tab = "settings" | "knowledge" | "skills" | "stats";
@@ -31,6 +32,8 @@ export function ProjectModal() {
   const project = config.projects.find((p) => p.id === projectId) ?? null;
   const [tab, setTab] = useState<Tab>("settings");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  useModalA11y(modalRef, !!project, () => setProjectModalId(null));
 
   /* İstatistikler — projeye ait sohbetlerden (gizli hariç) türetilir. */
   const stats = useMemo(() => {
@@ -72,6 +75,10 @@ export function ProjectModal() {
       onClick={() => setProjectModalId(null)}
     >
       <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={project.name}
         className="w-full max-w-lg max-h-[88vh] flex flex-col bg-surface border border-line rounded-2xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
