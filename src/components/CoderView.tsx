@@ -25,12 +25,14 @@ import {
   CircleCheck,
   GitPullRequest,
   Globe,
+  Keyboard,
   MoreHorizontal,
   Image as ImageIcon,
   Loader2 as Loader2Icon,
   MessageSquare,
   PanelLeft,
   Paperclip,
+  Plus,
   Check,
   ListChecks,
   RefreshCw,
@@ -2442,6 +2444,32 @@ export function CoderView() {
               <VenetianMask size={9} /> Gizli
             </span>
           )}
+          {/* En sık kullanılan 3 eylem ⋯ menüsünden çıkarılıp doğrudan üst
+             bara taşındı (tek tıkla erişim, özellikle mobilde). */}
+          <button
+            onClick={() => useStore.getState().newChat(false)}
+            title="Yeni sohbet (Ctrl+N)"
+            className="w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors shrink-0"
+          >
+            <Plus size={16} />
+          </button>
+          <button
+            onClick={() => setEditorOpen((v) => !v)}
+            title={editorOpen ? "Editörü kapat" : "Editör (IDE)"}
+            aria-pressed={editorOpen}
+            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors shrink-0 ${
+              editorOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
+            }`}
+          >
+            <Code2 size={16} />
+          </button>
+          <button
+            onClick={() => useStore.getState().setSkillsOpen(true)}
+            title="Skills"
+            className="w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors shrink-0"
+          >
+            <Zap size={16} />
+          </button>
           {/* Birleşik ⋯ menüsü — gruplu: Hızlı eylemler · Çalışma Alanı · Modlar · Araçlar */}
           <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen || toolsEnabled || !!config.safeMode || swarmMode || researchMode}>
             {/* Efor seçici herkese açık; "otomatik" dışı bir seviye seçilirse
@@ -2469,7 +2497,6 @@ export function CoderView() {
             {/* Sekme içeriği */}
             {moreTab === "workspace" && (
               <>
-                <MoreItem icon={<Code2 size={14} />} label={editorOpen ? "Editörü kapat" : "Editör (IDE)"} active={editorOpen} onClick={() => setEditorOpen((v) => !v)} />
                 {isAdmin && (
                   <MoreItem
                     icon={<Terminal size={14} />}
@@ -2492,12 +2519,14 @@ export function CoderView() {
               </>
             )}
 
-            {/* Mod çipleri (elle geçersiz kılma) yalnız admin'e — diğer
-               hesaplarda Tools/Güvenli/Kalite/Ekip/Araştırma otomatik yönetilir
-               (Tools: repo bağlanınca kendiliğinden açılır; kalan dördü
-               Otomatik Pilot'ın mesaj-bazlı kararına bağlıdır); Öğrenme Modu
-               Ayarlar → Genel'den standing tercih olarak açılabilir. */}
-            {moreTab === "modes" && isAdmin && (
+            {/* Mod çipleri (elle geçersiz kılma) — herkese açık: Otomatik Pilot
+               Tools/Güvenli/Kalite/Ekip/Araştırma'yı sessizce yönetir (Tools:
+               repo bağlanınca kendiliğinden açılır; kalan dördü Otomatik
+               Pilot'ın mesaj-bazlı kararına bağlıdır) ama kullanıcı ne
+               olduğunu görüp isterse elle geçersiz kılabilsin diye burada
+               herkese gösteriliyor. Öğrenme Modu Ayarlar → Genel'den standing
+               tercih olarak da açılabilir. */}
+            {moreTab === "modes" && (
               <div className="px-1.5 pb-1 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
                 {config.autoPilot !== false && (
                   <p className="w-full text-[10px] text-muted/55 mb-0.5">✦ Otomatik Pilot açık — bunlar elle geçersiz kılar.</p>
@@ -2528,9 +2557,9 @@ export function CoderView() {
 
             {moreTab === "tools" && (
               <>
-                <MoreItem icon={<Zap size={14} />} label="Skills" onClick={() => useStore.getState().setSkillsOpen(true)} />
                 <MoreItem icon={<BookOpen size={14} />} label="Kütüphane" onClick={() => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); }} />
                 <MoreItem icon={<Activity size={14} />} label="Etkinlik günlüğü" onClick={() => useStore.getState().setActivityOpen(true)} />
+                <MoreItem icon={<Keyboard size={14} />} label="Kısayollar" onClick={() => useStore.getState().setShortcutsOpen(true)} />
               </>
             )}
           </MoreMenu>
