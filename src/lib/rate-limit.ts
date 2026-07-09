@@ -5,10 +5,16 @@
 interface Bucket { tokens: number; resetAt: number }
 const buckets = new Map<string, Bucket>();
 
-/* Yalnızca header okuduğu için hem Request hem NextRequest kabul eder. */
+/* Yalnızca header okuduğu için hem Request hem NextRequest kabul eder.
+   `x-forwarded-for`'un EN SOLDAKİ parçası istemcinin kendisi tarafından
+   serbestçe ayarlanabilir (sahte IP göndererek limit tamamen atlatılabilir);
+   Vercel'in kendi altyapısı gerçek bağlanan IP'yi zincire EN SONA ekler, bu
+   yüzden EN SAĞDAKİ parçayı kullanıyoruz — istemcinin değiştiremediği tek
+   segman. */
 function clientKey(req: Request, scope: string): string {
   const fwd = req.headers.get("x-forwarded-for") || "";
-  const ip = fwd.split(",")[0].trim() || req.headers.get("x-real-ip") || "anon";
+  const parts = fwd.split(",").map((p) => p.trim()).filter(Boolean);
+  const ip = parts[parts.length - 1] || req.headers.get("x-real-ip") || "anon";
   return `${scope}:${ip}`;
 }
 
