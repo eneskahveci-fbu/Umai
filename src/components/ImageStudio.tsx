@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, ImageIcon, Loader2, Send, Sparkles, Trash2, Wand2, X } from "lucide-react";
+import { Download, Loader2, Send, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { consumeSurfaceHandoff, useSurfaceNav } from "@/lib/surfaceNav";
-import { StudioTopBar } from "./studio/StudioTopBar";
+import { consumeSurfaceHandoff } from "@/lib/surfaceNav";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import { buildFallbackChain } from "@/lib/fallback";
 import { fetchImageModels, IMAGE_MODEL_FALLBACK, pollinationsImageUrl, type ImageModelInfo } from "@/lib/pollinations";
@@ -52,9 +51,8 @@ function imgUrl(prompt: string, model: string, w: number, h: number, seed: numbe
   return pollinationsImageUrl(prompt, { model, width: w, height: h, seed });
 }
 
-export function ImageStudio({ embedded }: { embedded?: boolean } = {}) {
+export function ImageStudio() {
   const open = useStore((s) => s.imageStudioOpen);
-  const nav = useSurfaceNav();
   const addToast = useStore((s) => s.addToast);
   const config = useStore((s) => s.config);
 
@@ -376,33 +374,16 @@ export function ImageStudio({ embedded }: { embedded?: boolean } = {}) {
     </>
   );
 
-  /* embedded: DesignHub zaten dış sarmalayıcıyı + üst çubuğu sağlıyor —
+  /* DesignHub (StudioHub) zaten dış sarmalayıcıyı + üst çubuğu sağlıyor —
      yalnız "Temizle" eylemini (mesaj varsa) ince bir satırda gösteririz. */
-  if (embedded) {
-    return (
-      <>
-        {clearButton && (
-          <div className="h-10 shrink-0 flex items-center justify-end px-3 sm:px-4 border-b border-line/60">
-            {clearButton}
-          </div>
-        )}
-        {content}
-      </>
-    );
-  }
-
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-modal-bg pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-      {/* Üst bar */}
-      <StudioTopBar
-        icon={ImageIcon}
-        label="Görüntü"
-        activeSurface="image"
-        showWorkActions
-        onClose={() => nav.close()}
-        actions={clearButton}
-      />
+    <>
+      {clearButton && (
+        <div className="h-10 shrink-0 flex items-center justify-end px-3 sm:px-4 border-b border-line/60">
+          {clearButton}
+        </div>
+      )}
       {content}
-    </div>
+    </>
   );
 }
