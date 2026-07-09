@@ -351,7 +351,7 @@ function RightPanel({
           <FormatPanel project={project} setProject={setProject} activePageIndex={activePageIndex} />
         )}
         {tab === "tweaks" && (
-          <TweaksPanel />
+          <TweaksPanel project={project} setProject={setProject} activePageIndex={activePageIndex} />
         )}
       </div>
     </div>
@@ -502,22 +502,88 @@ function FormatPanel({
   );
 }
 
-function TweaksPanel() {
+const TWEAK_FONTS = [
+  { label: "Sistem", value: "system-ui, sans-serif" },
+  { label: "Serif", value: "Georgia, serif" },
+  { label: "Mono", value: "ui-monospace, monospace" },
+  { label: "Modern", value: "Inter, system-ui, sans-serif" },
+];
+
+function TweaksPanel({
+  project, setProject, activePageIndex,
+}: {
+  project: OpenDesignProject;
+  setProject: (p: OpenDesignProject) => void;
+  activePageIndex: number;
+}) {
+  const page = project.pages[activePageIndex];
+  if (!page || !isCanvasPage(page)) {
+    return <p className="text-xs text-muted/60 text-center py-4">İnce ayarlar sadece tuval modunda görünür.</p>;
+  }
+
+  /* Tüm metin katmanlarını topluca değiştirir — sayfanın kendisi kaydedilir,
+     "temel ölçek" gibi ayrı bir izlenen durum tutulmaz (her tıklama mevcut
+     boyutlar üzerinden orantılı uygulanır). */
+  const scaleLayers = (factor: number) => {
+    const newPages = [...project.pages];
+    newPages[activePageIndex] = {
+      ...page,
+      design: {
+        ...page.design,
+        layers: page.design.layers.map((l) => ({ ...l, size: Math.round(l.size * factor) })),
+      },
+    };
+    setProject({ ...project, pages: newPages, updatedAt: Date.now() });
+  };
+  const setFont = (font: string) => {
+    const newPages = [...project.pages];
+    newPages[activePageIndex] = {
+      ...page,
+      design: { ...page.design, layers: page.design.layers.map((l) => ({ ...l, font })) },
+    };
+    setProject({ ...project, pages: newPages, updatedAt: Date.now() });
+  };
+  const setAccent = (color: string) => {
+    const newPages = [...project.pages];
+    newPages[activePageIndex] = {
+      ...page,
+      design: { ...page.design, layers: page.design.layers.map((l) => ({ ...l, color })) },
+    };
+    setProject({ ...project, pages: newPages, updatedAt: Date.now() });
+  };
+  const currentFont = page.design.layers[0]?.font ?? TWEAK_FONTS[0].value;
+  const currentColor = page.design.layers[0]?.color ?? "#ffffff";
+
   return (
     <div className="space-y-3">
-      <p className="text-[10px] text-muted/50 mb-2">İnce Ayarlar</p>
-      <div className="space-y-2 text-xs">
-        <div className="flex items-center justify-between">
-          <span className="text-muted">Yazı ölçeği</span>
-          <span className="text-ink">1.0x</span>
+      <p className="text-[10px] text-muted/50 mb-2">İnce Ayarlar (tüm metin katmanlarına uygulanır)</p>
+      <div className="space-y-3 text-xs">
+        <div>
+          <span className="text-muted block mb-1.5">Yazı ölçeği</span>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => scaleLayers(0.9)} className="flex-1 px-2 py-1.5 rounded-lg bg-bgsoft border border-line/60 text-ink hover:border-brand/40 transition-colors">− Küçült</button>
+            <button onClick={() => scaleLayers(1.1)} className="flex-1 px-2 py-1.5 rounded-lg bg-bgsoft border border-line/60 text-ink hover:border-brand/40 transition-colors">+ Büyüt</button>
+          </div>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="text-muted">Yazı tipi</span>
-          <span className="text-ink">Sistem</span>
+        <div>
+          <span className="text-muted block mb-1.5">Yazı tipi</span>
+          <select
+            value={currentFont}
+            onChange={(e) => setFont(e.target.value)}
+            className="w-full bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-xs"
+          >
+            {TWEAK_FONTS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+          </select>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-muted">Vurgu rengi</span>
-          <div className="w-4 h-4 rounded bg-brand" />
+          <input
+            type="color"
+            value={/^#[0-9a-f]{6}$/i.test(currentColor) ? currentColor : "#ffffff"}
+            onChange={(e) => setAccent(e.target.value)}
+            className="w-7 h-7 rounded border border-line/60 cursor-pointer bg-transparent"
+            aria-label="Vurgu rengi"
+          />
         </div>
       </div>
     </div>

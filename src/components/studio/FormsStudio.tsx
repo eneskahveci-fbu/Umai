@@ -138,9 +138,15 @@ export function FormsStudio() {
           <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
         )}
         <button onClick={saveForm} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+        <button
+          onClick={() => pickTemplateFile((t) => { if (t.kind === "form") openForm(t.data); else addToast("Bu dosya bir anket şablonu değil.", "error"); }, (m) => addToast(m, "error"))}
+          title="Şablon içe aktar (.json)"
+          className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"
+        ><Download size={15} className="rotate-180" /></button>
         <ExportMenu
           options={[
             { key: "html", label: "Bağımsız HTML indir", icon: <Download size={14} className="text-brand" />, onSelect: exportHtml },
+            { key: "template", label: "Şablon olarak dışa aktar (.json)", icon: <Sparkles size={14} className="text-brand" />, onSelect: () => form && downloadTemplate({ kind: "form", data: form }, form.title), separatorBefore: true },
           ]}
         />
         <button onClick={() => void publish()} title="Yayınla — paylaşılabilir bağlantı" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-[#111110] text-xs font-semibold hover:bg-branddim transition-colors"><Globe size={13} /> <span className="hidden sm:inline">Yayınla</span></button>
