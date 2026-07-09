@@ -14,6 +14,7 @@ const GROUPS: { title: string; items: Shortcut[] }[] = [
       { keys: ["mod", "N"], label: "Yeni oturum" },
       { keys: ["mod", "B"], label: "Yan paneli aç/kapat" },
       { keys: ["mod", "K"], label: "Komut paleti" },
+      { keys: ["mod", "P"], label: "Komut paleti (hızlı dosya bulucu)" },
       { keys: ["mod", ","], label: "Ayarlar" },
       { keys: ["mod", "/"], label: "Bu yardım penceresi" },
       { keys: ["?"], label: "Kısayollar (klavyeden)" },
