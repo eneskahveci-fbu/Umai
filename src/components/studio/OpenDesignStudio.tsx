@@ -542,7 +542,7 @@ export interface OpenDesignMsg {
   text: string;
 }
 
-export function OpenDesignStudio({ embedded }: { embedded?: boolean } = {}) {
+export function OpenDesignStudio() {
   const nav = useSurfaceNav();
   const config = useStore((s) => s.config);
   const saveConfig = useStore((s) => s.saveConfig);
@@ -809,13 +809,6 @@ export function OpenDesignStudio({ embedded }: { embedded?: boolean } = {}) {
     </>
   );
 
-  const slimActionsRow = (
-    <div className="h-10 shrink-0 flex items-center gap-1 px-3 sm:px-4 border-b border-line/60 overflow-x-auto no-scrollbar">
-      <button onClick={newProjectAction} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink shrink-0">+ Yeni</button>
-      <div className="ml-auto flex items-center gap-1 shrink-0">{actionButtons}</div>
-    </div>
-  );
-
   const content = (
     <>
       <div className="flex-1 min-h-0 flex flex-col">
@@ -915,15 +908,6 @@ export function OpenDesignStudio({ embedded }: { embedded?: boolean } = {}) {
       />
     </>
   );
-
-  if (embedded) {
-    return (
-      <>
-        {slimActionsRow}
-        {content}
-      </>
-    );
-  }
 
   return (
     <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>

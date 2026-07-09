@@ -6,9 +6,9 @@ import {
   Plus, Save, Sparkles, Trash2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { consumeSurfaceHandoff, useSurfaceNav } from "@/lib/surfaceNav";
-import { StudioTopBar } from "./StudioTopBar";
+import { consumeSurfaceHandoff } from "@/lib/surfaceNav";
 import { SavedItemsModal } from "./SavedItemsModal";
+import { ExportMenu } from "./ExportMenu";
 import { safeFileName } from "./DocsStudio";
 import type { CraftForm, FormQuestion, FormQuestionType } from "@/lib/types";
 import { FORM_QUESTION_TYPES, formToHtml, generateForm, MAX_FORM_QUESTIONS, newQuestion } from "@/lib/forms";
@@ -28,9 +28,8 @@ const SUGGESTIONS = [
   "Çalışan nabız anketi: motivasyon, iş yükü, öneriler (anonim)",
 ];
 
-export function FormsStudio({ embedded }: { embedded?: boolean } = {}) {
+export function FormsStudio() {
   const open = useStore((s) => s.formsStudioOpen);
-  const nav = useSurfaceNav();
   const config = useStore((s) => s.config);
   const saveConfig = useStore((s) => s.saveConfig);
   const addToast = useStore((s) => s.addToast);
@@ -135,8 +134,15 @@ export function FormsStudio({ embedded }: { embedded?: boolean } = {}) {
     <div className="h-10 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
       <button onClick={() => { setForm(null); setView("home"); setBrief(""); }} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink shrink-0">+ Yeni</button>
       <div className="ml-auto flex items-center gap-1 shrink-0">
+        {saved.length > 0 && (
+          <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
+        )}
         <button onClick={saveForm} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
-        <button onClick={exportHtml} title="Bağımsız HTML indir (sunucusuz anket)" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
+        <ExportMenu
+          options={[
+            { key: "html", label: "Bağımsız HTML indir", icon: <Download size={14} className="text-brand" />, onSelect: exportHtml },
+          ]}
+        />
         <button onClick={() => void publish()} title="Yayınla — paylaşılabilir bağlantı" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-[#111110] text-xs font-semibold hover:bg-branddim transition-colors"><Globe size={13} /> <span className="hidden sm:inline">Yayınla</span></button>
       </div>
     </div>
@@ -294,34 +300,10 @@ export function FormsStudio({ embedded }: { embedded?: boolean } = {}) {
     </>
   );
 
-  if (embedded) {
-    return (
-      <>
-        {slimActionsRow}
-        {content}
-      </>
-    );
-  }
-
   return (
-    <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-      {/* Üst bar */}
-      <StudioTopBar
-        icon={ListChecks}
-        label="Anket"
-        activeSurface="forms"
-        showWorkActions={view === "work" && !!form}
-        onNew={() => { setForm(null); setView("home"); setBrief(""); }}
-        onClose={() => nav.close()}
-        actions={
-          <>
-            <button onClick={saveForm} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
-            <button onClick={exportHtml} title="Bağımsız HTML indir (sunucusuz anket)" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
-            <button onClick={() => void publish()} title="Yayınla — paylaşılabilir bağlantı" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-[#111110] text-xs font-semibold hover:bg-branddim transition-colors"><Globe size={13} /> <span className="hidden sm:inline">Yayınla</span></button>
-          </>
-        }
-      />
+    <>
+      {slimActionsRow}
       {content}
-    </div>
+    </>
   );
 }
