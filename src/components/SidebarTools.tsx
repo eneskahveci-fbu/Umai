@@ -17,7 +17,7 @@ const TOOLS: { href: string; label: string; desc: string; icon: typeof FileText 
 
 export function SidebarTools() {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   return (
     <div>
