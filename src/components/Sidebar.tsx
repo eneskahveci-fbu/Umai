@@ -9,6 +9,7 @@ import {
   Copy,
   Download,
   Folder,
+  FolderInput,
   FolderOpen,
   FolderPlus,
   Layers,
@@ -80,6 +81,7 @@ export function Sidebar() {
   const copyChatMarkdown = useStore((s) => s.copyChatMarkdown);
   const tagChat = useStore((s) => s.tagChat);
   const pinChat = useStore((s) => s.pinChat);
+  const moveChat = useStore((s) => s.moveChat);
   const updateChatEmbeddings = useStore((s) => s.updateChatEmbeddings);
   const router = useRouter();
   const pathname = usePathname() ?? "";
@@ -226,6 +228,25 @@ export function Sidebar() {
         <ActionIcon title={c.pinned ? "Sabitlemeyi kaldır" : "Sabitle"} onClick={(e) => { e.stopPropagation(); pinChat(c.id, !c.pinned); }}>
           <Pin size={10} className={c.pinned ? "text-brand" : ""} />
         </ActionIcon>
+        {config.projects.length > 0 && (
+          <div className="relative">
+            <ActionIcon title="Projeye taşı" onClick={(e) => e.stopPropagation()}>
+              <FolderInput size={10} className={c.projectId ? "text-brand" : ""} />
+            </ActionIcon>
+            <select
+              aria-label="Projeye taşı"
+              value={c.projectId ?? ""}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => { e.stopPropagation(); moveChat(c.id, e.target.value || null); }}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+            >
+              <option value="">Projesiz</option>
+              {config.projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <ActionIcon title="Etiket ekle" onClick={(e) => { e.stopPropagation(); const tag = window.prompt("Etiket (virgülle ayır):", c.tags?.join(", ") ?? ""); if (tag !== null) tagChat(c.id, tag.split(",").map(t => t.trim()).filter(Boolean)); }}>
           <Tag size={10} />
         </ActionIcon>
