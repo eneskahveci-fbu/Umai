@@ -88,7 +88,7 @@ export function VoiceButton({ onTranscript, lang = "tr-TR" }: VoiceButtonProps) 
         listening ? "Dinlemeyi durdur" :
         "Sesli dikte (Tarayıcı izni gerekebilir)"
       }
-      className={`shrink-0 w-9 h-9 rounded-xl grid place-items-center transition-all ${
+      className={`shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl grid place-items-center transition-all ${
         listening
           ? "bg-red/15 text-red ring-2 ring-red/40 animate-pulse"
           : "text-muted hover:text-ink hover:bg-bgsoft"

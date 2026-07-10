@@ -330,14 +330,14 @@ export function ImageStudio() {
                             onError={() => mark(it.id, { loading: false, error: true })}
                           />
                         )}
-                        <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-0 group-hover/img:opacity-100 transition-opacity">
+                        <div className="absolute top-2 right-2 flex items-center gap-1.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/img:opacity-100 transition-opacity">
                           {!it.loading && !it.error && (
                             <>
-                              <button onClick={() => download(it)} className="w-8 h-8 grid place-items-center rounded-lg bg-bg/70 backdrop-blur text-ink/80 hover:text-brand" title="İndir"><Download size={14} /></button>
-                              <button onClick={() => runGenerate(m.text ?? "", m.model ?? model, 1)} className="w-8 h-8 grid place-items-center rounded-lg bg-bg/70 backdrop-blur text-ink/80 hover:text-brand" title="Varyasyon üret"><Wand2 size={14} /></button>
+                              <button onClick={() => download(it)} className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg bg-bg/70 backdrop-blur text-ink/80 hover:text-brand" title="İndir"><Download size={14} /></button>
+                              <button onClick={() => runGenerate(m.text ?? "", m.model ?? model, 1)} className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg bg-bg/70 backdrop-blur text-ink/80 hover:text-brand" title="Varyasyon üret"><Wand2 size={14} /></button>
                             </>
                           )}
-                          <button onClick={() => removeItem(it.id)} className="w-8 h-8 grid place-items-center rounded-lg bg-bg/70 backdrop-blur text-ink/80 hover:text-red" title="Sil"><Trash2 size={14} /></button>
+                          <button onClick={() => removeItem(it.id)} className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg bg-bg/70 backdrop-blur text-ink/80 hover:text-red" title="Sil"><Trash2 size={14} /></button>
                         </div>
                       </div>
                     </div>
@@ -429,13 +429,13 @@ export function ImageStudio() {
   return (
     <>
       <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
-        <button onClick={newSession} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink shrink-0">+ Yeni</button>
+        <button onClick={newSession} className="text-xs px-2.5 py-2 sm:py-1 rounded-lg border border-line text-muted hover:text-ink shrink-0">+ Yeni</button>
         <div className="ml-auto flex items-center gap-1 shrink-0">
           {saved.length > 0 && (
-            <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
+            <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
           )}
           {msgs.length > 0 && (
-            <button onClick={saveSession} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+            <button onClick={saveSession} title="Kaydet" className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
           )}
           {clearButton}
         </div>

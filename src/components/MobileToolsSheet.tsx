@@ -37,7 +37,7 @@ export function MobileToolsSheet({ open, onClose }: { open: boolean; onClose: ()
       >
         <div className="flex items-center justify-between mb-2 px-1">
           <h2 className="text-sm font-bold">Araçlar</h2>
-          <button onClick={onClose} aria-label="Kapat" className="w-7 h-7 grid place-items-center rounded-lg text-muted hover:text-ink"><X size={14} /></button>
+          <button onClick={onClose} aria-label="Kapat" className="w-10 h-10 grid place-items-center rounded-lg text-muted hover:text-ink"><X size={16} /></button>
         </div>
         <div className="space-y-0.5">
           {TOOLS.map((t) => {

@@ -165,7 +165,7 @@ function MoreMenu({ active, children, placement = "top", icon, title = "Daha faz
         ref={btnRef}
         onClick={() => setOpen((o) => !o)}
         title={title}
-        className={`flex items-center gap-1.5 text-[12px] px-2 py-2 sm:py-1.5 rounded-lg transition-colors active:scale-95 ${
+        className={`flex items-center gap-1.5 text-[12px] px-2.5 py-2.5 sm:px-2 sm:py-1.5 rounded-lg transition-colors active:scale-95 ${
           open || active ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft active:bg-bgsoft"
         }`}
       >
@@ -3219,7 +3219,7 @@ export function CoderView() {
                       {/* User-attached preview is a base64 data URI; next/image can't optimize it. */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={img} alt="" className="w-16 h-16 object-cover rounded-xl border border-line shadow-sm" />
-                      <button onClick={() => setPendingImages((p) => p.filter((_, j) => j !== i))} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red text-white grid place-items-center text-xs opacity-0 group-hover/img:opacity-100 transition-opacity">×</button>
+                      <button onClick={() => setPendingImages((p) => p.filter((_, j) => j !== i))} aria-label="Görseli kaldır" className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red text-white grid place-items-center text-xs [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/img:opacity-100 transition-opacity">×</button>
                     </div>
                   ))}
                 </div>

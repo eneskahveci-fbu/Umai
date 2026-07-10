@@ -55,7 +55,7 @@ export function AccordionSection({ id, title, icon, badge, action, defaultOpen =
           {badge && <span className="text-[10px] text-muted/40 font-mono shrink-0">{badge}</span>}
         </button>
         {action && (
-          <div className="flex items-center pr-2 opacity-0 group-hover/acc:opacity-100 transition-opacity">
+          <div className="flex items-center pr-2 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/acc:opacity-100 transition-opacity">
             {action}
           </div>
         )}
