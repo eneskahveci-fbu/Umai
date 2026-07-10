@@ -57,6 +57,7 @@ import { fetchUserRepos } from "@/lib/github";
 import { fetchGitLabUserRepos } from "@/lib/gitlab";
 import { friendlyError } from "@/lib/friendlyError";
 import { pickReplacementModel } from "@/lib/modelPicker";
+import { isPushSubscribed, pushSupported, subscribeToPush, unsubscribeFromPush } from "@/lib/sw-register";
 import type { Provider, ResponseStyle } from "@/lib/types";
 
 export type SettingsTab = "model" | "github" | "general" | "fusion" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim";
@@ -126,6 +127,13 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     if (initialTab) setTab(initialTab);
   }
   const [search, setSearch] = useState("");
+  /* Web Push abonelik durumu (sekme kapalıyken de bildirim). VAPID env yoksa
+     sunucu zaten göndermez; düğme yalnız tarayıcı destekliyorsa görünür. */
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  useEffect(() => {
+    if (pushSupported()) isPushSubscribed().then(setPushSubscribed);
+  }, []);
   /* iOS tarzı mobil drill-down: mobilde önce kategori listesi gösterilir; bir
      satıra dokununca detay (mobileDetail=true) tam ekran açılır, geri ile listeye
      dönülür. sm+ (masaüstü) bu state'i yok sayar (yan-yana GNOME düzeni). */
@@ -599,19 +607,20 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
 
   /* GNOME tarzı dikey sekmeler. `admin: true` olanlar (teknik ayarlar) admin
      dışındaki kullanıcılardan tamamen gizlenir → sade deneyim. */
+  /* `group` — yalnız görsel kümeleme (ince ayraç); sekme davranışını etkilemez. */
   const ALL_TABS = [
-    { key: "hesap", label: "Hesap", icon: User, admin: false },
-    { key: "model", label: "Model", icon: Cpu, admin: false },
-    { key: "fusion", label: "Fusion", icon: Sparkles, admin: false },
-    { key: "github", label: "Git", icon: GitBranch, admin: false },
-    { key: "extensions", label: "Eklentiler", icon: Blocks, admin: false },
-    { key: "general", label: "Genel", icon: SlidersHorizontal, admin: false },
-    { key: "kullanim", label: "Kullanım", icon: BarChart3, admin: false },
-    { key: "plan", label: "Plan", icon: Crown, admin: false },
-    { key: "advanced", label: "Geliştirici", icon: Wrench, admin: true },
-    { key: "mcp", label: "MCP", icon: Plug, admin: true },
-    { key: "hooks", label: "Kancalar", icon: Webhook, admin: true },
-    { key: "hakkinda", label: "Hakkında", icon: Info, admin: false },
+    { key: "hesap", label: "Hesap", icon: User, admin: false, group: undefined },
+    { key: "model", label: "Model", icon: Cpu, admin: false, group: undefined },
+    { key: "fusion", label: "Fusion", icon: Sparkles, admin: false, group: undefined },
+    { key: "github", label: "Git", icon: GitBranch, admin: false, group: "Çalışma Alanı" },
+    { key: "extensions", label: "Eklentiler", icon: Blocks, admin: false, group: undefined },
+    { key: "general", label: "Genel", icon: SlidersHorizontal, admin: false, group: undefined },
+    { key: "kullanim", label: "Kullanım", icon: BarChart3, admin: false, group: "Kullanım & Plan" },
+    { key: "plan", label: "Plan", icon: Crown, admin: false, group: undefined },
+    { key: "advanced", label: "Geliştirici", icon: Wrench, admin: true, group: "Yönetici" },
+    { key: "mcp", label: "MCP", icon: Plug, admin: true, group: undefined },
+    { key: "hooks", label: "Kancalar", icon: Webhook, admin: true, group: undefined },
+    { key: "hakkinda", label: "Hakkında", icon: Info, admin: false, group: undefined },
   ] as const;
   const visibleTabs = ALL_TABS.filter((t) => isAdmin || !t.admin);
   /* Admin dışı kullanıcı gizli bir sekmedeyse (ör. arama/eski durum) Hesap'a düş. */
@@ -652,12 +661,15 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
           </div>
           {/* sm+: pill listesi (GNOME). Mobil: iOS satırları (chevron + büyük dokunma). */}
           <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-3 sm:px-2 pb-3 sm:gap-0.5">
-            {visibleTabs.map(({ key, label, icon: Icon }) => {
+            {visibleTabs.map(({ key, label, icon: Icon, group }) => {
               const hit = matchingTabs.has(key);
               const active = tab === key;
               return (
+                <div key={key}>
+                  {group && (
+                    <div className="px-3 sm:px-2.5 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-muted/40 first:pt-0">{group}</div>
+                  )}
                 <button
-                  key={key}
                   onClick={() => { changeTab(key); setMobileDetail(true); }}
                   className={`relative w-full flex items-center gap-3 sm:gap-2.5 px-3 py-3 sm:py-2 rounded-xl sm:rounded-lg text-[15px] sm:text-sm font-medium transition-colors text-left ${
                     active ? "sm:bg-brand/12 sm:text-brand bg-bgsoft text-ink" : "text-ink sm:text-muted hover:text-ink hover:bg-bgsoft sm:hover:bg-surface"
@@ -668,6 +680,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   {hit && !active && <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse shrink-0" />}
                   <ChevronRight size={16} className="sm:hidden text-muted/40 shrink-0" />
                 </button>
+                </div>
               );
             })}
           </nav>
@@ -1383,47 +1396,39 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     <div className="text-xs text-muted mt-0.5">Sekme arka planda iken yanıt hazır olunca bildirim gelir.</div>
                   </div>
                 </button>
-              </div>
-            </div>
-
-            {/* Yedekle / geri yükle */}
-            <div className="premium-card rounded-xl p-4">
-              <h4 className="text-sm font-bold mb-2">Yedek</h4>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    const s = useStore.getState();
-                    const data = JSON.stringify({ version: 1, exportedAt: Date.now(), config: s.config, chats: s.chats }, null, 2);
-                    const blob = new Blob([data], { type: "application/json" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url; a.download = `craftcoder-yedek-${new Date().toISOString().slice(0, 10)}.json`;
-                    a.click(); URL.revokeObjectURL(url);
-                    addToast("Yedek indirildi (ayarlar + sohbetler)", "success");
-                  }}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-line bg-bgsoft hover:border-brand text-sm"
-                >
-                  <Download size={14} /> Yedek indir
-                </button>
-                <label className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-line bg-bgsoft hover:border-brand text-sm cursor-pointer">
-                  <Upload size={14} /> Geri yükle
-                  <input
-                    type="file" accept="application/json" className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
+                {pushSupported() && (
+                  <button
+                    disabled={pushBusy}
+                    onClick={async () => {
+                      setPushBusy(true);
                       try {
-                        const data = JSON.parse(await file.text());
-                        if (!confirm("Bu yedek MEVCUT ayarlarının ve sohbetlerinin yerine geçecek. Devam edilsin mi?")) { e.target.value = ""; return; }
-                        useStore.getState().importBackup({ config: data.config, chats: data.chats });
-                        addToast("Yedek geri yüklendi ✓", "success");
-                      } catch { addToast("Geçersiz yedek dosyası", "error"); }
-                      e.target.value = "";
+                        if (pushSubscribed) {
+                          await unsubscribeFromPush();
+                          setPushSubscribed(false);
+                          addToast("Push bildirimleri kapatıldı.", "info");
+                        } else {
+                          const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+                          if (!vapidKey) { addToast("Push bildirimi bu sitede henüz yapılandırılmadı.", "error"); return; }
+                          const ok = await subscribeToPush(vapidKey);
+                          setPushSubscribed(ok);
+                          addToast(ok ? "Push bildirimleri açık — tarayıcı kapalıyken de haber verir." : "Push aboneliği başarısız.", ok ? "success" : "error");
+                        }
+                      } finally {
+                        setPushBusy(false);
+                      }
                     }}
-                  />
-                </label>
+                    className="flex items-center gap-3 p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 text-sm text-left transition-colors disabled:opacity-50"
+                  >
+                    <Bell size={16} className={`shrink-0 ${pushSubscribed ? "text-brand" : "text-muted"}`} />
+                    <div>
+                      <div className="text-sm font-semibold">{pushSubscribed ? "Push bildirimi açık" : "Push bildirimi aç"}</div>
+                      <div className="text-xs text-muted mt-0.5">
+                        “Arka planda çalıştır” ile başlattığın görev bitince, tarayıcı TAMAMEN kapalı olsa bile bildirim gelir.
+                      </div>
+                    </div>
+                  </button>
+                )}
               </div>
-              <p className="text-[11px] text-muted/60 mt-1.5">API anahtarları da dahil — dosyayı güvende tut.</p>
             </div>
 
             {/* Yanıt stili */}
@@ -1581,36 +1586,85 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               </div>
             )}
 
-            {/* Sistem promptu */}
-            <div className="premium-card rounded-xl p-4">
-              <h4 className="text-sm font-bold mb-1">Sistem Promptu</h4>
-              <textarea value={systemPromptDraft} onChange={(e) => setSystemPromptDraft(e.target.value)} onBlur={() => saveConfig({ ...config, systemPrompt: systemPromptDraft })} rows={4} className="input-mono !text-xs leading-relaxed" />
-              <button onClick={() => { saveConfig({ ...config, systemPrompt: DEFAULT_SYSTEM_PROMPT }); setSystemPromptDraft(DEFAULT_SYSTEM_PROMPT); }} className="text-xs text-muted hover:text-brand mt-1">Varsayılana sıfırla</button>
-            </div>
-
-            {/* Bağlam limiti */}
-            <div className="premium-card rounded-xl p-4">
-              <h4 className="text-sm font-bold mb-1">Bağlam Penceresi</h4>
-              <p className="text-xs text-muted mb-2 leading-relaxed">Modelin bir seferde ne kadar geçmişi (token) hatırlayacağı. Yükseği daha fazla bağlam demektir ama maliyeti artırır; modelin gerçek sınırının üstüne çıkmak fark etmez. Emin değilsen varsayılanda bırak.</p>
-              <select value={config.maxContext} onChange={(e) => saveConfig({ ...config, maxContext: Number(e.target.value) })} className="input-mono text-xs">
-                {[4096, 8192, 16384, 32768, 65536, 131072, 200000, 400000, 1000000, 2000000].map((n) => (
-                  <option key={n} value={n}>{n >= 1000000 ? `${(n / 1000000).toFixed(0)}M token` : `${(n / 1024).toFixed(0)}K token`}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Kısayollar */}
-            <div className="premium-card rounded-xl p-4">
-              <h4 className="text-sm font-bold mb-2">Klavye Kısayolları</h4>
-              <div className="grid gap-1.5 text-xs">
-                {[["Ctrl + N", "Yeni sohbet"], ["Ctrl + Shift + N", "Gizli sohbet"], ["Ctrl + ,", "Ayarlar"]].map(([key, desc]) => (
-                  <div key={key} className="flex items-center gap-3">
-                    <kbd className="px-2 py-0.5 rounded bg-bgsoft border border-line font-mono text-[11px] text-muted">{key}</kbd>
-                    <span className="text-muted">{desc}</span>
+            {/* Gelişmiş — günlük kullanımda dokunulmayan ayarlar tek katlanır blokta. */}
+            <details className="premium-card rounded-xl p-4 group/adv">
+              <summary className="text-sm font-bold cursor-pointer list-none flex items-center gap-2">
+                <ChevronRight size={14} className="text-muted/60 transition-transform group-open/adv:rotate-90" />
+                Gelişmiş
+              </summary>
+              <div className="flex flex-col gap-5 mt-4">
+                {/* Yedekle / geri yükle */}
+                <div>
+                  <h4 className="text-sm font-bold mb-2">Yedek</h4>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        const s = useStore.getState();
+                        const data = JSON.stringify({ version: 1, exportedAt: Date.now(), config: s.config, chats: s.chats }, null, 2);
+                        const blob = new Blob([data], { type: "application/json" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url; a.download = `craftcoder-yedek-${new Date().toISOString().slice(0, 10)}.json`;
+                        a.click(); URL.revokeObjectURL(url);
+                        addToast("Yedek indirildi (ayarlar + sohbetler)", "success");
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-line bg-bgsoft hover:border-brand text-sm"
+                    >
+                      <Download size={14} /> Yedek indir
+                    </button>
+                    <label className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-line bg-bgsoft hover:border-brand text-sm cursor-pointer">
+                      <Upload size={14} /> Geri yükle
+                      <input
+                        type="file" accept="application/json" className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const data = JSON.parse(await file.text());
+                            if (!confirm("Bu yedek MEVCUT ayarlarının ve sohbetlerinin yerine geçecek. Devam edilsin mi?")) { e.target.value = ""; return; }
+                            useStore.getState().importBackup({ config: data.config, chats: data.chats });
+                            addToast("Yedek geri yüklendi ✓", "success");
+                          } catch { addToast("Geçersiz yedek dosyası", "error"); }
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
                   </div>
-                ))}
+                  <p className="text-[11px] text-muted/60 mt-1.5">API anahtarları da dahil — dosyayı güvende tut.</p>
+                </div>
+
+                {/* Sistem promptu */}
+                <div>
+                  <h4 className="text-sm font-bold mb-1">Sistem Promptu</h4>
+                  <textarea value={systemPromptDraft} onChange={(e) => setSystemPromptDraft(e.target.value)} onBlur={() => saveConfig({ ...config, systemPrompt: systemPromptDraft })} rows={4} className="input-mono !text-xs leading-relaxed" />
+                  <button onClick={() => { saveConfig({ ...config, systemPrompt: DEFAULT_SYSTEM_PROMPT }); setSystemPromptDraft(DEFAULT_SYSTEM_PROMPT); }} className="text-xs text-muted hover:text-brand mt-1">Varsayılana sıfırla</button>
+                </div>
+
+                {/* Bağlam limiti */}
+                <div>
+                  <h4 className="text-sm font-bold mb-1">Bağlam Penceresi</h4>
+                  <p className="text-xs text-muted mb-2 leading-relaxed">Modelin bir seferde ne kadar geçmişi (token) hatırlayacağı. Yükseği daha fazla bağlam demektir ama maliyeti artırır; modelin gerçek sınırının üstüne çıkmak fark etmez. Emin değilsen varsayılanda bırak.</p>
+                  <select value={config.maxContext} onChange={(e) => saveConfig({ ...config, maxContext: Number(e.target.value) })} className="input-mono text-xs">
+                    {[4096, 8192, 16384, 32768, 65536, 131072, 200000, 400000, 1000000, 2000000].map((n) => (
+                      <option key={n} value={n}>{n >= 1000000 ? `${(n / 1000000).toFixed(0)}M token` : `${(n / 1024).toFixed(0)}K token`}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Kısayollar */}
+                <div>
+                  <h4 className="text-sm font-bold mb-2">Klavye Kısayolları</h4>
+                  <div className="grid gap-1.5 text-xs">
+                    {[["Ctrl + N", "Yeni sohbet"], ["Ctrl + Shift + N", "Gizli sohbet"], ["Ctrl + ,", "Ayarlar"]].map(([key, desc]) => (
+                      <div key={key} className="flex items-center gap-3">
+                        <kbd className="px-2 py-0.5 rounded bg-bgsoft border border-line font-mono text-[11px] text-muted">{key}</kbd>
+                        <span className="text-muted">{desc}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
+            </details>
           </section>
         )}
 

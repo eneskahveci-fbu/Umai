@@ -2,8 +2,10 @@ import { after } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { isSafeRemoteUrl } from "@/lib/urlSafety";
 import { createClient } from "@/lib/supabase/server";
-import { buildHeaders, callModel, type LlmCfg } from "@/lib/llmCall";
-import { JOB_SYSTEM, buildJobMessages, deriveJobTitle } from "@/lib/jobs";
+import { buildHeaders, type LlmCfg } from "@/lib/llmCall";
+import { runSwarmToCompletion } from "@/lib/swarmPipeline";
+import { sendPushToUser } from "@/lib/push";
+import { JOB_SYSTEM, deriveJobTitle } from "@/lib/jobs";
 import type { Provider } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -93,37 +95,34 @@ export async function POST(req: Request) {
   });
   if (insErr) return Response.json({ server: false, reason: insErr.message.slice(0, 120) });
 
-  /* Asıl iş: yanıt döndükten sonra sunucuda sürer (tarayıcıdan bağımsız). */
+  /* Asıl iş: yanıt döndükten sonra sunucuda sürer (tarayıcıdan bağımsız).
+     Ajan Ekibi ile aynı motor (planla → bölünmeye değerse paralel uzmanlar →
+     birleştir): görev basitse planlayıcı tek görev döndürür, ek gecikme
+     yaratmadan tek-ajan yanıtına düşülür. */
   after(async () => {
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), 280_000); // maxDuration emniyet payı
     try {
-      let result = "";
-      let lastErr: Error | null = null;
-      for (const cfg of cfgs) {
-        try {
-          result = await callModel(cfg, [
-            { role: "system", content: JOB_SYSTEM },
-            ...buildJobMessages(goal),
-          ], ac.signal);
-          if (result.trim()) break;
-        } catch (e) {
-          if ((e as Error)?.name === "AbortError") throw e;
-          lastErr = e as Error;
-        }
-      }
+      const result = await runSwarmToCompletion({
+        cfgs, baseSys: JOB_SYSTEM, shared: [], userTask: goal, signal: ac.signal,
+      });
       if (result.trim()) {
         await supabase.from("background_jobs").update({ status: "done", result: result.trim() }).eq("id", jobId);
+        await sendPushToUser(supabase, user.id, {
+          title: "Görev tamamlandı", body: deriveJobTitle(goal), url: "/app",
+        });
       } else {
         await supabase.from("background_jobs").update({
-          status: "error", error: lastErr?.message?.slice(0, 300) || "Model boş yanıt döndürdü.",
+          status: "error", error: "Model boş yanıt döndürdü.",
         }).eq("id", jobId);
+        await sendPushToUser(supabase, user.id, { title: "Görev başarısız", body: deriveJobTitle(goal), url: "/app" });
       }
     } catch (e) {
       await supabase.from("background_jobs").update({
         status: "error",
         error: (e as Error)?.name === "AbortError" ? "Süre sınırı aşıldı (5 dk)." : ((e as Error).message || "bilinmeyen").slice(0, 300),
       }).eq("id", jobId).then(() => undefined, () => undefined);
+      await sendPushToUser(supabase, user.id, { title: "Görev başarısız", body: deriveJobTitle(goal), url: "/app" }).catch(() => undefined);
     } finally {
       clearTimeout(timer);
     }

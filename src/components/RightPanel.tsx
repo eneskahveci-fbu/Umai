@@ -222,9 +222,9 @@ export function RightPanel(props: RightPanelProps) {
             onClick={splitView ? props.onCloseEditor : closeActive}
             aria-label="Kapat"
             title="Kapat"
-            className="text-muted/40 hover:text-ink w-8 h-8 grid place-items-center rounded-lg hover:bg-bgsoft transition-colors"
+            className="text-muted/40 hover:text-ink w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg hover:bg-bgsoft transition-colors"
           >
-            <X size={13} />
+            <X size={16} />
           </button>
         )}
       </div>

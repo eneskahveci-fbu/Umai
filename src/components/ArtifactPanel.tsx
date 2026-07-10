@@ -1,10 +1,11 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, Eye, Link2, Loader2, Maximize2, Minimize2, RotateCw, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, Eye, Link2, Maximize2, Minimize2, RotateCw, X } from "lucide-react";
 import { useState } from "react";
 import { useStore } from "@/lib/store";
 import type { Artifact } from "@/lib/types";
 import { buildArtifactSrcDoc, artifactDownload } from "@/lib/artifactDoc";
+import { ExportMenu } from "./studio/ExportMenu";
 
 export function ArtifactPanel() {
   const artifact = useStore((s) => s.artifact);
@@ -113,24 +114,23 @@ export function ArtifactPanel() {
           </div>
 
           <button onClick={copySource} className={iconBtn} title="Kaynağı kopyala">{copied ? <Check size={15} className="text-brand" /> : <Copy size={15} />}</button>
-          <button onClick={download} className={iconBtn} title="İndir"><Download size={15} /></button>
-          <button onClick={publish} disabled={publishing} className={iconBtn} title="Yayınla (paylaşılabilir bağlantı)">
-            {publishing ? <Loader2 size={15} className="animate-spin" /> : <Link2 size={15} />}
-          </button>
-          {view === "preview" && (
-            <>
-              <button onClick={() => setReloadKey((k) => k + 1)} className={iconBtn} title="Yenile"><RotateCw size={15} /></button>
-              <button
-                onClick={() => {
+          <ExportMenu
+            triggerLabel="Dışa aktar"
+            busy={publishing}
+            options={[
+              { key: "download", label: "İndir", icon: <Download size={14} />, onSelect: download },
+              { key: "publish", label: "Yayınla (bağlantı)", icon: <Link2 size={14} />, onSelect: publish },
+              ...(view === "preview" ? [
+                { key: "reload", label: "Yenile", icon: <RotateCw size={14} />, onSelect: () => setReloadKey((k) => k + 1), separatorBefore: true },
+                { key: "open-tab", label: "Yeni sekmede aç", icon: <ExternalLink size={14} />, onSelect: () => {
                   const blob = new Blob([srcdoc], { type: "text/html" });
                   const url = URL.createObjectURL(blob);
                   window.open(url, "_blank", "noopener");
                   setTimeout(() => URL.revokeObjectURL(url), 10000);
-                }}
-                className={iconBtn} title="Yeni sekmede aç"
-              ><ExternalLink size={15} /></button>
-            </>
-          )}
+                } },
+              ] : []),
+            ]}
+          />
           <button onClick={() => setExpanded(!expanded)} className={iconBtn} title={expanded ? "Küçült" : "Büyüt"}>{expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
           <button onClick={() => { setArtifact(null); setExpanded(false); }} className={iconBtn} title="Kapat"><X size={15} /></button>
         </div>
