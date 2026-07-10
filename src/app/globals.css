@@ -24,6 +24,9 @@
      rengini (currentColor) izler. */
   --font-sans: var(--font-inter), var(--font-emoji), system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-jetbrains-mono), var(--font-emoji), ui-monospace, monospace;
+  /* Başlıklar / hero metinler — sıcak editoryal serif (Perplexity/Claude'un
+     sans+serif ikilisi ruhunda), gövde metni --font-sans'ta kalır. */
+  --font-serif: var(--font-fraunces), Georgia, serif;
 }
 
 :root {
@@ -222,7 +225,8 @@ body {
 .prose-chat h3,
 .prose-chat h4 {
   margin: 24px 0 10px;
-  font-weight: 700;
+  font-family: var(--font-serif);
+  font-weight: 600;
   line-height: 1.35;
 }
 .prose-chat h1 { font-size: 1.35em; font-weight: 800; margin-top: 28px; }

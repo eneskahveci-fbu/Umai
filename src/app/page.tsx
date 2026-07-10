@@ -144,7 +144,7 @@ export default function Home() {
           kurulum yok · ücretsiz · anında
         </span>
 
-        <h1 className="animate-rise text-[2.6rem] leading-[1.06] sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-balance" style={{ animationDelay: "60ms" }}>
+        <h1 className="font-serif animate-rise text-[2.6rem] leading-[1.06] sm:text-6xl lg:text-7xl font-semibold tracking-tight text-balance" style={{ animationDelay: "60ms" }}>
           Bir cümle yaz,
           <br />
           <span className="brand-text">gerisini yapay zeka halletsin.</span>
@@ -189,7 +189,7 @@ export default function Home() {
 
       {/* NE YAPABİLİRSİN — sade, dört öğe */}
       <section className="max-w-4xl mx-auto px-5 sm:px-6 py-14 w-full">
-        <h2 className="text-2xl sm:text-3xl font-extrabold mb-8 tracking-tight text-center text-balance">Craft ile neler yapabilirsin?</h2>
+        <h2 className="font-serif text-2xl sm:text-3xl font-semibold mb-8 tracking-tight text-center text-balance">Craft ile neler yapabilirsin?</h2>
         <div className="grid sm:grid-cols-2 gap-3">
           {CAN_DO.map((f) => (
             <div key={f.title} className="premium-card rounded-2xl p-5 flex items-start gap-4">
@@ -221,7 +221,7 @@ export default function Home() {
           <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-brand/70 mb-3">
             <FlaskConical size={13} /> Araştırma & Kurumlar için
           </span>
-          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-balance">Ar-Ge ekipleri, akademisyenler ve kurumlar için</h2>
+          <h2 className="font-serif text-2xl sm:text-3xl font-semibold tracking-tight text-balance">Ar-Ge ekipleri, akademisyenler ve kurumlar için</h2>
           <p className="text-muted max-w-2xl mx-auto mt-3 text-balance">Proje başvurusundan sunuma, rapordan postere kadar — araştırma işini konuşarak hazırla. Verini kendi kontrolünde tut.</p>
         </div>
         <div className="grid sm:grid-cols-3 gap-3 mb-6">
@@ -252,7 +252,7 @@ export default function Home() {
         <div className="relative rounded-[2rem] overflow-hidden border border-brand/20 bg-surface p-10 sm:p-14 text-center elev-2">
           <div className="aurora absolute inset-0 -z-0" aria-hidden />
           <div className="absolute inset-0 -z-0 bg-[radial-gradient(ellipse_60%_90%_at_50%_50%,rgba(200,168,126,0.08),transparent)]" />
-          <h2 className="text-3xl sm:text-4xl font-extrabold mb-3 relative tracking-tight text-balance">Aklındaki şeyi bugün yap</h2>
+          <h2 className="font-serif text-3xl sm:text-4xl font-semibold mb-3 relative tracking-tight text-balance">Aklındaki şeyi bugün yap</h2>
           <p className="text-muted mb-8 max-w-lg mx-auto relative text-balance">
             Bir cümle yeter. Craft&apos;ı aç, ne istediğini yaz ve sonucu saniyeler içinde gör.
           </p>
@@ -268,7 +268,7 @@ export default function Home() {
       {/* FAQ */}
       <section className="max-w-3xl mx-auto px-5 sm:px-6 py-14 w-full">
         <div className="text-center mb-10">
-          <h2 className="text-3xl font-extrabold mb-3 tracking-tight">Sık sorulan sorular</h2>
+          <h2 className="font-serif text-3xl font-semibold mb-3 tracking-tight">Sık sorulan sorular</h2>
         </div>
         <div className="space-y-3">
           {FAQS.map((faq) => (
