@@ -414,21 +414,20 @@ export function Sidebar() {
       <div className="px-3 py-3 border-b border-line/60 shrink-0 space-y-2">
         <button
           onClick={() => newChat(false)}
-          className="btn-brand-glow w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[#111110] font-semibold text-sm transition-transform hover:-translate-y-0.5"
+          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-brand hover:bg-branddim text-[#111110] font-semibold text-sm transition-colors"
         >
           <Plus size={15} /> Yeni Sohbet
         </button>
         <button
           onClick={() => router.push("/studio")}
           aria-current={pathname.startsWith("/studio") ? "page" : undefined}
-          className={`group premium-card w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:-translate-y-0.5 ${
+          className={`premium-card w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
             pathname.startsWith("/studio")
               ? "border-brand/40 bg-brand/10 text-ink"
               : "text-ink/80 hover:text-ink hover:border-brand/40"
           }`}
         >
-          <Sparkles size={15} className="text-brand transition-transform duration-200 group-hover:scale-110 group-hover:rotate-6" /> Stüdyo
-          <span className="ml-auto text-[9px] font-bold uppercase tracking-wider text-brand/70 bg-brand/10 px-1.5 py-0.5 rounded">Tasarım · Görsel</span>
+          <Sparkles size={15} className="text-brand" /> Stüdyo
         </button>
         {/* İçerik araçları (Doküman/Anket/Defter) — anket kararıyla stüdyodan buraya taşındı. */}
         <SidebarTools />

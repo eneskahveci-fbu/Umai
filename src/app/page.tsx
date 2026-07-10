@@ -9,9 +9,7 @@ import {
   LayoutTemplate,
   MessageCircle,
   ShieldCheck,
-  Sparkles,
   Wand2,
-  Zap,
 } from "lucide-react";
 
 function LogoMark({ size = 28 }: { size?: number }) {
@@ -135,56 +133,45 @@ export default function Home() {
       </nav>
 
       {/* HERO */}
-      <header className="relative max-w-5xl mx-auto px-5 sm:px-6 pt-20 sm:pt-28 pb-14 text-center overflow-hidden w-full">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_65%_50%_at_50%_0%,rgba(200,168,126,0.14),transparent)]" />
-        <div className="aurora absolute inset-0 -z-10" aria-hidden />
-
-        <span className="animate-rise inline-flex items-center gap-2 text-sm text-muted border border-line bg-surface/70 backdrop-blur-sm px-4 py-1.5 rounded-full mb-8">
-          <Sparkles size={13} className="text-brand" />
-          kurulum yok · ücretsiz · anında
-        </span>
-
-        <h1 className="font-serif animate-rise text-[2.6rem] leading-[1.06] sm:text-6xl lg:text-7xl font-semibold tracking-tight text-balance" style={{ animationDelay: "60ms" }}>
-          Bir cümle yaz,
-          <br />
-          <span className="brand-text">gerisini yapay zeka halletsin.</span>
+      <header className="max-w-5xl mx-auto px-5 sm:px-6 pt-20 sm:pt-28 pb-14 text-center w-full">
+        <h1 className="font-serif text-[2.4rem] leading-[1.12] sm:text-5xl lg:text-6xl font-semibold tracking-tight text-balance">
+          Umai, konuşarak üreten ve kod yazan yapay zeka platformu.
         </h1>
 
-        <p className="animate-rise text-lg text-muted max-w-2xl mx-auto mt-6 leading-relaxed text-balance" style={{ animationDelay: "120ms" }}>
-          Web sitesi ve sunum tasarla, görsel üret, her şeyi sor — ya da kod yazıp depona bağlan.
-          Yazılım da yapay zeka da bilmene gerek yok. Sen anlat, Umai yapsın.
+        <p className="text-lg text-muted max-w-2xl mx-auto mt-6 leading-relaxed text-balance">
+          Web sitesi, sunum ve görsel tasarla; kod yaz, GitHub veya GitLab deponu yönet —
+          tek platformda, istediğin yapay zeka modeliyle. Kurulum yok, ücretsiz başlar.
         </p>
 
         {/* İKİ YOL — akıllı ayrım */}
-        <div className="grid sm:grid-cols-2 gap-4 mt-12 text-left animate-rise" style={{ animationDelay: "180ms" }}>
+        <div className="grid sm:grid-cols-2 gap-4 mt-12 text-left">
           {PATHS.map((p) => (
             <Link
               key={p.href}
               href={p.href}
-              className="hover-lift group relative premium-card rounded-3xl p-6 sm:p-7 flex flex-col overflow-hidden"
+              className="group premium-card rounded-2xl p-6 sm:p-7 flex flex-col transition-colors hover:border-brand/40"
             >
-              <div className="absolute inset-0 -z-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(200,168,126,0.08),transparent)]" />
-              <div className="relative flex items-center gap-3 mb-4">
-                <span className="w-12 h-12 rounded-2xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0 transition-transform duration-200 group-hover:scale-110">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="w-11 h-11 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0">
                   {p.icon}
                 </span>
-                <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand/70">{p.badge}</span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">{p.badge}</span>
               </div>
-              <h2 className="relative text-2xl font-extrabold tracking-tight mb-2">{p.title}</h2>
-              <p className="relative text-sm text-muted leading-relaxed mb-5 flex-1">{p.desc}</p>
-              <div className="relative flex flex-wrap gap-1.5 mb-5">
+              <h2 className="text-xl font-bold tracking-tight mb-2">{p.title}</h2>
+              <p className="text-sm text-muted leading-relaxed mb-5 flex-1">{p.desc}</p>
+              <div className="flex flex-wrap gap-1.5 mb-5">
                 {p.chips.map((c) => (
                   <span key={c} className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-bgsoft border border-line/70 text-ink/80">{c}</span>
                 ))}
               </div>
-              <span className="relative inline-flex items-center gap-1.5 text-sm font-semibold text-brand group-hover:gap-2.5 transition-all">
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand">
                 {p.cta} <ArrowRight size={15} />
               </span>
             </Link>
           ))}
         </div>
 
-        <p className="text-xs text-muted/60 mt-6">Emin değil misin? İkisini de tek hesapta dener, istediğin zaman geçiş yaparsın.</p>
+        <p className="text-xs text-muted/60 mt-6">İkisini de tek hesapta dener, istediğin zaman geçiş yaparsın.</p>
       </header>
 
       {/* NE YAPABİLİRSİN — sade, dört öğe */}
@@ -205,20 +192,10 @@ export default function Home() {
         </div>
       </section>
 
-      {/* GÜVEN ŞERİDİ */}
-      <section className="max-w-4xl mx-auto px-5 sm:px-6 py-8 w-full">
-        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-muted">
-          <span className="inline-flex items-center gap-2"><Zap size={15} className="text-brand" /> Anında başlar</span>
-          <span className="inline-flex items-center gap-2"><ShieldCheck size={15} className="text-brand" /> Anahtarların sende kalır</span>
-          <span className="inline-flex items-center gap-2"><Sparkles size={15} className="text-brand" /> Ücretsiz & kredi kartsız</span>
-          <span className="inline-flex items-center gap-2"><MessageCircle size={15} className="text-brand" /> Türkçe, insan diliyle</span>
-        </div>
-      </section>
-
       {/* ARAŞTIRMA & KURUMLAR */}
       <section className="max-w-5xl mx-auto px-5 sm:px-6 py-14 w-full">
         <div className="text-center mb-8">
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-brand/70 mb-3">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted mb-3">
             <FlaskConical size={13} /> Araştırma & Kurumlar için
           </span>
           <h2 className="font-serif text-2xl sm:text-3xl font-semibold tracking-tight text-balance">Ar-Ge ekipleri, akademisyenler ve kurumlar için</h2>
@@ -249,18 +226,16 @@ export default function Home() {
 
       {/* CTA BANNER */}
       <section className="max-w-5xl mx-auto px-5 sm:px-6 py-14 w-full">
-        <div className="relative rounded-[2rem] overflow-hidden border border-brand/20 bg-surface p-10 sm:p-14 text-center elev-2">
-          <div className="aurora absolute inset-0 -z-0" aria-hidden />
-          <div className="absolute inset-0 -z-0 bg-[radial-gradient(ellipse_60%_90%_at_50%_50%,rgba(200,168,126,0.08),transparent)]" />
-          <h2 className="font-serif text-3xl sm:text-4xl font-semibold mb-3 relative tracking-tight text-balance">Aklındaki şeyi bugün yap</h2>
-          <p className="text-muted mb-8 max-w-lg mx-auto relative text-balance">
-            Bir cümle yeter. Umai&apos;yi aç, ne istediğini yaz ve sonucu saniyeler içinde gör.
+        <div className="rounded-2xl border border-line bg-surface p-10 sm:p-14 text-center">
+          <h2 className="font-serif text-2xl sm:text-3xl font-semibold mb-3 tracking-tight text-balance">Ücretsiz başla</h2>
+          <p className="text-muted mb-8 max-w-lg mx-auto text-balance">
+            Hesap oluşturmadan dene; kredi kartı gerekmez.
           </p>
           <Link
             href="/app"
-            className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-[#111110] font-semibold px-8 py-4 rounded-2xl shadow-lg shadow-brand/25 hover:shadow-brand/35 transition-all duration-200 relative text-[15px]"
+            className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-[#111110] font-semibold px-8 py-4 rounded-xl transition-colors text-[15px]"
           >
-            Ücretsiz başla <ArrowRight size={17} />
+            Umai&apos;yi aç <ArrowRight size={17} />
           </Link>
         </div>
       </section>
@@ -290,7 +265,7 @@ export default function Home() {
             <LogoMark size={22} />
             <span className="text-ink">umai</span>
           </div>
-          <p className="text-sm text-muted">Herkes için yapay zeka stüdyosu · Tasarla, üret, sor</p>
+          <p className="text-sm text-muted">Web sitesi, sunum ve görsel tasarla · kod yaz ve depona bağlan</p>
 
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 mt-8 text-xs text-muted/70">
             <Link href="/pricing" className="hover:text-brand transition-colors">Fiyatlandırma</Link>
