@@ -473,7 +473,7 @@ export interface Config {
   rulesFile: string;
   fontScale: "sm" | "base" | "lg";
   soundEnabled: boolean;
-  accentColor: "amber" | "green" | "orange";
+  accentColor: "pine" | "green" | "orange";
   maxContext: number;
   webcontainerApiKey: string;
   /** Uzak WebSocket PTY sunucusu URL'i (ör. wss://terminal.example.com?token=xxx).

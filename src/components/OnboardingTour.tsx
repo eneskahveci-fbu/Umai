@@ -42,10 +42,10 @@ export function OnboardingTour() {
   const steps: Step[] = [
     {
       icon: <span className="text-2xl">◈</span>,
-      title: "Craft'a hoş geldin 👋",
+      title: "Umai'ye hoş geldin 👋",
       body: (
         <>
-          Ne istediğini <strong className="text-ink">sıradan cümlelerle</strong> yaz — Craft senin için yapsın.
+          Ne istediğini <strong className="text-ink">sıradan cümlelerle</strong> yaz — Umai senin için yapsın.
           Yazılım ya da yapay zeka bilmene gerek yok. Kurulum da yok: <strong className="text-ink">ücretsiz</strong> bir
           yapay zeka hazır bekliyor, hemen başlayabilirsin.
         </>

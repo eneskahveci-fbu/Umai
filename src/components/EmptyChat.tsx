@@ -41,7 +41,7 @@ export function EmptyChat({ onPrompt }: EmptyChatProps) {
       <div className="animate-rise text-[11px] font-semibold uppercase tracking-[0.18em] text-brand/70 mb-2">{greeting()} 👋</div>
       <h2 className="animate-rise text-[26px] sm:text-[28px] font-extrabold tracking-tight mb-2 text-center text-balance" style={{ animationDelay: "60ms" }}>Ne üzerinde çalışalım?</h2>
       <p className="animate-rise text-sm text-muted/70 max-w-sm text-center leading-relaxed mb-6" style={{ animationDelay: "120ms" }}>
-        Sıradan cümlelerle anlat — gerisini Craft halletsin.
+        Sıradan cümlelerle anlat — gerisini Umai halletsin.
       </p>
 
       {/* Kompakt öneri çipleri — büyük kart yığını yerine sade bir sıra. */}

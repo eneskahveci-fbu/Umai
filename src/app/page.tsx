@@ -17,15 +17,15 @@ import {
 function LogoMark({ size = 28 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-      <rect width="28" height="28" rx="7" fill="#c8a87e" fillOpacity="0.12" />
+      <rect width="28" height="28" rx="7" fill="#5c9478" fillOpacity="0.12" />
       <path
         d="M14 5L22 10.5V17.5L14 23L6 17.5V10.5L14 5Z"
-        stroke="#c8a87e"
+        stroke="#5c9478"
         strokeWidth="1.6"
         strokeLinejoin="round"
         fill="none"
       />
-      <circle cx="14" cy="14" r="2.8" fill="#c8a87e" fillOpacity="0.85" />
+      <circle cx="14" cy="14" r="2.8" fill="#5c9478" fillOpacity="0.85" />
     </svg>
   );
 }
@@ -64,7 +64,7 @@ const CAN_DO = [
 const FAQS = [
   {
     q: "Yazılım veya yapay zeka bilmiyorum, kullanabilir miyim?",
-    a: "Evet — Craft tam da bunun için tasarlandı. Ne istediğini sıradan cümlelerle yazarsın, gerisini yapay zeka halleder. Hiçbir kurulum, kod ya da teknik bilgi gerekmez.",
+    a: "Evet — Umai tam da bunun için tasarlandı. Ne istediğini sıradan cümlelerle yazarsın, gerisini yapay zeka halleder. Hiçbir kurulum, kod ya da teknik bilgi gerekmez.",
   },
   {
     q: "Ücretsiz mi? Kredi kartı istiyor mu?",
@@ -89,7 +89,7 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://craft-coder.vercel
 const JSON_LD_APP = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "Craft",
+  name: "Umai",
   description:
     "Herkes için yapay zeka stüdyosu. Web sitesi ve sunum tasarla, görsel üret, her şeyi sor — ya da kod yazıp GitHub/GitLab depona bağlan. Kurulum yok, ücretsiz başlar.",
   url: SITE_URL,
@@ -118,7 +118,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-5 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5 font-extrabold text-xl tracking-tight">
             <LogoMark size={28} />
-            <span className="text-ink">craft</span>
+            <span className="text-ink">umai</span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <Link href="/pricing" className="hidden sm:inline-flex text-sm text-muted hover:text-ink font-medium px-3 py-2 transition-colors">
@@ -152,7 +152,7 @@ export default function Home() {
 
         <p className="animate-rise text-lg text-muted max-w-2xl mx-auto mt-6 leading-relaxed text-balance" style={{ animationDelay: "120ms" }}>
           Web sitesi ve sunum tasarla, görsel üret, her şeyi sor — ya da kod yazıp depona bağlan.
-          Yazılım da yapay zeka da bilmene gerek yok. Sen anlat, Craft yapsın.
+          Yazılım da yapay zeka da bilmene gerek yok. Sen anlat, Umai yapsın.
         </p>
 
         {/* İKİ YOL — akıllı ayrım */}
@@ -189,7 +189,7 @@ export default function Home() {
 
       {/* NE YAPABİLİRSİN — sade, dört öğe */}
       <section className="max-w-4xl mx-auto px-5 sm:px-6 py-14 w-full">
-        <h2 className="font-serif text-2xl sm:text-3xl font-semibold mb-8 tracking-tight text-center text-balance">Craft ile neler yapabilirsin?</h2>
+        <h2 className="font-serif text-2xl sm:text-3xl font-semibold mb-8 tracking-tight text-center text-balance">Umai ile neler yapabilirsin?</h2>
         <div className="grid sm:grid-cols-2 gap-3">
           {CAN_DO.map((f) => (
             <div key={f.title} className="premium-card rounded-2xl p-5 flex items-start gap-4">
@@ -241,7 +241,7 @@ export default function Home() {
           <Link href="/app" className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-[#111110] font-semibold px-6 py-3 rounded-xl text-sm transition-colors">
             Araştırma için dene <ArrowRight size={15} />
           </Link>
-          <a href="mailto:eneskahveci.bs@gmail.com?subject=Craft%20—%20Kurumsal%2FAra%C5%9Ft%C4%B1rma%20Kullan%C4%B1m%C4%B1" className="inline-flex items-center gap-2 border border-line bg-surface text-muted hover:text-ink hover:border-brand/40 px-6 py-3 rounded-xl text-sm font-medium transition-colors">
+          <a href="mailto:eneskahveci.bs@gmail.com?subject=Umai%20—%20Kurumsal%2FAra%C5%9Ft%C4%B1rma%20Kullan%C4%B1m%C4%B1" className="inline-flex items-center gap-2 border border-line bg-surface text-muted hover:text-ink hover:border-brand/40 px-6 py-3 rounded-xl text-sm font-medium transition-colors">
             Kurumsal kullanım / teklif <ArrowRight size={15} />
           </a>
         </div>
@@ -254,7 +254,7 @@ export default function Home() {
           <div className="absolute inset-0 -z-0 bg-[radial-gradient(ellipse_60%_90%_at_50%_50%,rgba(200,168,126,0.08),transparent)]" />
           <h2 className="font-serif text-3xl sm:text-4xl font-semibold mb-3 relative tracking-tight text-balance">Aklındaki şeyi bugün yap</h2>
           <p className="text-muted mb-8 max-w-lg mx-auto relative text-balance">
-            Bir cümle yeter. Craft&apos;ı aç, ne istediğini yaz ve sonucu saniyeler içinde gör.
+            Bir cümle yeter. Umai&apos;yi aç, ne istediğini yaz ve sonucu saniyeler içinde gör.
           </p>
           <Link
             href="/app"
@@ -288,7 +288,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-5 sm:px-6 py-12 text-center">
           <div className="flex items-center justify-center gap-2 font-extrabold text-lg mb-3">
             <LogoMark size={22} />
-            <span className="text-ink">craft</span>
+            <span className="text-ink">umai</span>
           </div>
           <p className="text-sm text-muted">Herkes için yapay zeka stüdyosu · Tasarla, üret, sor</p>
 

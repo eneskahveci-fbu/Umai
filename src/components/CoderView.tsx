@@ -818,7 +818,7 @@ export function CoderView() {
   useEffect(() => {
     if (!streaming) return;
     const prev = document.title;
-    document.title = "● Yanıt yazılıyor… — Craft";
+    document.title = "● Yanıt yazılıyor… — Umai";
     return () => { document.title = prev; };
   }, [streaming]);
   /* Escape → akışı durdur (Claude davranışı; menüler açıkken onlara öncelik). */
@@ -2313,7 +2313,7 @@ export function CoderView() {
       if (useStore.getState().config.soundEnabled) {
         const { playReady, notifyReady } = await import("@/lib/sounds");
         playReady();
-        notifyReady("Craft", "Yanıt hazır.");
+        notifyReady("Umai", "Yanıt hazır.");
       }
       void extractMemory();
       fireHooks("onStop");
@@ -2501,7 +2501,7 @@ export function CoderView() {
           <div className="w-6 h-6 rounded-md bg-brand/15 border border-brand/25 grid place-items-center">
             <Code2 size={13} className="text-brand" />
           </div>
-          <span className="text-sm font-semibold text-ink">Craft</span>
+          <span className="text-sm font-semibold text-ink">Umai</span>
           {repo && (
             <span className="hidden sm:flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-bgsoft border border-line/60 text-muted/70 font-mono">
               {repo.owner}/{repo.repo}

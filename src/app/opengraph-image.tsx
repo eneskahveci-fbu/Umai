@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "Craft — AI kod asistanı";
+export const alt = "Umai — AI kod asistanı";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -17,9 +17,9 @@ export default function OpengraphImage() {
           alignItems: "center",
           justifyContent: "center",
           background:
-            "radial-gradient(60% 60% at 50% 20%, rgba(200,168,126,0.30), transparent), #111110",
+            "radial-gradient(60% 60% at 50% 20%, rgba(92,148,120,0.30), transparent), #171a16",
           fontFamily: "system-ui, sans-serif",
-          color: "#f0ebe0",
+          color: "#e6e3d8",
           padding: 64,
         }}
       >
@@ -36,14 +36,14 @@ export default function OpengraphImage() {
               width: 84,
               height: 84,
               borderRadius: 22,
-              background: "linear-gradient(135deg, #c8a87e, #e0caa8)",
+              background: "linear-gradient(135deg, #5c9478, #93c2ac)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#111110",
+              color: "#171a16",
               fontSize: 48,
               fontWeight: 800,
-              boxShadow: "0 16px 40px rgba(200,168,126,0.30)",
+              boxShadow: "0 16px 40px rgba(92,148,120,0.30)",
             }}
           >
             ◆
@@ -56,7 +56,7 @@ export default function OpengraphImage() {
               display: "flex",
             }}
           >
-            Craft
+            Umai
           </div>
         </div>
         <div
@@ -74,7 +74,7 @@ export default function OpengraphImage() {
         <div
           style={{
             fontSize: 24,
-            color: "#9a9080",
+            color: "#8f9285",
             textAlign: "center",
             maxWidth: 880,
             lineHeight: 1.4,
@@ -101,10 +101,10 @@ export default function OpengraphImage() {
               style={{
                 padding: "10px 20px",
                 borderRadius: 999,
-                border: "1px solid #2e2a24",
-                background: "rgba(20,20,27,0.6)",
+                border: "1px solid #363c31",
+                background: "rgba(30,34,28,0.6)",
                 fontSize: 20,
-                color: "#f0ebe0",
+                color: "#e6e3d8",
               }}
             >
               {tag}
