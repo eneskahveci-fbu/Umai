@@ -1328,7 +1328,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     onClick={() => {
                       saveConfig({ ...config, accentColor: k });
                       const cls = document.documentElement.classList;
-                      cls.remove("accent-pine", "accent-green", "accent-orange");
+                      cls.remove("accent-amber", "accent-pine", "accent-green", "accent-orange");
                       cls.add(`accent-${k}`);
                     }}
                     className={`flex-1 py-2 rounded-lg border text-xs flex items-center justify-center gap-1.5 transition-colors ${
