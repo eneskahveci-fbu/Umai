@@ -1886,6 +1886,10 @@ export function CoderView() {
         signal: abortCtl.signal,
         body: JSON.stringify({
           messages: apiMessages,
+          /* Dayanıklılık: sekme yanıt bitmeden kapanırsa sunucu bu chatId'ye
+             nihai yanıtı yazıp push bildirimi gönderir (yalnız /api/chat okur;
+             gizli sohbette hiç gönderilmez — Supabase'e hiçbir şey gitmemeli). */
+          chatId: !incognito ? chat?.id : undefined,
           baseUrl: active.baseUrl, model: active.model, apiKey: reqKey,
           provider: active.provider, systemPrompt: finalSystemPrompt,
           /* Çok-sağlayıcılı otomatik fallback: aktif model hata verirse sunucu

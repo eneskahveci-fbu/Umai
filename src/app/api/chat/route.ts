@@ -14,10 +14,16 @@ import { CODER_TOOLS } from "@/lib/tools";
 import { EXTENSION_TOOLS } from "@/lib/extensions/registry";
 import { searchWeb, formatResults, fetchUrl } from "@/lib/webSearch";
 import { isSafeRemoteUrl } from "@/lib/urlSafety";
+import { after } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { sendPushToUser } from "@/lib/push";
 import type { ChatMessage, MemoryItem, Provider, ResponseStyle } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/* Vercel: yanıt döndükten sonra da (after) devam eder — sekme kapansa bile
+   yanıt sunucuda tamamlanır ve kalıcı hâle gelir (bkz. aşağıda `after()`). */
+export const maxDuration = 300;
 
 interface RepoCtx {
   owner: string;
@@ -67,6 +73,11 @@ interface McpServerConfig {
 
 interface ChatRequest {
   messages: (ChatMessage | { role: string; content: unknown; tool_calls?: unknown[]; tool_call_id?: string })[];
+  /** Bu sohbetin id'si — verilirse ve kullanıcı girişliyse, sekme yanıt bitmeden
+      kapanırsa (bkz. `after()` bloğu) sunucu nihai yanıtı doğrudan `chats`
+      tablosuna yazar + push bildirimi gönderir. Yoksa davranış birebir eskisi
+      gibi (yalnız istemci taraflı kalıcılık). */
+  chatId?: string;
   baseUrl?: string;
   model?: string;
   apiKey?: string;
@@ -965,7 +976,7 @@ interface RoundResult {
 
 async function streamRound(
   upstream: Response,
-  controller: ReadableStreamDefaultController,
+  controller: { enqueue: (chunk: Uint8Array) => void },
   encoder: TextEncoder,
 ): Promise<RoundResult> {
   const reader = upstream.body!.getReader();
@@ -1407,9 +1418,30 @@ export async function POST(req: Request) {
     allTools = allTools.filter((t) => perms[t.function.name] !== false);
   }
 
+  /* Dayanıklılık: chatId verilmiş + kullanıcı girişliyse, sekme yanıt
+     bitmeden kapansa bile nihai yanıt aşağıdaki after() bloğunda `chats`
+     tablosuna yazılır + push bildirimi gönderilir. Supabase yoksa/girişsizse
+     ya da chatId gelmemişse (gizli sohbet vb.) davranış birebir eskisi gibi. */
+  const durableSupabase = await createClient();
+  const durableUser = durableSupabase ? (await durableSupabase.auth.getUser()).data.user : null;
+  const durableChatId = durableUser && body.chatId ? body.chatId : null;
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
+      /* İstemci bağlantıyı kapatınca (sekme kapanır/ağ gider) bunu güvenilir
+         biçimde yakala — orchestrate/route.ts'teki aynı desen. enqueue'daki
+         try/catch, abort olayı zamanında yetişmezse son bir güvenlik ağı. */
+      let clientGone = false;
+      req.signal.addEventListener("abort", () => { clientGone = true; }, { once: true });
+      const safe = {
+        enqueue: (chunk: Uint8Array) => {
+          try { controller.enqueue(chunk); } catch { clientGone = true; }
+        },
+      };
+      /* Turlar boyunca biriken tam yanıt metni — dayanıklılık kaydı bunu yazar. */
+      let fullContent = "";
+      let lastFinishReason: string | null = null;
       const MAX_ROUNDS = 25;
       /* İstek başına dosya-okuma önbelleği: aynı dosya tekrar çekilmez. */
       const readCache = new Map<string, string>();
@@ -1439,12 +1471,12 @@ export async function POST(req: Request) {
             const { messages: msgs, extra } = toolBodyFor(chosen, lastRound);
             upstream = await openCandidate(chosen, msgs, extra);
           } catch (err) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**Bağlantı hatası:** ${(err as Error).message}` } }] })}\n\n`));
+            safe.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**Bağlantı hatası:** ${(err as Error).message}` } }] })}\n\n`));
             break;
           }
           if (!upstream.ok || !upstream.body) {
             const detail = await upstream.text().catch(() => "");
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**${friendlyApiError(upstream.status, detail, { model: chosen.model, provider: chosen.provider as Provider })}**` } }] })}\n\n`));
+            safe.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**${friendlyApiError(upstream.status, detail, { model: chosen.model, provider: chosen.provider as Provider })}**` } }] })}\n\n`));
             break;
           }
         } else {
@@ -1462,28 +1494,30 @@ export async function POST(req: Request) {
             lastStatus = r.status || 500; lastDetail = await r.text().catch(() => ""); lastCand = c;
           }
           if (!upstream) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**${friendlyApiError(lastStatus, lastDetail, { model: lastCand.model, provider: lastCand.provider as Provider })}**` } }] })}\n\n`));
+            safe.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**${friendlyApiError(lastStatus, lastDetail, { model: lastCand.model, provider: lastCand.provider as Provider })}**` } }] })}\n\n`));
             break;
           }
           if (chosen !== primary) {
             /* Bir fallback'e geçildi → kullanıcı şeffaflık için bilgilendirilir. */
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ fallback_event: { provider: chosen!.provider, model: chosen!.model } })}\n\n`));
+            safe.enqueue(encoder.encode(`data: ${JSON.stringify({ fallback_event: { provider: chosen!.provider, model: chosen!.model } })}\n\n`));
           }
         }
 
-        const { content, toolCalls, finishReason, usage } = await streamRound(upstream, controller, encoder);
+        const { content, toolCalls, finishReason, usage } = await streamRound(upstream, safe, encoder);
+        fullContent += content;
+        if (finishReason) lastFinishReason = finishReason;
         if (usage) {
           /* prompt = en güncel turun bağlam boyutu; completion = turların toplamı. */
           realUsage.prompt = usage.prompt || realUsage.prompt;
           realUsage.completion += usage.completion;
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ usage_event: { prompt: realUsage.prompt, completion: realUsage.completion } })}\n\n`));
+          safe.enqueue(encoder.encode(`data: ${JSON.stringify({ usage_event: { prompt: realUsage.prompt, completion: realUsage.completion } })}\n\n`));
         }
 
         if (toolCalls.length === 0 || finishReason === "stop") {
           /* Bitiş nedenini istemciye ilet: "length" ⇒ yanıt token sınırında
              kesildi → istemci kesilme şeridi gösterir / otomatik devam eder. */
           if (finishReason && finishReason !== "tool_calls") {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ finish_event: { reason: finishReason } })}\n\n`));
+            safe.enqueue(encoder.encode(`data: ${JSON.stringify({ finish_event: { reason: finishReason } })}\n\n`));
           }
           break;
         }
@@ -1503,7 +1537,7 @@ export async function POST(req: Request) {
            (aynı dosyaya eşzamanlı yazıp veri kaybını önlemek için). start
            olayları önce; tool mesajları orijinal sırada (tool_call_id eşleşir). */
         for (const tc of toolCalls) {
-          controller.enqueue(
+          safe.enqueue(
             encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "start", id: tc.id, name: tc.name, arguments: tc.arguments } })}\n\n`),
           );
         }
@@ -1525,7 +1559,7 @@ export async function POST(req: Request) {
                   .slice(0, 4)
               : [];
             const fail = (m: string) => {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: m } })}\n\n`));
+              safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: m } })}\n\n`));
               resultById.set(tc.id, m);
             };
             if (!repoCtx) { fail("Hata: repo bağlı değil"); return; }
@@ -1542,7 +1576,7 @@ export async function POST(req: Request) {
               } catch (e) { return `(hata: ${(e as Error).message})`; }
             }));
             const combined = tasks.map((t, i) => `### ${t.title || "Alt görev"}\n${results[i]}`).join("\n\n");
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: `${tasks.length} alt-ajan tamamlandı` } })}\n\n`));
+            safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: `${tasks.length} alt-ajan tamamlandı` } })}\n\n`));
             resultById.set(tc.id, combined);
             return;
           }
@@ -1554,15 +1588,15 @@ export async function POST(req: Request) {
             const reason = args.reason ? String(args.reason) : undefined;
             if (!path || (tc.name === "rename_file" && !newPath)) {
               const msg = "Hata: gerekli yol(lar) eksik";
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: msg } })}\n\n`));
+              safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: msg } })}\n\n`));
               resultById.set(tc.id, msg);
               return;
             }
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ pending_action_event: { id: tc.id, kind: tc.name === "delete_file" ? "delete" : "rename", path, newPath, reason } })}\n\n`));
+            safe.enqueue(encoder.encode(`data: ${JSON.stringify({ pending_action_event: { id: tc.id, kind: tc.name === "delete_file" ? "delete" : "rename", path, newPath, reason } })}\n\n`));
             const note = tc.name === "delete_file"
               ? `⏸ '${path}' silme önerisi kullanıcı onayına sunuldu. Kullanıcı onaylayana kadar dosya DURUYOR; buna güvenerek devam etme.`
               : `⏸ '${path}' → '${newPath}' yeniden adlandırma önerisi kullanıcı onayına sunuldu.`;
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: note } })}\n\n`));
+            safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: note } })}\n\n`));
             resultById.set(tc.id, note);
             return;
           }
@@ -1571,9 +1605,9 @@ export async function POST(req: Request) {
              (craftai:terminal-output → callApi). Bu turda placeholder sonuç döner. */
           if (tc.name === "run_command") {
             const command = String(args.command ?? "").trim();
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ run_command_event: { command } })}\n\n`));
+            safe.enqueue(encoder.encode(`data: ${JSON.stringify({ run_command_event: { command } })}\n\n`));
             const note = `⏳ '${command}' komutu terminale gönderildi. Çıktısı ayrı bir mesaj olarak gelecek; ona göre devam et.`;
-            controller.enqueue(
+            safe.enqueue(
               encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: note } })}\n\n`),
             );
             resultById.set(tc.id, note);
@@ -1584,9 +1618,9 @@ export async function POST(req: Request) {
              olarak gelir ve ajan oradan devam eder. */
           if (tc.name === "ask_user") {
             const questions = args.questions;
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ ask_user_event: { questions } })}\n\n`));
+            safe.enqueue(encoder.encode(`data: ${JSON.stringify({ ask_user_event: { questions } })}\n\n`));
             const note = "⏳ Kullanıcıya soru(lar) soruldu — yanıt geldiğinde devam edilecek.";
-            controller.enqueue(
+            safe.enqueue(
               encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: note } })}\n\n`),
             );
             resultById.set(tc.id, note);
@@ -1596,8 +1630,8 @@ export async function POST(req: Request) {
           /* update_plan: ağ/repo işi yok — planı istemciye ayrı olay olarak yolla. */
           if (tc.name === "update_plan") {
             const plan = String(args.plan ?? "");
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ plan_event: { plan } })}\n\n`));
-            controller.enqueue(
+            safe.enqueue(encoder.encode(`data: ${JSON.stringify({ plan_event: { plan } })}\n\n`));
+            safe.enqueue(
               encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: "Plan güncellendi" } })}\n\n`),
             );
             resultById.set(tc.id, "Plan güncellendi.");
@@ -1619,11 +1653,11 @@ export async function POST(req: Request) {
             MUTATING.has(tc.name) ? roundWrites : undefined,
           );
           if (prevContent !== undefined && result.startsWith("✅") && typeof args.path === "string") {
-            controller.enqueue(
+            safe.enqueue(
               encoder.encode(`data: ${JSON.stringify({ checkpoint_event: { path: args.path, previous: prevContent } })}\n\n`),
             );
           }
-          controller.enqueue(
+          safe.enqueue(
             encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: result.slice(0, 400) + (result.length > 400 ? "…" : "") } })}\n\n`),
           );
           resultById.set(tc.id, result);
@@ -1645,7 +1679,7 @@ export async function POST(req: Request) {
                 : `chore: update ${paths.length} files (${paths.map((p) => p.split("/").pop()).join(", ")})`;
             })();
           const batchResult = await flushAtomicCommit(repoCtx, roundWrites, commitMsg);
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ batch_commit_event: { count: roundWrites.size, result: batchResult } })}\n\n`));
+          safe.enqueue(encoder.encode(`data: ${JSON.stringify({ batch_commit_event: { count: roundWrites.size, result: batchResult } })}\n\n`));
           /* Tool sonuçlarını gerçek commit bilgisiyle güncelle (AI sonraki turda görsün). */
           if (batchResult.startsWith("✅")) {
             for (const tc of toolCalls.filter((tc) => MUTATING.has(tc.name))) {
@@ -1662,8 +1696,46 @@ export async function POST(req: Request) {
         /* ask_user çağrıldıysa kullanıcı yanıtını bekle — döngüyü kır. */
         if (askUserCalled) break;
       }
-      controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
-      controller.close();
+      safe.enqueue(encoder.encode(`data: [DONE]\n\n`));
+      try { controller.close(); } catch { /* istemci zaten gitmiş olabilir */ }
+
+      /* Dayanıklılık: istemci akış bitmeden bağlantıyı kapattıysa (clientGone),
+         nihai yanıtı sunucu kendi yazar + push bildirimi gönderir. Bağlantı
+         hiç kopmadıysa istemcinin kendi persistCurrent()'ı zaten aynı işi
+         (daha zengin meta veriyle) yapacağından burada HİÇBİR ŞEY yapılmaz —
+         iki taraflı yazma/çakışma riski böylece tamamen ortadan kalkar. */
+      if (durableChatId && durableSupabase && durableUser && clientGone && fullContent.trim()) {
+        const chatId = durableChatId;
+        const supabase = durableSupabase;
+        const userId = durableUser.id;
+        const content = fullContent.trim();
+        const finishReason = lastFinishReason;
+        after(async () => {
+          try {
+            const { data: row } = await supabase
+              .from("chats")
+              .select("messages, title")
+              .eq("id", chatId)
+              .eq("user_id", userId)
+              .maybeSingle();
+            if (!row) return;
+            const messages = Array.isArray(row.messages) ? row.messages : [];
+            const last = messages[messages.length - 1] as { role?: string; content?: string } | undefined;
+            /* İstemci geri döndüyse ve zaten aynı yanıtı yazdıysa tekrar ekleme. */
+            if (last?.role === "assistant" && last?.content === content) return;
+            const assistantMsg = { role: "assistant", content, ...(finishReason ? { finishReason } : {}) };
+            await supabase
+              .from("chats")
+              .update({ messages: [...messages, assistantMsg], updated_at: new Date().toISOString() })
+              .eq("id", chatId);
+            await sendPushToUser(supabase, userId, {
+              title: row.title || "Yanıt hazır",
+              body: content.slice(0, 120),
+              url: "/app",
+            });
+          } catch { /* en kötü ihtimalle bu yanıt kaybolur — akış zaten kesikti */ }
+        });
+      }
     },
   });
 
