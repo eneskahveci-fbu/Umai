@@ -57,6 +57,7 @@ import { fetchUserRepos } from "@/lib/github";
 import { fetchGitLabUserRepos } from "@/lib/gitlab";
 import { friendlyError } from "@/lib/friendlyError";
 import { pickReplacementModel } from "@/lib/modelPicker";
+import { isPushSubscribed, pushSupported, subscribeToPush, unsubscribeFromPush } from "@/lib/sw-register";
 import type { Provider, ResponseStyle } from "@/lib/types";
 
 export type SettingsTab = "model" | "github" | "general" | "fusion" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim";
@@ -126,6 +127,13 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     if (initialTab) setTab(initialTab);
   }
   const [search, setSearch] = useState("");
+  /* Web Push abonelik durumu (sekme kapalıyken de bildirim). VAPID env yoksa
+     sunucu zaten göndermez; düğme yalnız tarayıcı destekliyorsa görünür. */
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  useEffect(() => {
+    if (pushSupported()) isPushSubscribed().then(setPushSubscribed);
+  }, []);
   /* iOS tarzı mobil drill-down: mobilde önce kategori listesi gösterilir; bir
      satıra dokununca detay (mobileDetail=true) tam ekran açılır, geri ile listeye
      dönülür. sm+ (masaüstü) bu state'i yok sayar (yan-yana GNOME düzeni). */
@@ -1388,6 +1396,38 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     <div className="text-xs text-muted mt-0.5">Sekme arka planda iken yanıt hazır olunca bildirim gelir.</div>
                   </div>
                 </button>
+                {pushSupported() && (
+                  <button
+                    disabled={pushBusy}
+                    onClick={async () => {
+                      setPushBusy(true);
+                      try {
+                        if (pushSubscribed) {
+                          await unsubscribeFromPush();
+                          setPushSubscribed(false);
+                          addToast("Push bildirimleri kapatıldı.", "info");
+                        } else {
+                          const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+                          if (!vapidKey) { addToast("Push bildirimi bu sitede henüz yapılandırılmadı.", "error"); return; }
+                          const ok = await subscribeToPush(vapidKey);
+                          setPushSubscribed(ok);
+                          addToast(ok ? "Push bildirimleri açık — tarayıcı kapalıyken de haber verir." : "Push aboneliği başarısız.", ok ? "success" : "error");
+                        }
+                      } finally {
+                        setPushBusy(false);
+                      }
+                    }}
+                    className="flex items-center gap-3 p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 text-sm text-left transition-colors disabled:opacity-50"
+                  >
+                    <Bell size={16} className={`shrink-0 ${pushSubscribed ? "text-brand" : "text-muted"}`} />
+                    <div>
+                      <div className="text-sm font-semibold">{pushSubscribed ? "Push bildirimi açık" : "Push bildirimi aç"}</div>
+                      <div className="text-xs text-muted mt-0.5">
+                        “Arka planda çalıştır” ile başlattığın görev bitince, tarayıcı TAMAMEN kapalı olsa bile bildirim gelir.
+                      </div>
+                    </div>
+                  </button>
+                )}
               </div>
             </div>
 

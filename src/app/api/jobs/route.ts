@@ -4,6 +4,7 @@ import { isSafeRemoteUrl } from "@/lib/urlSafety";
 import { createClient } from "@/lib/supabase/server";
 import { buildHeaders, type LlmCfg } from "@/lib/llmCall";
 import { runSwarmToCompletion } from "@/lib/swarmPipeline";
+import { sendPushToUser } from "@/lib/push";
 import { JOB_SYSTEM, deriveJobTitle } from "@/lib/jobs";
 import type { Provider } from "@/lib/types";
 
@@ -107,16 +108,21 @@ export async function POST(req: Request) {
       });
       if (result.trim()) {
         await supabase.from("background_jobs").update({ status: "done", result: result.trim() }).eq("id", jobId);
+        await sendPushToUser(supabase, user.id, {
+          title: "Görev tamamlandı", body: deriveJobTitle(goal), url: "/app",
+        });
       } else {
         await supabase.from("background_jobs").update({
           status: "error", error: "Model boş yanıt döndürdü.",
         }).eq("id", jobId);
+        await sendPushToUser(supabase, user.id, { title: "Görev başarısız", body: deriveJobTitle(goal), url: "/app" });
       }
     } catch (e) {
       await supabase.from("background_jobs").update({
         status: "error",
         error: (e as Error)?.name === "AbortError" ? "Süre sınırı aşıldı (5 dk)." : ((e as Error).message || "bilinmeyen").slice(0, 300),
       }).eq("id", jobId).then(() => undefined, () => undefined);
+      await sendPushToUser(supabase, user.id, { title: "Görev başarısız", body: deriveJobTitle(goal), url: "/app" }).catch(() => undefined);
     } finally {
       clearTimeout(timer);
     }

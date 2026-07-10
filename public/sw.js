@@ -85,3 +85,35 @@ self.addEventListener("fetch", (event) => {
 
   /* Diğer her şey (API dahil) → doğrudan ağ; SW karışmaz. */
 });
+
+/* ─── Web Push — sekme/tarayıcı TAMAMEN kapalıyken bile bildirim ─────────
+   Arka plan görevi (background_jobs) tamamlanınca sunucu (/api/jobs) bu
+   olayı tetikler. Abonelik yoksa sunucu zaten göndermez; burada yalnız
+   gelen payload'ı bildirime çevirir. */
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { /* boş payload — yok say */ }
+  const title = data.title || "Craft";
+  const options = {
+    body: data.body || "",
+    icon: "/pwa-icon",
+    badge: "/pwa-icon",
+    tag: "craftai-job",
+    data: { url: data.url || "/app" },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/app";
+  event.waitUntil(
+    (async () => {
+      const clientList = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of clientList) {
+        if (client.url.includes(url) && "focus" in client) return client.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
+    })(),
+  );
+});
