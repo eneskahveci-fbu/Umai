@@ -32,8 +32,8 @@ const notoEmoji = Noto_Emoji({
 
 export const metadata: Metadata = {
   title: {
-    default: "Craft — AI kod asistanı",
-    template: "%s — Craft",
+    default: "Umai — AI kod asistanı",
+    template: "%s — Umai",
   },
   description:
     "OpenAI-uyumlu herhangi bir modelle çalışan AI kod asistanı. Sohbet, gizli sohbet, geçmiş senkron ve GitHub deposuna bağlı Coder sekmesi.",
@@ -52,24 +52,24 @@ export const metadata: Metadata = {
     "GitHub Coder",
     "ücretsiz AI",
     "model bağımsız",
-    "Craft",
+    "Umai",
   ],
   authors: [{ name: "Enes Kahveci", url: "mailto:eneskahveci.bs@gmail.com" }],
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Craft — AI kod asistanı",
+    title: "Umai — AI kod asistanı",
     description:
       "İstediğin modelle çalışan AI kod asistanı. Sohbet, GitHub Coder, gizli mod.",
-    siteName: "Craft",
+    siteName: "Umai",
     type: "website",
     locale: "tr_TR",
     url: "/",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Craft — AI kod asistanı",
+    title: "Umai — AI kod asistanı",
     description:
       "İstediğin modelle çalışan AI kod asistanı. Sohbet, GitHub Coder, gizli mod.",
   },
@@ -88,8 +88,8 @@ export const metadata: Metadata = {
 
 export const viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#111110" },
-    { media: "(prefers-color-scheme: light)", color: "#f4f0e8" },
+    { media: "(prefers-color-scheme: dark)", color: "#171a16" },
+    { media: "(prefers-color-scheme: light)", color: "#ece7de" },
   ],
   colorScheme: "dark light",
   width: "device-width",
@@ -121,7 +121,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Craft" />
+        <meta name="apple-mobile-web-app-title" content="Umai" />
         {/* apple-touch-icon (180px) src/app/apple-icon.tsx'ten otomatik enjekte edilir */}
         {/* Tema flash'ını önle (private-mode safe) */}
         <script

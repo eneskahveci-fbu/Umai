@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Extension Registry — Craft genişletilebilirlik merkezi.
+// Extension Registry — Umai genişletilebilirlik merkezi.
 // Tüm yeni araçlar ve agent'lar BU dosyada birleştirilir.
 // Yeni bir extension eklemek için:
 //   1. Kendi dizinde araç/agent tanımını yaz

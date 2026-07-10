@@ -23,7 +23,7 @@ export function buildHeaders(provider: Provider, apiKey: string, origin?: string
   }
   if (provider === "openrouter") {
     h["HTTP-Referer"] = origin || process.env.NEXT_PUBLIC_SITE_URL || "https://craft-ai-web.vercel.app";
-    h["X-Title"] = "Craft Coder";
+    h["X-Title"] = "Umai";
   }
   return h;
 }

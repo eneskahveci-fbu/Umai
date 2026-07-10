@@ -21,8 +21,8 @@ export default function GlobalError({
           minHeight: "100vh",
           display: "grid",
           placeItems: "center",
-          background: "#111110",
-          color: "#f0ebe0",
+          background: "#171a16",
+          color: "#e6e3d8",
           fontFamily: "system-ui, sans-serif",
           padding: "2rem",
         }}
@@ -48,7 +48,7 @@ export default function GlobalError({
           <h1 style={{ fontSize: "1.5rem", fontWeight: 700, margin: "0 0 0.5rem" }}>
             Beklenmeyen bir hata oluştu
           </h1>
-          <p style={{ color: "#9a9080", fontSize: "0.9rem", margin: "0 0 1.5rem", lineHeight: 1.6 }}>
+          <p style={{ color: "#8f9285", fontSize: "0.9rem", margin: "0 0 1.5rem", lineHeight: 1.6 }}>
             Uygulama köke yakın bir noktada başarısız oldu. Lütfen tekrar dene; sorun
             sürerse sayfayı yenile.
           </p>
@@ -57,7 +57,7 @@ export default function GlobalError({
               style={{
                 fontFamily: "ui-monospace, monospace",
                 fontSize: "0.7rem",
-                color: "#6e6e82",
+                color: "#8f9285",
                 marginBottom: "1rem",
               }}
             >
@@ -71,7 +71,7 @@ export default function GlobalError({
               style={{
                 padding: "0.625rem 1.25rem",
                 borderRadius: 12,
-                background: "#c8a87e",
+                background: "#5c9478",
                 color: "#fff",
                 fontWeight: 600,
                 fontSize: "0.875rem",
@@ -89,9 +89,9 @@ export default function GlobalError({
               style={{
                 padding: "0.625rem 1.25rem",
                 borderRadius: 12,
-                border: "1px solid #2e2a24",
+                border: "1px solid #363c31",
                 background: "transparent",
-                color: "#f0ebe0",
+                color: "#e6e3d8",
                 fontWeight: 600,
                 fontSize: "0.875rem",
                 cursor: "pointer",

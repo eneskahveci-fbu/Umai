@@ -64,8 +64,8 @@ function groupChatsByDate(items: Chat[]): { label: string; items: Chat[] }[] {
 function SidebarLogo({ size = 22 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-      <path d="M14 4L23 9.5V18.5L14 24L5 18.5V9.5L14 4Z" stroke="#c8a87e" strokeWidth="1.7" strokeLinejoin="round" fill="none" />
-      <circle cx="14" cy="14" r="2.8" fill="#c8a87e" fillOpacity="0.9" />
+      <path d="M14 4L23 9.5V18.5L14 24L5 18.5V9.5L14 4Z" stroke="#5c9478" strokeWidth="1.7" strokeLinejoin="round" fill="none" />
+      <circle cx="14" cy="14" r="2.8" fill="#5c9478" fillOpacity="0.9" />
     </svg>
   );
 }
@@ -399,7 +399,7 @@ export function Sidebar() {
       <div className="h-14 px-4 flex items-center justify-between border-b border-line/60 shrink-0">
         <div className="flex items-center gap-2 font-extrabold text-base tracking-tight">
           <SidebarLogo size={22} />
-          <span className="text-ink">Craft</span>
+          <span className="text-ink">Umai</span>
         </div>
         <button
           onClick={() => setSidebarOpen(false)}

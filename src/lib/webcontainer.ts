@@ -75,7 +75,7 @@ const DEFAULT_FILES = {
   },
   "README.md": {
     file: {
-      contents: "# Craft sandbox\n\nGerçek Node.js çalışıyor. npm/git komutları kullanılabilir.\n",
+      contents: "# Umai sandbox\n\nGerçek Node.js çalışıyor. npm/git komutları kullanılabilir.\n",
     },
   },
 };

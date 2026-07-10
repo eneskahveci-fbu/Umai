@@ -714,7 +714,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             <div>
               <h4 className="text-sm font-bold flex items-center gap-2"><Crown size={16} className="text-brand" /> Plan & Abonelik</h4>
               <p className="text-xs text-muted/70 mt-1 leading-relaxed">
-                craft.ai BYOK ile her zaman ücretsizdir — kendi anahtarınla sınırsız kullanırsın. Pro yalnızca ek
+                Umai BYOK ile her zaman ücretsizdir — kendi anahtarınla sınırsız kullanırsın. Pro yalnızca ek
                 kolaylıklar (hazır kullanım + bulut senkron) sağlar.
               </p>
             </div>
@@ -733,7 +733,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             <div className="flex items-center gap-3">
               <span className="w-12 h-12 rounded-2xl bg-brand/12 border border-brand/20 grid place-items-center text-brand"><Info size={22} /></span>
               <div>
-                <div className="text-base font-bold">craft.ai</div>
+                <div className="text-base font-bold">Umai</div>
                 <div className="text-[11px] text-muted/60">Tarayıcıda çalışan Türkçe AI kodlama asistanı</div>
               </div>
             </div>
@@ -1251,7 +1251,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   <div>
                     <div className="text-sm font-semibold">✦ Otomatik Pilot <span className="text-[10px] font-bold uppercase tracking-wider text-brand/70">önerilen</span></div>
                     <div className="text-xs text-muted mt-0.5 leading-relaxed">
-                      Craft; ne kadar düşüneceğine, internette arama yapıp yapmayacağına ve kalite
+                      Umai; ne kadar düşüneceğine, internette arama yapıp yapmayacağına ve kalite
                       turuna mesajına bakarak kendisi karar verir. Hiçbir ayara dokunmana gerek kalmaz.
                       Sen bir modu elle açarsan o her zaman öncelikli olur.
                     </div>
@@ -1263,7 +1263,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   <div>
                     <div className="text-sm font-semibold">✦ Otomatik Pilot her zaman açık</div>
                     <div className="text-xs text-muted mt-0.5 leading-relaxed">
-                      Craft; ne kadar düşüneceğine, internette arama yapıp yapmayacağına ve kalite
+                      Umai; ne kadar düşüneceğine, internette arama yapıp yapmayacağına ve kalite
                       turuna mesajına bakarak kendisi karar verir. Hiçbir ayara dokunmana gerek yok.
                     </div>
                   </div>
@@ -1319,16 +1319,16 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               <h4 className="text-sm font-bold mb-2">Vurgu Rengi</h4>
               <div className="flex gap-2">
                 {([
-                  { k: "amber",  label: "Amber",   color: "bg-[#c8a87e]" },
+                  { k: "pine",   label: "Çam",     color: "bg-[#5c9478]" },
                   { k: "green",  label: "Yeşil",   color: "bg-[#3ddc84]" },
                   { k: "orange", label: "Turuncu", color: "bg-[#f97316]" },
-                ] as { k: "amber" | "green" | "orange"; label: string; color: string }[]).map(({ k, label, color }) => (
+                ] as { k: "pine" | "green" | "orange"; label: string; color: string }[]).map(({ k, label, color }) => (
                   <button
                     key={k}
                     onClick={() => {
                       saveConfig({ ...config, accentColor: k });
                       const cls = document.documentElement.classList;
-                      cls.remove("accent-amber", "accent-green", "accent-orange");
+                      cls.remove("accent-pine", "accent-green", "accent-orange");
                       cls.add(`accent-${k}`);
                     }}
                     className={`flex-1 py-2 rounded-lg border text-xs flex items-center justify-center gap-1.5 transition-colors ${
@@ -2164,7 +2164,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
 
             <div className="p-3 bg-brand/5 border border-brand/20 rounded-xl text-xs text-muted space-y-1.5">
               <div className="font-semibold text-brand">MCP nedir?</div>
-              <p>Model Context Protocol, Anthropic tarafından geliştirilen bir standarttır. Kendi araçlarını (veritabanı sorgu, dosya okuma, API çağrısı vb.) Craft&apos;a bağlayarak AI&apos;ın bunları otomatik kullanmasını sağlar.</p>
+              <p>Model Context Protocol, Anthropic tarafından geliştirilen bir standarttır. Kendi araçlarını (veritabanı sorgu, dosya okuma, API çağrısı vb.) Umai&apos;ye bağlayarak AI&apos;ın bunları otomatik kullanmasını sağlar.</p>
               <p>Aktif sunucuların araçları, araç kullanımı açıkken her sohbette AI&apos;a sunulur.</p>
             </div>
           </section>

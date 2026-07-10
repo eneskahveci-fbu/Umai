@@ -158,11 +158,11 @@ export default function LoginPage() {
 
       <Link href="/" className="flex items-center gap-2.5 font-extrabold text-xl mb-10 group">
         <svg width="36" height="36" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-          <rect width="28" height="28" rx="7" fill="#c8a87e" fillOpacity="0.12" />
-          <path d="M14 5L22 10.5V17.5L14 23L6 17.5V10.5L14 5Z" stroke="#c8a87e" strokeWidth="1.6" strokeLinejoin="round" fill="none" />
-          <circle cx="14" cy="14" r="2.8" fill="#c8a87e" fillOpacity="0.85" />
+          <rect width="28" height="28" rx="7" fill="#5c9478" fillOpacity="0.12" />
+          <path d="M14 5L22 10.5V17.5L14 23L6 17.5V10.5L14 5Z" stroke="#5c9478" strokeWidth="1.6" strokeLinejoin="round" fill="none" />
+          <circle cx="14" cy="14" r="2.8" fill="#5c9478" fillOpacity="0.85" />
         </svg>
-        <span className="text-ink">craft</span><span className="brand-text">.ai</span>
+        <span className="text-ink">umai</span>
       </Link>
 
       <div className="w-full max-w-[380px]">
