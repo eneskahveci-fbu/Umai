@@ -2529,6 +2529,8 @@ export function CoderView() {
               <VenetianMask size={9} /> Gizli
             </span>
           )}
+          {/* Bağlam (model/depo/gizli) ile eylemleri (yeni/editör/skills/⋯) ayıran ince çizgi. */}
+          <div className="w-px h-5 bg-line/60 mx-0.5 shrink-0" aria-hidden />
           {/* En sık kullanılan 3 eylem ⋯ menüsünden çıkarılıp doğrudan üst
              bara taşındı (tek tıkla erişim, özellikle mobilde). */}
           <button
@@ -2556,7 +2558,10 @@ export function CoderView() {
             <Zap size={16} />
           </button>
           {/* Birleşik ⋯ menüsü — gruplu: Hızlı eylemler · Çalışma Alanı · Modlar · Araçlar */}
-          <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen || toolsEnabled || !!config.safeMode || swarmMode || researchMode}>
+          {/* Aktif-parıltı yalnız panel aç/kapa durumlarını yansıtır — mod durumları
+             (toolsEnabled/safeMode/swarmMode/researchMode) zaten StatusBar'da rozet
+             olarak görünür, burada tekrar sinyal vermeye gerek yok. */}
+          <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen}>
             {/* Efor seçici herkese açık; "otomatik" dışı bir seviye seçilirse
                Otomatik Pilot'un o mesaj için kararını geçersiz kılar. */}
             <EffortMenuControl />
@@ -2631,17 +2636,14 @@ export function CoderView() {
                 <ModeChip icon={<Search size={12} />} label="Araştırma" active={researchMode} onClick={() => setResearchMode((v) => !v)} />
               </div>
             )}
-            {moreTab === "modes" && (
-              <MoreItem
-                icon={improvingPrompt ? <Loader2Icon size={14} className="animate-spin" /> : <Wand2 size={14} />}
-                label="Prompt geliştir"
-                desc="yazdığın istemi iyileştirir"
-                onClick={() => void improvePrompt()}
-              />
-            )}
-
             {moreTab === "tools" && (
               <>
+                <MoreItem
+                  icon={improvingPrompt ? <Loader2Icon size={14} className="animate-spin" /> : <Wand2 size={14} />}
+                  label="Prompt geliştir"
+                  desc="yazdığın istemi iyileştirir"
+                  onClick={() => void improvePrompt()}
+                />
                 <MoreItem icon={<BookOpen size={14} />} label="Kütüphane" onClick={() => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); }} />
                 <MoreItem icon={<Activity size={14} />} label="Etkinlik günlüğü" onClick={() => useStore.getState().setActivityOpen(true)} />
                 <MoreItem icon={<Keyboard size={14} />} label="Kısayollar" onClick={() => useStore.getState().setShortcutsOpen(true)} />
@@ -3201,10 +3203,10 @@ export function CoderView() {
               {attachedFiles.length > 0 && (
                 <div className="flex gap-2 mb-2.5 flex-wrap">
                   {attachedFiles.map((f) => (
-                    <div key={f.path} className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-xl bg-brand/10 border border-brand/25 text-brand">
+                    <div key={f.path} className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-xl bg-bgsoft border border-line text-muted">
                       <FileIcon name={f.path.split("/").pop() ?? ""} size={11} />
                       <span className="max-w-[180px] truncate font-mono">{f.path.split("/").pop()}</span>
-                      <button onClick={() => setAttachedFiles((prev) => prev.filter((x) => x.path !== f.path))} className="text-brand/60 hover:text-red transition-colors">
+                      <button onClick={() => setAttachedFiles((prev) => prev.filter((x) => x.path !== f.path))} className="text-muted/60 hover:text-red transition-colors">
                         <X size={10} />
                       </button>
                     </div>
