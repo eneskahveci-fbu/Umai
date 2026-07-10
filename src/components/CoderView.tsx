@@ -741,6 +741,7 @@ export function CoderView() {
   /* Ajanın bu turda yazdığı dosyaların ESKİ içeriği — "Geri al" için. */
   const [checkpoints, setCheckpoints] = useState<{ path: string; previous: string | null }[]>([]);
   const [undoing, setUndoing] = useState(false);
+  const [checkpointsExpanded, setCheckpointsExpanded] = useState(false);
   /* Ajanın önerdiği YIKICI işlemler (sil/yeniden adlandır) — onay bekler. */
   const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
   const [resolvingAction, setResolvingAction] = useState<string | null>(null);
@@ -1304,6 +1305,7 @@ export function CoderView() {
       }
       addToast(`↩ ${checkpoints.length} dosya eski haline döndürüldü`, "success");
       setCheckpoints([]);
+      setCheckpointsExpanded(false);
       store.setCheckpointsOnLast([]);
       void store.persistCurrent();
     } catch (e) {
@@ -1706,7 +1708,7 @@ export function CoderView() {
     if (!isContinuation) store.pushMessage({ role: "assistant", content: "" });
     store.setFinishReasonOnLast(undefined); // bayatlamış "kesildi" şeridini temizle
     store.setStreaming(true);
-    if (!isContinuation) setCheckpoints([]); // yeni tur — önceki turun geri-al noktaları sıfırlanır
+    if (!isContinuation) { setCheckpoints([]); setCheckpointsExpanded(false); } // yeni tur — önceki turun geri-al noktaları sıfırlanır
     const turnCheckpoints: { path: string; previous: string | null }[] =
       isContinuation ? [...(lastMsg?.checkpoints ?? [])] : []; // devamda önceki yazmalar korunur
     setPendingActions([]); // bekleyen yıkıcı işlem önerileri
@@ -3065,31 +3067,50 @@ export function CoderView() {
                         />
                       )}
                       {isLastAssistant && !streaming && checkpoints.length > 0 && repo && (
-                        <div className="ml-11 max-w-2xl mt-2 flex items-center gap-2 px-3 py-2 rounded-xl border border-line bg-bgsoft/50 text-xs">
-                          <RotateCcw size={13} className="text-yellow shrink-0" />
-                          <span className="text-muted flex-1 min-w-0 truncate">
-                            Ajan {checkpoints.length} dosyayı değiştirdi
-                            {checkpoints.length === 1 ? ` (${checkpoints[0].path})` : ""}
-                          </span>
-                          <button
-                            onClick={undoCheckpoints}
-                            disabled={undoing}
-                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-yellow/10 text-yellow hover:bg-yellow/20 font-semibold disabled:opacity-50 transition-colors shrink-0"
-                          >
-                            {undoing ? <Loader2Icon size={12} className="animate-spin" /> : <RotateCcw size={12} />}
-                            {undoing ? "Geri alınıyor…" : "Geri Al"}
-                          </button>
-                          <button
-                            onClick={() => {
-                              setCheckpoints([]);
-                              useStore.getState().setCheckpointsOnLast([]);
-                              void useStore.getState().persistCurrent();
-                            }}
-                            className="text-muted/50 hover:text-ink p-1 rounded transition-colors shrink-0"
-                            title="Kapat"
-                          >
-                            <X size={12} />
-                          </button>
+                        <div className="ml-11 max-w-2xl mt-2 rounded-xl border border-line bg-bgsoft/50 text-xs overflow-hidden">
+                          <div className="flex items-center gap-2 px-3 py-2">
+                            <RotateCcw size={13} className="text-yellow shrink-0" />
+                            {checkpoints.length === 1 ? (
+                              <span className="text-muted flex-1 min-w-0 truncate">
+                                Ajan 1 dosyayı değiştirdi ({checkpoints[0].path})
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => setCheckpointsExpanded((v) => !v)}
+                                className="flex items-center gap-1 text-muted hover:text-ink flex-1 min-w-0 text-left transition-colors"
+                              >
+                                <span className="truncate">Ajan {checkpoints.length} dosyayı değiştirdi</span>
+                                <ChevronDown size={12} className={`shrink-0 transition-transform ${checkpointsExpanded ? "rotate-180" : ""}`} />
+                              </button>
+                            )}
+                            <button
+                              onClick={undoCheckpoints}
+                              disabled={undoing}
+                              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-yellow/10 text-yellow hover:bg-yellow/20 font-semibold disabled:opacity-50 transition-colors shrink-0"
+                            >
+                              {undoing ? <Loader2Icon size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                              {undoing ? "Geri alınıyor…" : "Geri Al"}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setCheckpoints([]);
+                                setCheckpointsExpanded(false);
+                                useStore.getState().setCheckpointsOnLast([]);
+                                void useStore.getState().persistCurrent();
+                              }}
+                              className="text-muted/50 hover:text-ink p-1 rounded transition-colors shrink-0"
+                              title="Kapat"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                          {checkpoints.length > 1 && checkpointsExpanded && (
+                            <ul className="px-3 pb-2.5 pt-0.5 space-y-1 border-t border-line/40">
+                              {checkpoints.map((c) => (
+                                <li key={c.path} className="text-muted/70 font-mono text-[11px] truncate">{c.path}</li>
+                              ))}
+                            </ul>
+                          )}
                         </div>
                       )}
                     </div>

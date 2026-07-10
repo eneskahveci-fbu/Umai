@@ -60,6 +60,10 @@ export interface SwarmAgentState {
   title: string;
   role: string;
   status: "running" | "done" | "error";
+  /** Ajanın kendi ürettiği ham sonuç — bitince dolar; "Ajan Ekibi" panelinde
+      tıklayınca açılır (yalnız nihai birleşik cevabı değil, bu ajanın kendi
+      katkısını da görebilmek için). */
+  output?: string;
 }
 export interface SwarmState {
   phase: "planning" | "working" | "synthesizing" | "done";
