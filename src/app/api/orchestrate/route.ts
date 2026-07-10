@@ -348,8 +348,14 @@ export async function POST(req: Request) {
           return;
         }
 
-        /* Yapısal ekip durumu — her ajan bir satır (todo paneli). */
-        const agents = tasks.map((t) => ({ title: t.title, role: t.role, status: "running" as "running" | "done" | "error" }));
+        /* Yapısal ekip durumu — her ajan bir satır (todo paneli). `output` ajan
+           bitince dolar → istemci "Ajan Ekibi" panelinde ajanın kendi ham
+           katkısını (yalnız nihai birleşik cevabı değil) gösterebilir. */
+        const agents = tasks.map((t) => ({
+          title: t.title, role: t.role,
+          status: "running" as "running" | "done" | "error",
+          output: undefined as string | undefined,
+        }));
         sendEvent({ swarm_event: { phase: "working", agents } });
 
         /* ── 2) PARALEL UZMAN İŞÇİ AJANLAR ── */
@@ -376,12 +382,15 @@ export async function POST(req: Request) {
                 ? await withFallback((c) => runReadOnlyAgent(c, wmsgs, repoCtx, signal))
                 : await withFallback((c) => callModel(c, wmsgs, signal));
               agents[i].status = "done";
+              agents[i].output = r;
               sendEvent({ swarm_event: { phase: "working", agents } });
               return r;
             } catch (e) {
+              const msg = `(Bu alt görev tamamlanamadı: ${(e as Error).message})`;
               agents[i].status = "error";
+              agents[i].output = msg;
               sendEvent({ swarm_event: { phase: "working", agents } });
-              return `(Bu alt görev tamamlanamadı: ${(e as Error).message})`;
+              return msg;
             }
           }),
         );
