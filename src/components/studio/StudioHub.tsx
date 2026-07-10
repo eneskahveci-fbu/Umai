@@ -80,7 +80,7 @@ export function StudioHub() {
         )}
         <button
           onClick={() => nav.close()}
-          className="ml-auto w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors shrink-0"
+          className="ml-auto w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors shrink-0"
           title="Kapat"
         ><X size={16} /></button>
       </div>

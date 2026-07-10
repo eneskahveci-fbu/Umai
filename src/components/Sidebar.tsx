@@ -15,6 +15,7 @@ import {
   Layers,
   Link2,
   MessageSquare,
+  MoreHorizontal,
   Moon,
   Pencil,
   Pin,
@@ -103,8 +104,26 @@ export function Sidebar() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [sharingId, setSharingId] = useState<string | null>(null);
+  const [overflowMenuId, setOverflowMenuId] = useState<string | null>(null);
   const editRef = useRef<HTMLInputElement>(null);
   const addToast = useStore((s) => s.addToast);
+
+  /* "⋯" taşma menüsü — dışarı tıklayınca / Escape ile kapanır. */
+  useEffect(() => {
+    if (!overflowMenuId) return;
+    const onDown = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest("[data-chat-menu]")) setOverflowMenuId(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOverflowMenuId(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [overflowMenuId]);
 
   const shareChat = async (chatId: string) => {
     const chat = chats.find((c) => c.id === chatId);
@@ -228,40 +247,59 @@ export function Sidebar() {
         <ActionIcon title={c.pinned ? "Sabitlemeyi kaldır" : "Sabitle"} onClick={(e) => { e.stopPropagation(); pinChat(c.id, !c.pinned); }}>
           <Pin size={10} className={c.pinned ? "text-brand" : ""} />
         </ActionIcon>
-        {config.projects.length > 0 && (
-          <div className="relative">
-            <ActionIcon title="Projeye taşı" onClick={(e) => e.stopPropagation()}>
-              <FolderInput size={10} className={c.projectId ? "text-brand" : ""} />
-            </ActionIcon>
-            <select
-              aria-label="Projeye taşı"
-              value={c.projectId ?? ""}
+        <div className="relative" data-chat-menu>
+          <ActionIcon title="Daha fazla" onClick={(e) => { e.stopPropagation(); setOverflowMenuId(overflowMenuId === c.id ? null : c.id); }}>
+            <MoreHorizontal size={10} />
+          </ActionIcon>
+          {overflowMenuId === c.id && (
+            <div
               onClick={(e) => e.stopPropagation()}
-              onChange={(e) => { e.stopPropagation(); moveChat(c.id, e.target.value || null); }}
-              className="absolute inset-0 opacity-0 cursor-pointer"
+              className="animate-fade-in absolute right-0 top-full mt-1 z-20 w-44 rounded-lg border border-line bg-surface elev-2 py-1 text-[12px]"
             >
-              <option value="">Projesiz</option>
-              {config.projects.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-        <ActionIcon title="Etiket ekle" onClick={(e) => { e.stopPropagation(); const tag = window.prompt("Etiket (virgülle ayır):", c.tags?.join(", ") ?? ""); if (tag !== null) tagChat(c.id, tag.split(",").map(t => t.trim()).filter(Boolean)); }}>
-          <Tag size={10} />
-        </ActionIcon>
-        <ActionIcon title="Yeniden adlandır" onClick={(e) => { e.stopPropagation(); startRename(c.id, c.title); }}>
-          <Pencil size={10} />
-        </ActionIcon>
-        <ActionIcon title={sharingId === c.id ? "Paylaşılıyor…" : "Paylaş (link kopyala)"} onClick={(e) => { e.stopPropagation(); if (!sharingId) shareChat(c.id); }}>
-          <Share2 size={10} />
-        </ActionIcon>
-        <ActionIcon title="İndir (Markdown)" onClick={(e) => { e.stopPropagation(); exportChat(c.id); }}>
-          <Download size={10} />
-        </ActionIcon>
-        <ActionIcon title="Kopyala (Markdown)" onClick={(e) => { e.stopPropagation(); void copyChatMarkdown(c.id); }}>
-          <Copy size={10} />
-        </ActionIcon>
+              {config.projects.length > 0 && (
+                <div className="relative flex items-center gap-2 px-3 py-1.5 hover:bg-bgsoft/70 cursor-pointer">
+                  <FolderInput size={12} className={`shrink-0 ${c.projectId ? "text-brand" : ""}`} />
+                  <span className="flex-1 truncate">Projeye taşı</span>
+                  <select
+                    aria-label="Projeye taşı"
+                    value={c.projectId ?? ""}
+                    onChange={(e) => { moveChat(c.id, e.target.value || null); setOverflowMenuId(null); }}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  >
+                    <option value="">Projesiz</option>
+                    {config.projects.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <button
+                onClick={() => { setOverflowMenuId(null); const tag = window.prompt("Etiket (virgülle ayır):", c.tags?.join(", ") ?? ""); if (tag !== null) tagChat(c.id, tag.split(",").map(t => t.trim()).filter(Boolean)); }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-bgsoft/70 text-left"
+              >
+                <Tag size={12} /> Etiket ekle
+              </button>
+              <button
+                onClick={() => { setOverflowMenuId(null); if (!sharingId) shareChat(c.id); }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-bgsoft/70 text-left"
+              >
+                <Share2 size={12} /> {sharingId === c.id ? "Paylaşılıyor…" : "Paylaş"}
+              </button>
+              <button
+                onClick={() => { setOverflowMenuId(null); exportChat(c.id); }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-bgsoft/70 text-left"
+              >
+                <Download size={12} /> İndir (Markdown)
+              </button>
+              <button
+                onClick={() => { setOverflowMenuId(null); void copyChatMarkdown(c.id); }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-bgsoft/70 text-left"
+              >
+                <Copy size={12} /> Kopyala (Markdown)
+              </button>
+            </div>
+          )}
+        </div>
         <ActionIcon title="Sil" danger onClick={(e) => { e.stopPropagation(); if (confirm(`"${c.title || "Bu sohbet"}" silinsin mi? Bu işlem geri alınamaz.`)) deleteChat(c.id); }}>
           <Trash2 size={10} />
         </ActionIcon>
@@ -366,9 +404,9 @@ export function Sidebar() {
         <button
           onClick={() => setSidebarOpen(false)}
           title="Kapat (Ctrl+B)"
-          className="w-7 h-7 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
+          className="w-10 h-10 sm:w-7 sm:h-7 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
         >
-          <X size={14} />
+          <X size={16} />
         </button>
       </div>
 

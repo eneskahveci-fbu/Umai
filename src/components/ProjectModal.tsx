@@ -128,7 +128,7 @@ export function ProjectModal() {
         </div>
 
         {/* Sekmeler */}
-        <div className="flex items-center gap-1 px-3 pt-2 border-b border-line/60">
+        <div className="flex items-center gap-1 px-3 pt-2 border-b border-line/60 overflow-x-auto no-scrollbar shrink-0">
           {tabs.map((t) => {
             const Icon = t.icon;
             const active = tab === t.id;
@@ -136,7 +136,7 @@ export function ProjectModal() {
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold rounded-t-lg transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold rounded-t-lg transition-colors shrink-0 whitespace-nowrap ${
                   active ? "text-brand border-b-2 border-brand" : "text-muted/70 hover:text-ink"
                 }`}
               >

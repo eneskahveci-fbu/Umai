@@ -261,7 +261,7 @@ export function DocsStudio() {
                 <div key={b.id} className="group/blk flex items-start gap-1.5 -mx-2 px-2 py-0.5 rounded-lg hover:bg-bgsoft/40 transition-colors">
                   <div className="flex-1 min-w-0 pt-0.5">{blockInput(b)}</div>
                   {/* Blok kontrolleri — yalnız üzerine gelince (sakin görünüm). */}
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover/blk:opacity-100 transition-opacity shrink-0">
+                  <div className="flex items-center gap-0.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/blk:opacity-100 transition-opacity shrink-0">
                     <select
                       value={b.type}
                       onChange={(e) => patchBlock(b.id, { type: e.target.value as DocBlockType })}

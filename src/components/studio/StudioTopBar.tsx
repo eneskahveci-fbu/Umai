@@ -41,7 +41,7 @@ export function StudioTopBar({
       {showWorkActions && (
         <>
           {onNew && (
-            <button onClick={onNew} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink ml-1 shrink-0">
+            <button onClick={onNew} className="text-xs px-2.5 py-2 sm:py-1 rounded-lg border border-line text-muted hover:text-ink ml-1 shrink-0">
               {newLabel}
             </button>
           )}
@@ -60,7 +60,7 @@ export function StudioTopBar({
       )}
       <button
         onClick={onClose}
-        className={`${showWorkActions ? "" : "ml-auto"} w-8 h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors shrink-0`}
+        className={`${showWorkActions ? "" : "ml-auto"} w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted/60 hover:text-ink hover:bg-bgsoft transition-colors shrink-0`}
         title="Kapat"
         aria-label="Kapat"
       ><X size={16} /></button>
