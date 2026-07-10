@@ -59,3 +59,68 @@ export function watchConnection() {
     window.removeEventListener("online", onOn);
   };
 }
+
+/* ─── Web Push abonelik — sekme/tarayıcı KAPALIYKEN de bildirim ───────────
+   Tarayıcı bildirimine (Notification, yalnız sekme açıkken) ek; Ayarlar'da
+   ayrı bir düğmeden tetiklenir. VAPID public key sunucudan gelir (NEXT_
+   PUBLIC_ önekiyle istemciye zaten açık — ayrı bir uç gerekmez). */
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+export function pushSupported(): boolean {
+  return typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
+}
+
+/** Push aboneliği başlatır: izin ister, service worker üzerinden abone olur,
+    aboneliği sunucuya kaydeder. Başarılıysa true döner. */
+export async function subscribeToPush(vapidPublicKey: string): Promise<boolean> {
+  if (!pushSupported() || !vapidPublicKey) return false;
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") return false;
+  const reg = await navigator.serviceWorker.ready;
+  const existing = await reg.pushManager.getSubscription();
+  const sub = existing ?? await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as BufferSource,
+  });
+  const json = sub.toJSON();
+  if (!json.endpoint || !json.keys) return false;
+  const res = await fetch("/api/push/subscribe", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
+  });
+  const data = await res.json().catch(() => ({ ok: false }));
+  return !!data.ok;
+}
+
+/** Mevcut push aboneliğini hem tarayıcıdan hem sunucudan kaldırır. */
+export async function unsubscribeFromPush(): Promise<void> {
+  if (!pushSupported()) return;
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  if (!sub) return;
+  try {
+    await fetch("/api/push/subscribe", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: sub.endpoint }),
+    });
+  } finally {
+    await sub.unsubscribe();
+  }
+}
+
+/** Zaten abone mi? (Ayarlar'da anahtar durumu göstermek için.) */
+export async function isPushSubscribed(): Promise<boolean> {
+  if (!pushSupported()) return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    return !!sub;
+  } catch { return false; }
+}

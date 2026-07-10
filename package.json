@@ -52,6 +52,7 @@
     "remark-math": "^6.0.0",
     "shiki": "^4.2.0",
     "stripe": "^22.2.1",
+    "web-push": "^3.6.7",
     "web-tree-sitter": "^0.26.9",
     "zod": "^4.4.3",
     "zustand": "^5.0.13"
@@ -67,6 +68,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "@vitest/coverage-v8": "^4.1.7",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
