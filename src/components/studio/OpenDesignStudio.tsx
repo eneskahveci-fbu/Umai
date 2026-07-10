@@ -1020,21 +1020,21 @@ export function OpenDesignStudio() {
         onClick={() => setSidebarOpen((s) => (s === "chat" ? null : "chat"))}
         title="AI Sohbet"
         aria-label="AI Sohbet"
-        className={`w-8 h-8 grid place-items-center rounded-lg transition-colors ${sidebarOpen === "chat" ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
+        className={`w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg transition-colors ${sidebarOpen === "chat" ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
       ><MessageSquare size={15} /></button>
       <button
         onClick={() => setSidebarOpen((s) => (s === "right" ? null : "right"))}
         title="Katmanlar & Format"
         aria-label="Katmanlar & Format"
-        className={`w-8 h-8 grid place-items-center rounded-lg transition-colors ${sidebarOpen === "right" ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
+        className={`w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg transition-colors ${sidebarOpen === "right" ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
       ><Layers size={15} /></button>
-      <button onClick={saveProject} title="Kaydet" aria-label="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
-      <button onClick={() => setSavedOpen(true)} title="Projelerim" aria-label="Projelerim" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
+      <button onClick={saveProject} title="Kaydet" aria-label="Kaydet" className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+      <button onClick={() => setSavedOpen(true)} title="Projelerim" aria-label="Projelerim" className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
       <button
         onClick={() => setFusionEnabled((f) => !f)}
         title="Fusion: 3 model + hakem ile üretim"
         aria-label="Fusion: 3 model + hakem ile üretim"
-        className={`w-8 h-8 grid place-items-center rounded-lg transition-colors ${fusionEnabled ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
+        className={`w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg transition-colors ${fusionEnabled ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
       ><Sparkles size={15} /></button>
       <ExportMenu
         triggerLabel="Dışa aktar"
@@ -1058,7 +1058,7 @@ export function OpenDesignStudio() {
             <div className="fixed inset-0 z-40 pt-[env(safe-area-inset-top)] sm:static sm:z-auto sm:pt-0 sm:w-80 sm:shrink-0 sm:border-r border-line flex flex-col min-h-0 bg-bg sm:bg-transparent">
               <div className="sm:hidden h-11 shrink-0 flex items-center gap-2 px-3 border-b border-line">
                 <span className="text-xs font-bold flex items-center gap-1.5"><MessageSquare size={13} className="text-brand" /> AI Sohbet</span>
-                <button onClick={() => setSidebarOpen(null)} aria-label="Kapat" className="ml-auto w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-ink"><X size={16} /></button>
+                <button onClick={() => setSidebarOpen(null)} aria-label="Kapat" className="ml-auto w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-ink"><X size={16} /></button>
               </div>
               <ChatPanel
                 messages={messages}
@@ -1111,7 +1111,7 @@ export function OpenDesignStudio() {
             <div className="fixed inset-0 z-40 pt-[env(safe-area-inset-top)] sm:static sm:z-auto sm:pt-0 sm:w-64 sm:shrink-0 sm:border-l border-line flex flex-col min-h-0 bg-bg sm:bg-transparent">
               <div className="sm:hidden h-11 shrink-0 flex items-center gap-2 px-3 border-b border-line">
                 <span className="text-xs font-bold flex items-center gap-1.5"><Layers size={13} className="text-brand" /> Katmanlar & Format</span>
-                <button onClick={() => setSidebarOpen(null)} aria-label="Kapat" className="ml-auto w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-ink"><X size={16} /></button>
+                <button onClick={() => setSidebarOpen(null)} aria-label="Kapat" className="ml-auto w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-ink"><X size={16} /></button>
               </div>
               <RightPanel
                 project={project}

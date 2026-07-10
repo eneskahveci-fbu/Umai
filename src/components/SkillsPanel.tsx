@@ -630,7 +630,7 @@ function SkillCard({
             {skill.content}
           </p>
         </div>
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <div className="flex items-center gap-0.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 transition-opacity shrink-0">
           <button onClick={onEdit} className="text-muted/50 hover:text-ink p-1 rounded transition-colors" title="Düzenle">
             <Pencil size={11} />
           </button>
