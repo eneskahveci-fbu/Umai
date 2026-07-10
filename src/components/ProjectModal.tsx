@@ -5,6 +5,8 @@ import {
   BookOpen,
   FileText,
   FolderGit2,
+  MessageSquare,
+  Plus,
   Settings2,
   Sparkles,
   Trash2,
@@ -15,7 +17,7 @@ import { useStore } from "@/lib/store";
 import { useModalA11y } from "@/lib/useModalA11y";
 import { PROJECT_COLORS, projectColorHex } from "@/lib/constants";
 
-type Tab = "settings" | "knowledge" | "skills" | "stats";
+type Tab = "chats" | "settings" | "knowledge" | "skills" | "stats";
 
 const EMOJI_CHOICES = ["📁", "🌐", "🔌", "📊", "📱", "⚙️", "🧪", "🚀", "🔬", "🧩", "📦", "🛠️", "💡", "🎨", "🔐", "📝"];
 
@@ -28,12 +30,22 @@ export function ProjectModal() {
   const addProjectFile = useStore((s) => s.addProjectFile);
   const removeProjectFile = useStore((s) => s.removeProjectFile);
   const addToast = useStore((s) => s.addToast);
+  const selectChat = useStore((s) => s.selectChat);
+  const setActiveProject = useStore((s) => s.setActiveProject);
+  const newChat = useStore((s) => s.newChat);
 
   const project = config.projects.find((p) => p.id === projectId) ?? null;
-  const [tab, setTab] = useState<Tab>("settings");
+  const [tab, setTab] = useState<Tab>("chats");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   useModalA11y(modalRef, !!project, () => setProjectModalId(null));
+
+  /* Projeye ait sohbetler (gizli hariç), en son oluşturulan önce — Claude'un
+     Projeler sayfasındaki "bu projenin sohbetleri" listesinin karşılığı. */
+  const projectChats = useMemo(
+    () => chats.filter((c) => !c.incognito && c.projectId === projectId).sort((a, b) => b.created_at - a.created_at),
+    [chats, projectId],
+  );
 
   /* İstatistikler — projeye ait sohbetlerden (gizli hariç) türetilir. */
   const stats = useMemo(() => {
@@ -63,11 +75,25 @@ export function ProjectModal() {
   };
 
   const tabs: { id: Tab; label: string; icon: typeof Settings2 }[] = [
+    { id: "chats", label: "Sohbetler", icon: MessageSquare },
     { id: "settings", label: "Ayarlar", icon: Settings2 },
     { id: "knowledge", label: "Bilgi Tabanı", icon: BookOpen },
     { id: "skills", label: "Skills", icon: Sparkles },
     { id: "stats", label: "İstatistik", icon: FileText },
   ];
+
+  /* Bir sohbeti aç: modalı kapat, ilgili sohbete geç. */
+  const openChat = (chatId: string) => {
+    selectChat(chatId);
+    setProjectModalId(null);
+  };
+
+  /* Bu proje bağlamında yeni sohbet başlat (aktif proje olarak işaretlenir). */
+  const startNewChat = () => {
+    setActiveProject(project.id);
+    newChat(false);
+    setProjectModalId(null);
+  };
 
   return (
     <div
@@ -121,6 +147,37 @@ export function ProjectModal() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {tab === "chats" && (
+            <>
+              <button
+                onClick={startNewChat}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-brand hover:bg-branddim text-[#111110] font-semibold text-sm transition-colors"
+              >
+                <Plus size={15} /> Yeni sohbet
+              </button>
+              <div className="space-y-1.5">
+                {projectChats.length === 0 && (
+                  <p className="text-[12px] text-muted/40 italic text-center py-6">Bu projede henüz sohbet yok.</p>
+                )}
+                {projectChats.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => openChat(c.id)}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-bgsoft border border-line/60 hover:border-brand/40 text-left transition-colors"
+                  >
+                    <MessageSquare size={14} className="text-muted/60 shrink-0" />
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[12px] font-medium truncate">{c.title || "Yeni sohbet"}</span>
+                      <span className="block text-[10px] text-muted/50">
+                        {c.messages.length} mesaj · {new Date(c.created_at).toLocaleDateString("tr-TR")}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
           {tab === "settings" && (
             <>
               <Field label="Proje adı">
