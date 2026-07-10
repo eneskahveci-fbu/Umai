@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono, Noto_Emoji } from "next/font/google";
+import { Fraunces, Inter, JetBrains_Mono, Noto_Emoji } from "next/font/google";
 import "./globals.css";
 import { NativeInit } from "@/components/NativeInit";
 
@@ -10,6 +10,14 @@ const inter = Inter({
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
+  subsets: ["latin", "latin-ext"],
+});
+
+/* Başlıklar/hero metinler için sıcak editoryal serif — Perplexity Serif /
+   Anthropic Serif ruhuna (grotesk sans + editoryal serif ikilisi) benzer,
+   serbestçe kullanılabilir bir eşleşme. Gövde metni Inter'de kalır. */
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
   subsets: ["latin", "latin-ext"],
 });
 
@@ -104,7 +112,7 @@ export default function RootLayout({
   return (
     <html
       lang="tr"
-      className={`${inter.variable} ${jetbrainsMono.variable} ${notoEmoji.variable} h-full antialiased`}
+      className={`${inter.variable} ${jetbrainsMono.variable} ${notoEmoji.variable} ${fraunces.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>
