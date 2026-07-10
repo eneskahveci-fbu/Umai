@@ -151,9 +151,13 @@ function loadConfig(): Config {
         merged.skills = [...missing, ...existing];
         try { store.setItem(CONFIG_KEY, JSON.stringify(merged)); } catch { /* yok say */ }
       }
-      /* Eski purple/blue accent renkleri amber'e migrate et */
-      if ((merged.accentColor as string) === "purple" || (merged.accentColor as string) === "blue") {
-        merged.accentColor = "amber";
+      /* Eski purple/blue/amber accent renklerini pine'a migrate et (amber sınıfı artık yok) */
+      if (
+        (merged.accentColor as string) === "purple" ||
+        (merged.accentColor as string) === "blue" ||
+        (merged.accentColor as string) === "amber"
+      ) {
+        merged.accentColor = "pine";
       }
       /* Eski küçük bağlam penceresini (8192) çok daha uzun varsayılana yükselt */
       if (typeof merged.maxContext !== "number" || merged.maxContext <= 8192) {
