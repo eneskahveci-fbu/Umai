@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useModalA11y } from "@/lib/useModalA11y";
+import { setSurfaceOpenItem } from "@/lib/surfaceNav";
 import type { TreeNode } from "@/lib/types";
 
 interface PaletteAction {
@@ -52,6 +53,8 @@ export function CommandPalette() {
   const setOpen = useStore((s) => s.setCommandPaletteOpen);
   const theme = useStore((s) => s.config.theme);
   const tree = useStore((s) => s.tree);
+  const chats = useStore((s) => s.chats);
+  const config = useStore((s) => s.config);
   const router = useRouter();
 
   const [query, setQuery] = useState("");
@@ -241,7 +244,61 @@ export function CommandPalette() {
         }))
     : [];
 
-  const filtered: Row[] = [...commandRows, ...fileRows];
+  /* Birleşik arama: sohbetler + Doküman/Anket/Defter kayıtları — yalnız
+     dosya bulucuyla aynı eşikte (en az 1 karakter), her tür en fazla 5 sonuç. */
+  const chatRows: Row[] = query.length >= 1
+    ? chats
+        .filter((c) => !c.incognito && c.title.toLowerCase().includes(q))
+        .slice(0, 5)
+        .map((c) => ({
+          id: "chat:" + c.id,
+          label: c.title || "Adsız sohbet",
+          sub: "Sohbet",
+          icon: <MessageSquare size={16} />,
+          run: () => { useStore.getState().selectChat(c.id); setOpen(false); },
+        }))
+    : [];
+
+  const docRows: Row[] = query.length >= 1
+    ? (config.craftDocs ?? [])
+        .filter((d) => d.title.toLowerCase().includes(q))
+        .slice(0, 5)
+        .map((d) => ({
+          id: "doc:" + d.id,
+          label: d.title,
+          sub: "Doküman",
+          icon: <FileText size={16} />,
+          run: () => { setSurfaceOpenItem("docs", d.id); router.push("/studio/dokuman"); setOpen(false); },
+        }))
+    : [];
+
+  const formRows: Row[] = query.length >= 1
+    ? (config.craftForms ?? [])
+        .filter((f) => f.title.toLowerCase().includes(q))
+        .slice(0, 5)
+        .map((f) => ({
+          id: "form:" + f.id,
+          label: f.title,
+          sub: "Anket",
+          icon: <ListChecks size={16} />,
+          run: () => { setSurfaceOpenItem("forms", f.id); router.push("/studio/anket"); setOpen(false); },
+        }))
+    : [];
+
+  const notebookRows: Row[] = query.length >= 1
+    ? (config.craftNotebooks ?? [])
+        .filter((n) => n.title.toLowerCase().includes(q))
+        .slice(0, 5)
+        .map((n) => ({
+          id: "notebook:" + n.id,
+          label: n.title,
+          sub: "Defter",
+          icon: <BookOpen size={16} />,
+          run: () => { setSurfaceOpenItem("notebook", n.id); router.push("/studio/defter"); setOpen(false); },
+        }))
+    : [];
+
+  const filtered: Row[] = [...commandRows, ...chatRows, ...docRows, ...formRows, ...notebookRows, ...fileRows];
 
   /* Reset the highlighted row when the query changes, and clear search when
      the palette (re)opens — both adjusted during render rather than in an

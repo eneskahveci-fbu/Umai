@@ -11,6 +11,7 @@ import type { CraftNotebook, NotebookSource } from "@/lib/types";
 import { streamChat } from "@/lib/genChat";
 import { playTts, stopTts, TTS_MAX_CHARS, TTS_VOICES } from "@/lib/pollinations";
 import { useStudioProject } from "@/lib/useStudioProject";
+import { consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 
 /* Defter — NotebookLM'den İLHAM alan craft yorumu (klonu değil): metin/URL
    kaynakları ekle → yalnız o kaynaklardan yanıtlayan sohbet ([1] [2] atıflı)
@@ -80,6 +81,16 @@ export function NotebookStudio() {
   }, [msgs]);
 
   useEffect(() => () => { stopTts(); abortRef.current?.abort(); }, []);
+
+  /* ⌘K birleşik arama: belirli bir defteri doğrudan açarak gelinmiş olabilir. */
+  useEffect(() => {
+    const openId = consumeSurfaceOpenItem("notebook");
+    if (!openId) return;
+    const n = (useStore.getState().config.craftNotebooks ?? []).find((x) => x.id === openId);
+    if (!n) return;
+    const t = setTimeout(() => { setNbId(n.id); setTitle(n.title); setSources(n.sources); setMsgs([]); }, 0);
+    return () => clearTimeout(t);
+  }, []);
 
   if (!open) return null;
 
