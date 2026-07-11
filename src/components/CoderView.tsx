@@ -2500,10 +2500,13 @@ export function CoderView() {
         </button>
 
         <div className="flex items-center gap-2 shrink-0">
-          <div className="w-6 h-6 rounded-md bg-brand/15 border border-brand/25 grid place-items-center">
+          {/* Marka rozeti yalnız masaüstünde: mobilde zaten uygulama içindesin,
+             bu alan model/eylem ikonlarına kalsın (Editör toggle'ıyla aynı ikonu
+             tekrarlamak da kafa karıştırıyordu). */}
+          <div className="hidden sm:grid w-6 h-6 rounded-md bg-brand/15 border border-brand/25 place-items-center">
             <Code2 size={13} className="text-brand" />
           </div>
-          <span className="text-sm font-semibold text-ink">Umai</span>
+          <span className="hidden sm:inline text-sm font-semibold text-ink">Umai</span>
           {repo && (
             <span className="hidden sm:flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-bgsoft border border-line/60 text-muted/70 font-mono">
               {repo.owner}/{repo.repo}

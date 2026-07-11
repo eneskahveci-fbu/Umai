@@ -20,14 +20,14 @@ export function SidebarTools() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div>
+    <div className="flex-1 min-w-0">
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="group premium-card w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-ink/80 hover:text-ink hover:border-brand/40 transition-all"
+        className="premium-card w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-ink/80 hover:text-ink hover:border-brand/40 transition-colors"
       >
-        <Wrench size={15} className="text-brand transition-transform duration-200 group-hover:scale-110" /> Araçlar
-        <ChevronDown size={13} className={`ml-auto text-muted/60 transition-transform ${open ? "rotate-180" : ""}`} />
+        <Wrench size={15} className="text-brand shrink-0" /> <span className="truncate">Araçlar</span>
+        <ChevronDown size={13} className={`text-muted/60 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <div className="mt-1 space-y-0.5 pl-1.5">
