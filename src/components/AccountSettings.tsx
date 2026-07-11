@@ -46,7 +46,7 @@ export function AccountSettings() {
   }, []);
 
   const msgCount = chats.reduce((a, c) => a + c.messages.length, 0);
-  const designCount = config.savedDesigns?.length ?? 0;
+  const designCount = config.studioProjects?.length ?? 0;
   const skillCount = config.skills?.length ?? 0;
 
   const signOut = async () => {
@@ -183,7 +183,6 @@ export function AccountSettings() {
             const rows: { l: string; n: number; loc: string; cloud: boolean }[] = [
               { l: "Sohbetler", n: chats.length, loc: synced, cloud: signedIn },
               { l: "Stüdyo projeleri", n: config.studioProjects?.length ?? 0, loc: synced, cloud: signedIn },
-              { l: "Kayıtlı tasarımlar", n: config.savedDesigns?.length ?? 0, loc: synced, cloud: signedIn },
               { l: "Snippet'ler", n: snippets.length, loc: "Yalnız bu cihaz", cloud: false },
               { l: "API anahtarları", n: config.models.length, loc: "Bu cihazda şifreli", cloud: false },
             ];

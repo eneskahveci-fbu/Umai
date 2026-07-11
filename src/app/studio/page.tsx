@@ -1,28 +1,16 @@
 "use client";
 
-/* /studio — Open Design Platform (Birleşik Tasarım Stüdyosu).
-
-   Önceki yapı:
-   - /studio       → StudioHub (7 mod)
-   - /studio/sunum → SlidesStudio
-   - /studio/tuval → DesignStudio
-
-   Yeni yapı:
-   - /studio       → OpenDesignStudio (slayt+tuval+afiş+sosyal birleşik)
-   - /studio/sunum → /studio (redirect)
-   - /studio/tuval → /studio (redirect)
-   - /studio/gorsel → ImageStudio
-   - /studio/dokuman → DocsStudio
-   - /studio/anket → FormsStudio
-   - /studio/defter → NotebookStudio */
+/* /studio — Tasarım Stüdyosu: Claude Design'a paralel, tek canlı tasarım
+   tuvali (sol sohbet + sağ artifact önizleme), hazır şablonlar ve marka
+   stilleriyle. `/studio/sunum` ve `/studio/tuval` buraya yönlenir. */
 
 import { SurfacePage } from "@/components/studio/SurfacePage";
-import { OpenDesignStudio } from "@/components/studio/OpenDesignStudio";
+import { DesignStudio } from "@/components/DesignStudio";
 
 export default function StudioPage() {
   return (
     <SurfacePage flag="studioOpen">
-      <OpenDesignStudio />
+      <DesignStudio />
     </SurfacePage>
   );
 }
