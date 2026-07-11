@@ -9,7 +9,7 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import {
   AlertCircle, BookMarked, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-  Circle, CircleDot, Compass, FlaskConical, ListChecks, Microscope, Settings2,
+  Circle, CircleDot, Compass, FlaskConical, ListChecks, Microscope, MoreHorizontal, Settings2,
   Code2, Copy, FileText, FolderOpen, GitBranch, GitCommit, Globe,
   Loader2, Pencil, RefreshCw, Search, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, Users, Volume2, VolumeX, Wrench, X,
 } from "lucide-react";
@@ -502,9 +502,10 @@ function MessageBubbleImpl({
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState("");
-  /* Düşünme süreci varsayılan AÇIK: üretim sürerken otomatik genişler ki
-     kullanıcı modelin gerçek zamanlı düşünmesini görsün. */
-  const [thinkingOpen, setThinkingOpen] = useState(true);
+  /* Düşünce süreci artık sohbet akışında açık durmuyor — küçük bir "•••"
+     tetikleyici, tıklayınca yanıtın üstünde açılan camsı bir pano açar. */
+  const [thinkingOpen, setThinkingOpen] = useState(false);
+  const thinkRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const rateMessage = useStore((s) => s.rateMessage);
   const addSkill = useStore((s) => s.addSkill);
@@ -549,6 +550,21 @@ function MessageBubbleImpl({
   };
   useEffect(() => () => { if (speakingRef.current) stopTts(); }, []);
   useEffect(() => { speakingRef.current = speakingTts; }, [speakingTts]);
+
+  /* Düşünce panosu: dışarı tıklama / Escape ile kapanır (AuthButton'daki aynı desen). */
+  useEffect(() => {
+    if (!thinkingOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (!thinkRef.current?.contains(e.target as Node)) setThinkingOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setThinkingOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [thinkingOpen]);
 
   const startEdit = () => {
     setEditText(message.content);
@@ -711,22 +727,27 @@ function MessageBubbleImpl({
           </div>
         )}
 
-        {/* Thinking */}
+        {/* Thinking — akışta açık durmaz; "•••" tetikleyici camsı bir pano açar */}
         {message.thinking && (
-          <div className="mb-3 border border-brand/15 rounded-xl overflow-hidden bg-brand/5">
+          <div ref={thinkRef} className="relative inline-block mb-3">
             <button
               onClick={() => setThinkingOpen((o) => !o)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-brand/70 hover:text-brand/90 transition-colors"
+              aria-expanded={thinkingOpen}
+              aria-label="Düşünce sürecini göster"
+              title="Düşünce süreci"
+              className="relative grid h-[22px] w-[30px] place-items-center rounded-md border border-line bg-surface text-muted/60 transition-colors hover:text-brand hover:border-brand/40"
             >
-              <Brain size={12} />
-              <span className="font-semibold">Düşünce süreci</span>
-              {thinkingOpen
-                ? <ChevronDown size={11} className="ml-auto opacity-60" />
-                : <ChevronRight size={11} className="ml-auto opacity-60" />}
+              <MoreHorizontal size={13} />
+              {streamingNow && <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />}
             </button>
             {thinkingOpen && (
-              <div className="px-3 pb-3 text-[11px] text-muted/60 font-mono whitespace-pre-wrap leading-relaxed border-t border-brand/10 pt-2">
-                {message.thinking}
+              <div className="animate-fade-in absolute left-0 top-[calc(100%+8px)] z-20 w-80 max-w-[85vw] rounded-2xl border border-line bg-surface/70 p-4 shadow-2xl backdrop-blur-xl backdrop-saturate-150">
+                <div className="mb-2 flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-wide text-muted/60">
+                  <Brain size={11} className="text-brand/70" /> Düşünce süreci
+                </div>
+                <div className="max-h-56 overflow-y-auto text-[12.5px] text-muted whitespace-pre-wrap leading-relaxed">
+                  {message.thinking}
+                </div>
               </div>
             )}
           </div>
