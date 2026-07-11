@@ -65,6 +65,7 @@ import { RightPanel } from "./RightPanel";
 import { MultiCommitBar } from "./MultiCommitBar";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { EmptyChat } from "./EmptyChat";
+import { SelectionQuoteBar } from "./SelectionQuoteBar";
 import { VoiceButton } from "./VoiceButton";
 
 const RealTerminal = dynamic(() => import("./RealTerminal").then((m) => m.RealTerminal), {
@@ -878,6 +879,14 @@ export function CoderView() {
       taRef.current?.focus();
     }
   }, [pendingInput, setPendingInput]);
+
+  /* Claude'daki "seçili metni sor": asistan yanıtından seçilen metin composer'a
+     blockquote olarak eklenir, kullanıcı hemen sorusunu altına yazabilir. */
+  const quoteSelection = (text: string) => {
+    const quoted = text.split("\n").map((l) => `> ${l}`).join("\n");
+    setInput((prev) => (prev.trim() ? `${quoted}\n\n${prev}` : `${quoted}\n\n`));
+    taRef.current?.focus();
+  };
 
   useEffect(() => {
     /* silently restore last mounted folder if browser still grants permission */
@@ -2959,6 +2968,7 @@ export function CoderView() {
           {/* overscroll-contain: sayfa geri-çekme zinciri kesilir; overflow-anchor
              kapalı: tarayıcının kaydırma-çapası akışta zıplama yapmasın (yapışma
              mantığı stickRef ile bizde). */}
+          <SelectionQuoteBar containerRef={scrollRef} onQuote={quoteSelection} />
           <div ref={scrollRef} onScroll={onMessagesScroll} className="flex-1 overflow-y-auto overscroll-contain" style={{ overflowAnchor: "none" }}>
             {messages.length === 0 ? (
               <EmptyChat
@@ -3261,7 +3271,7 @@ export function CoderView() {
                 onChange={(e) => { for (const f of Array.from(e.target.files ?? [])) readFileIntoInput(f); e.target.value = ""; }} />
 
               {/* Textarea — geniş, butonsuz */}
-              <div className="flex items-end gap-2 bg-surface/95 backdrop-blur-sm elev-2 border border-line rounded-2xl px-4 py-3 sm:py-2.5 focus-within:border-brand/50 focus-within:shadow-[0_0_0_3px_rgba(200,168,126,0.12)] transition-all">
+              <div className="flex items-end gap-2 bg-surface/95 backdrop-blur-sm elev-2 border border-line rounded-2xl px-4 py-3 sm:py-2.5 focus-within:border-brand/50 focus-within:shadow-[0_0_0_3px_rgba(92,148,120,0.12)] transition-all">
                 <textarea
                   ref={taRef}
                   value={input}
