@@ -15,9 +15,10 @@
 
 import { useCallback, useRef, useState } from "react";
 import {
-  ChevronLeft, ChevronRight, Download, ExternalLink, FileText, FolderOpen, Layers, Loader2, Plus, RefreshCw, Save, Send, Settings2, Share2, Sparkles, Square, Trash2, User, LayoutTemplate, MessageSquare, GripVertical, Volume2, VolumeX, X
+  ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Copy, Download, ExternalLink, FileText, FolderOpen, Layers, Loader2, Plus, RefreshCw, Save, Send, Settings2, Share2, Sparkles, Square, Trash2, User, LayoutTemplate, MessageSquare, GripVertical, Volume2, VolumeX, X
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { clamp01, type Align, type Layer } from "@/lib/design";
 import { useSurfaceNav } from "@/lib/surfaceNav";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
 import { generateDeck } from "@/lib/slidesGen";
@@ -131,13 +132,18 @@ function ChatPanel({
 
 function CanvasPreview({
   project, activePageIndex, device, slideIdx, setSlideIdx,
+  selectedLayerId, onSelectLayer, onLayersChange,
 }: {
   project: OpenDesignProject;
   activePageIndex: number;
   device: DeviceId;
   slideIdx: number;
   setSlideIdx: (updater: (i: number) => number) => void;
+  selectedLayerId: string | null;
+  onSelectLayer: (id: string | null) => void;
+  onLayersChange: (layers: Layer[]) => void;
 }) {
+  const canvasRef = useRef<HTMLDivElement>(null);
   const page = project.pages[activePageIndex];
 
   if (!page) return <EmptyCanvas />;
@@ -191,6 +197,8 @@ function CanvasPreview({
           />
         ) : (
           <div
+            ref={canvasRef}
+            onClick={() => onSelectLayer(null)}
             className="w-full h-full rounded-xl overflow-hidden shadow-2xl shadow-black/20"
             style={{
               background: design.bgType === "gradient"
@@ -201,7 +209,30 @@ function CanvasPreview({
             {design.layers.map((layer) => (
               <div
                 key={layer.id}
-                className="absolute select-none"
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  onSelectLayer(layer.id);
+                  const rect = canvasRef.current?.getBoundingClientRect();
+                  if (!rect) return;
+                  const startLayers = design.layers;
+                  const target = e.currentTarget;
+                  target.setPointerCapture(e.pointerId);
+                  const onMove = (ev: PointerEvent) => {
+                    const nx = clamp01((ev.clientX - rect.left) / rect.width);
+                    const ny = clamp01((ev.clientY - rect.top) / rect.height);
+                    onLayersChange(startLayers.map((l) => (l.id === layer.id ? { ...l, x: nx, y: ny } : l)));
+                  };
+                  const onUp = () => {
+                    window.removeEventListener("pointermove", onMove);
+                    window.removeEventListener("pointerup", onUp);
+                  };
+                  window.addEventListener("pointermove", onMove);
+                  window.addEventListener("pointerup", onUp);
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className={`absolute select-none cursor-move rounded ${
+                  selectedLayerId === layer.id ? "outline outline-2 outline-brand outline-offset-4" : ""
+                }`}
                 style={{
                   left: `${layer.x * 100}%`,
                   top: `${layer.y * 100}%`,
@@ -307,12 +338,15 @@ function SlideCanvas({ slide, theme }: { slide: Slide; theme: SlideTheme }) {
 /* ── Sağ Panel: Katmanlar + Format + Tweaks ───────────────────────── */
 
 function RightPanel({
-  project, activePageIndex, setProject, activeSlideIdx,
+  project, activePageIndex, setProject, activeSlideIdx, selectedLayerId, onSelectLayer, onLayersChange,
 }: {
   project: OpenDesignProject;
   activePageIndex: number;
   setProject: (p: OpenDesignProject) => void;
   activeSlideIdx: number;
+  selectedLayerId: string | null;
+  onSelectLayer: (id: string | null) => void;
+  onLayersChange: (layers: Layer[]) => void;
 }) {
   const [tab, setTab] = useState<"layers" | "format" | "tweaks">("layers");
   const page = project.pages[activePageIndex];
@@ -348,7 +382,7 @@ function RightPanel({
       {/* İçerik */}
       <div className="flex-1 min-h-0 overflow-auto p-3">
         {tab === "layers" && (
-          <LayersPanel page={page} />
+          <LayersPanel page={page} selectedLayerId={selectedLayerId} onSelectLayer={onSelectLayer} onLayersChange={onLayersChange} />
         )}
         {tab === "format" && (
           <FormatPanel project={project} setProject={setProject} activePageIndex={activePageIndex} />
@@ -361,22 +395,122 @@ function RightPanel({
   );
 }
 
-function LayersPanel({ page }: { page?: ProjectPage }) {
+function newLayerId(): string {
+  return `lyr_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function LayersPanel({
+  page, selectedLayerId, onSelectLayer, onLayersChange,
+}: {
+  page?: ProjectPage;
+  selectedLayerId: string | null;
+  onSelectLayer: (id: string | null) => void;
+  onLayersChange: (layers: Layer[]) => void;
+}) {
   if (!page || isDeckPage(page)) {
     return <p className="text-xs text-muted/60 text-center py-4">Katmanlar sadece tuval modunda görünür.</p>;
   }
   const layers = page.design.layers ?? [];
+
+  const addLayer = () => {
+    const nl: Layer = {
+      id: newLayerId(), text: "Yeni metin", x: 0.5, y: 0.5,
+      size: 32, color: "#ffffff", weight: 600, align: "center", font: TWEAK_FONTS[0].value,
+    };
+    onLayersChange([...layers, nl]);
+    onSelectLayer(nl.id);
+  };
+  const duplicateLayer = (l: Layer) => {
+    const copy: Layer = { ...l, id: newLayerId(), x: clamp01(l.x + 0.03), y: clamp01(l.y + 0.03) };
+    const i = layers.findIndex((x) => x.id === l.id);
+    const next = [...layers];
+    next.splice(i + 1, 0, copy);
+    onLayersChange(next);
+    onSelectLayer(copy.id);
+  };
+  const deleteLayer = (id: string) => {
+    onLayersChange(layers.filter((l) => l.id !== id));
+    if (selectedLayerId === id) onSelectLayer(null);
+  };
+  const patchLayer = (id: string, patch: Partial<Layer>) => {
+    onLayersChange(layers.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  };
+  const moveLayer = (id: string, dir: -1 | 1) => {
+    const i = layers.findIndex((l) => l.id === id);
+    const j = i + dir;
+    if (i === -1 || j < 0 || j >= layers.length) return;
+    const next = [...layers];
+    [next[i], next[j]] = [next[j], next[i]];
+    onLayersChange(next);
+  };
+
   return (
     <div className="space-y-1">
-      <p className="text-[10px] text-muted/50 mb-2">Katmanlar ({layers.length})</p>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[10px] text-muted/50">Katmanlar ({layers.length})</p>
+        <button onClick={addLayer} className="w-5 h-5 grid place-items-center rounded text-muted hover:text-brand transition-colors" title="Katman ekle">
+          <Plus size={12} />
+        </button>
+      </div>
       {layers.length === 0 && (
-        <p className="text-xs text-muted/60 text-center py-4">Katman yok — AI ile tasarım üret.</p>
+        <p className="text-xs text-muted/60 text-center py-4">Katman yok — AI ile tasarım üret veya elle ekle.</p>
       )}
       {layers.map((l, i) => (
-        <div key={l.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-bgsoft transition-colors text-xs">
-          <GripVertical size={12} className="text-muted/40" />
-          <span className="flex-1 truncate">{l.text || "(boş)"}</span>
-          <span className="text-[10px] text-muted/40">#{i + 1}</span>
+        <div key={l.id}>
+          <button
+            onClick={() => onSelectLayer(selectedLayerId === l.id ? null : l.id)}
+            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors text-xs ${
+              selectedLayerId === l.id ? "bg-brand/10 text-brand" : "hover:bg-bgsoft text-ink"
+            }`}
+          >
+            <GripVertical size={12} className="text-muted/40 shrink-0" />
+            <span className="flex-1 truncate text-left">{l.text || "(boş)"}</span>
+            <span className="text-[10px] text-muted/40 shrink-0">#{i + 1}</span>
+          </button>
+          {selectedLayerId === l.id && (
+            <div className="ml-4 mt-1 mb-2 space-y-1.5 border-l border-line/60 pl-2.5">
+              <textarea
+                value={l.text}
+                onChange={(e) => patchLayer(l.id, { text: e.target.value })}
+                rows={2}
+                placeholder="Katman metni"
+                className="w-full bg-bgsoft border border-line rounded-lg px-2 py-1 text-xs outline-none focus:border-brand/50 resize-none"
+              />
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="range" min={10} max={120} value={l.size}
+                  onChange={(e) => patchLayer(l.id, { size: Number(e.target.value) })}
+                  className="flex-1"
+                  aria-label="Yazı boyutu"
+                />
+                <span className="text-[10px] text-muted/50 w-8 text-right">{l.size}px</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="color" value={l.color}
+                  onChange={(e) => patchLayer(l.id, { color: e.target.value })}
+                  className="w-7 h-7 rounded border border-line cursor-pointer bg-transparent"
+                  title="Renk"
+                />
+                <select
+                  value={l.align}
+                  onChange={(e) => patchLayer(l.id, { align: e.target.value as Align })}
+                  className="flex-1 bg-bgsoft border border-line rounded-lg px-2 py-1 text-[11px] outline-none cursor-pointer"
+                  aria-label="Hizalama"
+                >
+                  <option value="left">Sol</option>
+                  <option value="center">Orta</option>
+                  <option value="right">Sağ</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-1">
+                <button onClick={() => moveLayer(l.id, -1)} className="flex-1 h-7 grid place-items-center rounded text-muted/60 hover:text-ink transition-colors" title="Yukarı taşı"><ArrowUp size={12} /></button>
+                <button onClick={() => moveLayer(l.id, 1)} className="flex-1 h-7 grid place-items-center rounded text-muted/60 hover:text-ink transition-colors" title="Aşağı taşı"><ArrowDown size={12} /></button>
+                <button onClick={() => duplicateLayer(l)} className="flex-1 h-7 grid place-items-center rounded text-muted/60 hover:text-brand transition-colors" title="Çoğalt"><Copy size={12} /></button>
+                <button onClick={() => deleteLayer(l.id)} className="flex-1 h-7 grid place-items-center rounded text-muted/60 hover:text-red transition-colors" title="Sil"><Trash2 size={12} /></button>
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -766,7 +900,10 @@ export function OpenDesignStudio() {
      gezinme okları VE RightPanel'in deck kontrolleri (tema/yeniden yaz/TTS)
      AYNI indeksi paylaşır. Sayfa değişince sıfırlanır. */
   const [activeSlideIdx, setActiveSlideIdx] = useState(0);
-  const setActivePageIndex = (i: number) => { setActivePageIndexRaw(i); setActiveSlideIdx(0); };
+  /* Tuval'de seçili katman — CanvasPreview (tıkla/sürükle) ve RightPanel'in
+     Katmanlar sekmesi (liste + inceleyici) AYNI seçimi paylaşır. */
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+  const setActivePageIndex = (i: number) => { setActivePageIndexRaw(i); setActiveSlideIdx(0); setSelectedLayerId(null); };
   const [messages, setMessages] = useState<OpenDesignMsg[]>([]);
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState<StudioPhase | null>(null);
@@ -780,6 +917,17 @@ export function OpenDesignStudio() {
   const [device, setDevice] = useState<DeviceId>("web");
 
   const activePage = project.pages[activePageIndex];
+
+  /* Katman listesini elle değiştirir (sürükle, ekle, sil, çoğalt, metin/renk
+     düzenle). AI artifact varsa temizlenir — aksi halde manuel düzenleme
+     görünmez kalır (iframe hâlâ eski AI çıktısını gösterirdi). */
+  const onLayersChange = (layers: Layer[]) => {
+    const page = project.pages[activePageIndex];
+    if (!page || !isCanvasPage(page)) return;
+    const newPages = [...project.pages];
+    newPages[activePageIndex] = { ...page, design: { ...page.design, layers }, aiArtifact: undefined, updatedAt: Date.now() };
+    setProject({ ...project, pages: newPages, updatedAt: Date.now() });
+  };
 
   // Fusion bayrağı
   const [fusionEnabled, setFusionEnabled] = useState(false);
@@ -1103,6 +1251,9 @@ export function OpenDesignStudio() {
                 device={device}
                 slideIdx={activeSlideIdx}
                 setSlideIdx={setActiveSlideIdx}
+                selectedLayerId={selectedLayerId}
+                onSelectLayer={setSelectedLayerId}
+                onLayersChange={onLayersChange}
               />
             </div>
           </main>
@@ -1118,6 +1269,9 @@ export function OpenDesignStudio() {
                 activePageIndex={activePageIndex}
                 setProject={setProject}
                 activeSlideIdx={activeSlideIdx}
+                selectedLayerId={selectedLayerId}
+                onSelectLayer={setSelectedLayerId}
+                onLayersChange={onLayersChange}
               />
             </div>
           )}
