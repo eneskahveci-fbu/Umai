@@ -48,9 +48,9 @@ async function bootWsTerminal(
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
     fontSize: 13,
     theme: {
-      background: isLight ? "#211d16" : "#0e0d0a",
-      foreground: "#f0ebe0", cursor: "#c8a87e",
-      selectionBackground: "#c8a87e40",
+      background: isLight ? "#23271f" : "#12140f",
+      foreground: "#e6e3d8", cursor: "#5c9478",
+      selectionBackground: "#5c947840",
     },
   });
   const fit = new FitAddon();
@@ -233,9 +233,9 @@ async function bootWcTerminal(
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
     fontSize: 13,
     theme: {
-      background: isLight ? "#211d16" : "#0e0d0a",
-      foreground: "#f0ebe0", cursor: "#c8a87e",
-      selectionBackground: "#c8a87e40",
+      background: isLight ? "#23271f" : "#12140f",
+      foreground: "#e6e3d8", cursor: "#5c9478",
+      selectionBackground: "#5c947840",
       black: "#1c1917", brightBlack: "#4a4540",
     },
   });
@@ -269,7 +269,7 @@ async function bootWcTerminal(
   } else {
     await mountDefaults(wc);
   }
-  term.writeln("\x1b[1;35m▲ Craft sandbox\x1b[0m — Node.js + busybox-shell hazır");
+  term.writeln("\x1b[1;35m▲ Umai sandbox\x1b[0m — Node.js + busybox-shell hazır");
   term.writeln("\x1b[2mDeneyin: \x1b[36mnpm install\x1b[2m, \x1b[36mnpm run dev\x1b[2m, \x1b[36mnpm test\x1b[2m, \x1b[36mls\x1b[0m\n");
 
   const proc = await wc.spawn("jsh", { terminal: { cols: term.cols, rows: term.rows } });
@@ -449,7 +449,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
   return (
     <div
       className="h-64 shrink-0 border-t border-line/60 flex flex-col"
-      style={{ backgroundColor: appTheme === "light" ? "#211d16" : "#0e0d0a" }}
+      style={{ backgroundColor: appTheme === "light" ? "#23271f" : "#12140f" }}
     >
       {/* Terminal toolbar */}
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-line/30 bg-black/20 shrink-0">

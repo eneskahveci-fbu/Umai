@@ -73,7 +73,7 @@ export function withStep(job: BackgroundJob, text: string, at: number): Backgrou
 /* Otonom ajan sistem promptu: modele önce KISA bir plan, sonra işi bitirmesini
    söyler. Araçsız (Faz 1) — saf üretim/araştırma/yazım hedefleri için. */
 export const JOB_SYSTEM =
-  "Sen Craft'ın otonom görev ajanısın. Kullanıcı sana bir HEDEF verdi ve arka " +
+  "Sen Umai'nin otonom görev ajanısın. Kullanıcı sana bir HEDEF verdi ve arka " +
   "planda, tek seferde bitirmeni bekliyor — ara soru sorma, onay bekleme.\n\n" +
   "Çalışma biçimi:\n" +
   "1) Önce '## Plan' başlığı altında 2-5 maddelik KISA bir yapılacaklar listesi yaz.\n" +

@@ -45,8 +45,8 @@ export function useThemeClasses() {
     const { theme, accentColor, fontScale } = useStore.getState().config;
     const cl = document.documentElement.classList;
     cl.toggle("light", theme === "light");
-    cl.remove("accent-amber", "accent-green", "accent-orange");
-    cl.add(`accent-${accentColor ?? "amber"}`);
+    cl.remove("accent-amber", "accent-pine", "accent-green", "accent-orange");
+    cl.add(`accent-${accentColor ?? "pine"}`);
     cl.remove("font-sm", "font-base", "font-lg");
     cl.add(`font-${fontScale ?? "base"}`);
   }, []);

@@ -60,6 +60,10 @@ export interface SwarmAgentState {
   title: string;
   role: string;
   status: "running" | "done" | "error";
+  /** Ajanın kendi ürettiği ham sonuç — bitince dolar; "Ajan Ekibi" panelinde
+      tıklayınca açılır (yalnız nihai birleşik cevabı değil, bu ajanın kendi
+      katkısını da görebilmek için). */
+  output?: string;
 }
 export interface SwarmState {
   phase: "planning" | "working" | "synthesizing" | "done";
@@ -473,7 +477,7 @@ export interface Config {
   rulesFile: string;
   fontScale: "sm" | "base" | "lg";
   soundEnabled: boolean;
-  accentColor: "amber" | "green" | "orange";
+  accentColor: "pine" | "green" | "orange";
   maxContext: number;
   webcontainerApiKey: string;
   /** Uzak WebSocket PTY sunucusu URL'i (ör. wss://terminal.example.com?token=xxx).
