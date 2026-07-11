@@ -262,22 +262,22 @@ export interface DesignSystem {
   tokensCss: string;
 }
 
-/** Stüdyo projesi — kaydedilen bir tasarım (üretilen HTML + meta). user_config ile
-    senkronlanır. `versions`: aynı projenin son birkaç üretimi (geri dönüş için). */
+/** Stüdyo projesi — kaydedilen bir tasarım (üretilen artifact + meta). user_config
+    ile senkronlanır. `versions`: aynı projenin son birkaç üretimi (geri dönüş için,
+    hepsi `artifactType` türünde varsayılır — Design Studio'da tür neredeyse hep
+    "html", karışık-türlü sürüm geçmişi pratikte oluşmaz). */
 export interface StudioProject {
   id: string;
   name: string;
   brief: string;
   html: string;
+  artifactType?: Artifact["type"];
   designSystemId: string;
   skillId: string | null;
   directionId: string | null;
   versions?: string[];
   createdAt: number;
   updatedAt: number;
-  /** Open Design Stüdyosu'nun tam sayfa/katman verisi (yalnız o stüdyo okur/yazar;
-      `types.ts` döngüsel bağımlılığa girmesin diye kasıtlı olarak tiplenmemiş). */
-  openDesignData?: unknown;
 }
 
 /** Sunum Stüdyosu — slayt düzenleri (Google Slides'tan ilhamla, craft yorumu). */
@@ -391,14 +391,6 @@ export interface CraftImageSession {
   updatedAt: number;
 }
 
-/** Tasarım Stüdyosu'nda kaydedilen tek bir tasarım (HTML/CSS/JS). */
-export interface SavedDesign {
-  id: string;
-  title: string;
-  code: string;
-  createdAt: number;
-}
-
 export interface Config {
   models: ModelProfile[];
   activeModelId: string | null;
@@ -492,8 +484,6 @@ export interface Config {
   terminalSetupCommand?: string;
   /** Olaya bağlı otomasyonlar (Claude Code hooks benzeri). */
   automations?: Automation[];
-  /** Tasarım Stüdyosu'nda kaydedilen tasarımlar (kişiye özel; user_config ile senkron). */
-  savedDesigns?: SavedDesign[];
   /** Stüdyo: kullanıcının eklediği özel tasarım sistemleri (bundled'a ek). */
   customDesignSystems?: DesignSystem[];
   /** Stüdyo: kaydedilen projeler (çok-proje çalışma alanı). */

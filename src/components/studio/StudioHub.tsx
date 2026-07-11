@@ -1,7 +1,7 @@
 "use client";
 
 /* Görüntü + içerik araçları (Doküman/Anket/Defter) kabuğu — kullanıcı
-   anketi (Tem 2026) sonrası yapı. Tasarım (OpenDesignStudio) artık kendi
+   anketi (Tem 2026) sonrası yapı. Tasarım (DesignStudio) artık kendi
    `/studio` rotasında DOĞRUDAN render edilir, bu kabuktan geçmez; bu
    bileşen yalnız `/studio/gorsel`, `/studio/dokuman`, `/studio/anket`,
    `/studio/defter` rotalarının kabuğudur. Üst çubuk: Görüntü'de 2-düğmeli
