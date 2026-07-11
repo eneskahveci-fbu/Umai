@@ -52,6 +52,27 @@ export function consumeSurfaceHandoff(surface: Surface): string | null {
   } catch { return null; }
 }
 
+/* Belirli bir kaydı doğrudan açma (⌘K birleşik arama → bir dokümanı/anketi/
+   defteri seçince o kayıtla açılsın): aynı sessionStorage deseni, ayrı anahtar. */
+const OPEN_ITEM_KEY = "craft_studio_open_item";
+
+export function setSurfaceOpenItem(surface: Surface, itemId: string): void {
+  try {
+    sessionStorage.setItem(OPEN_ITEM_KEY, JSON.stringify({ surface, itemId, ts: Date.now() }));
+  } catch { /* yok say */ }
+}
+
+export function consumeSurfaceOpenItem(surface: Surface): string | null {
+  try {
+    const raw = sessionStorage.getItem(OPEN_ITEM_KEY);
+    if (!raw) return null;
+    const h = JSON.parse(raw) as { surface?: string; itemId?: string; ts?: number };
+    if (h.surface !== surface || !h.itemId || Date.now() - (h.ts ?? 0) > 60_000) return null;
+    sessionStorage.removeItem(OPEN_ITEM_KEY);
+    return h.itemId;
+  } catch { return null; }
+}
+
 export function useSurfaceNav() {
   const router = useRouter();
   const pathname = usePathname() ?? "";

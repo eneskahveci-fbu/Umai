@@ -6,7 +6,7 @@ import {
   Plus, Save, Sparkles, Trash2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { consumeSurfaceHandoff } from "@/lib/surfaceNav";
+import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { SavedItemsModal } from "./SavedItemsModal";
 import { ExportMenu } from "./ExportMenu";
 import { safeFileName } from "./DocsStudio";
@@ -45,9 +45,19 @@ export function FormsStudio() {
 
   useEffect(() => {
     const b = consumeSurfaceHandoff("forms");
-    if (!b) return;
-    const id = setTimeout(() => setBrief(b), 0);
-    return () => clearTimeout(id);
+    if (b) {
+      const t = setTimeout(() => setBrief(b), 0);
+      return () => clearTimeout(t);
+    }
+    /* ⌘K birleşik arama: belirli bir anketi doğrudan açarak gelinmiş olabilir. */
+    const openId = consumeSurfaceOpenItem("forms");
+    if (openId) {
+      const f = (useStore.getState().config.craftForms ?? []).find((x) => x.id === openId);
+      if (f) {
+        const t = setTimeout(() => { setForm(f); setView("work"); setPreviewKey((k) => k + 1); }, 0);
+        return () => clearTimeout(t);
+      }
+    }
   }, []);
 
   if (!open) return null;

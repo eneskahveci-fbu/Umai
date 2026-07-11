@@ -5,6 +5,7 @@
 import { useStore } from "./store";
 import { buildFallbackChain } from "./fallback";
 import { resolveKey } from "./studioGen";
+import { buildContextSections } from "./prompt";
 
 export interface GenChatOptions {
   system: string;
@@ -20,6 +21,12 @@ export async function streamChat(opts: GenChatOptions): Promise<string> {
   const resolved = await resolveKey();
   if (!resolved) throw new Error("Önce Ayarlar → Modeller'den bir model seç.");
   const cfg = useStore.getState().config;
+  /* Kullanıcının etkin eğitim setleri (Skills) yalnız sohbette değil, tüm
+     stüdyo üretimlerinde (Doküman/Anket/Defter/Sunum) de uygulansın —
+     bu ortak çekirdek üzerinden tek noktadan enjekte edilir. En fazla 5
+     (sohbetteki aynı üst sınır) — prompt şişmesin. */
+  const enabledSkills = (cfg.skills ?? []).filter((s) => s.enabled).slice(0, 5);
+  const system = enabledSkills.length ? opts.system + buildContextSections({ skills: enabledSkills }) : opts.system;
   const res = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -27,7 +34,7 @@ export async function streamChat(opts: GenChatOptions): Promise<string> {
     body: JSON.stringify({
       messages: opts.messages,
       baseUrl: resolved.baseUrl, model: resolved.model, apiKey: resolved.apiKey, provider: resolved.provider,
-      systemPrompt: opts.system,
+      systemPrompt: system,
       fallbacks: buildFallbackChain(cfg.models, cfg.activeModelId),
       tools: false, webSearch: false, temperature: opts.temperature ?? 0.7,
     }),

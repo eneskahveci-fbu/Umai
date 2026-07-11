@@ -6,7 +6,7 @@ import {
   Plus, Save, Sparkles, Trash2, Wand2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { consumeSurfaceHandoff } from "@/lib/surfaceNav";
+import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { SavedItemsModal } from "./SavedItemsModal";
 import { ExportMenu } from "./ExportMenu";
 import type { CraftDoc, DocBlock, DocBlockType } from "@/lib/types";
@@ -59,9 +59,19 @@ export function DocsStudio() {
   /* Hub'dan taşınan brief'i al (tek stüdyo hissi). */
   useEffect(() => {
     const b = consumeSurfaceHandoff("docs");
-    if (!b) return;
-    const id = setTimeout(() => setBrief(b), 0);
-    return () => clearTimeout(id);
+    if (b) {
+      const t = setTimeout(() => setBrief(b), 0);
+      return () => clearTimeout(t);
+    }
+    /* ⌘K birleşik arama: belirli bir dokümanı doğrudan açarak gelinmiş olabilir. */
+    const openId = consumeSurfaceOpenItem("docs");
+    if (openId) {
+      const doc = (useStore.getState().config.craftDocs ?? []).find((d) => d.id === openId);
+      if (doc) {
+        const t = setTimeout(() => { setDoc(doc); setView("work"); }, 0);
+        return () => clearTimeout(t);
+      }
+    }
   }, []);
 
   if (!open) return null;
