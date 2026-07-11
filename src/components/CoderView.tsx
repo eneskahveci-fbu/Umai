@@ -32,7 +32,6 @@ import {
   MessageSquare,
   PanelLeft,
   Paperclip,
-  Plus,
   Check,
   ListChecks,
   RefreshCw,
@@ -237,9 +236,10 @@ function ModelSwitcher() {
     <MoreMenu
       placement="bottom"
       icon={
-        <span className="flex items-center gap-1.5 text-xs">
+        <span className="flex items-center gap-1.5 text-sm">
           <span className="w-1.5 h-1.5 rounded-full bg-green shrink-0" />
-          <span className="truncate max-w-[140px] font-medium">{active?.label || active?.model || "Model seç"}</span>
+          <span className="truncate max-w-[160px] sm:max-w-[220px] font-semibold text-ink">{active?.label || active?.model || "Model seç"}</span>
+          <ChevronDown size={13} className="text-muted/50 shrink-0" />
         </span>
       }
     >
@@ -2495,86 +2495,61 @@ export function CoderView() {
           </div>
         </div>
       )}
-      {/* Header */}
+      {/* Header — ChatGPT tarzı 3 sütun: sol (sidebar+marka) · orta (model,
+         bar'ın görsel odağı) · sağ (rozetler + tek ⋯ menü). Az kullanılan
+         eylemler (Editör/Skills/Gizli sohbet) ⋯ menüsünün "Hızlı eylemler"
+         bölümüne taşındı — tek sohbet giriş noktası artık yalnız Sidebar. */}
       <div
-        className="brand-rule shrink-0 flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 bg-surface/60 backdrop-blur-sm overflow-x-auto scrollbar-none"
+        className="brand-rule shrink-0 grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 sm:gap-2 px-2 sm:px-3 bg-surface/60 backdrop-blur-sm overflow-x-auto scrollbar-none"
         style={{ height: "calc(3rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}
       >
-        <button
-          onClick={() => setSidebarOpen(true)}
-          title="Yan panel (Ctrl+B)"
-          className="w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors shrink-0"
-        >
-          <PanelLeft size={16} />
-        </button>
+        <div className="flex items-center gap-2 min-w-0 justify-self-start">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            title="Yan panel (Ctrl+B)"
+            className="w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors shrink-0"
+          >
+            <PanelLeft size={16} />
+          </button>
 
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Marka rozeti yalnız masaüstünde: mobilde zaten uygulama içindesin,
-             bu alan model/eylem ikonlarına kalsın (Editör toggle'ıyla aynı ikonu
-             tekrarlamak da kafa karıştırıyordu). */}
-          <div className="hidden sm:grid w-6 h-6 rounded-md bg-brand/15 border border-brand/25 place-items-center">
-            <Code2 size={13} className="text-brand" />
+          {/* Marka rozeti yalnız masaüstünde: mobilde zaten uygulama içindesin. */}
+          <div className="hidden sm:flex items-center gap-2 min-w-0">
+            <div className="w-6 h-6 rounded-md bg-brand/15 border border-brand/25 grid place-items-center shrink-0">
+              <Code2 size={13} className="text-brand" />
+            </div>
+            <span className="text-sm font-semibold text-ink shrink-0">Umai</span>
+            {repo && (
+              <span className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-bgsoft border border-line/60 text-muted/70 font-mono truncate">
+                {repo.owner}/{repo.repo}
+                <span className="text-muted/40">:</span>
+                <span className="text-brand/80">{repo.branch}</span>
+              </span>
+            )}
           </div>
-          <span className="hidden sm:inline text-sm font-semibold text-ink">Umai</span>
-          {repo && (
-            <span className="hidden sm:flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-bgsoft border border-line/60 text-muted/70 font-mono">
-              {repo.owner}/{repo.repo}
-              <span className="text-muted/40">:</span>
-              <span className="text-brand/80">{repo.branch}</span>
-            </span>
-          )}
         </div>
 
-        <div className="flex-1 min-w-0" />
-
-        {/* Token + maliyet — masaüstünde görünür (mobil header sade kalır;
-           ayrıntı ⋯ menü ve Ayarlar → Kullanım'da). */}
-        {config.models.length > 0 && (
-          <div className="hidden sm:block shrink-0">
-            <UsageBadge
-              chat={current ?? {}}
-              pendingTokens={
-                estimateTokens(input) + attachedFiles.reduce((a, f) => a + estimateTokens(f.content), 0)
-              }
-            />
-          </div>
-        )}
-
-        <div className="flex items-center gap-1 shrink-0">
+        {/* Orta: model switcher — bar'ın görsel odağı (ChatGPT'deki gibi ortada). */}
+        <div className="min-w-0 justify-self-center">
           <ModelSwitcher />
+        </div>
+
+        <div className="flex items-center gap-1 min-w-0 justify-self-end shrink-0">
+          {/* Token + maliyet — masaüstünde görünür (ayrıntı Ayarlar → Kullanım'da). */}
+          {config.models.length > 0 && (
+            <div className="hidden sm:block shrink-0">
+              <UsageBadge
+                chat={current ?? {}}
+                pendingTokens={
+                  estimateTokens(input) + attachedFiles.reduce((a, f) => a + estimateTokens(f.content), 0)
+                }
+              />
+            </div>
+          )}
           {incognito && (
-            <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-brand/10 text-brand border border-brand/30">
+            <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-brand/10 text-brand border border-brand/30 shrink-0">
               <VenetianMask size={9} /> Gizli
             </span>
           )}
-          {/* Bağlam (model/depo/gizli) ile eylemleri (yeni/editör/skills/⋯) ayıran ince çizgi. */}
-          <div className="w-px h-5 bg-line/60 mx-0.5 shrink-0" aria-hidden />
-          {/* En sık kullanılan 3 eylem ⋯ menüsünden çıkarılıp doğrudan üst
-             bara taşındı (tek tıkla erişim, özellikle mobilde). */}
-          <button
-            onClick={() => useStore.getState().newChat(false)}
-            title="Yeni sohbet (Ctrl+N)"
-            className="w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors shrink-0"
-          >
-            <Plus size={16} />
-          </button>
-          <button
-            onClick={() => setEditorOpen(!editorOpen)}
-            title={editorOpen ? "Editörü kapat" : "Editör (IDE)"}
-            aria-pressed={editorOpen}
-            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors shrink-0 ${
-              editorOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
-            }`}
-          >
-            <Code2 size={16} />
-          </button>
-          <button
-            onClick={() => useStore.getState().setSkillsOpen(true)}
-            title="Skills"
-            className="w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors shrink-0"
-          >
-            <Zap size={16} />
-          </button>
           {/* Birleşik ⋯ menüsü — gruplu: Hızlı eylemler · Çalışma Alanı · Modlar · Araçlar */}
           {/* Aktif-parıltı yalnız panel aç/kapa durumlarını yansıtır — mod durumları
              (toolsEnabled/safeMode/swarmMode/researchMode) zaten StatusBar'da rozet
@@ -2585,6 +2560,13 @@ export function CoderView() {
             <EffortMenuControl />
             <div className="h-px bg-line my-1" />
 
+            <MoreItem
+              icon={<Code2 size={14} />}
+              label={editorOpen ? "Editörü kapat" : "Editör (IDE)"}
+              active={editorOpen}
+              onClick={() => setEditorOpen(!editorOpen)}
+            />
+            <MoreItem icon={<Zap size={14} />} label="Skills" onClick={() => useStore.getState().setSkillsOpen(true)} />
             <MoreItem icon={<VenetianMask size={14} />} label="Gizli sohbet" onClick={() => useStore.getState().newChat(true)} />
 
             {/* Sekme çubuğu — tıklanınca menü açık kalır */}

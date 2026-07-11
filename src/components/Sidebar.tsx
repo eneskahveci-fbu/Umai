@@ -94,6 +94,7 @@ export function Sidebar() {
   const removeProject = useStore((s) => s.removeProject);
   const updateProject = useStore((s) => s.updateProject);
   const setProjectModalId = useStore((s) => s.setProjectModalId);
+  const setCommandPaletteOpen = useStore((s) => s.setCommandPaletteOpen);
 
   const [search, setSearch] = useState("");
   /* Proje: satır-içi ekleme/yeniden adlandırma (window.prompt yerine). */
@@ -354,22 +355,19 @@ export function Sidebar() {
           </button>
         </div>
 
-        <div className="flex-1 flex flex-col items-center gap-1 pt-3 overflow-y-auto min-h-0">
-          {history.slice(0, 8).map((c) => (
-            <button
-              key={c.id}
-              onClick={() => selectChat(c.id)}
-              title={c.title}
-              className={`w-10 h-10 rounded-xl grid place-items-center transition-colors ${
-                currentId === c.id
-                  ? "bg-brand/15 text-brand"
-                  : "text-muted/50 hover:text-ink hover:bg-bgsoft"
-              }`}
-            >
-              <MessageSquare size={14} />
-            </button>
-          ))}
+        {/* Ara (⌘K) — ChatGPT'nin daraltılmış rail'i gibi minimal: logo/yeni/ara
+           dışında sohbet listesi tutmaz, tam liste genişletilmiş panelde. */}
+        <div className="px-2 pt-2 shrink-0">
+          <button
+            onClick={() => setCommandPaletteOpen(true)}
+            title="Ara (⌘K)"
+            className="w-full h-9 rounded-xl text-muted/60 hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
+          >
+            <Search size={14} />
+          </button>
         </div>
+
+        <div className="flex-1" />
 
         <div className="px-2 pb-3 space-y-1 shrink-0 border-t border-line/60 pt-3">
           <button
@@ -437,6 +435,14 @@ export function Sidebar() {
           className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-brand hover:bg-branddim text-[#111110] font-semibold text-sm transition-colors"
         >
           <Plus size={15} /> Yeni Sohbet
+        </button>
+        <button
+          onClick={() => setCommandPaletteOpen(true)}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink text-sm transition-colors"
+        >
+          <Search size={14} className="shrink-0" />
+          <span className="flex-1 text-left">Ara</span>
+          <span className="text-[10px] text-muted/40 font-mono shrink-0">⌘K</span>
         </button>
         <div className="flex gap-2">
           <button
@@ -620,45 +626,48 @@ export function Sidebar() {
           </div>
         </AccordionSection>
 
-        <AccordionSection
-          id="chats"
-          title="Sohbetler"
-          icon={<MessageSquare size={11} />}
-          badge={chats.length > 0 ? String(chats.length) : undefined}
-          defaultOpen
-        >
-          <div className="relative mb-2">
-            <Search size={11} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted/40" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Sohbetlerde ara (başlık + içerik)…"
-              className="w-full bg-bgsoft/60 border border-line/60 rounded-xl pl-8 pr-3 py-2 text-xs outline-none focus:border-brand/50 placeholder:text-muted/35 transition-colors"
-            />
+        {/* Sohbet listesi — ChatGPT'nin ana listesi gibi her zaman açık, katlanamaz
+           (eskiden AccordionSection'dı; kapalı kalıp yanlışlıkla gizlenebiliyordu). */}
+        <div className="pt-1">
+          <div className="flex items-center gap-2 px-3 py-2">
+            <MessageSquare size={11} className="text-muted/60 shrink-0" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted/60 flex-1 truncate">Sohbetler</span>
+            {chats.length > 0 && <span className="text-[10px] text-muted/40 font-mono shrink-0">{chats.length}</span>}
           </div>
+          <div className="px-2 pb-2">
+            <div className="relative mb-2">
+              <Search size={11} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted/40" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Sohbetlerde ara (başlık + içerik)…"
+                className="w-full bg-bgsoft/60 border border-line/60 rounded-xl pl-8 pr-3 py-2 text-xs outline-none focus:border-brand/50 placeholder:text-muted/35 transition-colors"
+              />
+            </div>
 
-          {history.length === 0 ? (
-            <div className="text-center py-8 px-3">
-              <Code2 size={20} className="mx-auto mb-2 text-muted/15" />
-              <p className="text-[11px] text-muted/40 leading-relaxed">
-                {search ? "Eşleşen oturum yok." : "Henüz oturum yok."}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {sections.map((sec) => (
-                <div key={sec.label}>
-                  <div className="px-2.5 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted/40 select-none">
-                    {sec.label}
+            {history.length === 0 ? (
+              <div className="text-center py-8 px-3">
+                <Code2 size={20} className="mx-auto mb-2 text-muted/15" />
+                <p className="text-[11px] text-muted/40 leading-relaxed">
+                  {search ? "Eşleşen oturum yok." : "Henüz oturum yok."}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {sections.map((sec) => (
+                  <div key={sec.label}>
+                    <div className="px-2.5 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted/40 select-none">
+                      {sec.label}
+                    </div>
+                    <div className="space-y-0.5">
+                      {sec.items.map(renderRow)}
+                    </div>
                   </div>
-                  <div className="space-y-0.5">
-                    {sec.items.map(renderRow)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </AccordionSection>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* "İlgili" (Obsidian-lite) — yalnız aktif bir sohbet ve karşılaştıracak
             başka sohbet varsa gösterilir. Panel açılınca (lazy mount) hesaplanır. */}
