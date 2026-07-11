@@ -41,8 +41,8 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
     setPublishedUrl(null);
   }
 
-  const srcdoc = buildArtifactSrcDoc(artifact.type, artifact.content);
-  const { ext, body: downloadBody } = artifactDownload(artifact.type, artifact.content);
+  const srcdoc = buildArtifactSrcDoc(artifact.type, artifact.content, artifact.language);
+  const { ext, body: downloadBody } = artifactDownload(artifact.type, artifact.content, artifact.language);
 
   const copySource = async () => {
     try { await navigator.clipboard.writeText(artifact.content); setCopied(true); setTimeout(() => setCopied(false), 1500); }

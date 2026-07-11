@@ -5,7 +5,7 @@ import { readJson, asContent, isValidationError } from "@/lib/validate";
 
 export const runtime = "nodejs";
 
-const VALID_TYPES = new Set(["html", "svg", "mermaid"]);
+const VALID_TYPES = new Set(["html", "svg", "mermaid", "code", "markdown"]);
 const MAX_CONTENT_BYTES = 300_000; // ~300KB (bayt bazlı — asContent 413 döner)
 
 /* Artifact yayınlama: bir artifact'ı (html/svg/mermaid) bağımsız, paylaşılabilir

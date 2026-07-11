@@ -6,9 +6,10 @@ import { CRAFT_RULES, lintArtifact } from "./studioCraft";
 import { skillById, directionById } from "./studioConstants";
 import type { Artifact } from "./types";
 
-/* Stüdyo üretim motoru — Open Design tarzı: brief + skill + tasarım yönü (+ ileride
-   tasarım sistemi) → üretim-seviyesi tek-sayfa HTML → sandbox iframe artifact'ı.
-   Mevcut /api/chat akışı, fallback zinciri ve preview.ts yeniden kullanılır. */
+/* Stüdyo üretim motoru — Claude Artifacts paritesi: brief (+ opsiyonel skill/yön)
+   → LLM formatı SEÇER (html/jsx/kod/markdown/mermaid) → uygun tipte artifact
+   (html/svg/mermaid/code/markdown). Mevcut /api/chat akışı, fallback zinciri
+   ve preview.ts yeniden kullanılır. */
 
 export type StudioPhase = "planning" | "generating" | "rendering" | "done" | "error";
 
@@ -38,14 +39,19 @@ export interface GenerateResult {
 }
 
 const STUDIO_SYSTEM_BASE =
-  "Sen kıdemli bir ürün tasarımcısı + front-end geliştiricisisin (Open Design / Claude Design seviyesi). " +
-  "Kullanıcının brief'ine göre TEK, kendi kendine yeten, üretim kalitesinde, modern, estetik ve responsive bir tasarım üret. " +
-  "Çıktı: TEK bir ```html bloğu — inline CSS (gerekirse vanilla JS). " +
-  "İlkeler: net görsel hiyerarşi, dengeli boşluk ritmi, tutarlı tipografik ölçek, erişilebilir kontrast, ince mikro-etkileşimler (hover/transition). " +
-  "Lorem ipsum yerine konuya uygun gerçekçi içerik yaz. " +
+  "Sen Claude'un Artifacts özelliğine paralel çalışan kıdemli bir yaratıcı + teknik asistansın. " +
+  "Kullanıcının isteğine göre EN UYGUN formatta TEK, kendi kendine yeten, üretim kalitesinde bir çıktı üret. " +
+  "Formatı kullanıcının ne istediğine bakarak SEN seç:\n" +
+  "• Görsel tasarım / web sayfası / mobil ekran / arayüz mockup'ı → TEK bir ```html bloğu (inline CSS, gerekirse vanilla JS).\n" +
+  "• İnteraktif bileşen/uygulama (React ile daha iyi ifade ediliyorsa) → TEK bir ```jsx bloğu, bir App bileşeniyle.\n" +
+  "• Kod (script, fonksiyon, algoritma — herhangi bir dilde) → o dilin adıyla TEK bir kod bloğu (ör. ```python, ```go, ```sql). Çalışan, temiz, gerekli yerde yorumlu.\n" +
+  "• Doküman / rapor / makale / özet / plan → TEK bir ```markdown bloğu. Net başlık hiyerarşisi, taranabilir yapı.\n" +
+  "• Diyagram / akış şeması / mimari şema / ilişki grafiği → TEK bir ```mermaid bloğu.\n" +
+  "• Basit veri tablosu → ```markdown içinde bir tablo YETERLİ; görsel/etkileşimli bir tablo isteniyorsa ```html kullan.\n" +
+  "Görsel/HTML çıktılarda: net görsel hiyerarşi, dengeli boşluk ritmi, tutarlı tipografik ölçek, erişilebilir kontrast, ince mikro-etkileşimler (hover/transition); lorem ipsum yerine konuya uygun gerçekçi içerik yaz. " +
   "Görsel gerekiyorsa: CSS gradient/SVG; FOTOĞRAF için picsum.photos; KONUYA ÖZEL AI görseli için " +
   "https://image.pollinations.ai/prompt/<URL-encoded%20İngilizce%20açıklama>?width=800&height=600&nologo=true (anahtarsız) kullan. " +
-  "SADECE kod bloğunu döndür, açıklama yazma. (Özellikle React istenirse ```jsx ve bir App bileşeni kullan.)";
+  "SADECE tek kod bloğunu döndür, ekstra açıklama yazma.";
 
 /* Sunum (deck) için çok-slaytlı, kendi kendine gezinen HTML talimatı. */
 const DECK_INSTRUCTION =
@@ -80,7 +86,7 @@ export function buildStudioSystem(opts: Pick<GenerateOptions, "skillId" | "direc
   /* Kompozisyon sırası (Open Design dersi): marka sözleşmesi ÖNCE ve otoriter,
      zanaat kuralları sonra (çakışmada marka kazanır), tür talimatı en sonda. */
   let sys = STUDIO_SYSTEM_BASE;
-  if (opts.designSystemPrompt?.trim()) sys += `\n\n[Marka tasarım sistemi — renk/tipografi/boşlukta OTORİTER, buna UY]:\n${opts.designSystemPrompt.trim()}`;
+  if (opts.designSystemPrompt?.trim()) sys += `\n\n[Marka tasarım sistemi — YALNIZCA görsel/HTML çıktı üretiyorsan renk/tipografi/boşlukta OTORİTER, buna UY; kod/doküman/diyagram üretiyorsan bu bölümü YOK SAY]:\n${opts.designSystemPrompt.trim()}`;
   sys += CRAFT_RULES;
   const skill = skillById(opts.skillId);
   if (skill) sys += `\n\n[Çıktı türü — ${skill.name}]: ${skill.instructions}`;
@@ -142,12 +148,22 @@ export async function generateArtifact(opts: GenerateOptions): Promise<GenerateR
   const block = blocks.find((b) => ["html", "htm", "jsx", "tsx", "react", "js", "javascript", "svg"].includes(b.lang)) || blocks[0];
   let artifact: Artifact | null = null;
   if (block) artifact = buildSingleBlockPreview(block.lang || "html", block.code);
+  /* Claude Artifacts paritesi: html/react/svg/mermaid dışında kalan bloklar da
+     (buildSingleBlockPreview bunları tanımadığı için null döner) artifact
+     olsun — biçimlendirilmiş belge (markdown) ya da herhangi bir dilde kod. */
+  if (!artifact && block?.lang) {
+    artifact = block.lang === "md" || block.lang === "markdown"
+      ? { type: "markdown", content: block.code, title: "Doküman" }
+      : { type: "code", content: block.code, title: `${block.lang} kodu`, language: block.lang };
+  }
   if (!artifact && /<[a-z]/i.test(full)) artifact = buildSingleBlockPreview("html", full);
   if (!artifact) { opts.onPhase?.("error"); throw new Error("Üretim ayrıştırılamadı — brief'i biraz daha açık yaz."); }
 
   opts.onPhase?.("done");
-  /* Kalite denetimi (danışma niteliğinde): bulgular yanıt notu olarak eklenir. */
-  const warnings = lintArtifact(artifact.content);
+  /* Kalite denetimi (danışma niteliğinde) yalnızca görsel/HTML çıktılar için
+     anlamlı — kod/doküman/diyagram çıktılarında hex renk/viewport kontrolü
+     konu dışı, sessizce atlanır. */
+  const warnings = artifact.type === "html" ? lintArtifact(artifact.content) : [];
   const note = warnings.length ? `\n\n🧹 Kalite notu: ${warnings.join(" · ")}. İstersen "düzelt" de, gidereyim.` : "";
-  return { artifact, text: (stripCode(full) || "Tasarımı oluşturdum.") + note };
+  return { artifact, text: (stripCode(full) || "Oluşturdum.") + note };
 }

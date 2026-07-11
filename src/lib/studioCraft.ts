@@ -4,7 +4,7 @@
    marka kazanır. + lintArtifact: üretilen HTML'de kalite kontrolleri. */
 
 export const CRAFT_RULES =
-  "\n\n[ZANAAT KURALLARI — marka sözleşmesiyle çakışırsa MARKA kazanır]:\n" +
+  "\n\n[ZANAAT KURALLARI — YALNIZCA görsel/HTML çıktı üretiyorsan uygula (kod/doküman/diyagram üretiyorsan YOK SAY); marka sözleşmesiyle çakışırsa MARKA kazanır]:\n" +
   "• Tipografi: en fazla 2 yazı ailesi; net ölçek (ör. 14/16/20/28/40+); satır aralığı gövdede 1.6-1.8, başlıkta 1.1-1.3; satır uzunluğu ~60-75 karakter.\n" +
   "• Renk: renkleri CSS değişkenleriyle (:root'ta --bg --surface --fg --muted --accent…) tanımla, gövdede ham hex tekrarı yapma; 1 vurgu rengi yeter.\n" +
   "• Anti-klişe: varsayılan indigo/mor SaaS paletinden (#6366f1 ailesi) kaçın; jenerik 'emoji + gradient kutu' ızgaraları yerine içeriğe özgü kompozisyon kur; sahte 'lorem ipsum' asla.\n" +
