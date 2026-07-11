@@ -21,7 +21,7 @@ import { autoStudioSkill } from "@/lib/autoPilot";
 import type { Artifact, StudioProject } from "@/lib/types";
 import { designSystemById, designSystemPromptText } from "@/lib/designSystems";
 import { type StudioTemplate } from "@/lib/studioTemplates";
-import { TemplateGallery } from "./studio/TemplateGallery";
+import { StudioHomeScreen, EmptyChatHint } from "./studio/StudioHomeScreen";
 import { ArtifactCanvas } from "./ArtifactCanvas";
 import { StudioTopBar } from "./studio/StudioTopBar";
 import { SavedItemsModal } from "./studio/SavedItemsModal";
@@ -59,17 +59,16 @@ function newDesignProject(): StudioProject {
   };
 }
 
-/* ── Sol Panel: AI Sohbet (boşken hazır şablonlar) ────────────────── */
+/* ── Sol Panel: AI Sohbet (ilk gönderimden sonra — anasayfa artık StudioHomeScreen) ── */
 
 function ChatPanel({
-  messages, busy, phase, onFollowup, onStop, onPickTemplate,
+  messages, busy, phase, onFollowup, onStop,
 }: {
   messages: DesignMsg[];
   busy: boolean;
   phase: StudioPhase | null;
   onFollowup: (text: string) => void;
   onStop: () => void;
-  onPickTemplate: (t: StudioTemplate) => void;
 }) {
   const [input, setInput] = useState("");
 
@@ -84,7 +83,7 @@ function ChatPanel({
     <div className="flex flex-col h-full">
       <div className="flex-1 min-h-0 overflow-auto p-3">
         {messages.length === 0 ? (
-          <TemplateGallery onPick={onPickTemplate} />
+          <EmptyChatHint />
         ) : (
           <div className="space-y-3">
             {messages.map((m, i) => (
@@ -135,17 +134,21 @@ function ChatPanel({
   );
 }
 
-function EmptyCanvas() {
+function EmptyCanvas({ busy, phase }: { busy: boolean; phase: StudioPhase | null }) {
   return (
     <div className="h-full grid place-items-center text-center px-6">
       <div className="max-w-xs flex flex-col items-center gap-3">
         <span className="w-14 h-14 rounded-2xl grid place-items-center text-brand bg-brand/10 border border-brand/20 animate-breathe">
-          <Sparkles size={24} />
+          {busy ? <Loader2 size={24} className="animate-spin" /> : <Sparkles size={24} />}
         </span>
-        <p className="text-sm font-semibold text-ink">Tasarım alanı boş</p>
-        <p className="text-xs text-muted/70">
-          ✦ Soldan bir şablon seç ya da kendi brief&apos;ini yaz — örn. &ldquo;minimal bir SaaS afişi&rdquo;.
+        <p className="text-sm font-semibold text-ink">
+          {busy && phase ? PHASE_LABEL[phase] : "Tasarım alanı boş"}
         </p>
+        {!busy && (
+          <p className="text-xs text-muted/70">
+            ✦ Soldan bir değişiklik iste, tuval burada canlanacak.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -168,14 +171,25 @@ export function DesignStudio() {
   const [versionIndex, setVersionIndex] = useState(0);
   const [savedOpen, setSavedOpen] = useState(false);
   const [fusionEnabled, setFusionEnabled] = useState(false);
+  /* Anasayfanın (StudioHomeScreen) kendi brief taslağı — sohbet başlayınca
+     bir daha görünmez, ChatPanel kendi composer'ına geçer. */
+  const [homeBrief, setHomeBrief] = useState("");
   /* Mobilde sohbet/tuval arası basit geçiş — masaüstünde ikisi de her zaman görünür. */
   const [mobileView, setMobileView] = useState<"chat" | "canvas">("chat");
   const abortRef = useRef<AbortController | null>(null);
 
+  /* Henüz hiç mesaj VE tasarım yoksa Claude'un anasayfasına paralel tam-ekran
+     giriş ekranı gösterilir; ilk gönderimle (veya şablon seçimiyle) sohbet+
+     tuval iki-panel görünümüne geçilir — Claude'da bir isteğin Artifacts
+     panelini açması gibi. `!project.html` ek şartı: brief'i olmayan eski bir
+     kayıtlı projeyi açınca (messages boş kalır) anasayfaya değil, yüklenen
+     tasarıma bakılsın. */
+  const showHome = messages.length === 0 && !project.html;
+
   const versions = project.versions ?? [];
   const vIndex = Math.min(versionIndex, Math.max(0, versions.length - 1));
   const shownContent = versions[vIndex] ?? project.html;
-  const shownArtifact: Artifact = { type: project.artifactType ?? "html", content: shownContent, title: project.name };
+  const shownArtifact: Artifact = { type: project.artifactType ?? "html", content: shownContent, title: project.name, language: project.artifactLanguage };
 
   /* ── AI Üretim ─────────────────────────────────────────────────── */
 
@@ -189,8 +203,12 @@ export function DesignStudio() {
     const ac = new AbortController();
     abortRef.current = ac;
 
-    const skillId = template?.skillId ?? (followup ? project.skillId : autoStudioSkill(brief)) ?? "landing";
-    const directionId = template?.directionId ?? project.directionId ?? "minimal";
+    /* Skill/yön artık ZORUNLU değil — eşleşme yoksa null kalır ve LLM formatı
+       (html/kod/markdown/mermaid) brief'in kendisinden serbestçe seçer (Claude
+       Artifacts paritesi). Eskiden "landing"/"minimal" zorla atanıyordu; bir
+       Python script isteğine "hero+CTA" talimatı enjekte etmek anlamsızdı. */
+    const skillId = template?.skillId ?? (followup ? project.skillId : autoStudioSkill(brief));
+    const directionId = template?.directionId ?? project.directionId;
     /* Marka seçici kaldırıldı — Stüdyo artık her zaman sabit "Claude" tasarım
        sistemini kullanır (çıktılar da arayüz gibi Claude Design'a paralel). */
     const designSystemId = "claude";
@@ -241,11 +259,19 @@ export function DesignStudio() {
       });
 
       const wasEmpty = !project.html;
-      const nextVersions = [...(project.versions ?? []), result.artifact.content].slice(-MAX_VERSIONS);
+      /* versions[] tek bir `artifactType` alanını PAYLAŞIR (sürüm başına tip
+         yok) — takip mesajında format değişirse (ör. HTML tasarımdan Python
+         koduna) eski sürümler yanlış tipte render olur. Format değiştiğinde
+         geçmişi taşımak yerine yeni bir sürüm zinciri başlat. */
+      const typeChanged = followup && project.artifactType && project.artifactType !== result.artifact.type;
+      const nextVersions = typeChanged
+        ? [result.artifact.content]
+        : [...(project.versions ?? []), result.artifact.content].slice(-MAX_VERSIONS);
       setProject((p) => ({
         ...p,
         html: result.artifact.content,
         artifactType: result.artifact.type,
+        artifactLanguage: result.artifact.language,
         skillId, directionId, designSystemId,
         versions: nextVersions,
         brief,
@@ -293,6 +319,7 @@ export function DesignStudio() {
     setMessages(p.brief ? [{ role: "user", text: p.brief }, { role: "assistant", text: "Tasarımı yeniden yükledim." }] : []);
     setSavedOpen(false);
     setMobileView(p.html ? "canvas" : "chat");
+    setHomeBrief("");
   }, []);
 
   const removeSavedProject = useCallback((p: StudioProject) => {
@@ -304,6 +331,7 @@ export function DesignStudio() {
     setMessages([]);
     setVersionIndex(0);
     setMobileView("chat");
+    setHomeBrief("");
     addToast("Yeni proje oluşturuldu.", "info");
   }, [addToast]);
 
@@ -329,6 +357,22 @@ export function DesignStudio() {
     </>
   );
 
+  /* Anasayfada henüz kaydedilecek bir tasarım yok — yalnız Projelerim (eski
+     bir işe dönmek için) ve Fusion (bir sonraki üretimi etkiler) anlamlı. */
+  const homeActionButtons = (
+    <>
+      {savedProjects.length > 0 && (
+        <button onClick={() => setSavedOpen(true)} title="Projelerim" aria-label="Projelerim" className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
+      )}
+      <button
+        onClick={() => setFusionEnabled((f) => !f)}
+        title="Fusion: 3 model + hakem ile üretim"
+        aria-label="Fusion: 3 model + hakem ile üretim"
+        className={`w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg transition-colors ${fusionEnabled ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
+      ><Sparkles size={15} /></button>
+    </>
+  );
+
   return (
     <div className="theme-claude fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       <StudioTopBar
@@ -336,53 +380,62 @@ export function DesignStudio() {
         label="Tasarım"
         activeSurface="studio"
         showWorkActions
-        onNew={newProjectAction}
-        title={{ value: project.name, onChange: (v) => setProject((p) => ({ ...p, name: v })), placeholder: "Tasarım adı" }}
+        onNew={showHome ? undefined : newProjectAction}
+        title={showHome ? undefined : { value: project.name, onChange: (v) => setProject((p) => ({ ...p, name: v })), placeholder: "Tasarım adı" }}
         onClose={() => nav.close()}
-        actions={actionButtons}
+        actions={showHome ? homeActionButtons : actionButtons}
       />
 
-      <div className="flex-1 min-h-0 flex">
-        {/* Sol: sohbet — masaüstünde sabit, mobilde tam-ekran (yalnız mobileView==="chat"). */}
-        <div className={`${mobileView === "chat" ? "flex" : "hidden"} sm:flex flex-col min-h-0 w-full sm:w-[380px] sm:shrink-0 border-r border-line bg-bg sm:bg-transparent`}>
-          <div className="sm:hidden h-11 shrink-0 flex items-center gap-2 px-3 border-b border-line">
-            <span className="text-xs font-bold flex items-center gap-1.5"><Sparkles size={13} className="text-brand" /> Sohbet</span>
-            {project.html && (
-              <button onClick={() => setMobileView("canvas")} className="ml-auto text-[11px] font-semibold text-brand px-2 py-1 rounded-lg hover:bg-brand/10">Tuvale git →</button>
-            )}
+      {showHome ? (
+        <StudioHomeScreen
+          brief={homeBrief}
+          setBrief={setHomeBrief}
+          busy={busy}
+          onSubmit={(t) => { setHomeBrief(""); runGenerate(t, false); }}
+          onPickTemplate={(t) => { setHomeBrief(""); runGenerate(t.brief, false, t); }}
+        />
+      ) : (
+        <div className="flex-1 min-h-0 flex">
+          {/* Sol: sohbet — masaüstünde sabit, mobilde tam-ekran (yalnız mobileView==="chat"). */}
+          <div className={`${mobileView === "chat" ? "flex" : "hidden"} sm:flex flex-col min-h-0 w-full sm:w-[380px] sm:shrink-0 border-r border-line bg-bg sm:bg-transparent`}>
+            <div className="sm:hidden h-11 shrink-0 flex items-center gap-2 px-3 border-b border-line">
+              <span className="text-xs font-bold flex items-center gap-1.5"><Sparkles size={13} className="text-brand" /> Sohbet</span>
+              {project.html && (
+                <button onClick={() => setMobileView("canvas")} className="ml-auto text-[11px] font-semibold text-brand px-2 py-1 rounded-lg hover:bg-brand/10">Tuvale git →</button>
+              )}
+            </div>
+            <ChatPanel
+              messages={messages}
+              busy={busy}
+              phase={phase}
+              onFollowup={(t) => runGenerate(t, true)}
+              onStop={stop}
+            />
           </div>
-          <ChatPanel
-            messages={messages}
-            busy={busy}
-            phase={phase}
-            onFollowup={(t) => runGenerate(t, true)}
-            onStop={stop}
-            onPickTemplate={(t) => runGenerate(t.brief, false, t)}
-          />
-        </div>
 
-        {/* Sağ: tuval — masaüstünde her zaman görünür, mobilde yalnız mobileView==="canvas". */}
-        <main className={`${mobileView === "canvas" ? "flex" : "hidden"} sm:flex flex-1 min-h-0 flex-col bg-bgsoft/30`}>
-          <div className="sm:hidden h-11 shrink-0 flex items-center gap-2 px-3 border-b border-line">
-            <button onClick={() => setMobileView("chat")} aria-label="Sohbete dön" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-ink"><X size={16} /></button>
-            <span className="text-xs font-bold truncate">{project.name}</span>
-          </div>
-          <div className="flex-1 min-h-0">
-            {project.html ? (
-              <ArtifactCanvas
-                artifact={shownArtifact}
-                versionIndex={vIndex}
-                versionTotal={versions.length}
-                onPrevVersion={() => setVersionIndex((i) => Math.max(0, i - 1))}
-                onNextVersion={() => setVersionIndex((i) => Math.min(versions.length - 1, i + 1))}
-                extraExportOptions={[printPdfOption]}
-              />
-            ) : (
-              <EmptyCanvas />
-            )}
-          </div>
-        </main>
-      </div>
+          {/* Sağ: tuval — masaüstünde her zaman görünür, mobilde yalnız mobileView==="canvas". */}
+          <main className={`${mobileView === "canvas" ? "flex" : "hidden"} sm:flex flex-1 min-h-0 flex-col bg-bgsoft/30`}>
+            <div className="sm:hidden h-11 shrink-0 flex items-center gap-2 px-3 border-b border-line">
+              <button onClick={() => setMobileView("chat")} aria-label="Sohbete dön" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-ink"><X size={16} /></button>
+              <span className="text-xs font-bold truncate">{project.name}</span>
+            </div>
+            <div className="flex-1 min-h-0">
+              {project.html ? (
+                <ArtifactCanvas
+                  artifact={shownArtifact}
+                  versionIndex={vIndex}
+                  versionTotal={versions.length}
+                  onPrevVersion={() => setVersionIndex((i) => Math.max(0, i - 1))}
+                  onNextVersion={() => setVersionIndex((i) => Math.min(versions.length - 1, i + 1))}
+                  extraExportOptions={[printPdfOption]}
+                />
+              ) : (
+                <EmptyCanvas busy={busy} phase={phase} />
+              )}
+            </div>
+          </main>
+        </div>
+      )}
 
       <SavedItemsModal
         open={savedOpen}

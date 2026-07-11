@@ -29,7 +29,7 @@ export default async function PublishedArtifactPage({ params }: Props) {
 
   if (error || !data) return <ErrorPage message="Bu artifact bulunamadı veya silinmiş." />;
 
-  const type = (["html", "svg", "mermaid"].includes(data.type) ? data.type : "html") as Artifact["type"];
+  const type = (["html", "svg", "mermaid", "code", "markdown"].includes(data.type) ? data.type : "html") as Artifact["type"];
   const srcdoc = buildArtifactSrcDoc(type, data.content ?? "");
   const date = new Date(data.created_at).toLocaleString("tr-TR");
 

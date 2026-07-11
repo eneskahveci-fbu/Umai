@@ -239,9 +239,14 @@ export interface Skill {
 }
 
 export interface Artifact {
-  type: "html" | "svg" | "mermaid";
+  /** Claude Artifacts paritesi: görsel tasarım (html), vektör (svg), diyagram
+      (mermaid), herhangi bir dilde kod (code) veya biçimlendirilmiş belge
+      (markdown). */
+  type: "html" | "svg" | "mermaid" | "code" | "markdown";
   content: string;
   title: string;
+  /** "code" tipi için sözdizimi vurgulama dili (ör. "python", "go", "sql"). */
+  language?: string;
 }
 
 export interface PromptTemplate {
@@ -264,14 +269,17 @@ export interface DesignSystem {
 
 /** Stüdyo projesi — kaydedilen bir tasarım (üretilen artifact + meta). user_config
     ile senkronlanır. `versions`: aynı projenin son birkaç üretimi (geri dönüş için,
-    hepsi `artifactType` türünde varsayılır — Design Studio'da tür neredeyse hep
-    "html", karışık-türlü sürüm geçmişi pratikte oluşmaz). */
+    hepsi `artifactType`/`artifactLanguage` türünde varsayılır — bir takip
+    mesajında format değişirse (ör. html → code) DesignStudio.tsx sürüm
+    zincirini SIFIRLAR, karışık-türlü geçmiş oluşmaz). */
 export interface StudioProject {
   id: string;
   name: string;
   brief: string;
   html: string;
   artifactType?: Artifact["type"];
+  /** "code" tipi sürümler için sözdizimi dili. */
+  artifactLanguage?: string;
   designSystemId: string;
   skillId: string | null;
   directionId: string | null;
