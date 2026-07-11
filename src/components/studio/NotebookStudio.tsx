@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  BookOpen, FolderOpen, Globe, Link2, Loader2, Plus, Save, Send,
+  BookOpen, FileText, FolderOpen, Globe, Link2, Loader2, Plus, Save, Send,
   Sparkles, Trash2, Volume2, VolumeX,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -63,6 +63,8 @@ export function NotebookStudio() {
   const [pasteText, setPasteText] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [fetching, setFetching] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [speaking, setSpeaking] = useState(false);
   /* Sesli özet üretimi `busy`'den AYRI izlenir — normal bir soru sorulurken
      "Sesli özet" butonu ilgisiz şekilde grileşmesin (yalnız kendi üretimi
@@ -107,6 +109,21 @@ export function NotebookStudio() {
     } catch (e) {
       addToast(`URL getirilemedi: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
     } finally { setFetching(false); }
+  };
+
+  /* PDF: istemcide metni çıkar (pdf.js, veri sunucuya gitmez) — CoderView'daki
+     dosya-ekleme akışıyla aynı mantık. */
+  const addFile = async (f: File) => {
+    if (sources.length >= MAX_SOURCES) { addToast(`En fazla ${MAX_SOURCES} kaynak.`, "info"); return; }
+    if (f.size > 20_000_000) { addToast("PDF 20MB'den büyük.", "error"); return; }
+    setPdfBusy(true);
+    try {
+      const { extractPdfText } = await import("@/lib/pdf");
+      const text = await extractPdfText(f);
+      setSources((s) => [...s, { id: newSourceId(), name: f.name, text, enabled: true }]);
+    } catch (e) {
+      addToast(`PDF okunamadı: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+    } finally { setPdfBusy(false); }
   };
 
   const ask = async (question?: string) => {
@@ -240,6 +257,16 @@ export function NotebookStudio() {
                   {fetching ? <Loader2 size={13} className="animate-spin" /> : <Globe size={13} />}
                 </button>
               </div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void addFile(f); e.target.value = ""; }}
+              />
+              <button onClick={() => fileRef.current?.click()} disabled={pdfBusy} className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg border border-line text-muted text-xs font-semibold hover:text-brand hover:border-brand/50 disabled:opacity-40 transition-colors">
+                {pdfBusy ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} PDF kaynak ekle
+              </button>
             </div>
 
             {/* Sesli özet */}
