@@ -12,6 +12,7 @@ import { streamChat } from "@/lib/genChat";
 import { playTts, stopTts, TTS_MAX_CHARS, TTS_VOICES } from "@/lib/pollinations";
 import { useStudioProject } from "@/lib/useStudioProject";
 import { consumeSurfaceOpenItem } from "@/lib/surfaceNav";
+import { CrossTypeRelated } from "./CrossTypeRelated";
 
 /* Defter — NotebookLM'den İLHAM alan craft yorumu (klonu değil): metin/URL
    kaynakları ekle → yalnız o kaynaklardan yanıtlayan sohbet ([1] [2] atıflı)
@@ -294,6 +295,14 @@ export function NotebookStudio() {
                 {TTS_VOICES.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
               </select>
             </div>
+
+            {/* "İlgili" (Obsidian-lite) — yalnız kayıtlı bir defterde, çapraz-tip
+                (sohbet/doküman/anket dahil) arar. */}
+            {saved.some((n) => n.id === nbId) && (
+              <div className="border-t border-line/60 pt-3">
+                <CrossTypeRelated kind="notebook" id={nbId} />
+              </div>
+            )}
           </div>
         </div>
 

@@ -31,6 +31,16 @@ export function docEmbeddingText(d: { title: string; blocks: { text: string }[] 
   return clip(`${d.title}\n${text}`);
 }
 
+export function formEmbeddingText(f: { title: string; desc?: string; questions: { label: string }[] }): string {
+  const text = f.questions.map((q) => q.label).filter(Boolean).join("\n");
+  return clip(`${f.title}\n${f.desc ?? ""}\n${text}`);
+}
+
+export function notebookEmbeddingText(n: { title: string; sources: { name: string; text: string }[] }): string {
+  const text = n.sources.map((s) => `${s.name}\n${s.text}`).filter(Boolean).join("\n");
+  return clip(`${n.title}\n${text}`);
+}
+
 /** Eksik/bayat gömmeleri toplu (tek embed() çağrısı) hesaplar. `versionOf` içerik
     değiştiğinde artan bir sayı (ör. mesaj/blok sayısı) döndürmeli — güncel
     öğelere DOKUNULMAZ (aynı referans korunur), yalnız bayat/eksik olanlar

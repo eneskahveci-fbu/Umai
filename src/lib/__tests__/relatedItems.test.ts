@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { chatEmbeddingText, docEmbeddingText, findRelated, withFreshEmbeddings } from "../relatedItems";
+import {
+  chatEmbeddingText, docEmbeddingText, formEmbeddingText, notebookEmbeddingText,
+  findRelated, withFreshEmbeddings,
+} from "../relatedItems";
 
 vi.mock("../rag", async () => {
   const actual = await vi.importActual<typeof import("../rag")>("../rag");
@@ -25,6 +28,37 @@ describe("docEmbeddingText", () => {
   it("başlığı ve blok metinlerini birleştirir", () => {
     const text = docEmbeddingText({ title: "Doküman", blocks: [{ text: "birinci" }, { text: "" }, { text: "ikinci" }] });
     expect(text).toBe("Doküman\nbirinci\nikinci");
+  });
+});
+
+describe("formEmbeddingText", () => {
+  it("başlık, açıklama ve soru metinlerini birleştirir", () => {
+    const text = formEmbeddingText({
+      title: "Anket", desc: "kısa açıklama",
+      questions: [{ label: "isim?" }, { label: "" }, { label: "yaş?" }],
+    });
+    expect(text).toContain("Anket");
+    expect(text).toContain("kısa açıklama");
+    expect(text).toContain("isim?");
+    expect(text).toContain("yaş?");
+  });
+
+  it("açıklama yoksa boş bırakır (çökmez)", () => {
+    const text = formEmbeddingText({ title: "Anket", questions: [{ label: "isim?" }] });
+    expect(text).toBe("Anket\n\nisim?");
+  });
+});
+
+describe("notebookEmbeddingText", () => {
+  it("başlık ve kaynak adı+metnini birleştirir", () => {
+    const text = notebookEmbeddingText({
+      title: "Defter",
+      sources: [{ name: "kaynak1", text: "içerik1" }, { name: "kaynak2", text: "içerik2" }],
+    });
+    expect(text).toContain("Defter");
+    expect(text).toContain("kaynak1");
+    expect(text).toContain("içerik1");
+    expect(text).toContain("kaynak2");
   });
 });
 
