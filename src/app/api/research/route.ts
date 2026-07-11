@@ -140,17 +140,31 @@ export async function POST(req: Request) {
         const queries = parseQueries(planRaw, String(topic));
 
         /* ── 2) YELPAZE ARAMA (paralel) ── */
-        const agents = queries.map((q) => ({ title: q, role: "araştırmacı", status: "running" as "running" | "done" | "error" }));
+        const agents = queries.map((q) => ({
+          title: q, role: "araştırmacı",
+          status: "running" as "running" | "done" | "error",
+          output: undefined as string | undefined,
+        }));
         sendEvent({ swarm_event: { kind: "research", phase: "working", agents } });
+
+        /* Ajan çıktısı: bu alt-sorgu için bulunan kaynakların kısa listesi —
+           "Ajan Ekibi" paneliyle aynı UI, nihai rapordan ÖNCE hangi kaynağın
+           hangi alt-sorgudan geldiğini görebilmek için. */
+        const formatSources = (list: SearchResult[]): string =>
+          list.length
+            ? list.slice(0, 5).map((r) => `- [${r.title || r.url}](${r.url})`).join("\n")
+            : "(kaynak bulunamadı)";
 
         const perQuery = await Promise.all(queries.map(async (q, i) => {
           try {
             const r = await searchWeb(q);
             agents[i].status = "done";
+            agents[i].output = formatSources(r);
             sendEvent({ swarm_event: { kind: "research", phase: "working", agents } });
             return r;
           } catch {
             agents[i].status = "error";
+            agents[i].output = "(arama başarısız oldu)";
             sendEvent({ swarm_event: { kind: "research", phase: "working", agents } });
             return [] as SearchResult[];
           }

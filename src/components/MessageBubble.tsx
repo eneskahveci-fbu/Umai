@@ -294,6 +294,7 @@ function SwarmPanel({ swarm }: { swarm: SwarmState }) {
   const done = agents.filter((a) => a.status === "done").length;
   const active = phase !== "done";
   const HeaderIcon = isResearch ? Search : Users;
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
   return (
     <div className="mb-3 border border-line/50 rounded-xl overflow-hidden bg-bgsoft/30">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-line/30 text-xs">
@@ -313,23 +314,40 @@ function SwarmPanel({ swarm }: { swarm: SwarmState }) {
         <div className="px-3 py-2.5 space-y-1.5">
           {agents.map((a, i) => {
             const RoleIcon = SWARM_ROLE_ICON[a.role] ?? Settings2;
+            const canExpand = a.status !== "running" && !!a.output;
+            const isOpen = openIdx === i;
             return (
-            <div key={i} className="flex items-start gap-2 text-xs">
-              <RoleIcon size={13} className="text-muted/70 shrink-0 mt-0.5" />
-              {a.status === "done" ? (
-                <Check size={12} className="text-green shrink-0 mt-0.5" />
-              ) : a.status === "error" ? (
-                <X size={12} className="text-red-400 shrink-0 mt-0.5" />
-              ) : (
-                <Loader2 size={12} className="text-brand shrink-0 mt-0.5 animate-spin" />
+            <div key={i}>
+              <button
+                type="button"
+                disabled={!canExpand}
+                onClick={() => setOpenIdx(isOpen ? null : i)}
+                className={`w-full flex items-start gap-2 text-xs text-left ${canExpand ? "cursor-pointer" : "cursor-default"}`}
+              >
+                <RoleIcon size={13} className="text-muted/70 shrink-0 mt-0.5" />
+                {a.status === "done" ? (
+                  <Check size={12} className="text-green shrink-0 mt-0.5" />
+                ) : a.status === "error" ? (
+                  <X size={12} className="text-red-400 shrink-0 mt-0.5" />
+                ) : (
+                  <Loader2 size={12} className="text-brand shrink-0 mt-0.5 animate-spin" />
+                )}
+                <span className={`flex-1 min-w-0 ${
+                  a.status === "done" ? "text-muted/60" :
+                  a.status === "error" ? "text-red-400/80" :
+                  "text-ink font-medium"
+                }`}>
+                  {a.title}
+                </span>
+                {canExpand && (
+                  <ChevronDown size={12} className={`text-muted/40 shrink-0 mt-0.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                )}
+              </button>
+              {isOpen && a.output && (
+                <div className="mt-1.5 ml-5 mr-1 px-2.5 py-2 rounded-lg bg-bg/50 border border-line/30 text-[11px] text-muted/80 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
+                  {a.output}
+                </div>
               )}
-              <span className={
-                a.status === "done" ? "text-muted/60" :
-                a.status === "error" ? "text-red-400/80" :
-                "text-ink font-medium"
-              }>
-                {a.title}
-              </span>
             </div>
             );
           })}

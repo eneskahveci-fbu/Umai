@@ -1,16 +1,16 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #111110;
-  --color-bgsoft: #1b1a17;
-  --color-surface: #181714;
-  --color-surface2: #22201c;
-  --color-line: #2e2a24;
-  --color-ink: #f0ebe0;
-  --color-muted: #9a9080;
-  --color-brand: #c8a87e;
-  --color-branddim: #b09060;
-  --color-accent: #d4bc9a;
+  --color-bg: #171a16;
+  --color-bgsoft: #1e221c;
+  --color-surface: #1a1d18;
+  --color-surface2: #262b23;
+  --color-line: #363c31;
+  --color-ink: #e6e3d8;
+  --color-muted: #8f9285;
+  --color-brand: #5c9478;
+  --color-branddim: #4a7a62;
+  --color-accent: #7ab098;
   --color-cyan: #46d4e0;
   --color-yellow: #e8c06a;
   --color-blue: #5aa7ff;
@@ -30,10 +30,10 @@
 }
 
 :root {
-  --accent: #c8a87e;
+  --accent: #5c9478;
   --font-scale: 1;
 }
-.accent-amber  { --accent: #c8a87e; --color-brand: #c8a87e; --color-branddim: #b09060; }
+.accent-pine   { --accent: #5c9478; --color-brand: #5c9478; --color-branddim: #4a7a62; }
 .accent-green  { --accent: #3ddc84; --color-brand: #3ddc84; --color-branddim: #2abc6a; }
 .accent-orange { --accent: #f97316; --color-brand: #f97316; --color-branddim: #ea580c; }
 
@@ -47,16 +47,16 @@ pre, code, .font-mono { font-size: calc(0.8rem * var(--font-scale)); }
 
 /* ─── Light tema ─── */
 html.light {
-  --color-bg: #f2ece0;
-  --color-bgsoft: #e8e1d4;
-  --color-surface: #f8f3e8;
-  --color-surface2: #dfd8cc;
-  --color-line: #c4baa8;
-  --color-ink: #1c1917;
-  --color-muted: #6b5e50;
-  --color-brand: #7a5c30;
-  --color-branddim: #6a4e28;
-  --color-accent: #9a7040;
+  --color-bg: #ece7de;
+  --color-bgsoft: #e1dbcd;
+  --color-surface: #f5f2ea;
+  --color-surface2: #d9d2c0;
+  --color-line: #c2b9a4;
+  --color-ink: #23241f;
+  --color-muted: #6f6a5c;
+  --color-brand: #2f5d46;
+  --color-branddim: #244836;
+  --color-accent: #3f7a5c;
   --color-cyan: #2c8c8c;
   --color-yellow: #a07828;
   --color-green: #2a8040;
@@ -67,16 +67,16 @@ html.light {
 
 /* ─── Gradyanlar ─── */
 .brand-gradient {
-  background: linear-gradient(135deg, #c8a87e 0%, #e0caa8 50%, #b09060 100%);
+  background: linear-gradient(135deg, #5c9478 0%, #93c2ac 50%, #4a7a62 100%);
 }
 .brand-text {
-  background: linear-gradient(120deg, #c8a87e, #e8d8b8);
+  background: linear-gradient(120deg, #5c9478, #a8d4c0);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 html.light .brand-text {
-  background: linear-gradient(120deg, #8a6940, #c8a87e);
+  background: linear-gradient(120deg, #244836, #4a8068);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -474,7 +474,7 @@ html { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--color-mu
   -webkit-tap-highlight-color: transparent;
 }
 ::selection {
-  background: rgba(200, 168, 126, 0.30);
+  background: rgba(92, 148, 120, 0.30);
 }
 
 /* ─── Mesaj ayracı ─── */
@@ -608,16 +608,7 @@ html.light body {
     0 2px 10px -6px rgba(0,0,0,.45);
 }
 
-/* 7) Marka butonu parıltısı — birincil aksiyonlar için üst-highlight + glow. */
-.btn-brand-glow {
-  background: linear-gradient(180deg, var(--color-accent), var(--color-brand));
-  box-shadow:
-    0 1px 0 rgba(255,255,255,.18) inset,
-    0 6px 18px -8px color-mix(in srgb, var(--color-brand) 70%, transparent);
-}
-.btn-brand-glow:hover { filter: brightness(1.05); }
-
-/* 8) Cam (glass) yüzey — üst barlar/menüler için hafif bulanıklık + saydamlık. */
+/* 7) Cam (glass) yüzey — üst barlar/menüler için hafif bulanıklık + saydamlık. */
 .glass {
   background: color-mix(in srgb, var(--color-surface) 78%, transparent);
   -webkit-backdrop-filter: saturate(140%) blur(12px);
@@ -625,31 +616,7 @@ html.light body {
   border: 1px solid color-mix(in srgb, var(--color-ink) 7%, var(--color-line));
 }
 
-/* 9) Aurora — marka tonlu (amber), çok yavaş süzülen ışıma. Fütüristik his verir
-   ama YALNIZCA --color-brand kullanır → tema birebir korunur. */
-@keyframes aurora-drift {
-  0%   { transform: translate3d(0, 0, 0) scale(1);    opacity: .75; }
-  50%  { transform: translate3d(2%, -2%, 0) scale(1.08); opacity: 1; }
-  100% { transform: translate3d(0, 0, 0) scale(1);    opacity: .75; }
-}
-.aurora {
-  pointer-events: none;
-  background:
-    radial-gradient(42% 32% at 22% 18%, color-mix(in srgb, var(--color-brand) 13%, transparent), transparent 70%),
-    radial-gradient(36% 28% at 80% 32%, color-mix(in srgb, var(--color-brand) 9%, transparent), transparent 70%);
-  filter: blur(6px);
-  animation: aurora-drift 20s ease-in-out infinite;
-}
-
-/* 10) Giriş animasyonu — yumuşak yükselerek belirme (akıcılık). */
-@keyframes rise-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-.animate-rise { animation: rise-in .6s cubic-bezier(.22,.61,.36,1) both; }
-
-/* 11) Hover-lift — kart/öğe üzerine gelince hafif yükselme (mikro-etkileşim). */
-.hover-lift { transition: transform .2s ease, box-shadow .2s ease; }
-.hover-lift:hover { transform: translateY(-3px); box-shadow: 0 16px 40px -16px rgba(0,0,0,.55); }
-
-/* 12) Nabız — kalıcı canlı/AI göstergeleri için çok hafif "nefes alma"
+/* 8) Nabız — kalıcı canlı/AI göstergeleri için çok hafif "nefes alma"
    (breathing) animasyonu. Otomatik Pilot rozeti ve Stüdyo boş-durum ikonu
    gibi HER ZAMAN AÇIK durumları işaretler; "meşgul" değil "canlı" hissi verir. */
 @keyframes breathe {
@@ -658,7 +625,7 @@ html.light body {
 }
 .animate-breathe { animation: breathe 2.8s ease-in-out infinite; }
 
-/* 13) Akış parıltısı — asistan avatarı YALNIZCA o mesaj akarken hafif bir
+/* 9) Akış parıltısı — asistan avatarı YALNIZCA o mesaj akarken hafif bir
    halka parıltısı alır; akış bitince anında durur (transient, kalıcı değil). */
 @keyframes stream-glow {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-brand) 35%, transparent); }
@@ -667,10 +634,6 @@ html.light body {
 .animate-stream-glow { animation: stream-glow 1.6s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .aurora { animation: none; }
-  .animate-rise { animation: none; }
-  .hover-lift { transition: none; }
-  .hover-lift:hover { transform: none; }
   .animate-breathe { animation: none; }
   .animate-stream-glow { animation: none; }
 }
