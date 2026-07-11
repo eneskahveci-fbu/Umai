@@ -1,10 +1,10 @@
 "use client";
 
 /* Mobil alt gezinme çubuğu (yalnız sm altı) — dört öğe: Sohbet · Stüdyo ·
-   Araçlar · Ayarlar. Stüdyo'nun modları (Tasarım/Görüntü) tek tıkla erişilemez
-   değil: içeri girince StudioSwitcher (kompakt açılır liste) tümüne ulaştırır.
-   "Araçlar" birer rotaya gitmez — alttan-açılan kısa liste (`MobileToolsSheet`)
-   açan bir aksiyon düğmesidir. "Ayarlar" ise gerçek `/settings` rotasına gider
+   Araçlar · Ayarlar. Stüdyo artık tek mod (Tasarım) — Görüntü üretimi genel
+   sohbette "/gorsel" komutuna taşındı. "Araçlar" birer rotaya gitmez —
+   alttan-açılan kısa liste (`MobileToolsSheet`) açan bir aksiyon düğmesidir.
+   "Ayarlar" ise gerçek `/settings` rotasına gider
    (Sidebar'ın masaüstündeki iki düğmesiyle aynı hizada — bkz. Sidebar.tsx),
    böylece diğer üç sekmeyle aynı aktif-vurgu deseni otomatik çalışır.
    Aktif sekme marka renginde; safe-area alt boşluğu korunur. */

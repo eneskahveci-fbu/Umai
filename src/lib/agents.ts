@@ -187,6 +187,19 @@ export const AGENTS: Agent[] = [
       "bulguları kaynak numaralarıyla atıfla ([1], [2]) ve sonda 'Kaynaklar' bölümü ekle. " +
       "Yalnızca kaynaklardaki bilgiyi kullan, emin olmadığını belirt. Türkçe yanıt ver.",
   },
+  {
+    /* ÖZEL DURUM: diğer agent'ların aksine bu asla LLM'e ULAŞMAZ — CoderView'in
+       send() fonksiyonu bu id'yi görünce Pollinations'la doğrudan görsel üretir
+       (bkz. CoderView.tsx). systemPrompt burada yalnızca tip uyumluluğu için var;
+       kullanılmaz. Eski Stüdyo > Görüntü yüzeyinin yerini alır. */
+    id: "image-gen",
+    command: "/gorsel",
+    label: "Görsel Oluştur",
+    icon: "🖼️",
+    description: "Ücretsiz, anahtarsız AI görsel üretir (Pollinations) — doğrudan sohbete döner",
+    placeholder: "Ne görmek istersin? Örn. 'gün batımında sisli dağ manzarası, sinematik ışık'…",
+    systemPrompt: "(kullanılmaz — istemci tarafında intercept edilir)",
+  },
 ];
 
 import { EXTENSION_AGENTS } from "@/lib/extensions/registry";

@@ -1,13 +1,19 @@
 "use client";
 
-import { StudioHub } from "@/components/studio/StudioHub";
-import { SurfacePage } from "@/components/studio/SurfacePage";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-/* /studio/gorsel — Tasarım grubu kabuğu, Görüntü modu açık başlar. */
-export default function ImagePage() {
+/* /studio/gorsel → /app'e yönlendir. Görüntü üretimi Stüdyo'dan kaldırıldı;
+   artık genel sohbette "/gorsel <brief>" komutuyla üretiliyor. Kullanıcı eski
+   linkle gelirse sessizce ana sohbete atlar. */
+export default function ImageRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/app");
+  }, [router]);
   return (
-    <SurfacePage flag="imageStudioOpen">
-      <StudioHub />
-    </SurfacePage>
+    <div className="h-screen grid place-items-center bg-bg text-muted/60 text-sm">
+      Yönlendiriliyor…
+    </div>
   );
 }

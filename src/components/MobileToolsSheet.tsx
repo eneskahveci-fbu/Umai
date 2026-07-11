@@ -2,9 +2,9 @@
 
 /* Mobil "Araçlar" alt-sekmesinin açtığı kısa liste — masaüstündeki
    `SidebarTools.tsx` açılır listesinin mobil eşleniği (aynı 3 araç).
-   Görüntü burada YOK: Stüdyo sekmesi → StudioSwitcher'dan zaten erişilebilir,
-   ikinci bir yol açmak yalnız kafa karıştırır. Kendi durumunu `MobileTabBar`
-   tutar, bu yalnız görünümdür. */
+   Görüntü burada YOK: üretimi genel sohbette "/gorsel" komutuyla yapılıyor,
+   ayrı bir stüdyo yüzeyi yok. Kendi durumunu `MobileTabBar` tutar, bu yalnız
+   görünümdür. */
 import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import { BookOpen, FileText, ListChecks, X } from "lucide-react";

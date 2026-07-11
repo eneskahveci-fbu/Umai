@@ -4,9 +4,12 @@
    TASARIM STÜDYOSU — Claude Design'a birebir paralel: sol sohbet, sağ TEK
    canlı tasarım tuvali. "OpenDesignStudio" (çoklu sayfa/format/deck/katman
    editörü) sadeleştirilerek buna dönüştürüldü — tek tasarım alanı, hazır
-   şablonlar (studioTemplates.ts) + marka stilleri (designSystems.ts).
-   Tuval, sohbetin ArtifactPanel'iyle AYNI ArtifactCanvas bileşenini
-   paylaşır (önizleme/kod, sürüm gezinme, kopyala/indir/yayınla — tek kaynak).
+   şablonlar (studioTemplates.ts). Marka seçici YOK: üretim her zaman sabit
+   "claude" tasarım sistemini kullanır (designSystems.ts) — çıktı da arayüz
+   gibi Claude Design'a paralel olsun diye. Arayüz kendisi de `.theme-claude`
+   ile Claude'un gerçek paletini uygular (bkz. globals.css). Tuval, sohbetin
+   ArtifactPanel'iyle AYNI ArtifactCanvas bileşenini paylaşır (önizleme/kod,
+   sürüm gezinme, kopyala/indir/yayınla — tek kaynak).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useCallback, useRef, useState } from "react";
@@ -16,7 +19,7 @@ import { useSurfaceNav } from "@/lib/surfaceNav";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
 import { autoStudioSkill } from "@/lib/autoPilot";
 import type { Artifact, StudioProject } from "@/lib/types";
-import { bundledDesignSystems, designSystemById, designSystemPromptText } from "@/lib/designSystems";
+import { designSystemById, designSystemPromptText } from "@/lib/designSystems";
 import { type StudioTemplate } from "@/lib/studioTemplates";
 import { TemplateGallery } from "./studio/TemplateGallery";
 import { ArtifactCanvas } from "./ArtifactCanvas";
@@ -59,7 +62,7 @@ function newDesignProject(): StudioProject {
 /* ── Sol Panel: AI Sohbet (boşken hazır şablonlar) ────────────────── */
 
 function ChatPanel({
-  messages, busy, phase, onFollowup, onStop, onPickTemplate, designSystemId, onDesignSystemChange,
+  messages, busy, phase, onFollowup, onStop, onPickTemplate,
 }: {
   messages: DesignMsg[];
   busy: boolean;
@@ -67,8 +70,6 @@ function ChatPanel({
   onFollowup: (text: string) => void;
   onStop: () => void;
   onPickTemplate: (t: StudioTemplate) => void;
-  designSystemId: string;
-  onDesignSystemChange: (id: string) => void;
 }) {
   const [input, setInput] = useState("");
 
@@ -108,17 +109,6 @@ function ChatPanel({
       </div>
 
       <div className="shrink-0 border-t border-line p-2.5 space-y-1.5">
-        <select
-          value={designSystemId}
-          onChange={(e) => onDesignSystemChange(e.target.value)}
-          className="w-full bg-bgsoft border border-line rounded-lg px-2 py-1.5 text-[11px] text-muted outline-none focus:border-brand/50 cursor-pointer"
-          aria-label="Marka stili"
-        >
-          <option value="">Marka: Serbest (AI seçsin)</option>
-          {bundledDesignSystems.map((s) => (
-            <option key={s.id} value={s.id}>Marka: {s.name}</option>
-          ))}
-        </select>
         <div className="flex items-end gap-1.5 rounded-xl border border-line bg-surface focus-within:border-brand/50 px-2 py-1.5">
           <textarea
             value={input}
@@ -201,8 +191,10 @@ export function DesignStudio() {
 
     const skillId = template?.skillId ?? (followup ? project.skillId : autoStudioSkill(brief)) ?? "landing";
     const directionId = template?.directionId ?? project.directionId ?? "minimal";
-    const designSystemId = template?.designSystemId ?? project.designSystemId;
-    const system = designSystemId ? designSystemById(config, designSystemId) : undefined;
+    /* Marka seçici kaldırıldı — Stüdyo artık her zaman sabit "Claude" tasarım
+       sistemini kullanır (çıktılar da arayüz gibi Claude Design'a paralel). */
+    const designSystemId = "claude";
+    const system = designSystemById(config, designSystemId);
 
     try {
       let boostInstruction: string | undefined;
@@ -338,7 +330,7 @@ export function DesignStudio() {
   );
 
   return (
-    <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+    <div className="theme-claude fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       <StudioTopBar
         icon={Sparkles}
         label="Tasarım"
@@ -366,8 +358,6 @@ export function DesignStudio() {
             onFollowup={(t) => runGenerate(t, true)}
             onStop={stop}
             onPickTemplate={(t) => runGenerate(t.brief, false, t)}
-            designSystemId={project.designSystemId}
-            onDesignSystemChange={(id) => setProject((p) => ({ ...p, designSystemId: id }))}
           />
         </div>
 

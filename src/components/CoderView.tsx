@@ -97,6 +97,7 @@ import {
 } from "@/lib/gitlab";
 import type { TreeFile, TreeNode } from "@/lib/types";
 import { ALL_AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agents";
+import { pollinationsImageUrl } from "@/lib/pollinations";
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
 import { buildContextSections } from "@/lib/prompt";
 import { detectSensitive } from "@/lib/pii";
@@ -1283,6 +1284,31 @@ export function CoderView() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attachedFiles, tree]);
 
+  /* Komut paletinden ("Görsel oluştur" vb.) composer'a metin bırakma isteği —
+     ör. "/gorsel " önceden doldurulup imleç odaklanır, kullanıcı brief'i yazar.
+     İki kaynak: zaten /app'teysek canlı custom event; başka rotadan
+     router.push ile geliniyorsa (bu bileşen henüz mount değildi, event kaçtı)
+     mount anında sessionStorage'dan okunur (surfaceNav.ts handoff deseniyle
+     aynı). */
+  useEffect(() => {
+    const applyPrefill = (prefill: string) => {
+      setInput(prefill);
+      const detected = findAgentByCommand(prefill);
+      if (detected) setActiveAgent(detected);
+      setTimeout(() => taRef.current?.focus(), 0);
+    };
+    try {
+      const handoff = sessionStorage.getItem("craft_composer_prefill");
+      if (handoff) { sessionStorage.removeItem("craft_composer_prefill"); applyPrefill(handoff); }
+    } catch { /* yok say */ }
+    const handler = (e: Event) => {
+      const prefill = (e as CustomEvent<{ text: string }>).detail?.text;
+      if (prefill) applyPrefill(prefill);
+    };
+    window.addEventListener("craftai:composer-prefill", handler);
+    return () => window.removeEventListener("craftai:composer-prefill", handler);
+  }, []);
+
   /* Geri al: ajanın bu turda değiştirdiği dosyaları eski içerikleriyle yeniden
      commit eder (revert); bu turda OLUŞTURULAN dosyaları (previous === null)
      siler. EditorPanel/MultiCommitBar ile aynı yazma/silme uçları. */
@@ -2351,6 +2377,30 @@ export function CoderView() {
     const text = input.trim();
     if ((!text && pendingImages.length === 0 && attachedFiles.length === 0) || streaming) return;
     const store = useStore.getState();
+
+    /* "/gorsel <brief>" — LLM'e / model seçimine hiç İHTİYAÇ DUYMADAN ANINDA
+       görsel üretimi (Pollinations, ücretsiz/anahtarsız) — bu yüzden aşağıdaki
+       "aktif model var mı" kapısından ÖNCE ele alınır. Eski Stüdyo > Görüntü
+       yüzeyinin yerini alır — aynı üretim artık doğrudan genel sohbette. */
+    const imgDetected = findAgentByCommand(text);
+    const imgAgent = imgDetected ?? activeAgent;
+    const imgPromptText = imgDetected ? stripCommand(text) : text;
+    if (imgAgent?.id === "image-gen" && imgPromptText.trim()) {
+      if (!store.currentId) store.newChat(incognito);
+      const imgPrompt = imgPromptText.trim();
+      setInput("");
+      setActiveAgent(null);
+      store.pushMessage({ role: "user", content: imgPrompt });
+      const seed = Math.floor(Math.random() * 1_000_000);
+      store.pushMessage({
+        role: "assistant",
+        content: `**"${imgPrompt}"** için oluşturdum:`,
+        images: [pollinationsImageUrl(imgPrompt, { seed })],
+      });
+      void store.persistCurrent();
+      return;
+    }
+
     if (!store.activeModel()) { store.setSettingsOpen(true); return; }
     if (!store.currentId) store.newChat(incognito);
 
