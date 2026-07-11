@@ -14,6 +14,7 @@ import type { CraftForm, FormQuestion, FormQuestionType } from "@/lib/types";
 import { FORM_QUESTION_TYPES, formToHtml, generateForm, MAX_FORM_QUESTIONS, newQuestion } from "@/lib/forms";
 import { downloadTemplate, pickTemplateFile } from "@/lib/templateShare";
 import { publishArtifact } from "@/lib/studioExport";
+import { useStudioProject } from "@/lib/useStudioProject";
 
 /* Anket Stüdyosu — Google Forms'tan İLHAM alan craft yorumu (klon değil):
    brief → yapılandırılmış soru listesi → canlı önizleme → BAĞIMSIZ HTML form.
@@ -30,9 +31,8 @@ const SUGGESTIONS = [
 
 export function FormsStudio() {
   const open = useStore((s) => s.formsStudioOpen);
-  const config = useStore((s) => s.config);
-  const saveConfig = useStore((s) => s.saveConfig);
   const addToast = useStore((s) => s.addToast);
+  const { saved, save, remove } = useStudioProject<CraftForm>("craftForms", 40);
 
   const [view, setView] = useState<"home" | "work">("home");
   const [brief, setBrief] = useState("");
@@ -100,11 +100,7 @@ export function FormsStudio() {
 
   const saveForm = () => {
     if (!form) return;
-    const stamped = { ...form, updatedAt: Date.now() };
-    setForm(stamped);
-    const existing = config.craftForms ?? [];
-    saveConfig({ ...config, craftForms: [stamped, ...existing.filter((f) => f.id !== form.id)].slice(0, 40) });
-    addToast("Anket kaydedildi.", "success");
+    setForm(save(form, "Anket kaydedildi."));
   };
 
   const exportHtml = () => {
@@ -125,10 +121,7 @@ export function FormsStudio() {
   };
 
   const openForm = (f: CraftForm) => { setForm(f); setView("work"); setSavedOpen(false); setPreviewKey((k) => k + 1); };
-  const removeForm = (id: string) =>
-    saveConfig({ ...config, craftForms: (config.craftForms ?? []).filter((f) => f.id !== id) });
-
-  const saved = config.craftForms ?? [];
+  const removeForm = remove;
 
   const slimActionsRow = view === "work" && form && (
     <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">

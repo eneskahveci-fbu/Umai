@@ -9,14 +9,20 @@
    yerel bir geçiş kontrolü görünür. */
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { BookOpen, FileText, ListChecks, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav, type Surface } from "@/lib/surfaceNav";
 import { StudioSwitcher } from "./StudioSwitcher";
-import { ImageStudio } from "../ImageStudio";
-import { DocsStudio } from "./DocsStudio";
-import { FormsStudio } from "./FormsStudio";
-import { NotebookStudio } from "./NotebookStudio";
+
+/* Her araç yalnız kendi rotası açılınca gerçekten gerekli — next/dynamic ile
+   dördü de ayrı chunk'ta kalır (ör. /studio/anket ziyareti Doküman/Defter/
+   Görüntü'nün kodunu indirmez). */
+const studioLoading = <div className="flex-1 grid place-items-center text-xs text-muted/50">Yükleniyor…</div>;
+const ImageStudio = dynamic(() => import("../ImageStudio").then((m) => m.ImageStudio), { ssr: false, loading: () => studioLoading });
+const DocsStudio = dynamic(() => import("./DocsStudio").then((m) => m.DocsStudio), { ssr: false, loading: () => studioLoading });
+const FormsStudio = dynamic(() => import("./FormsStudio").then((m) => m.FormsStudio), { ssr: false, loading: () => studioLoading });
+const NotebookStudio = dynamic(() => import("./NotebookStudio").then((m) => m.NotebookStudio), { ssr: false, loading: () => studioLoading });
 
 function useEverOpened(open: boolean) {
   const [ever, setEver] = useState(open);

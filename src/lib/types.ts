@@ -299,14 +299,19 @@ export interface Slide {
   notes?: string;
 }
 
-export interface SlideDeck {
+/** Docs/Forms/Notebook/Slides stüdyolarının paylaştığı taban şekil
+    (bkz. useStudioProject.ts — ortak kaydet/sil/liste mantığı bunun üzerine kurulu). */
+export interface StudioProjectBase {
   id: string;
   title: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SlideDeck extends StudioProjectBase {
   themeId: string;
   slides: Slide[];
   brief?: string;
-  createdAt: number;
-  updatedAt: number;
 }
 
 /** Doküman Stüdyosu — Notion'dan ilhamla blok tabanlı doküman (craft yorumu). */
@@ -320,13 +325,9 @@ export interface DocBlock {
   checked?: boolean;
 }
 
-export interface CraftDoc {
-  id: string;
-  title: string;
+export interface CraftDoc extends StudioProjectBase {
   blocks: DocBlock[];
   brief?: string;
-  createdAt: number;
-  updatedAt: number;
   /** "İlgili" (bkz. relatedItems.ts) — istemci taraflı önbelleklenmiş gömme
       vektörü + hesaplandığı andaki blok sayısı (bayatlığı algılamak için). */
   embedding?: number[];
@@ -345,14 +346,10 @@ export interface FormQuestion {
   required?: boolean;
 }
 
-export interface CraftForm {
-  id: string;
-  title: string;
+export interface CraftForm extends StudioProjectBase {
   desc?: string;
   questions: FormQuestion[];
   brief?: string;
-  createdAt: number;
-  updatedAt: number;
 }
 
 /** Defter — NotebookLM'den ilhamla kaynak-temelli çalışma alanı. */
@@ -365,12 +362,8 @@ export interface NotebookSource {
   enabled: boolean;
 }
 
-export interface CraftNotebook {
-  id: string;
-  title: string;
+export interface CraftNotebook extends StudioProjectBase {
   sources: NotebookSource[];
-  createdAt: number;
-  updatedAt: number;
 }
 
 /** Görüntü Stüdyosu'nda kaydedilen tek bir oturum — sohbet akışı (prompt +
@@ -494,8 +487,6 @@ export interface Config {
   customDesignSystems?: DesignSystem[];
   /** Stüdyo: kaydedilen projeler (çok-proje çalışma alanı). */
   studioProjects?: StudioProject[];
-  /** Sunum Stüdyosu: kaydedilen slayt desteleri. */
-  slideDecks?: SlideDeck[];
   /** Doküman Stüdyosu: kaydedilen dokümanlar. */
   craftDocs?: CraftDoc[];
   /** Anket Stüdyosu: kaydedilen anketler. */
