@@ -10,6 +10,7 @@ import { SavedItemsModal } from "./SavedItemsModal";
 import type { CraftNotebook, NotebookSource } from "@/lib/types";
 import { streamChat } from "@/lib/genChat";
 import { playTts, stopTts, TTS_MAX_CHARS, TTS_VOICES } from "@/lib/pollinations";
+import { useStudioProject } from "@/lib/useStudioProject";
 
 /* Defter — NotebookLM'den İLHAM alan craft yorumu (klonu değil): metin/URL
    kaynakları ekle → yalnız o kaynaklardan yanıtlayan sohbet ([1] [2] atıflı)
@@ -51,6 +52,7 @@ export function NotebookStudio() {
   const config = useStore((s) => s.config);
   const saveConfig = useStore((s) => s.saveConfig);
   const addToast = useStore((s) => s.addToast);
+  const { saved, save: saveNbItem, remove: removeNb } = useStudioProject<CraftNotebook>("craftNotebooks", 20);
 
   const [nbId, setNbId] = useState<string>(() => `nb_${Date.now().toString(36)}`);
   const [title, setTitle] = useState("Yeni defter");
@@ -161,26 +163,18 @@ export function NotebookStudio() {
       id: nbId, title: title.trim() || "Defter", sources,
       createdAt: Date.now(), updatedAt: Date.now(),
     };
-    const existing = config.craftNotebooks ?? [];
-    const prev = existing.find((n) => n.id === nbId);
-    if (prev) nb.createdAt = prev.createdAt;
-    saveConfig({ ...config, craftNotebooks: [nb, ...existing.filter((n) => n.id !== nbId)].slice(0, 20) });
-    addToast("Defter kaydedildi.", "success");
+    saveNbItem(nb, "Defter kaydedildi.");
   };
 
   const openNb = (n: CraftNotebook) => {
     stopTts(); setSpeaking(false);
     setNbId(n.id); setTitle(n.title); setSources(n.sources); setMsgs([]); setSavedOpen(false);
   };
-  const removeNb = (id: string) =>
-    saveConfig({ ...config, craftNotebooks: (config.craftNotebooks ?? []).filter((n) => n.id !== id) });
 
   const newNb = () => {
     stopTts(); setSpeaking(false);
     setNbId(`nb_${Date.now().toString(36)}`); setTitle("Yeni defter"); setSources([]); setMsgs([]);
   };
-
-  const saved = config.craftNotebooks ?? [];
 
   const slimActionsRow = (
     <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
