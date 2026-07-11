@@ -306,6 +306,9 @@ export interface StudioProjectBase {
   title: string;
   createdAt: number;
   updatedAt: number;
+  /** Bağlı olduğu proje (bkz. Project — Claude Projects tarzı klasörleme).
+      Tanımsız = hiçbir projeye bağlı değil. */
+  projectId?: string;
 }
 
 export interface SlideDeck extends StudioProjectBase {
@@ -350,6 +353,10 @@ export interface CraftForm extends StudioProjectBase {
   desc?: string;
   questions: FormQuestion[];
   brief?: string;
+  /** "İlgili" (bkz. relatedItems.ts) — istemci taraflı önbelleklenmiş gömme
+      vektörü + hesaplandığı andaki soru sayısı (bayatlığı algılamak için). */
+  embedding?: number[];
+  embeddingVersion?: number;
 }
 
 /** Defter — NotebookLM'den ilhamla kaynak-temelli çalışma alanı. */
@@ -364,6 +371,10 @@ export interface NotebookSource {
 
 export interface CraftNotebook extends StudioProjectBase {
   sources: NotebookSource[];
+  /** "İlgili" (bkz. relatedItems.ts) — istemci taraflı önbelleklenmiş gömme
+      vektörü + hesaplandığı andaki kaynak sayısı (bayatlığı algılamak için). */
+  embedding?: number[];
+  embeddingVersion?: number;
 }
 
 /** Görüntü Stüdyosu'nda kaydedilen tek bir oturum — sohbet akışı (prompt +
