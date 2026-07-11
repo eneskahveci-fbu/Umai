@@ -1,16 +1,16 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #171a16;
-  --color-bgsoft: #1e221c;
-  --color-surface: #1a1d18;
-  --color-surface2: #262b23;
-  --color-line: #363c31;
-  --color-ink: #e6e3d8;
-  --color-muted: #8f9285;
-  --color-brand: #5c9478;
-  --color-branddim: #4a7a62;
-  --color-accent: #7ab098;
+  --color-bg: #0d0f0b;
+  --color-bgsoft: #14170f;
+  --color-surface: #111309;
+  --color-surface2: #1c2016;
+  --color-line: #2a3024;
+  --color-ink: #eef0e9;
+  --color-muted: #8b9084;
+  --color-brand: #00e39a;
+  --color-branddim: #00b87e;
+  --color-accent: #35d6a3;
   --color-cyan: #46d4e0;
   --color-yellow: #e8c06a;
   --color-blue: #5aa7ff;
@@ -30,10 +30,10 @@
 }
 
 :root {
-  --accent: #5c9478;
+  --accent: #00e39a;
   --font-scale: 1;
 }
-.accent-pine   { --accent: #5c9478; --color-brand: #5c9478; --color-branddim: #4a7a62; }
+.accent-pine   { --accent: #00e39a; --color-brand: #00e39a; --color-branddim: #00b87e; }
 .accent-green  { --accent: #3ddc84; --color-brand: #3ddc84; --color-branddim: #2abc6a; }
 .accent-orange { --accent: #f97316; --color-brand: #f97316; --color-branddim: #ea580c; }
 
@@ -47,16 +47,16 @@ pre, code, .font-mono { font-size: calc(0.8rem * var(--font-scale)); }
 
 /* ─── Light tema ─── */
 html.light {
-  --color-bg: #ece7de;
-  --color-bgsoft: #e1dbcd;
-  --color-surface: #f5f2ea;
-  --color-surface2: #d9d2c0;
-  --color-line: #c2b9a4;
-  --color-ink: #23241f;
-  --color-muted: #6f6a5c;
-  --color-brand: #2f5d46;
-  --color-branddim: #244836;
-  --color-accent: #3f7a5c;
+  --color-bg: #f7f8f6;
+  --color-bgsoft: #f0f2ec;
+  --color-surface: #ffffff;
+  --color-surface2: #e8eae3;
+  --color-line: #dfe2d9;
+  --color-ink: #14150f;
+  --color-muted: #6b6e64;
+  --color-brand: #00a876;
+  --color-branddim: #007a55;
+  --color-accent: #1f8f5f;
   --color-cyan: #2c8c8c;
   --color-yellow: #a07828;
   --color-green: #2a8040;
@@ -371,6 +371,16 @@ html.light .prose-chat pre {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 15%, transparent);
 }
 
+/* Yüzen composer'ın odak halkası — vurgu rengini (accent seçimi dahil) izler. */
+.composer-glow {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 16px 40px -12px rgba(0, 0, 0, 0.35);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.composer-glow:focus-within {
+  border-color: color-mix(in srgb, var(--color-brand) 50%, var(--color-line));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 16%, transparent), 0 16px 40px -12px rgba(0, 0, 0, 0.4);
+}
+
 /* ─── Global smooth scrolling + branded focus ring ─── */
 html { scroll-behavior: smooth; }
 
@@ -474,7 +484,7 @@ html { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--color-mu
   -webkit-tap-highlight-color: transparent;
 }
 ::selection {
-  background: rgba(92, 148, 120, 0.30);
+  background: color-mix(in srgb, var(--color-brand) 30%, transparent);
 }
 
 /* ─── Mesaj ayracı ─── */
