@@ -3270,8 +3270,8 @@ export function CoderView() {
               <input ref={imgRef} type="file" multiple accept="image/*" className="hidden"
                 onChange={(e) => { for (const f of Array.from(e.target.files ?? [])) readFileIntoInput(f); e.target.value = ""; }} />
 
-              {/* Textarea — geniş, butonsuz */}
-              <div className="flex items-end gap-2 bg-surface/95 backdrop-blur-sm elev-2 border border-line rounded-2xl px-4 py-3 sm:py-2.5 focus-within:border-brand/50 focus-within:shadow-[0_0_0_3px_rgba(92,148,120,0.12)] transition-all">
+              {/* Yüzen composer — camsı zemin, gölge odak halkasıyla vurgu rengini izler */}
+              <div className="composer-glow flex items-end gap-2 bg-surface/85 backdrop-blur-xl border border-line rounded-[20px] pl-4 pr-2 py-2.5 sm:py-2">
                 <textarea
                   ref={taRef}
                   value={input}
