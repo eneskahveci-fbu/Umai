@@ -41,18 +41,29 @@ export function EmptyChat({ onPrompt }: EmptyChatProps) {
         Bir istek yaz veya aşağıdaki örneklerden birini seç.
       </p>
 
-      {/* Kompakt öneri çipleri — büyük kart yığını yerine sade bir sıra. */}
+      {/* Kompakt öneri çipleri — ilk aksiyon birincil (dolu), geri kalanı ikincil (outline). */}
       <div className="flex flex-wrap items-center justify-center gap-2 max-w-md mb-6">
-        {SAMPLE_PROMPTS.map(({ icon: Icon, label, text }) => (
-          <button
-            key={label}
-            onClick={() => onPrompt(text)}
-            className="group inline-flex items-center gap-2 px-3.5 py-2 rounded-full border border-line bg-surface/60 text-[13px] font-medium text-ink/75 hover:text-ink hover:border-brand/40 hover:bg-surface transition-colors"
-          >
-            <Icon size={13} className="text-brand/80" />
-            {label}
-          </button>
-        ))}
+        {SAMPLE_PROMPTS.map(({ icon: Icon, label, text }, i) =>
+          i === 0 ? (
+            <button
+              key={label}
+              onClick={() => onPrompt(text)}
+              className="inline-flex items-center gap-2 pl-3 pr-3.5 py-2 rounded-full bg-brand hover:bg-branddim text-[13px] font-semibold text-[#111110] transition-colors"
+            >
+              <Icon size={13} />
+              {label}
+            </button>
+          ) : (
+            <button
+              key={label}
+              onClick={() => onPrompt(text)}
+              className="inline-flex items-center gap-1.5 pl-2.5 pr-3.5 py-2 rounded-full border border-line text-[13px] font-medium text-muted hover:text-ink hover:border-brand/40 transition-colors"
+            >
+              <Icon size={13} className="text-muted/70" />
+              {label}
+            </button>
+          )
+        )}
       </div>
 
       {/* İnce bağlantılar: devam + Stüdyo köprüsü (kart değil). */}
