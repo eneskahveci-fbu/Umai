@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { SidebarTools } from "./SidebarTools";
 import {
   Check,
+  ChevronDown,
   Code2,
   Copy,
   Download,
@@ -156,6 +157,7 @@ export function Sidebar() {
     if (c.incognito || !c.projectId) continue;
     projectCounts.set(c.projectId, (projectCounts.get(c.projectId) ?? 0) + 1);
   }
+  const unassignedCount = chats.filter((c) => !c.incognito && !c.projectId).length;
 
   const submitNewProject = () => {
     const name = newProjectName.trim();
@@ -170,22 +172,35 @@ export function Sidebar() {
     setEditProjectName("");
   };
 
-  const history = chats
-    .filter((c) => !c.incognito)
-    .filter((c) => (activeProject ? c.projectId === activeProject : true))
-    .filter((c) => {
-      if (!search) return true;
-      const q = search.toLowerCase();
-      if (c.title.toLowerCase().includes(q)) return true;
-      return c.messages.some((m) =>
-        typeof m.content === "string" && m.content.toLowerCase().includes(q)
-      );
-    })
-    .sort((a, b) => {
-      if (a.pinned && !b.pinned) return -1;
-      if (!a.pinned && b.pinned) return 1;
-      return b.created_at - a.created_at;
-    });
+  const matchesSearch = (c: Chat) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    if (c.title.toLowerCase().includes(q)) return true;
+    return c.messages.some((m) => typeof m.content === "string" && m.content.toLowerCase().includes(q));
+  };
+  const sortChats = (list: Chat[]) => [...list].sort((a, b) => {
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    return b.created_at - a.created_at;
+  });
+  const toSections = (list: Chat[]): { label: string; items: Chat[] }[] => {
+    const pinned = list.filter((c) => c.pinned);
+    const unpinned = list.filter((c) => !c.pinned);
+    return [
+      ...(pinned.length ? [{ label: "Sabitlenenler", items: pinned }] : []),
+      ...groupChatsByDate(unpinned),
+    ];
+  };
+
+  /* ChatGPT'nin Projects'i gibi: proje seçiliyken o projenin sohbetleri
+     KENDİ satırının altında iç içe (nested) gösterilir — aşağıdaki "Sohbetler"
+     bölümü her zaman yalnız PROJESİZ sohbetleri listeler (filtrelenip
+     gizlenmez), böylece iki liste birbirini ezmez. */
+  const unassignedHistory = sortChats(chats.filter((c) => !c.incognito && !c.projectId && matchesSearch(c)));
+  const activeProjectHistory = activeProject
+    ? sortChats(chats.filter((c) => !c.incognito && c.projectId === activeProject && matchesSearch(c)))
+    : [];
+  const history = activeProject ? activeProjectHistory : unassignedHistory;
 
   const startRename = (id: string, title: string) => {
     setEditingId(id);
@@ -197,13 +212,8 @@ export function Sidebar() {
     setEditingId(null);
   };
 
-  /* Sabitlenenler ayrı bölümde; geri kalanlar tarihe göre gruplanır. */
-  const pinned = history.filter((c) => c.pinned);
-  const unpinned = history.filter((c) => !c.pinned);
-  const sections: { label: string; items: Chat[] }[] = [
-    ...(pinned.length ? [{ label: "Sabitlenenler", items: pinned }] : []),
-    ...groupChatsByDate(unpinned),
-  ];
+  const sections = toSections(unassignedHistory);
+  const activeProjectSections = toSections(activeProjectHistory);
 
   const renderRow = (c: Chat) => (
     <div
@@ -484,7 +494,8 @@ export function Sidebar() {
           }
         >
           <div className="space-y-0.5">
-            {/* Tümü (proje filtresi yok) */}
+            {/* Projesiz görünüme dön — aktif bir proje varsa onu kapatır (klasörler
+               tek seferde yalnız biri açık kalır, ChatGPT'nin Projects'i gibi). */}
             <button
               onClick={() => setActiveProject(null)}
               className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors ${
@@ -492,7 +503,7 @@ export function Sidebar() {
               }`}
             >
               <Layers size={13} className="shrink-0" />
-              <span className="flex-1 text-[12px] font-medium truncate">Tüm sohbetler</span>
+              <span className="flex-1 text-[12px] font-medium truncate">Projesiz sohbetler</span>
               {!activeProject && <Check size={12} className="shrink-0" />}
             </button>
 
@@ -519,56 +530,78 @@ export function Sidebar() {
                 );
               }
               return (
-                <div
-                  key={p.id}
-                  className={`group/proj flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${
-                    active ? "bg-brand/10 text-brand" : "text-muted hover:text-ink hover:bg-bgsoft/60"
-                  }`}
-                  onClick={() => setActiveProject(p.id)}
-                  title={p.description || p.name}
-                >
-                  {p.icon ? (
-                    <span className="text-[13px] leading-none shrink-0 w-3.5 text-center">{p.icon}</span>
-                  ) : p.color ? (
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0 ml-0.5" style={{ background: projectColorHex(p.color) }} />
-                  ) : active ? (
-                    <FolderOpen size={13} className="shrink-0" />
-                  ) : (
-                    <Folder size={13} className="shrink-0" />
-                  )}
-                  <span className="flex-1 text-[12px] font-medium truncate">{p.name}</span>
-                  {/* Sohbet sayısı rozeti — hover'da eylemlere yer açmak için gizlenir */}
-                  {count > 0 && (
-                    <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded-md shrink-0 group-hover/proj:hidden ${
-                      active ? "bg-brand/15 text-brand/80" : "bg-bgsoft text-muted/60"
-                    }`}>
-                      {count}
-                    </span>
-                  )}
-                  {/* Hover eylemleri: detay paneli / yeniden adlandır / sil */}
-                  <div className="hidden group-hover/proj:flex items-center gap-0.5 shrink-0">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setProjectModalId(p.id); }}
-                      title="Proje ayarları"
-                      className="p-0.5 rounded text-muted/60 hover:text-brand transition-colors"
-                    >
-                      <Settings2 size={12} />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setEditingProjectId(p.id); setEditProjectName(p.name); }}
-                      title="Yeniden adlandır"
-                      className="p-0.5 rounded text-muted/60 hover:text-brand transition-colors"
-                    >
-                      <Pencil size={12} />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); if (confirm(`"${p.name}" projesi silinsin mi? (Sohbetler silinmez, projesiz kalır.)`)) removeProject(p.id); }}
-                      title="Sil"
-                      className="p-0.5 rounded text-muted/60 hover:text-red transition-colors"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                <div key={p.id}>
+                  <div
+                    className={`group/proj flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${
+                      active ? "bg-brand/10 text-brand" : "text-muted hover:text-ink hover:bg-bgsoft/60"
+                    }`}
+                    onClick={() => setActiveProject(active ? null : p.id)}
+                    title={p.description || p.name}
+                  >
+                    {/* Klasör aç/kapa oku — ChatGPT'nin Projects'i gibi, sohbetler
+                       kendi başlığının altında iç içe (nested) gösterilir. */}
+                    <ChevronDown size={10} className={`shrink-0 text-muted/40 transition-transform ${active ? "" : "-rotate-90"}`} />
+                    {p.icon ? (
+                      <span className="text-[13px] leading-none shrink-0 w-3.5 text-center">{p.icon}</span>
+                    ) : p.color ? (
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0 ml-0.5" style={{ background: projectColorHex(p.color) }} />
+                    ) : active ? (
+                      <FolderOpen size={13} className="shrink-0" />
+                    ) : (
+                      <Folder size={13} className="shrink-0" />
+                    )}
+                    <span className="flex-1 text-[12px] font-medium truncate">{p.name}</span>
+                    {/* Sohbet sayısı rozeti — hover'da eylemlere yer açmak için gizlenir */}
+                    {count > 0 && (
+                      <span className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded-md shrink-0 group-hover/proj:hidden ${
+                        active ? "bg-brand/15 text-brand/80" : "bg-bgsoft text-muted/60"
+                      }`}>
+                        {count}
+                      </span>
+                    )}
+                    {/* Hover eylemleri: detay paneli / yeniden adlandır / sil */}
+                    <div className="hidden group-hover/proj:flex items-center gap-0.5 shrink-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setProjectModalId(p.id); }}
+                        title="Proje ayarları"
+                        className="p-0.5 rounded text-muted/60 hover:text-brand transition-colors"
+                      >
+                        <Settings2 size={12} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditingProjectId(p.id); setEditProjectName(p.name); }}
+                        title="Yeniden adlandır"
+                        className="p-0.5 rounded text-muted/60 hover:text-brand transition-colors"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); if (confirm(`"${p.name}" projesi silinsin mi? (Sohbetler silinmez, projesiz kalır.)`)) removeProject(p.id); }}
+                        title="Sil"
+                        className="p-0.5 rounded text-muted/60 hover:text-red transition-colors"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Nested: proje aktifken kendi sohbetleri hemen altında girintili görünür. */}
+                  {active && (
+                    <div className="pl-4 ml-3.5 border-l border-line/40 mt-0.5 mb-1 space-y-2">
+                      {activeProjectSections.length === 0 ? (
+                        <p className="text-[11px] text-muted/40 italic px-2 py-1">Bu projede henüz sohbet yok.</p>
+                      ) : (
+                        activeProjectSections.map((sec) => (
+                          <div key={sec.label}>
+                            <div className="px-2 pt-0.5 pb-1 text-[9px] font-semibold uppercase tracking-wider text-muted/35 select-none">
+                              {sec.label}
+                            </div>
+                            <div className="space-y-0.5">{sec.items.map(renderRow)}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -627,12 +660,14 @@ export function Sidebar() {
         </AccordionSection>
 
         {/* Sohbet listesi — ChatGPT'nin ana listesi gibi her zaman açık, katlanamaz
-           (eskiden AccordionSection'dı; kapalı kalıp yanlışlıkla gizlenebiliyordu). */}
+           (eskiden AccordionSection'dı; kapalı kalıp yanlışlıkla gizlenebiliyordu).
+           Yalnız PROJESİZ sohbetleri listeler — proje sohbetleri artık kendi
+           klasörünün altında (nested) görünüyor, bkz. yukarıdaki Projeler. */}
         <div className="pt-1">
           <div className="flex items-center gap-2 px-3 py-2">
             <MessageSquare size={11} className="text-muted/60 shrink-0" />
             <span className="text-[10px] font-bold uppercase tracking-widest text-muted/60 flex-1 truncate">Sohbetler</span>
-            {chats.length > 0 && <span className="text-[10px] text-muted/40 font-mono shrink-0">{chats.length}</span>}
+            {unassignedCount > 0 && <span className="text-[10px] text-muted/40 font-mono shrink-0">{unassignedCount}</span>}
           </div>
           <div className="px-2 pb-2">
             <div className="relative mb-2">
@@ -645,7 +680,7 @@ export function Sidebar() {
               />
             </div>
 
-            {history.length === 0 ? (
+            {unassignedHistory.length === 0 ? (
               <div className="text-center py-8 px-3">
                 <Code2 size={20} className="mx-auto mb-2 text-muted/15" />
                 <p className="text-[11px] text-muted/40 leading-relaxed">
