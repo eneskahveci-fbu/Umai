@@ -243,10 +243,15 @@ export function Sidebar() {
           {c.tags[0]}
         </span>
       )}
-      <div className="flex items-center gap-0.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 transition-opacity shrink-0">
-        <ActionIcon title={c.pinned ? "Sabitlemeyi kaldır" : "Sabitle"} onClick={(e) => { e.stopPropagation(); pinChat(c.id, !c.pinned); }}>
-          <Pin size={10} className={c.pinned ? "text-brand" : ""} />
-        </ActionIcon>
+      <div className="flex items-center gap-0.5 shrink-0">
+        {/* Hızlı sabitle/sil — yalnız hover özellikli cihazlarda (masaüstü);
+            dokunmatikte satır başına ikon kalabalığı olmasın diye "..." menüsü
+            içinden erişilir (aşağıda, mobil-erişilebilir). */}
+        <div className="hidden sm:flex items-center gap-0.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 transition-opacity">
+          <ActionIcon title={c.pinned ? "Sabitlemeyi kaldır" : "Sabitle"} onClick={(e) => { e.stopPropagation(); pinChat(c.id, !c.pinned); }}>
+            <Pin size={10} className={c.pinned ? "text-brand" : ""} />
+          </ActionIcon>
+        </div>
         <div className="relative" data-chat-menu>
           <ActionIcon title="Daha fazla" onClick={(e) => { e.stopPropagation(); setOverflowMenuId(overflowMenuId === c.id ? null : c.id); }}>
             <MoreHorizontal size={10} />
@@ -256,6 +261,12 @@ export function Sidebar() {
               onClick={(e) => e.stopPropagation()}
               className="animate-fade-in absolute right-0 top-full mt-1 z-20 w-44 rounded-lg border border-line bg-surface elev-2 py-1 text-[12px]"
             >
+              <button
+                onClick={() => { setOverflowMenuId(null); pinChat(c.id, !c.pinned); }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-bgsoft/70 text-left sm:hidden"
+              >
+                <Pin size={12} className={c.pinned ? "text-brand" : ""} /> {c.pinned ? "Sabitlemeyi kaldır" : "Sabitle"}
+              </button>
               {config.projects.length > 0 && (
                 <div className="relative flex items-center gap-2 px-3 py-1.5 hover:bg-bgsoft/70 cursor-pointer">
                   <FolderInput size={12} className={`shrink-0 ${c.projectId ? "text-brand" : ""}`} />
@@ -297,12 +308,21 @@ export function Sidebar() {
               >
                 <Copy size={12} /> Kopyala (Markdown)
               </button>
+              <div className="h-px bg-line/60 my-1 sm:hidden" />
+              <button
+                onClick={() => { setOverflowMenuId(null); if (confirm(`"${c.title || "Bu sohbet"}" silinsin mi? Bu işlem geri alınamaz.`)) deleteChat(c.id); }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-bgsoft/70 text-left text-red-400 sm:hidden"
+              >
+                <Trash2 size={12} /> Sil
+              </button>
             </div>
           )}
         </div>
-        <ActionIcon title="Sil" danger onClick={(e) => { e.stopPropagation(); if (confirm(`"${c.title || "Bu sohbet"}" silinsin mi? Bu işlem geri alınamaz.`)) deleteChat(c.id); }}>
-          <Trash2 size={10} />
-        </ActionIcon>
+        <div className="hidden sm:flex items-center gap-0.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 transition-opacity">
+          <ActionIcon title="Sil" danger onClick={(e) => { e.stopPropagation(); if (confirm(`"${c.title || "Bu sohbet"}" silinsin mi? Bu işlem geri alınamaz.`)) deleteChat(c.id); }}>
+            <Trash2 size={10} />
+          </ActionIcon>
+        </div>
       </div>
     </div>
   );
@@ -418,19 +438,21 @@ export function Sidebar() {
         >
           <Plus size={15} /> Yeni Sohbet
         </button>
-        <button
-          onClick={() => router.push("/studio")}
-          aria-current={pathname.startsWith("/studio") ? "page" : undefined}
-          className={`premium-card w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-            pathname.startsWith("/studio")
-              ? "border-brand/40 bg-brand/10 text-ink"
-              : "text-ink/80 hover:text-ink hover:border-brand/40"
-          }`}
-        >
-          <Sparkles size={15} className="text-brand" /> Stüdyo
-        </button>
-        {/* İçerik araçları (Doküman/Anket/Defter) — anket kararıyla stüdyodan buraya taşındı. */}
-        <SidebarTools />
+        <div className="flex gap-2">
+          <button
+            onClick={() => router.push("/studio")}
+            aria-current={pathname.startsWith("/studio") ? "page" : undefined}
+            className={`premium-card flex-1 min-w-0 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+              pathname.startsWith("/studio")
+                ? "border-brand/40 bg-brand/10 text-ink"
+                : "text-ink/80 hover:text-ink hover:border-brand/40"
+            }`}
+          >
+            <Sparkles size={15} className="text-brand shrink-0" /> <span className="truncate">Stüdyo</span>
+          </button>
+          {/* İçerik araçları (Doküman/Anket/Defter) — anket kararıyla stüdyodan buraya taşındı. */}
+          <SidebarTools />
+        </div>
       </div>
 
       {/* Workspace accordion (Projects + History) */}
