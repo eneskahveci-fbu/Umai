@@ -8,6 +8,7 @@ import type {
   GitHubAccount,
   GitLabAccount,
   Hook,
+  MediaAsset,
   McpServer,
   MemoryItem,
   ModelProfile,
@@ -176,6 +177,22 @@ function loadConfig(): Config {
             ? { ...m, model: "openai" }
             : m
         );
+      }
+      /* Eski Görüntü Stüdyosu oturumlarını yeni Kütüphane'ye bir kez taşı.
+         URL'ler zaten deterministik olduğu için indirme/yükleme gerekmez. */
+      if (!Array.isArray(merged.mediaAssets) && Array.isArray(merged.craftImages)) {
+        const mediaAssets: MediaAsset[] = merged.craftImages.flatMap((session: import("./types").CraftImageSession) =>
+          session.msgs.flatMap((msg) => (msg.items ?? []).map((item) => ({
+            id: item.id,
+            title: session.title,
+            url: item.url,
+            prompt: msg.role === "user" ? msg.text : undefined,
+            createdAt: session.updatedAt || session.createdAt || Date.now(),
+            source: "image-gen" as const,
+          }))),
+        ).filter((asset: MediaAsset, index: number, all: MediaAsset[]) => Boolean(asset.url) && all.findIndex((x: MediaAsset) => x.id === asset.id) === index);
+        merged.mediaAssets = mediaAssets;
+        try { store.setItem(CONFIG_KEY, JSON.stringify(merged)); } catch { /* kota — yok say */ }
       }
       /* Ölü GitHub deposunu canlı GitLab deposuna migrate et */
       const migrated = migrateRepos(merged);

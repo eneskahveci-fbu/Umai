@@ -15,7 +15,9 @@ import {
   Bot,
   Sparkles,
   Image as ImageIcon,
+  Images,
   ListChecks,
+  RefreshCw,
   Zap,
   Code2,
 } from "lucide-react";
@@ -177,6 +179,26 @@ export function CommandPalette() {
         setOpen(false);
       },
       keywords: ["goruntu", "görüntü", "image", "gorsel", "görsel", "resim"],
+    },
+    {
+      id: "open-library",
+      label: "Kütüphane'yi aç (tüm çıktılar tek yerde)",
+      icon: <Images size={16} />,
+      action: () => {
+        router.push("/library");
+        setOpen(false);
+      },
+      keywords: ["kutuphane", "kütüphane", "library", "medya", "media", "galeri", "gallery", "arsiv", "arşiv"],
+    },
+    {
+      id: "open-converter",
+      label: "Dönüştürücü'yü aç (görsel ⇄ PDF/PNG/JPG/WebP)",
+      icon: <RefreshCw size={16} />,
+      action: () => {
+        router.push("/tools/converter");
+        setOpen(false);
+      },
+      keywords: ["donusturucu", "dönüştürücü", "converter", "pdf", "png", "jpg", "webp", "donustur", "dönüştür"],
     },
     {
       id: "open-skills",

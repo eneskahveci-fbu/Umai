@@ -187,8 +187,13 @@ create table if not exists public.published_artifacts (
   title       text not null default 'Artifact',
   type        text not null default 'html',   -- html | svg | mermaid
   content     text not null,
+  language    text,
   created_at  timestamptz not null default now()
 );
+
+-- Eski kurulumlar için kod artifact'inin sözdizimi dilini geriye uyumlu ekle.
+alter table public.published_artifacts
+  add column if not exists language text;
 
 alter table public.published_artifacts enable row level security;
 

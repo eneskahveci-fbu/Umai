@@ -14,11 +14,16 @@ export async function POST(req: NextRequest) {
   const limited = checkLimit(req, "publish", 10, 60_000);
   if (limited) return NextResponse.json(limited.body, { status: limited.status, headers: { "Retry-After": String(limited.retryAfter) } });
   try {
-    const { title, type, content: rawContent } = await readJson(req) as { title?: unknown; type?: unknown; content?: unknown };
+    const { title, type, content: rawContent, language } = await readJson(req) as {
+      title?: unknown; type?: unknown; content?: unknown; language?: unknown;
+    };
     if (typeof type !== "string" || !VALID_TYPES.has(type)) {
       return NextResponse.json({ error: "Geçersiz artifact türü" }, { status: 400 });
     }
     const content = asContent(rawContent, MAX_CONTENT_BYTES);
+    const artifactLanguage = typeof language === "string"
+      ? language.toLowerCase().replace(/[^a-z0-9_+#-]/g, "").slice(0, 32) || null
+      : null;
 
     const sb = await createClient();
     if (!sb) return NextResponse.json({ error: "Veritabanı bağlantısı yok" }, { status: 503 });
@@ -33,6 +38,7 @@ export async function POST(req: NextRequest) {
       title: (typeof title === "string" ? title : "").slice(0, 200) || "Artifact",
       type,
       content,
+      language: artifactLanguage,
     });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
