@@ -1,18 +1,18 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { Image as ImageIcon, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { useSurfaceNav, type Surface } from "@/lib/surfaceNav";
 
 /* Stüdyo mod anahtarı — TEK SAYFA felsefesi (kullanıcı anketi, Tem 2026):
-   stüdyoda yalnız iki mod kaldı: Tasarım (Open Design tek tuval — slayt,
-   afiş, sosyal, story, sunum destesi hepsi orada) ve Görüntü (AI görsel).
-   İçerik araçları (Doküman/Anket/Defter) stüdyodan çıktı → Sidebar'daki
-   "Araçlar" satırından açılır. Dropdown kalktı; iki düğmelik sade şerit. */
+   stüdyoda tek mod kaldı: Tasarım (Claude Design'a paralel tek tuval — slayt,
+   afiş, sosyal, story, sunum destesi hepsi orada). Görüntü üretimi Stüdyo'dan
+   kaldırıldı, genel sohbette "/gorsel" komutuyla üretiliyor. İçerik araçları
+   (Doküman/Anket/Defter) stüdyodan çıktı → Sidebar'daki "Araçlar" satırından
+   açılır. Tek yüzey kaldığından bileşen kendini gizler (bkz. aşağı). */
 
 export const STUDIO_SURFACES: { id: Surface; name: string; icon: LucideIcon; title: string }[] = [
   { id: "studio", name: "Tasarım", icon: Sparkles, title: "Slayt · Afiş · Sosyal · Tuval — tek tuval" },
-  { id: "image", name: "Görüntü", icon: ImageIcon, title: "AI görsel üretimi (Pollinations)" },
 ];
 
 /* Eski yüzey adları — geriye uyumluluk (slides/canvas → studio). */
@@ -24,6 +24,10 @@ export const LEGACY_SURFACE_MAP: Record<string, Surface> = {
 export function StudioSwitcher({ active }: { active: Surface }) {
   const nav = useSurfaceNav();
   const normalized = (LEGACY_SURFACE_MAP[active] ?? active) as Surface;
+
+  /* Tek yüzey kalınca aralarında geçiş yapılacak bir şey kalmıyor — Claude
+     Design'ın sade, anahtarsız üst çubuğuna paralel: hiç render etme. */
+  if (STUDIO_SURFACES.length <= 1) return null;
 
   return (
     <div className="flex items-center bg-bgsoft border border-line/60 rounded-lg p-0.5 text-xs font-semibold shrink-0">

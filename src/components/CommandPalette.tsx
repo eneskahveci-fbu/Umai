@@ -163,10 +163,17 @@ export function CommandPalette() {
     },
     {
       id: "open-image",
-      label: "Görüntü Stüdyosu'nu aç (AI görsel)",
+      label: "Görsel oluştur (sohbette /gorsel)",
       icon: <ImageIcon size={16} />,
       action: () => {
-        router.push("/studio/gorsel");
+        /* İki yol birden: zaten /app'teysek canlı custom event anında yakalanır;
+           başka bir rotadan geliniyorsa router.push sonrası CoderView henüz
+           mount olmamıştır — sessionStorage handoff (surfaceNav.ts'teki
+           setSurfaceHandoff ile aynı desen) mount olunca okunur, zamanlama
+           sorunu olmaz. */
+        try { sessionStorage.setItem("craft_composer_prefill", "/gorsel "); } catch { /* yok say */ }
+        window.dispatchEvent(new CustomEvent("craftai:composer-prefill", { detail: { text: "/gorsel " } }));
+        router.push("/app");
         setOpen(false);
       },
       keywords: ["goruntu", "görüntü", "image", "gorsel", "görsel", "resim"],

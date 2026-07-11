@@ -14,7 +14,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **craft.ai**, tarayıcı üzerinde çalışan Türkçe bir yapay zekâ kodlama
 asistanıdır. Çoklu LLM sağlayıcı desteği, GitHub/GitLab entegrasyonu, Monaco
 editör, sohbet/coder/karşılaştırma görünümleri, "Skills" (eğitim seti) sistemi,
-**Tasarım & Görüntü Stüdyoları**, **canlı kod önizleme (sandbox/Artifacts)**,
+**Tasarım Stüdyosu (Claude Design'a birebir paralel)**, sohbette AI görsel
+üretimi (`/gorsel`), **canlı kod önizleme (sandbox/Artifacts)**,
 **Öğrenme Modu** ve **otomatik ajan ekibi (swarm)** sunar. Tüm API anahtarları
 yalnızca kullanıcının tarayıcısında saklanır.
 
@@ -44,8 +45,7 @@ src/
 │   ├── SettingsModal.tsx     # GNOME tarzı dikey sekmeli ayarlar (arama + admin gating)
 │   ├── AccountSettings.tsx   # Hesap: şifre/e-posta/ad, oturum, istatistik, silme
 │   ├── ExtensionsSettings.tsx# Modüler eklenti paketleri (aç/kapat)
-│   ├── DesignStudio.tsx      # Claude Design'a paralel: tek tasarım tuvali + hazır şablonlar
-│   ├── ImageStudio.tsx       # Qwen Studio tarzı sohbet akışı (görsel üretim)
+│   ├── DesignStudio.tsx      # Claude Design'a birebir paralel (arayüz+çıktı): tek tasarım tuvali + hazır şablonlar
 │   ├── ArtifactPanel.tsx     # Canlı önizleme/Artifacts (preview↔kod, kopya, indir)
 │   └── ...
 ├── api/account/delete/route.ts # Hesap silme (servis anahtarı sunucuda; yoksa 501)
@@ -82,26 +82,34 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
 ## Stüdyolar, Önizleme ve Modlar
 
 - **Tasarım Stüdyosu** (`DesignStudio.tsx`, rota `/studio`): Claude Design'a
-  birebir paralel — sol AI sohbet, sağ TEK canlı tasarım tuvali (`ArtifactCanvas`,
-  sohbetteki `ArtifactPanel` ile PAYLAŞILAN bileşen: önizleme↔kod, sürüm
-  gezinme, kopyala/indir/PDF/yayınla). Boş durumda hazır şablon ızgarası
-  (`lib/studioTemplates.ts`, 19 şablon) + marka stili seçici (`lib/designSystems.ts`,
-  13 kürasyonlu sistem — Claude/OpenAI/Stripe/Linear/Vercel/Notion…). Fusion
-  (3 model + hakem) opsiyonel toggle. Üretim `lib/studioGen.ts`'in
-  `generateArtifact()`'ı (brief + skill + yön + marka + Fusion → tek HTML
-  artifact, `/api/chat` üzerinden); "sunum" ayrı bir yüzey DEĞİL, yalnızca
-  kendi kendine gezinen tek-HTML-sayfa üreten bir şablon kategorisi
-  (`STUDIO_SKILLS`'teki `deck`). Kayıtlı projeler `config.studioProjects`'te.
-- **Görüntü Stüdyosu** (`ImageStudio.tsx`): Qwen Studio benzeri sohbet akışı.
-  Konuşarak görsel üretir (Pollinations image, keyless), çoklu varyasyon (1/2/4),
-  ücretsiz LLM ile prompt geliştirme, model/format seçimi. Model listesi
-  Pollinations kataloğundan canlı çekilir (`lib/pollinations.ts`).
+  birebir paralel — hem ARAYÜZ hem ÇIKTI. Sol AI sohbet, sağ TEK canlı tasarım
+  tuvali (`ArtifactCanvas`, sohbetteki `ArtifactPanel` ile PAYLAŞILAN bileşen:
+  önizleme↔kod, sürüm gezinme, kopyala/indir/PDF/yayınla). Kök sarmalayıcı
+  `.theme-claude` sınıfını taşır (`globals.css`) — Claude.ai'nin gerçek
+  paletini (kremsi/koyu-antrasit yüzey + terracotta `#d97757` vurgu) yalnız
+  CSS değişken override'ıyla uygular, alt bileşenlerin hiçbiri değişmedi (tek
+  kaynak). Boş durumda hazır şablon ızgarası (`lib/studioTemplates.ts`, 19
+  şablon). Marka SEÇİCİSİ YOK — üretim her zaman sabit "claude" tasarım
+  sistemini kullanır (`lib/designSystems.ts`'teki `claude` girdisi, otoriter
+  marka sözleşmesi olarak `studioGen.ts`'e enjekte edilir) — çıktı da arayüz
+  gibi Claude Design'a paralel olsun diye. Fusion (3 model + hakem) opsiyonel
+  toggle. Üretim `lib/studioGen.ts`'in `generateArtifact()`'ı (brief + skill +
+  yön + Fusion → tek HTML artifact, `/api/chat` üzerinden); "sunum" ayrı bir
+  yüzey DEĞİL, yalnızca kendi kendine gezinen tek-HTML-sayfa üreten bir şablon
+  kategorisi (`STUDIO_SKILLS`'teki `deck`). Kayıtlı projeler
+  `config.studioProjects`'te.
+- **Görüntü üretimi** — artık ayrı bir Stüdyo yüzeyi DEĞİL: genel sohbette
+  `/gorsel <brief>` slash komutuyla üretilir (`lib/agents.ts`'teki `image-gen`
+  girdisi + `CoderView.tsx`'in `send()`'inde özel-durum intercept — LLM'e
+  gitmeden Pollinations URL'i doğrudan asistan mesajına `images[]` olarak
+  eklenir). Komut paletinden de tetiklenebilir (`craftai:composer-prefill`
+  custom event).
 - **Pollinations merkezi** (`lib/pollinations.ts`): görsel URL kurucusu, canlı
   model kataloğu, TTS (ses seçimi + tarayıcı yedeği), `speakableText`. Sohbette
   her asistan yanıtında "Seslendir" butonu bunu kullanır.
-- **Stüdyo anahtarı, iki mod** (`studio/StudioSwitcher.tsx`): yalnız Tasarım ·
-  Görüntü arasında geçiş yapar (2026 kullanıcı anketiyle içerik araçları —
-  Doküman/Anket/Defter — Sidebar → Araçlar'a taşındı, switcher'da değiller).
+- **Stüdyo anahtarı** (`studio/StudioSwitcher.tsx`): tek yüzey (Tasarım) kaldığı
+  için kendini gizler — render etmez (2026 kullanıcı anketiyle içerik araçları
+  Doküman/Anket/Defter Sidebar → Araçlar'a, Görüntü genel sohbete taşındı).
 - **Doküman Stüdyosu** (`studio/DocsStudio.tsx`, `/studio/dokuman`): Notion'dan
   ilhamla blok tabanlı doküman (`lib/docs.ts`) — AI taslak + "devam et",
   Markdown/bağımsız HTML dışa aktarma, `config.craftDocs`.

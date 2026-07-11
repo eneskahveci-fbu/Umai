@@ -395,8 +395,6 @@ interface StoreState {
   setSidebarOpen: (b: boolean) => void;
   settingsOpen: boolean;
   setSettingsOpen: (b: boolean) => void;
-  imageStudioOpen: boolean;
-  setImageStudioOpen: (b: boolean) => void;
   /** Stüdyo (Open Design tarzı brief→önizleme deneyimi, tek tuval). */
   studioOpen: boolean;
   setStudioOpen: (b: boolean) => void;
@@ -1002,8 +1000,6 @@ export const useStore = create<StoreState>()((set, get) => ({
   setSidebarOpen: (b) => set({ sidebarOpen: b }),
   settingsOpen: false,
   setSettingsOpen: (b) => set({ settingsOpen: b }),
-  imageStudioOpen: false,
-  setImageStudioOpen: (b) => set({ imageStudioOpen: b }),
   studioOpen: false,
   setStudioOpen: (b) => set({ studioOpen: b }),
   docsStudioOpen: false,

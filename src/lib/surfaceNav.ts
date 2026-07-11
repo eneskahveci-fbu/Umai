@@ -3,22 +3,21 @@
 /* ═══════════════════════════════════════════════════════════════════════
    SURFACE NAV — Birleşik Tasarım Platformu
    ═══════════════════════════════════════════════════════════════════════
-   Önceki 7 yüzey artık 5'e indirildi:
+   Yüzeyler:
 
-   /studio         → Open Design Studio (slayt+tuval+afiş+sosyal birleşik)
-   /studio/gorsel  → AI görsel üretimi
+   /studio         → Tasarım Stüdyosu (Claude Design'a paralel tek tuval)
    /studio/dokuman → Doküman
    /studio/anket   → Anket/Form
    /studio/defter  → Defter
 
-   /studio/sunum ve /studio/tuval ARTIK /studio'ya yönlendirilir
-   (geriye uyumluluk için redirect).
-   ═══════════════════════════════════════════════════════════════════════ */
+   /studio/sunum, /studio/tuval ve /studio/gorsel ARTIK yönlendirilir
+   (geriye uyumluluk için redirect). Görsel üretimi Stüdyo'dan kaldırıldı —
+   artık genel sohbette "/gorsel <brief>" komutuyla üretiliyor (bkz. agents.ts). */
 
 import { usePathname, useRouter } from "next/navigation";
 import { useStore } from "./store";
 
-export type Surface = "studio" | "slides" | "docs" | "forms" | "canvas" | "image" | "notebook";
+export type Surface = "studio" | "slides" | "docs" | "forms" | "canvas" | "notebook";
 
 /* Yeni rota yapısı — slides ve canvas artık /studio'ya yönlendirilir */
 export const SURFACE_ROUTES: Record<Surface, string> = {
@@ -27,7 +26,6 @@ export const SURFACE_ROUTES: Record<Surface, string> = {
   docs: "/studio/dokuman",
   forms: "/studio/anket",
   canvas: "/studio",       // ← Redirect: birleşik stüdyo
-  image: "/studio/gorsel",
   notebook: "/studio/defter",
 };
 
@@ -88,7 +86,6 @@ export function useSurfaceNav() {
     s.setStudioOpen(which === "studio" || which === "slides" || which === "canvas");
     s.setDocsStudioOpen(which === "docs");
     s.setFormsStudioOpen(which === "forms");
-    s.setImageStudioOpen(which === "image");
     s.setNotebookStudioOpen(which === "notebook");
   };
 
@@ -101,7 +98,6 @@ export function useSurfaceNav() {
     s.setStudioOpen(false);
     s.setDocsStudioOpen(false);
     s.setFormsStudioOpen(false);
-    s.setImageStudioOpen(false);
     s.setNotebookStudioOpen(false);
   };
 
