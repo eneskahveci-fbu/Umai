@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   BookOpen,
   FileText,
   FolderGit2,
+  ListChecks,
   MessageSquare,
   Plus,
   Settings2,
@@ -16,15 +18,29 @@ import {
 import { useStore } from "@/lib/store";
 import { useModalA11y } from "@/lib/useModalA11y";
 import { PROJECT_COLORS, projectColorHex } from "@/lib/constants";
+import { setSurfaceOpenItem } from "@/lib/surfaceNav";
+import type { StudioProjectBase } from "@/lib/types";
 
 type Tab = "chats" | "settings" | "knowledge" | "skills" | "stats";
 
 const EMOJI_CHOICES = ["📁", "🌐", "🔌", "📊", "📱", "⚙️", "🧪", "🚀", "🔬", "🧩", "📦", "🛠️", "💡", "🎨", "🔐", "📝"];
 
+/* Doküman/Anket/Defter'in "Sohbetler" sekmesindeki projeye bağlama —
+   üçü de config'te ayrı bir StudioProjectBase[] listesi (bkz. useStudioProject.ts),
+   bu yüzden tek generic satır bileşeni (ContentSection) üçüne de hizmet eder. */
+type ContentKind = "doc" | "form" | "notebook";
+const CONTENT_META: Record<ContentKind, { key: "craftDocs" | "craftForms" | "craftNotebooks"; label: string; icon: typeof FileText; route: string }> = {
+  doc: { key: "craftDocs", label: "Dokümanlar", icon: FileText, route: "/studio/dokuman" },
+  form: { key: "craftForms", label: "Anketler", icon: ListChecks, route: "/studio/anket" },
+  notebook: { key: "craftNotebooks", label: "Defterler", icon: BookOpen, route: "/studio/defter" },
+};
+
 export function ProjectModal() {
+  const router = useRouter();
   const projectId = useStore((s) => s.projectModalId);
   const setProjectModalId = useStore((s) => s.setProjectModalId);
   const config = useStore((s) => s.config);
+  const saveConfig = useStore((s) => s.saveConfig);
   const chats = useStore((s) => s.chats);
   const updateProject = useStore((s) => s.updateProject);
   const addProjectFile = useStore((s) => s.addProjectFile);
@@ -93,6 +109,70 @@ export function ProjectModal() {
     setActiveProject(project.id);
     newChat(false);
     setProjectModalId(null);
+  };
+
+  /* Doküman/Anket/Defter'i projeye bağla/çıkar — Sidebar'ın sohbet-taşıma
+     dropdown'uyla aynı fikir, yalnız config'teki ilgili listeye uygulanır. */
+  const setContentProject = (kind: ContentKind, itemId: string, pid: string | undefined) => {
+    const { key } = CONTENT_META[kind];
+    const list = ((config[key] as StudioProjectBase[] | undefined) ?? []).map((item) =>
+      item.id === itemId ? { ...item, projectId: pid } : item
+    );
+    saveConfig({ ...config, [key]: list });
+  };
+
+  /* Bir dokümanı/anketi/defteri aç: modalı kapat, ilgili stüdyoya git (⌘K'nın
+     kullandığı AYNI "belirli öğeyi aç" köprüsü — bkz. surfaceNav.ts). */
+  const openContent = (kind: ContentKind, itemId: string) => {
+    setSurfaceOpenItem(kind === "doc" ? "docs" : kind === "form" ? "forms" : "notebook", itemId);
+    router.push(CONTENT_META[kind].route);
+    setProjectModalId(null);
+  };
+
+  /* Doküman/Anket/Defter'in kendi bölümü: proje.id'ye bağlı olanları listeler,
+     boş bir "+ Ekle" açılır menüsüyle henüz bağlı olmayanlardan birini bağlar. */
+  const renderContentSection = (kind: ContentKind) => {
+    const meta = CONTENT_META[kind];
+    const Icon = meta.icon;
+    const all = ((config[meta.key] as StudioProjectBase[] | undefined) ?? []);
+    const inProject = all.filter((x) => x.projectId === project.id);
+    const notInProject = all.filter((x) => x.projectId !== project.id);
+    return (
+      <div key={kind} className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <h4 className="text-[11px] font-semibold text-muted/70 uppercase tracking-wide flex items-center gap-1.5">
+            <Icon size={12} /> {meta.label} ({inProject.length})
+          </h4>
+          {notInProject.length > 0 && (
+            <select
+              value=""
+              onChange={(e) => { if (e.target.value) setContentProject(kind, e.target.value, project.id); }}
+              className="bg-bgsoft border border-line rounded-lg px-2 py-1 text-[11px] outline-none focus:border-brand/50 cursor-pointer max-w-[140px]"
+              aria-label={`${meta.label} ekle`}
+            >
+              <option value="">+ Ekle</option>
+              {notInProject.map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}
+            </select>
+          )}
+        </div>
+        {inProject.length === 0 ? (
+          <p className="text-[11px] text-muted/40 italic py-1">Bu projede henüz {meta.label.toLowerCase()} yok.</p>
+        ) : (
+          <div className="space-y-1">
+            {inProject.map((x) => (
+              <div key={x.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-bgsoft border border-line/60">
+                <button onClick={() => openContent(kind, x.id)} className="flex-1 min-w-0 text-left text-[12px] font-medium truncate hover:text-brand transition-colors">
+                  {x.title}
+                </button>
+                <button onClick={() => setContentProject(kind, x.id, undefined)} aria-label="Projeden çıkar" title="Projeden çıkar" className="text-muted/40 hover:text-red p-0.5 shrink-0">
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -174,6 +254,12 @@ export function ProjectModal() {
                     </span>
                   </button>
                 ))}
+              </div>
+
+              <div className="pt-2 border-t border-line/60 space-y-4">
+                {renderContentSection("doc")}
+                {renderContentSection("form")}
+                {renderContentSection("notebook")}
               </div>
             </>
           )}

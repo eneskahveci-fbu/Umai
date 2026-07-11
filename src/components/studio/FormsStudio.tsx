@@ -15,6 +15,7 @@ import { FORM_QUESTION_TYPES, formToHtml, generateForm, MAX_FORM_QUESTIONS, newQ
 import { downloadTemplate, pickTemplateFile } from "@/lib/templateShare";
 import { publishArtifact } from "@/lib/studioExport";
 import { useStudioProject } from "@/lib/useStudioProject";
+import { CrossTypeRelated } from "./CrossTypeRelated";
 
 /* Anket Stüdyosu — Google Forms'tan İLHAM alan craft yorumu (klon değil):
    brief → yapılandırılmış soru listesi → canlı önizleme → BAĞIMSIZ HTML form.
@@ -277,6 +278,14 @@ export function FormsStudio() {
               <button onClick={addQ} className="flex items-center gap-1.5 text-xs text-muted/60 hover:text-brand transition-colors">
                 <Plus size={13} /> Soru ekle
               </button>
+
+              {/* "İlgili" (Obsidian-lite) — yalnız kayıtlı bir ankette, çapraz-tip
+                  (sohbet/doküman/defter dahil) arar. */}
+              {saved.some((f) => f.id === form.id) && (
+                <div className="mt-6 border-t border-line/60 pt-4">
+                  <CrossTypeRelated kind="form" id={form.id} />
+                </div>
+              )}
             </div>
           </div>
 
