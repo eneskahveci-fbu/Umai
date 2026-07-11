@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildFallbackChain, KEYLESS_PROVIDERS } from "./fallback";
-import type { ModelProfile } from "./types";
+import { buildFallbackChain, KEYLESS_PROVIDERS } from "../fallback";
+import type { ModelProfile } from "../types";
 
 function m(partial: Partial<ModelProfile> & { id: string; provider: ModelProfile["provider"] }): ModelProfile {
   return {
