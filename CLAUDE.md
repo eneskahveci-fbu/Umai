@@ -44,7 +44,7 @@ src/
 │   ├── SettingsModal.tsx     # GNOME tarzı dikey sekmeli ayarlar (arama + admin gating)
 │   ├── AccountSettings.tsx   # Hesap: şifre/e-posta/ad, oturum, istatistik, silme
 │   ├── ExtensionsSettings.tsx# Modüler eklenti paketleri (aç/kapat)
-│   ├── DesignStudio.tsx      # Claude Design tarzı AI tasarım alanı (sohbet→tuval)
+│   ├── DesignStudio.tsx      # Claude Design'a paralel: tek tasarım tuvali + hazır şablonlar
 │   ├── ImageStudio.tsx       # Qwen Studio tarzı sohbet akışı (görsel üretim)
 │   ├── ArtifactPanel.tsx     # Canlı önizleme/Artifacts (preview↔kod, kopya, indir)
 │   └── ...
@@ -81,28 +81,27 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
 
 ## Stüdyolar, Önizleme ve Modlar
 
-- **Tasarım Stüdyosu** (`DesignStudio.tsx`): Claude Design benzeri. Sol AI sohbet
-  paneli doğal dille tasarım üretir/değiştirir (ücretsiz LLM; `pollinations-free`
-  fallback), sağ canlı tuval. Görsel yükleme (vision bağlam), AI slider'lar
-  (boşluk/ölçek/renk tonu), kalite seviyeleri. Dışa aktarma: PNG · bağımsız HTML
-  · PDF. AI arka plan = Pollinations (anahtarsız).
+- **Tasarım Stüdyosu** (`DesignStudio.tsx`, rota `/studio`): Claude Design'a
+  birebir paralel — sol AI sohbet, sağ TEK canlı tasarım tuvali (`ArtifactCanvas`,
+  sohbetteki `ArtifactPanel` ile PAYLAŞILAN bileşen: önizleme↔kod, sürüm
+  gezinme, kopyala/indir/PDF/yayınla). Boş durumda hazır şablon ızgarası
+  (`lib/studioTemplates.ts`, 19 şablon) + marka stili seçici (`lib/designSystems.ts`,
+  13 kürasyonlu sistem — Claude/OpenAI/Stripe/Linear/Vercel/Notion…). Fusion
+  (3 model + hakem) opsiyonel toggle. Üretim `lib/studioGen.ts`'in
+  `generateArtifact()`'ı (brief + skill + yön + marka + Fusion → tek HTML
+  artifact, `/api/chat` üzerinden); "sunum" ayrı bir yüzey DEĞİL, yalnızca
+  kendi kendine gezinen tek-HTML-sayfa üreten bir şablon kategorisi
+  (`STUDIO_SKILLS`'teki `deck`). Kayıtlı projeler `config.studioProjects`'te.
 - **Görüntü Stüdyosu** (`ImageStudio.tsx`): Qwen Studio benzeri sohbet akışı.
   Konuşarak görsel üretir (Pollinations image, keyless), çoklu varyasyon (1/2/4),
   ücretsiz LLM ile prompt geliştirme, model/format seçimi. Model listesi
   Pollinations kataloğundan canlı çekilir (`lib/pollinations.ts`).
-- **Sunum Stüdyosu** (`studio/SlidesStudio.tsx`, rota `/studio/sunum`): Google
-  Slides'tan İLHAM alan craft yorumu. Brief → yapılandırılmış slayt JSON'u
-  (`lib/slidesGen.ts`) → deterministik tema render'ı (`lib/slides.ts`). Slaytlar
-  veri olarak kalır: tema değişimi kayıpsız, tek slaytı AI ile yeniden yazma,
-  Pollinations görselleri (deterministik seed), TTS anlatım (openai-audio),
-  bağımsız HTML/PDF dışa aktarma. Desteler `config.slideDecks`'te saklanır.
 - **Pollinations merkezi** (`lib/pollinations.ts`): görsel URL kurucusu, canlı
   model kataloğu, TTS (ses seçimi + tarayıcı yedeği), `speakableText`. Sohbette
   her asistan yanıtında "Seslendir" butonu bunu kullanır.
-- **Tek stüdyo, yedi mod** (`studio/StudioSwitcher.tsx`): tüm stüdyo yüzeyleri
-  ortak mod çubuğunu paylaşır — Tasarım · Sunum · Doküman · Anket · Tuval ·
-  Görüntü · Defter. Hub'daki (`StudioHome`) araç çipleri brief'i seçilen araca
-  taşır (`surfaceNav.setSurfaceHandoff`).
+- **Stüdyo anahtarı, iki mod** (`studio/StudioSwitcher.tsx`): yalnız Tasarım ·
+  Görüntü arasında geçiş yapar (2026 kullanıcı anketiyle içerik araçları —
+  Doküman/Anket/Defter — Sidebar → Araçlar'a taşındı, switcher'da değiller).
 - **Doküman Stüdyosu** (`studio/DocsStudio.tsx`, `/studio/dokuman`): Notion'dan
   ilhamla blok tabanlı doküman (`lib/docs.ts`) — AI taslak + "devam et",
   Markdown/bağımsız HTML dışa aktarma, `config.craftDocs`.
@@ -114,8 +113,11 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   ilhamla kaynak-temelli sohbet — metin yapıştır / URL getir (`/api/fetch-text`),
   yalnız kaynaklardan [n] atıflı yanıt, Pollinations TTS "sesli özet",
   `config.craftNotebooks`.
-- **Şablon paylaşımı** (`lib/templateShare.ts`): sunum/doküman/anket JSON
-  olarak dışa/içe aktarılır (Canva'nın şablon paylaşımından ilham, sunucusuz).
+- **Şablon paylaşımı** (`lib/templateShare.ts`): doküman/anket JSON olarak
+  dışa/içe aktarılır (Canva'nın şablon paylaşımından ilham, sunucusuz). Bu,
+  Tasarım Stüdyosu'nun kendi hazır-şablon galerisinden (`studioTemplates.ts`)
+  AYRI bir mekanizma — biri kullanıcının kendi içeriğini paylaşması, diğeri
+  uygulamanın kürasyonlu başlangıç noktaları.
 - **Ortak üretim çekirdeği** (`lib/genChat.ts`): stüdyo motorlarının paylaştığı
   akışlı LLM çağrısı + JSON ayıklama; anahtarsızda Pollinations'a düşer.
 - **Sandbox / Artifacts** (`preview.ts` + `ArtifactPanel.tsx`): kod bloğu →
