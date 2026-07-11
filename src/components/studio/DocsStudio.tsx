@@ -16,6 +16,7 @@ import {
 } from "@/lib/docs";
 import { downloadTemplate, pickTemplateFile } from "@/lib/templateShare";
 import { docEmbeddingText, findRelated, withFreshEmbeddings } from "@/lib/relatedItems";
+import { useStudioProject } from "@/lib/useStudioProject";
 
 /* Doküman Stüdyosu — Notion'dan İLHAM alan craft yorumu (klon değil):
    doküman = düzenlenebilir blok listesi. AI taslağı JSON bloklar olarak üretir;
@@ -43,9 +44,8 @@ export function safeFileName(s: string, fallback: string): string {
 
 export function DocsStudio() {
   const open = useStore((s) => s.docsStudioOpen);
-  const config = useStore((s) => s.config);
-  const saveConfig = useStore((s) => s.saveConfig);
   const addToast = useStore((s) => s.addToast);
+  const { saved, save, saveAll, remove } = useStudioProject<CraftDoc>("craftDocs", 40);
 
   const [view, setView] = useState<"home" | "work">("home");
   const [brief, setBrief] = useState("");
@@ -124,18 +124,11 @@ export function DocsStudio() {
 
   const saveDoc = () => {
     if (!doc) return;
-    const stamped = { ...doc, updatedAt: Date.now() };
-    setDoc(stamped);
-    const existing = config.craftDocs ?? [];
-    saveConfig({ ...config, craftDocs: [stamped, ...existing.filter((d) => d.id !== doc.id)].slice(0, 40) });
-    addToast("Doküman kaydedildi.", "success");
+    setDoc(save(doc, "Doküman kaydedildi."));
   };
 
   const openDoc = (d: CraftDoc) => { setDoc(d); setView("work"); setSavedOpen(false); };
-  const removeDoc = (id: string) =>
-    saveConfig({ ...config, craftDocs: (config.craftDocs ?? []).filter((d) => d.id !== id) });
-
-  const saved = config.craftDocs ?? [];
+  const removeDoc = remove;
 
   const blockInput = (b: DocBlock) => {
     const common = "w-full bg-transparent outline-none placeholder:text-muted/40";
@@ -300,7 +293,7 @@ export function DocsStudio() {
                 karşılaştıracak başka kayıtlı doküman varsa gösterilir. */}
             {saved.some((d) => d.id === doc.id) && saved.length > 1 && (
               <div className="mt-6 border-t border-line/60 pt-4">
-                <RelatedDocs docs={saved} currentId={doc.id} onOpen={openDoc} onSave={(next) => saveConfig({ ...config, craftDocs: next })} />
+                <RelatedDocs docs={saved} currentId={doc.id} onOpen={openDoc} onSave={saveAll} />
               </div>
             )}
           </div>
