@@ -2392,10 +2392,27 @@ export function CoderView() {
       setActiveAgent(null);
       store.pushMessage({ role: "user", content: imgPrompt });
       const seed = Math.floor(Math.random() * 1_000_000);
+      const url = pollinationsImageUrl(imgPrompt, { seed });
       store.pushMessage({
         role: "assistant",
         content: `**"${imgPrompt}"** için oluşturdum:`,
-        images: [pollinationsImageUrl(imgPrompt, { seed })],
+        images: [url],
+      });
+      const chatId = useStore.getState().currentId ?? undefined;
+      const config = useStore.getState().config;
+      useStore.getState().saveConfig({
+        ...config,
+        mediaAssets: [{
+          id: `img_${Date.now().toString(36)}_${seed}`,
+          title: imgPrompt.slice(0, 72) || "Görsel",
+          url,
+          prompt: imgPrompt,
+          seed,
+          createdAt: Date.now(),
+          projectId: config.activeProjectId ?? undefined,
+          chatId,
+          source: "image-gen" as const,
+        }, ...(config.mediaAssets ?? [])].slice(0, 200),
       });
       void store.persistCurrent();
       return;
@@ -3823,5 +3840,3 @@ function UsageModal({ chat, pos, onClose }: { chat: { totalInTokens?: number; to
     document.body,
   );
 }
-
-

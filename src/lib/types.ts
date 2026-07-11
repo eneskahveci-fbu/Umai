@@ -399,6 +399,20 @@ export interface CraftImageSession {
   updatedAt: number;
 }
 
+/** Sohbet, Stüdyo veya dönüştürücüden üretilen kalıcı medya kaydı. Görsel
+    verisi yerine URL/metaveri tutulur; böylece tarayıcı deposu şişmez. */
+export interface MediaAsset {
+  id: string;
+  title: string;
+  url: string;
+  prompt?: string;
+  seed?: number;
+  createdAt: number;
+  projectId?: string;
+  chatId?: string;
+  source: "image-gen" | "upload" | "converter";
+}
+
 export interface Config {
   models: ModelProfile[];
   activeModelId: string | null;
@@ -504,6 +518,8 @@ export interface Config {
   craftNotebooks?: CraftNotebook[];
   /** Görüntü Stüdyosu: kaydedilen üretim oturumları. */
   craftImages?: CraftImageSession[];
+  /** Kütüphane: sohbetten/stüdyodan üretilen görseller ve dosya sonuçları. */
+  mediaAssets?: MediaAsset[];
   /** Seslendirme (TTS) için tercih edilen Pollinations sesi (varsayılan: nova). */
   ttsVoice?: string;
   mcpServers?: McpServer[];

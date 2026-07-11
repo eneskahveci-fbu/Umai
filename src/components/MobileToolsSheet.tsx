@@ -1,19 +1,21 @@
 "use client";
 
 /* Mobil "Araçlar" alt-sekmesinin açtığı kısa liste — masaüstündeki
-   `SidebarTools.tsx` açılır listesinin mobil eşleniği (aynı 3 araç).
+   `SidebarTools.tsx` açılır listesinin mobil eşleniği (aynı araçlar).
    Görüntü burada YOK: üretimi genel sohbette "/gorsel" komutuyla yapılıyor,
    ayrı bir stüdyo yüzeyi yok. Kendi durumunu `MobileTabBar` tutar, bu yalnız
    görünümdür. */
 import { useRef } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, FileText, ListChecks, X } from "lucide-react";
+import { BookOpen, FileText, Images, ListChecks, RefreshCw, X } from "lucide-react";
 import { useModalA11y } from "@/lib/useModalA11y";
 
 const TOOLS: { href: string; label: string; desc: string; icon: typeof FileText }[] = [
+  { href: "/library", label: "Kütüphane", desc: "tüm çıktıların tek yeri", icon: Images },
   { href: "/studio/dokuman", label: "Doküman", desc: "blok tabanlı yazım", icon: FileText },
   { href: "/studio/anket", label: "Anket", desc: "AI anket + HTML form", icon: ListChecks },
   { href: "/studio/defter", label: "Defter", desc: "kaynaklı sohbet + sesli özet", icon: BookOpen },
+  { href: "/tools/converter", label: "Dönüştürücü", desc: "görsel ⇄ PDF/PNG/JPG/WebP", icon: RefreshCw },
 ];
 
 export function MobileToolsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {

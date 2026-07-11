@@ -63,7 +63,12 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
       const res = await fetch("/api/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: artifact.title, type: artifact.type, content: artifact.content }),
+        body: JSON.stringify({
+          title: artifact.title,
+          type: artifact.type,
+          content: artifact.content,
+          language: artifact.language,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.id) {
