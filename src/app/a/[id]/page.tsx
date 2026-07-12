@@ -21,9 +21,12 @@ export default async function PublishedArtifactPage({ params }: Props) {
   const sb = await createClient();
   if (!sb) return <ErrorPage message="Veritabanı bağlantısı kurulamadı." />;
 
+  /* select("*"): `language` kolonu migrate edilmemiş kurulumlarda da sayfa
+     çalışsın (açık kolon listesi TÜM eski paylaşım linklerini kırıyordu).
+     Sunucu bileşeni — user_id render edilmez, sızmaz. */
   const { data, error } = await sb
     .from("published_artifacts")
-    .select("id, title, type, content, language, created_at")
+    .select("*")
     .eq("id", id)
     .single();
 

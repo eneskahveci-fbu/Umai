@@ -32,14 +32,20 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await sb.auth.getUser();
 
     const id = `a_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
-    const { error } = await sb.from("published_artifacts").insert({
+    const row = {
       id,
       user_id: user?.id ?? null,
       title: (typeof title === "string" ? title : "").slice(0, 200) || "Artifact",
       type,
       content,
-      language: artifactLanguage,
-    });
+    };
+    let { error } = await sb.from("published_artifacts").insert({ ...row, language: artifactLanguage });
+    /* Geriye uyumluluk: `language` kolonu henüz migrate edilmemiş bir Supabase
+       kurulumunda insert TÜM türler için kırılmasın — kolon-yok hatasında
+       dilsiz yeniden dene (yalnız kod vurgusu kaybolur, yayın çalışır). */
+    if (error && /language/i.test(error.message)) {
+      ({ error } = await sb.from("published_artifacts").insert(row));
+    }
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ id });
@@ -56,13 +62,16 @@ export async function GET(req: NextRequest) {
   const sb = await createClient();
   if (!sb) return NextResponse.json({ error: "Veritabanı bağlantısı yok" }, { status: 503 });
 
-  /* Yalnız herkese açık alanları seç — sahip kimliği (user_id) sızdırma. */
+  /* select("*"): `language` kolonu migrate edilmemiş kurulumlarda da çalışsın
+     (açık kolon listesi kolon-yok hatası verirdi). user_id yanıttan AYIKLANIR
+     — sahip kimliği sızdırma. */
   const { data, error } = await sb
     .from("published_artifacts")
-    .select("id, title, type, content, created_at")
+    .select("*")
     .eq("id", id)
     .single();
   if (error || !data) return NextResponse.json({ error: "Artifact bulunamadı" }, { status: 404 });
 
-  return NextResponse.json(data);
+  const { id: rid, title, type, content, created_at, language } = data as Record<string, unknown>;
+  return NextResponse.json({ id: rid, title, type, content, created_at, language: language ?? null });
 }
