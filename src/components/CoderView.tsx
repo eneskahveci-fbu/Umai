@@ -20,7 +20,6 @@ import {
   FolderOpen,
   Folder,
   GraduationCap,
-  Bot,
   Circle,
   CircleCheck,
   GitPullRequest,
@@ -3412,22 +3411,13 @@ export function CoderView() {
                   />
                 )}
                 {/* Dosya & görsel ekleme — tek ikon (ataç). Web araması artık
-                    Otomatik Pilot ile kendiliğinden çalışır (manuel toggle yok). */}
-                <MoreMenu icon={<Paperclip size={16} />} title="Dosya ekle veya arka planda çalıştır">
+                    Otomatik Pilot ile kendiliğinden çalışır (manuel toggle yok).
+                    "Arka planda çalıştır" kaldırıldı (kullanıcı kararı): normal
+                    mesaj zaten sekme kapansa da sunucuda tamamlanıyor ve kuyruk
+                    ajanı araçsız/bağlamsız olduğundan sohbetten daha zayıftı. */}
+                <MoreMenu icon={<Paperclip size={16} />} title="Dosya veya görsel ekle">
                   <MoreItem icon={<Paperclip size={14} />} label="Dosya ekle" desc="kod, metin, belge" onClick={() => fileRef.current?.click()} />
                   <MoreItem icon={<ImageIcon size={14} />} label="Görsel ekle" desc="fotoğraf, ekran görüntüsü" onClick={() => imgRef.current?.click()} />
-                  <MoreItem
-                    icon={<Bot size={14} />}
-                    label="Arka planda çalıştır"
-                    desc="uzun görevi kuyruğa al, sen çalışmaya devam et"
-                    onClick={() => {
-                      const goal = input.trim();
-                      if (!goal) { useStore.getState().addToast("Önce bir hedef/görev yaz.", "info"); return; }
-                      useStore.getState().enqueueJob(goal);
-                      setInput("");
-                      useStore.getState().addToast("Görev arka plana alındı — bitince haber vereceğim.", "success");
-                    }}
-                  />
                 </MoreMenu>
                 {streaming ? (
                   <button onClick={stop} className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-red hover:bg-red/80 active:bg-red/70 text-white grid place-items-center transition-colors" title="Durdur">
