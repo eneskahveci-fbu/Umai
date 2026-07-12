@@ -66,8 +66,8 @@ function buildHeaders(provider: Provider, apiKey: string, req: Request): Record<
     h["Authorization"] = `Bearer ${apiKey}`;
   }
   if (provider === "openrouter") {
-    h["HTTP-Referer"] = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://craft-ai-web.vercel.app";
-    h["X-Title"] = "Umai";
+    h["HTTP-Referer"] = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://umai.vercel.app";
+    h["X-Title"] = "UMAI";
   }
   return h;
 }

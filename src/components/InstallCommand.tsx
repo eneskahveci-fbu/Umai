@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Check, Copy, Terminal } from "lucide-react";
 
 /* Landing page'de terminal kurulum komutu (Mac & Linux) — tek tık kopyala. */
-const CMD = "curl -fsSL https://craft-coder.vercel.app/install.sh | sh";
+const CMD = "curl -fsSL https://umai.vercel.app/install.sh | sh";
 
 export function InstallCommand() {
   const [copied, setCopied] = useState(false);

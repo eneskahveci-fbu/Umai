@@ -13,6 +13,7 @@ import {
   FolderInput,
   FolderOpen,
   FolderPlus,
+  Images,
   Layers,
   Link2,
   MessageSquare,
@@ -427,7 +428,7 @@ export function Sidebar() {
       <div className="h-14 px-4 flex items-center justify-between border-b border-line/60 shrink-0">
         <div className="flex items-center gap-2 font-extrabold text-base tracking-tight">
           <SidebarLogo size={22} />
-          <span className="text-ink">Umai</span>
+          <span className="text-ink">UMAI</span>
         </div>
         <button
           onClick={() => setSidebarOpen(false)}
@@ -466,9 +467,23 @@ export function Sidebar() {
           >
             <Sparkles size={15} className="text-brand shrink-0" /> <span className="truncate">Stüdyo</span>
           </button>
-          {/* İçerik araçları (Doküman/Anket/Defter) — anket kararıyla stüdyodan buraya taşındı. */}
-          <SidebarTools />
+          {/* Kütüphane üst seviyede (Codex IA önerisi): üretilen çıktılar
+             keşfedilebilir olsun — Araçlar açılır listesine gömülmesin. */}
+          <button
+            onClick={() => router.push("/library")}
+            aria-current={pathname.startsWith("/library") ? "page" : undefined}
+            className={`premium-card flex-1 min-w-0 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+              pathname.startsWith("/library")
+                ? "border-brand/40 bg-brand/10 text-ink"
+                : "text-ink/80 hover:text-ink hover:border-brand/40"
+            }`}
+          >
+            <Images size={15} className="text-brand shrink-0" /> <span className="truncate">Kütüphane</span>
+          </button>
         </div>
+        {/* İçerik araçları (Doküman/Anket/Defter/Dönüştürücü) — anket kararıyla
+           stüdyodan buraya taşındı; kendi açılır listesinde. */}
+        <SidebarTools />
       </div>
 
       {/* Workspace accordion (Projects + History) */}

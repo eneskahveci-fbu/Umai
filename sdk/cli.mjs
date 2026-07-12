@@ -101,7 +101,7 @@ const C = {
 /* Sıfır-yapılandırmayla çalışsın: ücretsiz Pollinations + herkese açık sunucu.
    Kullanıcı bayrak/env ile kendi modelini/anahtarını verebilir. */
 const DEFAULTS = {
-  appUrl: "https://craft-coder.vercel.app",
+  appUrl: "https://umai.vercel.app",
   baseUrl: "https://text.pollinations.ai/openai",
   model: "openai",
   provider: "pollinations",

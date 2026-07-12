@@ -278,7 +278,7 @@ export const STYLE_LABELS: Record<ResponseStyle, { label: string; prompt: string
 };
 
 export const DEFAULT_SYSTEM_PROMPT =
-  "Sen Umai, deneyimli bir yazılım geliştirme asistanısın. Kod yazabilir, " +
+  "Sen UMAI, deneyimli bir yazılım geliştirme asistanısın. Kod yazabilir, " +
   "açıklayabilir, hata ayıklayabilir, mimari önerebilirsin. Kullanıcı sana GitHub " +
   "deposundan dosya içeriği gösterebilir; bunları dikkate al. Adım adım düşün. " +
   "Cevapların Türkçe ve markdown formatında olsun; kod bloklarını dilini belirterek yaz. " +
@@ -587,7 +587,7 @@ export const DEFAULT_SKILLS: Skill[] = [
 
 export const POLLINATIONS_DEFAULT_MODEL: ModelProfile = {
   id: "craft-default-pollinations",
-  label: "✦ Umai Default (Ücretsiz)",
+  label: "✦ UMAI Default (Ücretsiz)",
   provider: "pollinations",
   baseUrl: "https://text.pollinations.ai/openai",
   model: "openai",

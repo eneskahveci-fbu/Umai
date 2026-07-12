@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # Craft Coder CLI — tek komut kurulum (Mac & Linux)
-#   curl -fsSL https://craft-coder.vercel.app/install.sh | sh
+#   curl -fsSL https://umai.vercel.app/install.sh | sh
 #
 # Kurar:
 #   craft-coder            → terminalde AI kod ajanı (Claude Code gibi)
@@ -9,7 +9,7 @@
 # Ajan yalnız Node 18+ ister. Köprü ayrıca node-pty derler (opsiyonel).
 set -e
 
-BASE="${CRAFT_BASE:-https://craft-coder.vercel.app}"
+BASE="${CRAFT_BASE:-https://umai.vercel.app}"
 DIR="$HOME/.craft-coder"
 
 b='\033[38;2;200;168;126m'; g='\033[32m'; y='\033[33m'; r='\033[31m'; z='\033[0m'

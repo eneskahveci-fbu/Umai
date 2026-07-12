@@ -162,7 +162,7 @@ export default function LoginPage() {
           <path d="M14 5L22 10.5V17.5L14 23L6 17.5V10.5L14 5Z" stroke="#5c9478" strokeWidth="1.6" strokeLinejoin="round" fill="none" />
           <circle cx="14" cy="14" r="2.8" fill="#5c9478" fillOpacity="0.85" />
         </svg>
-        <span className="text-ink">umai</span>
+        <span className="text-ink">UMAI</span>
       </Link>
 
       <div className="w-full max-w-[380px]">

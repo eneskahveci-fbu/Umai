@@ -62,7 +62,7 @@ const CAN_DO = [
 const FAQS = [
   {
     q: "Yazılım veya yapay zeka bilmiyorum, kullanabilir miyim?",
-    a: "Evet — Umai tam da bunun için tasarlandı. Ne istediğini sıradan cümlelerle yazarsın, gerisini yapay zeka halleder. Hiçbir kurulum, kod ya da teknik bilgi gerekmez.",
+    a: "Evet — UMAI tam da bunun için tasarlandı. Ne istediğini sıradan cümlelerle yazarsın, gerisini yapay zeka halleder. Hiçbir kurulum, kod ya da teknik bilgi gerekmez.",
   },
   {
     q: "Ücretsiz mi? Kredi kartı istiyor mu?",
@@ -82,12 +82,12 @@ const FAQS = [
   },
 ];
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://craft-coder.vercel.app";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://umai.vercel.app";
 
 const JSON_LD_APP = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "Umai",
+  name: "UMAI",
   description:
     "Herkes için yapay zeka stüdyosu. Web sitesi ve sunum tasarla, görsel üret, her şeyi sor — ya da kod yazıp GitHub/GitLab depona bağlan. Kurulum yok, ücretsiz başlar.",
   url: SITE_URL,
@@ -116,7 +116,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-5 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5 font-extrabold text-xl tracking-tight">
             <LogoMark size={28} />
-            <span className="text-ink">umai</span>
+            <span className="text-ink">UMAI</span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <Link href="/pricing" className="hidden sm:inline-flex text-sm text-muted hover:text-ink font-medium px-3 py-2 transition-colors">
@@ -135,7 +135,7 @@ export default function Home() {
       {/* HERO */}
       <header className="max-w-5xl mx-auto px-5 sm:px-6 pt-20 sm:pt-28 pb-14 text-center w-full">
         <h1 className="font-serif text-[2.4rem] leading-[1.12] sm:text-5xl lg:text-6xl font-semibold tracking-tight text-balance">
-          Umai, konuşarak üreten ve kod yazan yapay zeka platformu.
+          UMAI, konuşarak üreten ve kod yazan yapay zeka platformu.
         </h1>
 
         <p className="text-lg text-muted max-w-2xl mx-auto mt-6 leading-relaxed text-balance">
@@ -176,7 +176,7 @@ export default function Home() {
 
       {/* NE YAPABİLİRSİN — sade, dört öğe */}
       <section className="max-w-4xl mx-auto px-5 sm:px-6 py-14 w-full">
-        <h2 className="font-serif text-2xl sm:text-3xl font-semibold mb-8 tracking-tight text-center text-balance">Umai ile neler yapabilirsin?</h2>
+        <h2 className="font-serif text-2xl sm:text-3xl font-semibold mb-8 tracking-tight text-center text-balance">UMAI ile neler yapabilirsin?</h2>
         <div className="grid sm:grid-cols-2 gap-3">
           {CAN_DO.map((f) => (
             <div key={f.title} className="premium-card rounded-2xl p-5 flex items-start gap-4">
@@ -218,7 +218,7 @@ export default function Home() {
           <Link href="/app" className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-[#111110] font-semibold px-6 py-3 rounded-xl text-sm transition-colors">
             Araştırma için dene <ArrowRight size={15} />
           </Link>
-          <a href="mailto:eneskahveci.bs@gmail.com?subject=Umai%20—%20Kurumsal%2FAra%C5%9Ft%C4%B1rma%20Kullan%C4%B1m%C4%B1" className="inline-flex items-center gap-2 border border-line bg-surface text-muted hover:text-ink hover:border-brand/40 px-6 py-3 rounded-xl text-sm font-medium transition-colors">
+          <a href="mailto:eneskahveci.bs@gmail.com?subject=UMAI%20—%20Kurumsal%2FAra%C5%9Ft%C4%B1rma%20Kullan%C4%B1m%C4%B1" className="inline-flex items-center gap-2 border border-line bg-surface text-muted hover:text-ink hover:border-brand/40 px-6 py-3 rounded-xl text-sm font-medium transition-colors">
             Kurumsal kullanım / teklif <ArrowRight size={15} />
           </a>
         </div>
@@ -235,7 +235,7 @@ export default function Home() {
             href="/app"
             className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-[#111110] font-semibold px-8 py-4 rounded-xl transition-colors text-[15px]"
           >
-            Umai&apos;yi aç <ArrowRight size={17} />
+            UMAI&apos;yi aç <ArrowRight size={17} />
           </Link>
         </div>
       </section>
@@ -263,7 +263,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-5 sm:px-6 py-12 text-center">
           <div className="flex items-center justify-center gap-2 font-extrabold text-lg mb-3">
             <LogoMark size={22} />
-            <span className="text-ink">umai</span>
+            <span className="text-ink">UMAI</span>
           </div>
           <p className="text-sm text-muted">Web sitesi, sunum ve görsel tasarla · kod yaz ve depona bağlan</p>
 

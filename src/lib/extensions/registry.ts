@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Extension Registry — Umai genişletilebilirlik merkezi.
+// Extension Registry — UMAI genişletilebilirlik merkezi.
 // Tüm yeni araçlar ve agent'lar BU dosyada birleştirilir.
 // Yeni bir extension eklemek için:
 //   1. Kendi dizinde araç/agent tanımını yaz

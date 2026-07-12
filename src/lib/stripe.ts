@@ -11,5 +11,5 @@ export function getStripe(): Stripe | null {
 export const PRO_PRICE_ID = process.env.STRIPE_PRICE_ID || process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || "";
 
 export function siteUrl(): string {
-  return process.env.NEXT_PUBLIC_SITE_URL || "https://craft-coder.vercel.app";
+  return process.env.NEXT_PUBLIC_SITE_URL || "https://umai.vercel.app";
 }

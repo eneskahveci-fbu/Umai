@@ -32,8 +32,8 @@ const notoEmoji = Noto_Emoji({
 
 export const metadata: Metadata = {
   title: {
-    default: "Umai — AI kod asistanı",
-    template: "%s — Umai",
+    default: "UMAI — AI kod asistanı",
+    template: "%s — UMAI",
   },
   description:
     "OpenAI-uyumlu herhangi bir modelle çalışan AI kod asistanı. Sohbet, gizli sohbet, geçmiş senkron ve GitHub deposuna bağlı Coder sekmesi.",
@@ -52,24 +52,24 @@ export const metadata: Metadata = {
     "GitHub Coder",
     "ücretsiz AI",
     "model bağımsız",
-    "Umai",
+    "UMAI",
   ],
   authors: [{ name: "Enes Kahveci", url: "mailto:eneskahveci.bs@gmail.com" }],
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Umai — AI kod asistanı",
+    title: "UMAI — AI kod asistanı",
     description:
       "İstediğin modelle çalışan AI kod asistanı. Sohbet, GitHub Coder, gizli mod.",
-    siteName: "Umai",
+    siteName: "UMAI",
     type: "website",
     locale: "tr_TR",
     url: "/",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Umai — AI kod asistanı",
+    title: "UMAI — AI kod asistanı",
     description:
       "İstediğin modelle çalışan AI kod asistanı. Sohbet, GitHub Coder, gizli mod.",
   },
@@ -83,7 +83,7 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://craft-ai-web.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://umai.vercel.app"),
 };
 
 export const viewport = {
@@ -121,7 +121,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Umai" />
+        <meta name="apple-mobile-web-app-title" content="UMAI" />
         {/* apple-touch-icon (180px) src/app/apple-icon.tsx'ten otomatik enjekte edilir */}
         {/* Tema flash'ını önle (private-mode safe) */}
         <script
