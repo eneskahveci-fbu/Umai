@@ -4,6 +4,7 @@ import { ArrowLeft, BookOpen, FileText, Images, LayoutPanelTop, ListChecks, Wren
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
+import { useAuthGate, useThemeClasses } from "@/lib/authGate";
 
 type Tab = "all" | "media" | "design" | "docs" | "forms" | "notebooks";
 
@@ -17,12 +18,20 @@ const tabs: { id: Tab; label: string; icon: typeof Images }[] = [
 ];
 
 export default function LibraryPage() {
+  /* /studio ve /app ile AYNI giriş kapısı (tutarlılık) + tema sınıfları
+     (koyu/açık tercihi bu bağımsız rotada da uygulansın). */
+  const auth = useAuthGate();
+  useThemeClasses();
   const router = useRouter();
   const config = useStore((s) => s.config);
   const saveConfig = useStore((s) => s.saveConfig);
   const [tab, setTab] = useState<Tab>("all");
   const media = useMemo(() => [...(config.mediaAssets ?? [])].sort((a, b) => b.createdAt - a.createdAt), [config.mediaAssets]);
   const show = (kind: Tab) => tab === "all" || tab === kind;
+
+  if (auth !== "in") {
+    return <div className="h-screen grid place-items-center bg-bg text-muted/60 text-sm">Yükleniyor…</div>;
+  }
 
   const sendToConverter = (url: string) => {
     try { sessionStorage.setItem("umai_converter_source", url); } catch { /* yok say */ }

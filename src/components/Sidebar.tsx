@@ -18,7 +18,6 @@ import {
   Link2,
   MessageSquare,
   MoreHorizontal,
-  Moon,
   Pencil,
   Pin,
   Plus,
@@ -27,7 +26,6 @@ import {
   Settings2,
   Share2,
   Sparkles,
-  Sun,
   Tag,
   Trash2,
   Wrench,
@@ -736,20 +734,10 @@ export function Sidebar() {
       {/* Bottom */}
       <div className="border-t border-line/60 shrink-0">
         <div className="px-3 pt-3 pb-2 space-y-1">
-          <div className="flex gap-1.5">
-            <button
-              onClick={() => router.push("/settings")}
-              aria-current={pathname === "/settings" ? "page" : undefined}
-              className={`flex-1 flex items-center gap-2.5 px-3 py-2 rounded-xl border text-sm transition-colors ${
-                pathname === "/settings"
-                  ? "border-brand/40 bg-brand/10 text-ink"
-                  : "border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink"
-              }`}
-            >
-              <Settings size={14} /> Ayarlar
-            </button>
-            <ThemeToggle />
-          </div>
+          {/* Ayarlar butonu ve tema anahtarı burada YOK (bilinçli, kullanıcı
+             kararı): Ayarlar hesap menüsünün içinde (AuthButton), tema tercihi
+             Ayarlar → Temel'de. Aynı hedefe/ayara birden çok komşu girdi kafa
+             karıştırıyordu. Hızlı erişim: Ctrl+, kısayolu ve ⌘K komutları. */}
           <AuthButton />
         </div>
         <DevCredit />
@@ -815,21 +803,6 @@ function RelatedChats({
         </button>
       ))}
     </div>
-  );
-}
-
-function ThemeToggle() {
-  const config = useStore((s) => s.config);
-  const toggleTheme = useStore((s) => s.toggleTheme);
-  const isDark = config.theme !== "light";
-  return (
-    <button
-      onClick={toggleTheme}
-      title={isDark ? "Açık temaya geç" : "Koyu temaya geç"}
-      className="flex items-center justify-center w-10 rounded-xl border border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-brand transition-colors shrink-0"
-    >
-      {isDark ? <Sun size={14} /> : <Moon size={14} />}
-    </button>
   );
 }
 
