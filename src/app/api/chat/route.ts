@@ -1103,6 +1103,12 @@ export async function POST(req: Request) {
   let model = body.model || "";
   let apiKey = body.apiKey || "";
   let provider: string = body.provider || "hf";
+  /* Savunma: istemcinin cihaz-şifreli (enc:1:) anahtarı yanlışlıkla buraya
+     sızarsa sağlayıcıya GÖNDERME — anahtarsız say. Anahtar gerektiren
+     sağlayıcıda access mantığı ücretsiz Pollinations'a düşürür (401 duvarı
+     yerine yanıt); anahtarsızlarda (ör. Pollinations token'ı) bozuk token
+     atılır, anonim yol çalışır. */
+  if (apiKey.startsWith("enc:1:")) apiKey = "";
   /* KEYLESS_CHAT_PROVIDERS ile senkron tutulmalı: "custom" (kullanıcının
      kendi anahtarsız çalışabilen OpenAI-uyumlu ucu) buradan hariç
      tutulmazsa, anahtarsız custom istek sessizce Pollinations'a düşer ve
@@ -1175,7 +1181,9 @@ export async function POST(req: Request) {
     const cp = f.provider ?? "custom";
     const cb = (f.baseUrl ?? "").replace(/\/$/, "");
     const cm = f.model ?? "";
-    const ck = f.apiKey ?? "";
+    /* Şifreli (enc:1:) aday anahtarı sağlayıcıya sızdırma — anahtarsız say
+       (anahtar gerektiren aday elenmiş olur, anahtarsızda token atılır). */
+    const ck = (f.apiKey ?? "").startsWith("enc:1:") ? "" : (f.apiKey ?? "");
     if (!cb || !cm) continue;
     if (!KEYLESS_CHAT_PROVIDERS.has(cp) && !ck) continue;
     const key = `${cp}|${cb}|${cm}`;
