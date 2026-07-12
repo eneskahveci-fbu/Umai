@@ -3,10 +3,14 @@
 import { ArrowLeft, Download, FileImage, FileUp, Image as ImageIcon, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuthGate, useThemeClasses } from "@/lib/authGate";
 
 type Output = "pdf" | "png" | "jpeg" | "webp";
 
 export default function ConverterPage() {
+  /* /studio ve /app ile AYNI giriş kapısı (tutarlılık) + tema sınıfları. */
+  const auth = useAuthGate();
+  useThemeClasses();
   const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
   const [output, setOutput] = useState<Output>("pdf");
@@ -51,6 +55,10 @@ export default function ConverterPage() {
         : msg || "Dönüştürme tamamlanamadı.");
     } finally { setBusy(false); }
   };
+
+  if (auth !== "in") {
+    return <div className="h-screen grid place-items-center bg-bg text-muted/60 text-sm">Yükleniyor…</div>;
+  }
 
   return <main className="min-h-screen bg-bg text-ink"><header className="h-14 border-b border-line flex items-center px-4 sm:px-6"><button onClick={() => router.push("/library")} className="w-10 h-10 grid place-items-center rounded-lg text-muted hover:bg-bgsoft hover:text-ink" aria-label="Kütüphaneye dön"><ArrowLeft size={17} /></button><div><h1 className="text-sm font-semibold">Dönüştürücü</h1><p className="text-[11px] text-muted">Görselleri yerelde dönüştür</p></div></header><div className="max-w-3xl mx-auto px-4 py-8 sm:py-12"><div className="border border-line bg-surface rounded-lg p-5 sm:p-6"><div className="flex items-start gap-3"><div className="w-10 h-10 grid place-items-center rounded-lg bg-brand/10 text-brand"><FileImage size={19} /></div><div><h2 className="text-base font-semibold">Görsel dönüştür</h2><p className="text-xs text-muted mt-1">Image → PDF, PNG, JPG veya WebP. Dosyalar tarayıcından çıkmaz.</p></div></div><label className="mt-6 min-h-32 border border-dashed border-line rounded-lg grid place-items-center cursor-pointer hover:border-brand/60 hover:bg-bgsoft/40 transition-colors"><span className="text-center text-sm text-muted"><FileUp size={20} className="mx-auto mb-2" />Görselleri seç veya buraya bırak<br /><small>PNG, JPG, WebP · en fazla 20 dosya</small></span><input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={(e) => addFiles(e.target.files)} /></label>{files.length > 0 && <div className="mt-4 space-y-2">{files.map((file, index) => <div key={`${file.name}-${index}`} className="flex items-center gap-2 p-2 rounded-lg bg-bgsoft text-xs"><ImageIcon size={14} className="text-muted" /><span className="truncate flex-1">{file.name}</span><span className="text-muted">{formatBytes(file.size)}</span><button onClick={() => setFiles((items) => items.filter((_, i) => i !== index))} className="p-1 text-muted hover:text-red" aria-label={`${file.name} dosyasını kaldır`}><Trash2 size={14} /></button></div>)}</div>}<div className="mt-6"><p className="text-xs font-semibold mb-2">Çıktı biçimi</p><div className="flex flex-wrap gap-2">{(["pdf", "png", "jpeg", "webp"] as Output[]).map((item) => <button key={item} onClick={() => setOutput(item)} className={`px-3 py-2 rounded-lg border text-xs font-semibold uppercase ${output === item ? "border-brand bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"}`}>{item === "jpeg" ? "JPG" : item}</button>)}</div>{output === "pdf" && <p className="text-[11px] text-muted mt-3">JPEG dosyaları PDF’ye özgün baytlarıyla gömülür. PNG/WebP, PDF uyumluluğu için beyaz zeminli JPEG’e dönüştürülür.</p>}{output !== "pdf" && files.length > 1 && <p className="text-[11px] text-muted mt-3">Biçim dönüşümünde ilk dosya kullanılır.</p>}</div><button disabled={!files.length || busy} onClick={convert} className="mt-6 w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-brand text-bg text-sm font-semibold disabled:opacity-40 hover:bg-branddim"><Download size={16} />{busy ? "Hazırlanıyor…" : output === "pdf" ? "PDF indir" : "Dönüştür ve indir"}</button>{notice && <p className="mt-4 text-xs text-muted" role="status">{notice}</p>}</div></div></main>;
 }

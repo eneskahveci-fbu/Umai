@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, ChevronDown, FileText, ListChecks, RefreshCw, Wrench } from "lucide-react";
+import { BookOpen, ChevronDown, FileText, ListChecks, Wrench } from "lucide-react";
 
 /* Sidebar "Araçlar" satırı — kullanıcı anketi (Tem 2026) kararı: içerik
    araçları (Doküman/Anket/Defter) stüdyodan çıkarıldı; burada TEK satır,
@@ -15,7 +15,8 @@ const TOOLS: { href: string; label: string; desc: string; icon: typeof FileText 
   { href: "/studio/dokuman", label: "Doküman", desc: "blok tabanlı yazım", icon: FileText },
   { href: "/studio/anket", label: "Anket", desc: "AI anket + HTML form", icon: ListChecks },
   { href: "/studio/defter", label: "Defter", desc: "kaynaklı sohbet + sesli özet", icon: BookOpen },
-  { href: "/tools/converter", label: "Dönüştürücü", desc: "görsel ⇄ PDF/PNG/JPG/WebP", icon: RefreshCw },
+  /* Dönüştürücü bu listede DEĞİL (kullanıcı onayı): girişi Kütüphane
+     başlığındaki buton + ⌘K — aynı araca üç ayrı yol gereksizdi. */
 ];
 
 export function SidebarTools() {

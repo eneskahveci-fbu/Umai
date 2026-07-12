@@ -2719,9 +2719,12 @@ export function CoderView() {
                     store.setToolsEnabled(!store.toolsEnabled);
                   }}
                 />
+                {/* Öğrenme/Kalite çipleri kaldırıldı (kullanıcı onayı): aynı
+                   config anahtarları Ayarlar → Temel'de zaten var — kalıcı bir
+                   tercihin iki yerden değişmesi kafa karıştırıyordu. Kalanlar
+                   oturumluk/sohbetlik durumlar (Tools, Ekip, Araştırma) ya da
+                   Ayarlar'da olmayanlar. */}
                 <ModeChip icon={<ShieldCheck size={12} />} label="Güvenli" active={!!config.safeMode} onClick={() => useStore.getState().saveConfig({ ...config, safeMode: !config.safeMode })} />
-                <ModeChip icon={<GraduationCap size={12} />} label="Öğrenme" active={!!config.learningMode} onClick={() => useStore.getState().saveConfig({ ...config, learningMode: !config.learningMode })} />
-                <ModeChip icon={<Sparkles size={12} />} label="Kalite" active={!!config.qualityMode} onClick={() => useStore.getState().saveConfig({ ...config, qualityMode: !config.qualityMode })} />
                 <ModeChip icon={<Users size={12} />} label="Ekip" active={swarmMode} onClick={() => setSwarmMode((v) => !v)} />
                 <ModeChip icon={<Search size={12} />} label="Araştırma" active={researchMode} onClick={() => setResearchMode((v) => !v)} />
               </div>

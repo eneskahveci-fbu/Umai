@@ -63,6 +63,9 @@ export function AuthButton() {
               <p className="text-[11px] text-muted/60">Oturum açık</p>
               <p className="truncate font-medium text-ink">{userEmail}</p>
             </div>
+            {/* Ayarlar'ın TEK sidebar girişi burası (kullanıcı kararı):
+               sidebar gövdesindeki bağımsız Ayarlar butonu kaldırıldı,
+               aynı hedefe iki komşu girdi kafa karıştırıyordu. */}
             <button
               onClick={() => { setMenuOpen(false); router.push("/settings"); }}
               className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bgsoft/70 text-left text-ink/85"
