@@ -44,7 +44,11 @@ export default function ConverterPage() {
         setNotice("Dönüştürme tamamlandı.");
       }
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Dönüştürme tamamlanamadı.");
+      /* Tarayıcının ham İngilizce decode hatası yerine anlaşılır Türkçe mesaj. */
+      const msg = error instanceof Error ? error.message : "";
+      setNotice(/decod|encod|source image/i.test(msg)
+        ? "Görsel çözülemedi — dosya bozuk veya desteklenmeyen bir biçimde olabilir."
+        : msg || "Dönüştürme tamamlanamadı.");
     } finally { setBusy(false); }
   };
 
