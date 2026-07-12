@@ -44,9 +44,8 @@ KÜTÜPHANE (/library) VE DÖNÜŞTÜRÜCÜ (/tools/converter)
 - Kütüphane: üretilen TÜM çıktılar tek yerde — Medya (görseller), Tasarım (stüdyo projeleri), Doküman, Anket, Defter. Sekmeli görünüm; görselde "Dönüştür" ve "Sil" eylemleri. Sidebar → Araçlar veya ⌘K'dan açılır.
 - Dönüştürücü: görselleri tamamen tarayıcıda dönüştürür (sunucuya yüklenmez) — PNG/JPG/WebP birbirine, çoklu görsel → tek PDF (JPEG'ler kalite kaybı OLMADAN gömülür).
 
-GÖREV KUYRUĞU (Otonom Ajan / arka plan görevleri)
-- Composer'daki ataç menüsünden "Arka planda çalıştır" ile veya ⌘K'dan bir görev kuyruğa eklenir.
-- Uygulama açıkken (herhangi bir sekmede/yüzeyde) arka planda tek tek yürütülür; ilerleme sağ-altta yüzen bir panoda canlı gösterilir, bitince ses + tarayıcı bildirimi verir, sonucu yeni bir sohbete açılabilir.
+ARKA PLAN DAVRANIŞI
+- Ayrı bir "arka planda çalıştır" düğmesi YOK — normal mesaj zaten sekme kapansa bile sunucuda tamamlanıp kalıcı hâle gelir; kullanıcı başka sohbete/yüzeye geçebilir. Kullanıcı "arka planda çalıştırma nerede" diye sorarsa: mesajı normal gönder, gerisi kendiliğinden.
 
 AYARLAR (⚙️) — 11 sekme (Gelişmiş/MCP/Kancalar yalnızca admin'e görünür)
 - Hesap: e-posta/şifre/görünen ad, oturum yönetimi, kullanım istatistikleri, hesabı silme.
