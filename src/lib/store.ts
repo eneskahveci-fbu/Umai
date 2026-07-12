@@ -679,24 +679,35 @@ export const useStore = create<StoreState>()((set, get) => ({
       }
       const remote = (data?.config ?? null) as Partial<Config> | null;
       const owner = getConfigOwner();
-      const apply = (cfg: Config) => {
-        applyTheme(cfg.theme ?? "dark");
+      /* KRİTİK: bellekteki config HER ZAMAN düz metin olmalı (saveConfig
+         sözleşmesi). Yerel taraf açılıştaki rehydrate yarışında hâlâ şifreli
+         olabilir, buluttan gelen de şifreli kaydedilmiş olabilir — uygulamadan
+         önce ÇÖZ. Aksi halde enc:1: anahtarlar bellekte kalıp sağlayıcılara
+         gidiyor ve 401 veriyordu ("anahtar test edilmiyor / ücretsiz model
+         bile hata veriyor" şikayetinin kök nedeni). */
+      const apply = async (cfg: Config): Promise<Config> => {
+        const plain = await decryptConfigSecrets(cfg);
+        applyTheme(plain.theme ?? "dark");
         const store = getStore();
-        if (store) store.setItem(CONFIG_KEY, JSON.stringify(cfg));
-        set({ config: cfg, configHydratedFor: userId });
+        /* Depoya saveConfig ile tutarlı biçimde ŞİFRELİ yaz — düz metin bırakma. */
+        if (store) {
+          try { store.setItem(CONFIG_KEY, JSON.stringify(await encryptConfigSecrets(plain))); } catch { /* kota — yok say */ }
+        }
+        set({ config: plain, configHydratedFor: userId });
         setConfigOwner(userId);
+        return plain;
       };
       if (owner === userId) {
         /* Aynı kullanıcı → cihazlar arası birleştir (model/git kaybetme). */
         const local = get().config;
-        if (remote) { const merged = mergeConfigs(local, remote); apply(merged); pushCloudConfig(get, userId, merged); }
-        else { apply(local); pushCloudConfig(get, userId, local); }
+        if (remote) { const merged = await apply(mergeConfigs(local, remote)); pushCloudConfig(get, userId, merged); }
+        else { const plain = await apply(local); pushCloudConfig(get, userId, plain); }
       } else {
         /* Farklı kullanıcı (veya bu hesap bu tarayıcıda ilk kez) → YEREL config'i
            KULLANMA (önceki kullanıcının modeli/git'i sızmasın). Buluttaki kendi
            config'i varsa onu TEMİZ tabana uygula; yoksa temiz varsayılan (Pollinations). */
-        if (remote) { apply(mergeConfigs(DEFAULT_CONFIG, remote)); }
-        else { apply({ ...DEFAULT_CONFIG }); pushCloudConfig(get, userId, DEFAULT_CONFIG); }
+        if (remote) { await apply(mergeConfigs(DEFAULT_CONFIG, remote)); }
+        else { await apply({ ...DEFAULT_CONFIG }); pushCloudConfig(get, userId, DEFAULT_CONFIG); }
       }
     } catch {
       get().addToast("Hesap senkronu sırasında hata oluştu.", "error");

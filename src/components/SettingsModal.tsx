@@ -56,6 +56,20 @@ import { quickComplete } from "@/lib/quickComplete";
 import { fetchUserRepos } from "@/lib/github";
 import { fetchGitLabUserRepos } from "@/lib/gitlab";
 import { friendlyError } from "@/lib/friendlyError";
+import { decryptField, isEncrypted } from "@/lib/secureKeys";
+
+/* Kullanım anında şifre çözme: bellekteki config'den gelen anahtar `enc:1:`
+   (şifreli) olabilir — açılıştaki rehydrate yarışı ya da bulut senkronunun
+   çözmeden uygulaması yüzünden. Sağlayıcıya ASLA şifreli blob gönderme:
+   çözülemiyorsa boş dön, kullanıcı anahtarı yeniden girer. (Aynı sınıf hata
+   daha önce sohbet yolunda yaşandı ve resolveModelApiKey ile çözüldü; burası
+   Ayarlar'daki test/model-listeleme yollarının eşleniği.) */
+async function usableKey(raw: string | undefined | null): Promise<string> {
+  const v = (raw ?? "").trim();
+  if (!v) return "";
+  const dec = await decryptField(v);
+  return isEncrypted(dec) ? "" : dec;
+}
 import { pickReplacementModel } from "@/lib/modelPicker";
 import { isPushSubscribed, pushSupported, subscribeToPush, unsubscribeFromPush } from "@/lib/sw-register";
 import type { Provider, ResponseStyle } from "@/lib/types";
@@ -278,10 +292,14 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   /* Sağlayıcıdan anahtarla canlı çekilen model listesi + durum */
   const [fetchedModels, setFetchedModels] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  /* Otomatik anahtar testinin GÖRÜNÜR sonucu — eskiden sessizce yutulur,
+     kullanıcı "test edilmiyor" sanırdı. ok/err + kısa mesaj. */
+  const [keyCheck, setKeyCheck] = useState<{ ok: boolean; text: string } | null>(null);
 
   /* Anahtar girildiğinde modelleri otomatik (debounce'lu) çek. Anahtara göre
      gerçek model listesini getirir; böylece model adı tahminden kaynaklı
-     "geçersiz model/anahtar" hataları oluşmaz. */
+     "geçersiz model/anahtar" hataları oluşmaz. Sonuç (başarı VE hata) artık
+     anahtar alanının altında görünür. */
   useEffect(() => {
     if (!open || tab !== "model") return;
     const key = apiKey.trim();
@@ -289,26 +307,41 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     if (!url || (key.length > 0 && key.length < 8)) return;
     if (provider !== "ollama" && provider !== "custom" && provider !== "pollinations" && key.length === 0) return;
     const t = setTimeout(() => {
-      fetch("/api/models", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ baseUrl: url, apiKey: key, provider }),
-      })
-        .then((r) => r.json().catch(() => ({})))
-        .then((data) => {
-          if (!Array.isArray(data.models)) return;
+      void (async () => {
+        const plainKey = await usableKey(key);
+        if (key && !plainKey) {
+          setKeyCheck({ ok: false, text: "Kayıtlı anahtar bu tarayıcıda çözülemedi — anahtarı yeniden yapıştır." });
+          return;
+        }
+        setLoadingModels(true);
+        try {
+          const r = await fetch("/api/models", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ baseUrl: url, apiKey: plainKey, provider }),
+          });
+          const data = await r.json().catch(() => ({}));
+          if (!Array.isArray(data.models)) {
+            setKeyCheck({ ok: false, text: data.error || `Anahtar doğrulanamadı (HTTP ${r.status}).` });
+            return;
+          }
           const models: string[] = data.models;
           setFetchedModels(models);
+          setKeyCheck({ ok: true, text: `Anahtar çalışıyor — ${models.length} model bulundu.` });
           if (models.length && !models.includes(model.trim())) {
             /* Henüz hiçbir şey başarısız olmadı — tahmin yürütmeye gerek yok.
                Eşleşme varsa uygula; yoksa modeli DEĞİŞTİRME, kullanıcı
                Gelişmiş'ten kendi seçsin (liste zaten fetchedModels'te). */
-            const r = pickReplacementModel(models, PROVIDER_MODELS[provider] ?? [], model.trim());
-            if (r.kind === "hardcoded-match" || r.kind === "free-tier-match") setModel(r.model);
+            const rp = pickReplacementModel(models, PROVIDER_MODELS[provider] ?? [], model.trim());
+            if (rp.kind === "hardcoded-match" || rp.kind === "free-tier-match") setModel(rp.model);
             else setAdvOpen(true);
           }
-        })
-        .catch(() => { /* sessiz; manuel "Yenile" butonu var */ });
+        } catch (e) {
+          setKeyCheck({ ok: false, text: `Sağlayıcıya ulaşılamadı: ${(e as Error).message}` });
+        } finally {
+          setLoadingModels(false);
+        }
+      })();
     }, 700);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -345,10 +378,13 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   const onProvider = (p: Provider) => {
     setProvider(p);
     setFetchedModels([]);
+    setKeyCheck(null);
     if (p !== "custom") { setBaseUrl(PRESETS[p].baseUrl); setModel(PRESETS[p].model); }
     /* Sağlayıcı için daha önce kaydedilmiş anahtar varsa otomatik doldur →
-       aynı sağlayıcıya tekrar anahtar girmeye gerek kalmaz. */
-    setApiKey(config.providerKeys?.[p] ?? "");
+       aynı sağlayıcıya tekrar anahtar girmeye gerek kalmaz. Bellekteki değer
+       şifreli (enc:1:) olabilir — input'a/sağlayıcıya sızmadan önce çöz. */
+    setApiKey("");
+    void usableKey(config.providerKeys?.[p]).then((k) => { if (k) setApiKey(k); });
   };
 
   /* Girilen anahtar + Base URL ile sağlayıcının desteklediği gerçek modelleri
@@ -361,7 +397,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
       const res = await fetch("/api/models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ baseUrl: baseUrl.trim(), apiKey: apiKey.trim(), provider }),
+        body: JSON.stringify({ baseUrl: baseUrl.trim(), apiKey: await usableKey(apiKey), provider }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !Array.isArray(data.models)) {
@@ -472,7 +508,9 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   const testModel = async (m: { baseUrl: string; model: string; apiKey: string; provider: Provider }) => {
     setTesting(true);
     try {
-      const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "Merhaba, 1+1=?" }], baseUrl: m.baseUrl, model: m.model, apiKey: m.apiKey, provider: m.provider }) });
+      /* Kayıtlı modelin anahtarı bellekte şifreli kalmış olabilir — çöz. */
+      const key = (await usableKey(m.apiKey)) || (await usableKey(config.providerKeys?.[m.provider]));
+      const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "Merhaba, 1+1=?" }], baseUrl: m.baseUrl, model: m.model, apiKey: key, provider: m.provider }) });
       addToast(res.ok ? "Bağlantı başarılı!" : `Hata: ${(await res.text()).slice(0, 200)}`, res.ok ? "success" : "error");
     } catch (err) { addToast(`Hata: ${(err as Error).message}`, "error"); }
     finally { setTesting(false); }
@@ -526,7 +564,11 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   };
 
   const addAndTest = async () => {
-    const key = apiKey.trim() || config.providerKeys?.[provider] || "";
+    /* KÖK NEDEN düzeltmesi: providerKeys'ten gelen değer şifreli (enc:1:)
+       olabilirdi ve test isteği sağlayıcıya şifreli blob'la gidip 401 alırdı
+       ("test edilmiyor / ücretsiz model bile hata veriyor" şikayeti). Artık
+       kullanım anında çözülür; çözülemiyorsa boş sayılır. */
+    const key = await usableKey(apiKey.trim() || config.providerKeys?.[provider] || "");
     if (!key && !KEY_OPTIONAL.includes(provider)) { addToast("Önce API anahtarını yapıştır.", "error"); return; }
     const bu = baseUrl.trim() || PRESETS[provider].baseUrl;
     let mdl = model.trim() || PRESETS[provider].model;
@@ -811,7 +853,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               <div className="flex gap-1.5">
                 <input
                   value={apiKey}
-                  onChange={(e) => { setApiKey(e.target.value); setQuickResult(null); }}
+                  onChange={(e) => { setApiKey(e.target.value); setQuickResult(null); setKeyCheck(null); }}
                   placeholder={PRESETS[provider].keyHint}
                   className="input-mono flex-1"
                   onKeyDown={(e) => { if (e.key === "Enter" && !quickBusy) addAndTest(); }}
@@ -824,6 +866,18 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   {quickBusy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Ekle ve test et
                 </button>
               </div>
+              {/* Anahtarın CANLI doğrulama durumu — yazmayı bırakınca otomatik
+                 test edilir; başarı da hata da burada görünür (sessiz kalmaz). */}
+              {!quickResult && keyCheck && (
+                <div className={`mt-2 flex items-start gap-1.5 text-[11px] break-words leading-relaxed ${keyCheck.ok ? "text-green font-semibold" : "text-red"}`}>
+                  {keyCheck.ok ? <Check size={12} className="shrink-0 mt-0.5" /> : <X size={12} className="shrink-0 mt-0.5" />} {keyCheck.text}
+                </div>
+              )}
+              {!quickResult && !keyCheck && loadingModels && (
+                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted/70">
+                  <Loader2 size={12} className="animate-spin" /> Anahtar test ediliyor…
+                </div>
+              )}
               {quickSwapNote && (
                 <div className={`mt-2 rounded-lg border px-2.5 py-2 text-[11px] break-words leading-relaxed ${quickSwapNote.tone === "warning" ? "border-red/30 bg-red/8 text-red" : "border-brand/30 bg-brand/8 text-muted"}`}>
                   {quickSwapNote.text}
