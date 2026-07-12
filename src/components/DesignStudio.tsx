@@ -13,7 +13,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useCallback, useRef, useState } from "react";
-import { FileText, FolderOpen, Loader2, Save, Send, Sparkles, Square, User, X } from "lucide-react";
+import { FileCode2, FileText, FolderOpen, Loader2, Save, Send, Sparkles, Square, User, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav } from "@/lib/surfaceNav";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
@@ -26,6 +26,7 @@ import { ArtifactCanvas } from "./ArtifactCanvas";
 import { StudioTopBar } from "./studio/StudioTopBar";
 import { SavedItemsModal } from "./studio/SavedItemsModal";
 import { printPdf } from "@/lib/studioExport";
+import { artifactDownload } from "@/lib/artifactDoc";
 import { pickDraftModels, fillSelfConsistency, generateDrafts, judgeDrafts, buildBoostInstruction, type DraftJudge } from "@/lib/boost";
 import { buildFallbackChain } from "@/lib/fallback";
 import { resolveModelApiKey } from "@/lib/secureKeys";
@@ -344,6 +345,27 @@ export function DesignStudio() {
     onSelect: () => { if (!printPdf(shownArtifact.content)) addToast("Yazdırma penceresi açılamadı — pop-up engelleyiciyi kontrol et.", "error"); },
   };
 
+  /* Üretimi gerçek proje dosyasına çevirme yolu (Codex önerisi, teslim akışı):
+     içerik sessionStorage handoff'uyla /app'e taşınır, CoderView mount olunca
+     editörde açar — dosyayı repoya işleme/commit mevcut editör akışıyla,
+     KULLANICI ONAYIYLA olur; buradan doğrudan repo yazılmaz. */
+  const openInEditorOption = {
+    key: "editor",
+    label: "Editörde aç (repo'ya işle)",
+    icon: <FileCode2 size={14} />,
+    onSelect: () => {
+      const { ext, body } = artifactDownload(shownArtifact.type, shownArtifact.content, shownArtifact.language);
+      const slug = (project.name || "tasarim").toLowerCase().replace(/[^a-z0-9çğıöşü]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "tasarim";
+      try {
+        sessionStorage.setItem("umai_editor_handoff", JSON.stringify({ path: `studio/${slug}.${ext}`, content: body }));
+      } catch {
+        addToast("İçerik taşınamadı (tarayıcı depolama kotası).", "error");
+        return;
+      }
+      nav.close(); // /app'e döner; CoderView handoff'u mount'ta tüketir
+    },
+  };
+
   const actionButtons = (
     <>
       <button onClick={saveProject} title="Kaydet" aria-label="Kaydet" className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
@@ -427,7 +449,7 @@ export function DesignStudio() {
                   versionTotal={versions.length}
                   onPrevVersion={() => setVersionIndex((i) => Math.max(0, i - 1))}
                   onNextVersion={() => setVersionIndex((i) => Math.min(versions.length - 1, i + 1))}
-                  extraExportOptions={[printPdfOption]}
+                  extraExportOptions={[printPdfOption, openInEditorOption]}
                 />
               ) : (
                 <EmptyCanvas busy={busy} phase={phase} />

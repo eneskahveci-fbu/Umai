@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Umai — AI kod asistanı",
-    short_name: "Umai",
+    name: "UMAI — AI kod asistanı",
+    short_name: "UMAI",
     description:
       "OpenAI-uyumlu herhangi bir modelle çalışan AI kod asistanı.",
     start_url: "/app",

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Stüdyo — Umai",
+  title: "Stüdyo — UMAI",
   description: "Brief yaz, AI tasarlasın: web · doküman · görsel. Ücretsiz, tarayıcıda.",
 };
 

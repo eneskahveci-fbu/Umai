@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Gizlilik Politikası — Umai",
+  title: "Gizlilik Politikası — UMAI",
   description:
-    "Umai'nin kişisel verilerinizi nasıl işlediğine dair KVKK ve GDPR uyumlu gizlilik politikası.",
+    "UMAI'nin kişisel verilerinizi nasıl işlediğine dair KVKK ve GDPR uyumlu gizlilik politikası.",
 };
 
 export default function PrivacyPage() {
@@ -16,7 +16,7 @@ export default function PrivacyPage() {
             <span className="w-6 h-6 rounded-md bg-brand/10 border border-brand/25 grid place-items-center text-brand text-xs">
               ◇
             </span>
-            umai
+            UMAI
           </Link>
           <div className="flex items-center gap-4 text-sm text-muted">
             <Link href="/terms" className="hover:text-ink">Kullanım Şartları</Link>
@@ -52,7 +52,7 @@ export default function PrivacyPage() {
 
           <Section title="2. İşlenen Kişisel Veriler">
             <p>
-              Umai farklı işlevler için farklı veriler işler. Aşağıda hangi
+              UMAI farklı işlevler için farklı veriler işler. Aşağıda hangi
               verilerin, hangi amaçla ve hangi hukuki dayanak ile işlendiği
               açıklanmaktadır.
             </p>
@@ -101,9 +101,9 @@ export default function PrivacyPage() {
 
           <Section title="3. Üçüncü Taraf Veri İşleyiciler">
             <p>
-              Umai, hizmet sunumunda aşağıdaki üçüncü taraf sağlayıcıları
+              UMAI, hizmet sunumunda aşağıdaki üçüncü taraf sağlayıcıları
               kullanmaktadır. Sohbet mesajlarınız, seçtiğiniz AI sağlayıcısına{" "}
-              <strong>Umai sunucusu üzerinden</strong> iletilir. Bu iletim
+              <strong>UMAI sunucusu üzerinden</strong> iletilir. Bu iletim
               sırasında mesajlar sunucuda <strong>kalıcı olarak saklanmaz</strong>.
             </p>
 
@@ -174,9 +174,9 @@ export default function PrivacyPage() {
 
             <p className="mt-4 text-sm">
               Her API sağlayıcısının kendi gizlilik politikasını incelemenizi öneririz.
-              API anahtarınızı Umai&apos;ye kaydettiğinizde, bu anahtar{" "}
+              API anahtarınızı UMAI&apos;ye kaydettiğinizde, bu anahtar{" "}
               <strong>yalnızca tarayıcınızın yerel deposunda (localStorage)</strong>{" "}
-              saklanır ve Umai sunucusuna gönderilmez.
+              saklanır ve UMAI sunucusuna gönderilmez.
             </p>
           </Section>
 
@@ -254,7 +254,7 @@ export default function PrivacyPage() {
 
           <Section title="8. Çerezler">
             <p>
-              Umai yalnızca zorunlu çerezler kullanmaktadır. Ayrıntılar için{" "}
+              UMAI yalnızca zorunlu çerezler kullanmaktadır. Ayrıntılar için{" "}
               <Link href="/cookies" className="text-brand hover:underline">
                 Çerez Politikamıza
               </Link>{" "}
@@ -318,7 +318,7 @@ function LegalFooter() {
     <footer className="border-t border-line">
       <div className="max-w-3xl mx-auto px-6 py-8 flex flex-wrap items-center justify-between gap-4 text-xs text-muted">
         <Link href="/" className="font-extrabold text-ink hover:text-brand">
-          umai
+          UMAI
         </Link>
         <div className="flex gap-6">
           <Link href="/privacy" className="hover:text-ink">Gizlilik</Link>

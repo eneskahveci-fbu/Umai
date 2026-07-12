@@ -10,7 +10,7 @@ const config: CapacitorConfig = {
   webDir: "mobile",
   server: {
     // Üretim URL'i; geliştirme için CAP_SERVER_URL ile geçersiz kıl.
-    url: process.env.CAP_SERVER_URL || "https://craft-coder.vercel.app",
+    url: process.env.CAP_SERVER_URL || "https://umai.vercel.app",
     cleartext: false,
   },
   ios: { contentInset: "always" },

@@ -129,8 +129,8 @@ function buildCandidateHeaders(c: Candidate, req: Request): Record<string, strin
     h["Authorization"] = `Bearer ${c.apiKey}`;
   }
   if (c.provider === "openrouter") {
-    h["HTTP-Referer"] = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://craft-ai-web.vercel.app";
-    h["X-Title"] = "Umai";
+    h["HTTP-Referer"] = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://umai.vercel.app";
+    h["X-Title"] = "UMAI";
   }
   return h;
 }

@@ -821,7 +821,7 @@ export function CoderView() {
   useEffect(() => {
     if (!streaming) return;
     const prev = document.title;
-    document.title = "● Yanıt yazılıyor… — Umai";
+    document.title = "● Yanıt yazılıyor… — UMAI";
     return () => { document.title = prev; };
   }, [streaming]);
   /* Escape → akışı durdur (Claude davranışı; menüler açıkken onlara öncelik). */
@@ -1308,6 +1308,29 @@ export function CoderView() {
     window.addEventListener("craftai:composer-prefill", handler);
     return () => window.removeEventListener("craftai:composer-prefill", handler);
   }, []);
+
+  /* Stüdyo'dan "Editörde aç (repo'ya işle)" handoff'u — DesignStudio üretimi
+     sessionStorage'a bırakır, burada mount'ta editör sekmesi olarak açılır.
+     Repoya yazma/commit mevcut editör akışıyla, kullanıcı onayıyla olur. */
+  useEffect(() => {
+    let raw: string | null = null;
+    try {
+      raw = sessionStorage.getItem("umai_editor_handoff");
+      if (raw) sessionStorage.removeItem("umai_editor_handoff");
+    } catch { /* erişilemez depolama — yok say */ }
+    if (!raw) return;
+    /* setState'i effect gövdesinden çıkar (react-hooks/set-state-in-effect) —
+       mount sonrası bir sonraki tick'te aç. */
+    const id = setTimeout(() => {
+      try {
+        const h = JSON.parse(raw!) as { path?: string; content?: string };
+        if (!h.path || typeof h.content !== "string") return;
+        openInEditor({ path: h.path, content: h.content, language: detectLanguage(h.path) });
+        useStore.getState().addToast(`Stüdyo çıktısı editörde açıldı: ${h.path} — kaydedip commit edebilirsin.`, "success");
+      } catch { /* bozuk handoff — yok say */ }
+    }, 0);
+    return () => clearTimeout(id);
+  }, [openInEditor]);
 
   /* Geri al: ajanın bu turda değiştirdiği dosyaları eski içerikleriyle yeniden
      commit eder (revert); bu turda OLUŞTURULAN dosyaları (previous === null)
@@ -2350,7 +2373,7 @@ export function CoderView() {
       if (useStore.getState().config.soundEnabled) {
         const { playReady, notifyReady } = await import("@/lib/sounds");
         playReady();
-        notifyReady("Umai", "Yanıt hazır.");
+        notifyReady("UMAI", "Yanıt hazır.");
       }
       void extractMemory();
       fireHooks("onStop");
@@ -2584,7 +2607,7 @@ export function CoderView() {
             <div className="w-6 h-6 rounded-md bg-brand/15 border border-brand/25 grid place-items-center shrink-0">
               <Code2 size={13} className="text-brand" />
             </div>
-            <span className="text-sm font-semibold text-ink shrink-0">Umai</span>
+            <span className="text-sm font-semibold text-ink shrink-0">UMAI</span>
             {repo && (
               <span className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-bgsoft border border-line/60 text-muted/70 font-mono truncate">
                 {repo.owner}/{repo.repo}

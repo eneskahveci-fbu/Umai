@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Compass, Home, MessageSquare } from "lucide-react";
 
 export const metadata = {
-  title: "Sayfa bulunamadı — Umai",
+  title: "Sayfa bulunamadı — UMAI",
   description: "Aradığın sayfa burada değil.",
 };
 
