@@ -209,9 +209,13 @@ export default function AppPage() {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key === "n") { e.preventDefault(); useStore.getState().newChat(false); }
+      /* Ctrl/Cmd+Shift+N = gizli sohbet — CommandPalette ve Ayarlar'ın kısayol
+         listesinde zaten reklamı yapılıyordu ama hiçbir yerde dinlenmiyordu. */
+      if (mod && e.key.toLowerCase() === "n") { e.preventDefault(); useStore.getState().newChat(e.shiftKey); }
       if (mod && e.key === ",") { e.preventDefault(); useStore.getState().setSettingsOpen(true); }
-      if (mod && e.key === "k") { e.preventDefault(); useStore.getState().setCommandPaletteOpen(true); }
+      /* Ctrl/Cmd+K: CommandPalette.tsx kendi global dinleyicisinde ele alır
+         (Ctrl/Cmd+P ile birlikte, tek kaynak) — burada da tutmak iki dinleyicinin
+         aynı tuşta yarışıp paleti aynı anda açıp kapatmasına yol açıyordu. */
       if (mod && e.key === "b") { e.preventDefault(); useStore.getState().setSidebarOpen(!useStore.getState().sidebarOpen); }
       if (mod && e.key === "/") { e.preventDefault(); useStore.getState().setShortcutsOpen(!useStore.getState().shortcutsOpen); }
     };
@@ -246,13 +250,6 @@ export default function AppPage() {
           İçeriğe atla
         </a>
         <Sidebar />
-
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 z-30 bg-bg/70 backdrop-blur-sm md:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
 
         <main
           id="main-content"

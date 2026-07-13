@@ -49,6 +49,7 @@ export function ProjectModal() {
   const selectChat = useStore((s) => s.selectChat);
   const setActiveProject = useStore((s) => s.setActiveProject);
   const newChat = useStore((s) => s.newChat);
+  const setSidebarOpen = useStore((s) => s.setSidebarOpen);
 
   const project = config.projects.find((p) => p.id === projectId) ?? null;
   const [tab, setTab] = useState<Tab>("chats");
@@ -104,11 +105,14 @@ export function ProjectModal() {
     setProjectModalId(null);
   };
 
-  /* Bu proje bağlamında yeni sohbet başlat (aktif proje olarak işaretlenir). */
+  /* Bu proje bağlamında yeni sohbet başlat (aktif proje olarak işaretlenir).
+     Mobilde Sidebar hâlâ tam-ekran açık olabilir (bu modal onun üzerinden
+     açılır) — o da kapanmalı, aksi halde kullanıcı ayrıca kapatmak zorunda. */
   const startNewChat = () => {
     setActiveProject(project.id);
     newChat(false);
     setProjectModalId(null);
+    if (typeof window !== "undefined" && window.innerWidth < 768) setSidebarOpen(false);
   };
 
   /* Doküman/Anket/Defter'i projeye bağla/çıkar — Sidebar'ın sohbet-taşıma
