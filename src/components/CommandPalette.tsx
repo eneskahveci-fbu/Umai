@@ -15,6 +15,7 @@ import {
   Sparkles,
   Image as ImageIcon,
   Images,
+  Layers,
   ListChecks,
   Network,
   RefreshCw,
@@ -158,6 +159,16 @@ export function CommandPalette() {
         setOpen(false);
       },
       keywords: ["kroki", "harita", "zihin", "mindmap", "mind map", "beyin", "firtinasi", "fırtınası", "dal"],
+    },
+    {
+      id: "open-cards",
+      label: "Kartlar'ı aç (AI kartlarla aralıklı tekrar)",
+      icon: <Layers size={16} />,
+      action: () => {
+        router.push("/studio/kartlar");
+        setOpen(false);
+      },
+      keywords: ["kart", "kartlar", "anki", "flashcard", "ezber", "tekrar", "vurgu", "vurgular", "calis", "çalış"],
     },
     {
       id: "open-image",
@@ -336,7 +347,20 @@ export function CommandPalette() {
         }))
     : [];
 
-  const filtered: Row[] = [...commandRows, ...chatRows, ...docRows, ...formRows, ...notebookRows, ...mapRows, ...fileRows];
+  const deckRows: Row[] = query.length >= 1
+    ? (config.craftDecks ?? [])
+        .filter((d) => d.title.toLowerCase().includes(q))
+        .slice(0, 5)
+        .map((d) => ({
+          id: "deck:" + d.id,
+          label: d.title,
+          sub: "Kartlar",
+          icon: <Layers size={16} />,
+          run: () => { setSurfaceOpenItem("cards", d.id); router.push("/studio/kartlar"); setOpen(false); },
+        }))
+    : [];
+
+  const filtered: Row[] = [...commandRows, ...chatRows, ...docRows, ...formRows, ...notebookRows, ...mapRows, ...deckRows, ...fileRows];
 
   /* Reset the highlighted row when the query changes, and clear search when
      the palette (re)opens — both adjusted during render rather than in an

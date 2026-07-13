@@ -393,6 +393,33 @@ export interface CraftNotebook extends StudioProjectBase {
   embeddingVersion?: number;
 }
 
+/** Kartlar (Anki'den İLHAM): tek bilgi kartı — Leitner kutusu tabanlı
+    aralıklı tekrar (box 0-4; bkz. lib/cards.ts gradeCard/dueCards). */
+export interface FlashCard {
+  id: string;
+  front: string;
+  back: string;
+  /** Leitner kutusu: 0 (yeni/zor) … 4 (kalıcı). */
+  box: number;
+  /** Bir sonraki tekrar zamanı (epoch ms). */
+  due: number;
+}
+
+export interface CraftDeck extends StudioProjectBase {
+  cards: FlashCard[];
+  brief?: string;
+}
+
+/** Vurgular (Readwise'dan İLHAM): sohbet yanıtlarından seçilip kaydedilen
+    pasajlar — Kartlar stüdyosunda yeniden okunur ve karta dönüştürülür. */
+export interface Highlight {
+  id: string;
+  text: string;
+  /** Kaynağın kısa etiketi (ör. sohbet başlığı). */
+  source: string;
+  createdAt: number;
+}
+
 /** Kroki (mind-map) düğümü — özyinelemeli ağaç. */
 export interface MindNode {
   id: string;
@@ -536,6 +563,10 @@ export interface Config {
   craftForms?: CraftForm[];
   /** Defter: kaydedilen kaynak defterleri. */
   craftNotebooks?: CraftNotebook[];
+  /** Kartlar: kaydedilen kart desteleri. */
+  craftDecks?: CraftDeck[];
+  /** Vurgular: sohbetlerden kaydedilen pasajlar (en yeni önce, sınırlı). */
+  highlights?: Highlight[];
   /** Kroki: kaydedilen zihin haritaları. */
   craftMaps?: CraftMap[];
   /** Görüntü Stüdyosu: kaydedilen üretim oturumları. */

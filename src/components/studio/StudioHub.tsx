@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import { BookOpen, FileText, ListChecks, Network, X } from "lucide-react";
+import { BookOpen, FileText, Layers, ListChecks, Network, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav, type Surface } from "@/lib/surfaceNav";
 
@@ -22,6 +22,7 @@ const DocsStudio = dynamic(() => import("./DocsStudio").then((m) => m.DocsStudio
 const FormsStudio = dynamic(() => import("./FormsStudio").then((m) => m.FormsStudio), { ssr: false, loading: () => studioLoading });
 const NotebookStudio = dynamic(() => import("./NotebookStudio").then((m) => m.NotebookStudio), { ssr: false, loading: () => studioLoading });
 const MapStudio = dynamic(() => import("./MapStudio").then((m) => m.MapStudio), { ssr: false, loading: () => studioLoading });
+const CardsStudio = dynamic(() => import("./CardsStudio").then((m) => m.CardsStudio), { ssr: false, loading: () => studioLoading });
 
 function useEverOpened(open: boolean) {
   const [ever, setEver] = useState(open);
@@ -34,11 +35,12 @@ const CONTENT_LABEL: Partial<Record<Surface, { name: string; icon: typeof FileTe
   forms: { name: "Anket", icon: ListChecks },
   notebook: { name: "Defter", icon: BookOpen },
   map: { name: "Kroki", icon: Network },
+  cards: { name: "Kartlar", icon: Layers },
 };
 
 /* İçerik araçları arasında Sidebar'a dönmeden hızlı geçiş — yalnızca bu
    araçların kendi arasında yerel bir kısayol. */
-const CONTENT_SURFACES: Surface[] = ["docs", "forms", "notebook", "map"];
+const CONTENT_SURFACES: Surface[] = ["docs", "forms", "notebook", "map", "cards"];
 
 export function StudioHub() {
   const nav = useSurfaceNav();
@@ -46,15 +48,17 @@ export function StudioHub() {
   const formsOpen = useStore((s) => s.formsStudioOpen);
   const notebookOpen = useStore((s) => s.notebookStudioOpen);
   const mapOpen = useStore((s) => s.mapStudioOpen);
+  const cardsOpen = useStore((s) => s.cardsStudioOpen);
 
   const everDocs = useEverOpened(docsOpen);
   const everForms = useEverOpened(formsOpen);
   const everNotebook = useEverOpened(notebookOpen);
   const everMap = useEverOpened(mapOpen);
+  const everCards = useEverOpened(cardsOpen);
 
-  if (!docsOpen && !formsOpen && !notebookOpen && !mapOpen) return null;
+  if (!docsOpen && !formsOpen && !notebookOpen && !mapOpen && !cardsOpen) return null;
 
-  const active: Surface = docsOpen ? "docs" : formsOpen ? "forms" : notebookOpen ? "notebook" : "map";
+  const active: Surface = docsOpen ? "docs" : formsOpen ? "forms" : notebookOpen ? "notebook" : mapOpen ? "map" : "cards";
 
   return (
     <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0">
@@ -72,7 +76,7 @@ export function StudioHub() {
                 }`}
                 aria-current={isActive ? "true" : undefined}
               >
-                <c.icon size={13} /> {c.name}
+                <c.icon size={13} /> <span className={isActive ? "" : "hidden sm:inline"}>{c.name}</span>
               </button>
             );
           })}
@@ -88,6 +92,7 @@ export function StudioHub() {
       {everForms && <FormsStudio />}
       {everNotebook && <NotebookStudio />}
       {everMap && <MapStudio />}
+      {everCards && <CardsStudio />}
     </div>
   );
 }

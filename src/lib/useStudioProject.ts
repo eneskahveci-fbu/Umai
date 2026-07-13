@@ -3,7 +3,7 @@
 import { useStore } from "./store";
 import type { Config, StudioProjectBase } from "./types";
 
-type StudioListKey = "craftDocs" | "craftForms" | "craftNotebooks" | "craftMaps";
+type StudioListKey = "craftDocs" | "craftForms" | "craftNotebooks" | "craftMaps" | "craftDecks";
 
 /** Docs/Forms/Notebook/Slides stüdyolarının ortak kaydet/sil/liste mantığı:
     en-yeni-önce sırayla, en fazla `max` öğe tutulur; var olan bir öğe
