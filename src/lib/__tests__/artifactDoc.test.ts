@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildArtifactSrcDoc, artifactDownload } from "../artifactDoc";
+import { buildArtifactSrcDoc, withAnnotationScript, artifactDownload } from "../artifactDoc";
 
 /* Claude Artifacts paritesi (code/markdown türleri) regresyon testleri —
    önizleme belgesi kurulumu, HTML-escape güvenliği ve indirme uzantıları. */
@@ -46,6 +46,30 @@ describe("buildArtifactSrcDoc — mevcut türler değişmedi", () => {
   it("svg ve mermaid kendi iskeletlerini kullanır", () => {
     expect(buildArtifactSrcDoc("svg", "<svg/>")).toContain("place-items:center");
     expect(buildArtifactSrcDoc("mermaid", "graph TD; A-->B")).toContain("mermaid.initialize");
+  });
+});
+
+describe("withAnnotationScript — İşaretle & Değiştir", () => {
+  it("script'i SON </body>'den hemen önce enjekte eder", () => {
+    const doc = buildArtifactSrcDoc("html", "<p>hi</p>");
+    const out = withAnnotationScript(doc);
+    expect(out).toContain("__umaiAnnotate");
+    expect(out.lastIndexOf("__umaiAnnotate")).toBeLessThan(out.lastIndexOf("</body>"));
+  });
+  it("</body> yoksa sona ekler", () => {
+    const out = withAnnotationScript("<div>parça</div>");
+    expect(out.endsWith("</script>")).toBe(true);
+    expect(out).toContain("__umaiAnnotate");
+  });
+  it("buildArtifactSrcDoc'un kendisi script İÇERMEZ (yayınlanan sayfa temiz kalır)", () => {
+    expect(buildArtifactSrcDoc("html", "<p>hi</p>")).not.toContain("__umaiAnnotate");
+    expect(buildArtifactSrcDoc("svg", "<svg/>")).not.toContain("__umaiAnnotate");
+  });
+  it("içerikteki sahte </body> yerine gerçek (son) kapanışı hedefler", () => {
+    const doc = `<html><body><code>&lt;/body&gt; örneği</code><p id="son">bitiş</p></body></html>`;
+    const out = withAnnotationScript(doc);
+    const scriptIdx = out.indexOf("__umaiAnnotate");
+    expect(scriptIdx).toBeGreaterThan(out.indexOf('id="son"'));
   });
 });
 
