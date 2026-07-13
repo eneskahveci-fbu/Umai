@@ -7,7 +7,7 @@
    görünümdür. */
 import { useRef } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, FileText, Images, ListChecks, X } from "lucide-react";
+import { BookOpen, FileText, Images, ListChecks, Network, X } from "lucide-react";
 import { useModalA11y } from "@/lib/useModalA11y";
 
 const TOOLS: { href: string; label: string; desc: string; icon: typeof FileText }[] = [
@@ -15,6 +15,7 @@ const TOOLS: { href: string; label: string; desc: string; icon: typeof FileText 
   { href: "/studio/dokuman", label: "Doküman", desc: "blok tabanlı yazım", icon: FileText },
   { href: "/studio/anket", label: "Anket", desc: "AI anket + HTML form", icon: ListChecks },
   { href: "/studio/defter", label: "Defter", desc: "kaynaklı sohbet + sesli özet", icon: BookOpen },
+  { href: "/studio/kroki", label: "Kroki", desc: "AI zihin haritası + SVG", icon: Network },
   /* Dönüştürücü bu listede DEĞİL (masaüstüyle tutarlı): girişi Kütüphane
      başlığındaki buton — mobilde de Kütüphane buradan bir dokunuş uzakta. */
 ];
