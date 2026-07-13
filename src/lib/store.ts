@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { newHighlight, pushHighlight } from "./cards";
 import type {
   Artifact,
   Chat,
@@ -391,6 +392,10 @@ interface StoreState {
   editorOpen: boolean;
   setEditorOpen: (b: boolean) => void;
   addSkill: (s: Omit<Skill, "id" | "createdAt" | "usageCount">) => void;
+  /** Vurgular (Readwise'dan ilham): sohbet yanıtından pasaj kaydet/sil.
+      Tekilleştirme + üst sınır lib/cards.ts pushHighlight'ta. */
+  addHighlight: (text: string, source: string) => void;
+  removeHighlight: (id: string) => void;
   updateSkill: (id: string, patch: Partial<Skill>) => void;
   /** Otomatik bellek: damıtılmış kalıcı bilgileri "auto_memory" skill'ine
       ekler (tekilleştirme + en eski kayıtları düşerek en çok 40 madde). */
@@ -421,6 +426,9 @@ interface StoreState {
   /** Kroki (zihin haritası; brief → AI ağaç → SVG). */
   mapStudioOpen: boolean;
   setMapStudioOpen: (b: boolean) => void;
+  /** Kartlar (Anki'den ilhamla; aralıklı tekrar) + Vurgular. */
+  cardsStudioOpen: boolean;
+  setCardsStudioOpen: (b: boolean) => void;
   /** Defter (NotebookLM'den ilhamla; kaynak-temelli sohbet). */
   notebookStudioOpen: boolean;
   setNotebookStudioOpen: (b: boolean) => void;
@@ -909,6 +917,15 @@ export const useStore = create<StoreState>()((set, get) => ({
     };
     get().saveConfig({ ...config, skills: [skill, ...(config.skills ?? [])] });
   },
+  addHighlight: (text, source) => {
+    const config = get().config;
+    const next = pushHighlight(config.highlights ?? [], newHighlight(text, source));
+    if (next !== (config.highlights ?? [])) get().saveConfig({ ...config, highlights: next });
+  },
+  removeHighlight: (id) => {
+    const config = get().config;
+    get().saveConfig({ ...config, highlights: (config.highlights ?? []).filter((h) => h.id !== id) });
+  },
   addAutoMemoryFacts: (facts) => {
     const config = get().config;
     const skills = (config.skills ?? []).slice();
@@ -1011,6 +1028,8 @@ export const useStore = create<StoreState>()((set, get) => ({
   setFormsStudioOpen: (b) => set({ formsStudioOpen: b }),
   mapStudioOpen: false,
   setMapStudioOpen: (b) => set({ mapStudioOpen: b }),
+  cardsStudioOpen: false,
+  setCardsStudioOpen: (b) => set({ cardsStudioOpen: b }),
   notebookStudioOpen: false,
   setNotebookStudioOpen: (b) => set({ notebookStudioOpen: b }),
   streaming: false,

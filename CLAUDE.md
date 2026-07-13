@@ -127,6 +127,15 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   ilhamla kaynak-temelli sohbet — metin yapıştır / URL getir (`/api/fetch-text`),
   yalnız kaynaklardan [n] atıflı yanıt, Pollinations TTS "sesli özet",
   `config.craftNotebooks`.
+- **Kartlar + Vurgular** (`studio/CardsStudio.tsx`, `/studio/kartlar`):
+  Anki'den ilhamla çalışma kartları — brief ya da Vurgular → AI kartlar
+  (`lib/cards.ts`), 5 kutulu Leitner aralıklı tekrar (`gradeCard`/`dueCards`;
+  bilinçli olarak SM-2 değil), çalışma notu her cevapta sessizce kaydedilir,
+  Anki'ye TSV dışa aktarma; `config.craftDecks`. **Vurgular** (Readwise'dan
+  ilham): sohbet yanıtındaki seçili metin MessageBubble'daki Vurgula
+  (Highlighter) butonuyla `config.highlights`'a düşer (mousedown'da yakalanır
+  — seçim temizlenmeden), Kartlar → Vurgular sekmesinde okunur/silinir ve
+  "seçilenlerden kart üret" ile desteye dönüşür.
 - **Kroki** (`studio/MapStudio.tsx`, `/studio/kroki`): zihin haritası —
   brief → AI ağaç (`lib/mindmap.ts`: normalize + derinlik/dal sınırları),
   tıkla-düzenle (yeniden adlandır / dal ekle / AI "Dallandır" / sil).
