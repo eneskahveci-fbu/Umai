@@ -123,6 +123,12 @@ export const PRESETS: Record<Provider, Preset> = {
     model: "openai",
     keyHint: "opsiyonel: pollinations.ai ücretsiz token'ı (limiti yükseltir)",
   },
+  ovh: {
+    label: "🇪🇺 OVHcloud AI Endpoints (Ücretsiz · Anahtarsız)",
+    baseUrl: "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
+    model: "Mistral-Small-3.2-24B-Instruct-2506",
+    keyHint: "opsiyonel: OVH anahtarı (anonim 2 istek/dk sınırını kaldırır)",
+  },
   github: {
     label: "🐙 GitHub Models (Ücretsiz)",
     baseUrl: "https://models.github.ai/inference",
@@ -230,6 +236,15 @@ export const PROVIDER_MODELS: Record<Provider, string[]> = {
   pollinations: [
     "openai",
     "openai-fast",
+  ],
+  /* Canlı /v1/models kataloğundan (anonim erişim, Tem 2026) — sohbet modelleri. */
+  ovh: [
+    "Mistral-Small-3.2-24B-Instruct-2506",
+    "gpt-oss-120b",
+    "Meta-Llama-3_3-70B-Instruct",
+    "Qwen3-Coder-30B-A3B-Instruct",
+    "Qwen3-32B",
+    "Mistral-Nemo-Instruct-2407",
   ],
   github: [
     "gpt-4o",
@@ -591,6 +606,19 @@ export const POLLINATIONS_DEFAULT_MODEL: ModelProfile = {
   provider: "pollinations",
   baseUrl: "https://text.pollinations.ai/openai",
   model: "openai",
+  apiKey: "",
+};
+
+/* İkinci anahtarsız taban — OVHcloud AI Endpoints (anonim, AB-barındırmalı).
+   Anonim sınır IP başına 2 istek/dk olduğundan yalnız fallback zincirinin SON
+   halkası olarak kullanılır (bkz. fallback.ts); kullanıcı isterse Ayarlar'dan
+   kendi OVH modelini/anahtarını da ekleyebilir (PRESETS.ovh). */
+export const OVH_FREE_MODEL: ModelProfile = {
+  id: "craft-keyless-ovh",
+  label: "🇪🇺 OVH Ücretsiz (Anahtarsız)",
+  provider: "ovh",
+  baseUrl: "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
+  model: "Mistral-Small-3.2-24B-Instruct-2506",
   apiKey: "",
 };
 
