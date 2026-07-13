@@ -112,7 +112,12 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   Doküman/Anket/Defter Sidebar → Araçlar'a, Görüntü genel sohbete taşındı).
 - **Doküman Stüdyosu** (`studio/DocsStudio.tsx`, `/studio/dokuman`): Notion'dan
   ilhamla blok tabanlı doküman (`lib/docs.ts`) — AI taslak + "devam et",
-  Markdown/bağımsız HTML dışa aktarma, `config.craftDocs`.
+  Markdown/bağımsız HTML dışa aktarma, `config.craftDocs`. **Yazım Asistanı**
+  (Grammarly'den ilham, `lib/proofread.ts`): araç çubuğundaki SpellCheck
+  butonu metin bloklarını AI'ya denetletir; öneriler `validateIssues` ile
+  METNE KARŞI doğrulanır (segmentte geçmeyen "find" elenir — halüsinasyon
+  koruması), panelde tek tek/toplu uygulanır (`applyIssue` yalnız ilk
+  eşleşmeyi değiştirir; metin değişmişse null → öneri düşer).
 - **Anket Stüdyosu** (`studio/FormsStudio.tsx`, `/studio/anket`): Google
   Forms'tan ilhamla (`lib/forms.ts`) — AI soru üretimi, canlı önizleme,
   SUNUCUSUZ bağımsız HTML form (yanıtlar dolduranın tarayıcısında + CSV),
