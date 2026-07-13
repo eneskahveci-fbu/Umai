@@ -215,9 +215,7 @@ export function NotebookStudio() {
         className="ml-auto hidden md:block w-40 bg-transparent text-xs text-muted focus:text-ink border-b border-transparent focus:border-line outline-none px-1 py-0.5"
       />
       <div className="flex items-center gap-1 shrink-0">
-        {saved.length > 0 && (
-          <button onClick={() => setSavedOpen(true)} title="Kayıtlı defterler" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
-        )}
+        <button onClick={() => setSavedOpen(true)} title="Kayıtlı defterler" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
         <button onClick={saveNb} title="Defteri kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
       </div>
     </div>

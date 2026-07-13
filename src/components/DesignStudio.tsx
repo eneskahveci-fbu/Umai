@@ -12,10 +12,10 @@
    sürüm gezinme, kopyala/indir/yayınla — tek kaynak).
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FileCode2, FileText, FolderOpen, Loader2, Save, Send, Sparkles, Square, User, X } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { useSurfaceNav } from "@/lib/surfaceNav";
+import { useSurfaceNav, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
 import { autoStudioSkill } from "@/lib/autoPilot";
 import type { Artifact, StudioProject } from "@/lib/types";
@@ -326,6 +326,18 @@ export function DesignStudio() {
   const removeSavedProject = useCallback((p: StudioProject) => {
     saveConfig({ ...config, studioProjects: (config.studioProjects ?? []).filter((x) => x.id !== p.id) });
   }, [config, saveConfig]);
+
+  /* ProjectModal'ın "Sohbetler" sekmesinden belirli bir tasarımı açarak
+     gelinmiş olabilir (⌘K'nın kullandığı AYNI "belirli öğeyi aç" köprüsü). */
+  useEffect(() => {
+    const openId = consumeSurfaceOpenItem("studio");
+    if (!openId) return;
+    const p = (useStore.getState().config.studioProjects ?? []).find((x) => x.id === openId);
+    if (p) {
+      const t = setTimeout(() => openSavedProject(p), 0);
+      return () => clearTimeout(t);
+    }
+  }, [openSavedProject]);
 
   const newProjectAction = useCallback(() => {
     setProject(newDesignProject());
