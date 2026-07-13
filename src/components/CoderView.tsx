@@ -2497,8 +2497,12 @@ export function CoderView() {
       )}
       {/* Header — ChatGPT tarzı 3 sütun: sol (sidebar+marka) · orta (model,
          bar'ın görsel odağı) · sağ (rozetler + tek ⋯ menü). Az kullanılan
-         eylemler (Editör/Skills/Gizli sohbet) ⋯ menüsünün "Hızlı eylemler"
-         bölümüne taşındı — tek sohbet giriş noktası artık yalnız Sidebar. */}
+         eylemler (Editör/Skills) ⋯ menüsünün "Hızlı eylemler" bölümüne
+         taşındı — normal (görünür) sohbet için tek giriş noktası artık
+         yalnız Sidebar. "Gizli sohbet" bunun istisnası: farklı bir yetenek
+         (incognito) sunduğundan, Sidebar'da hiç karşılığı olmayan ⋯
+         menüsündeki tek yolu kalıyor (Ctrl/Cmd+Shift+N kısayolu da var,
+         bkz. app/page.tsx). */}
       <div
         className="brand-rule shrink-0 grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 sm:gap-2 px-2 sm:px-3 bg-surface/60 backdrop-blur-sm overflow-x-auto scrollbar-none"
         style={{ height: "calc(3rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}
@@ -2554,7 +2558,7 @@ export function CoderView() {
           {/* Aktif-parıltı yalnız panel aç/kapa durumlarını yansıtır — mod durumları
              (toolsEnabled/safeMode/swarmMode/researchMode) zaten StatusBar'da rozet
              olarak görünür, burada tekrar sinyal vermeye gerek yok. */}
-          <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen}>
+          <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen || wsOpen}>
             {/* Efor seçici herkese açık; "otomatik" dışı bir seviye seçilirse
                Otomatik Pilot'un o mesaj için kararını geçersiz kılar. */}
             <EffortMenuControl />

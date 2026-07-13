@@ -129,7 +129,7 @@ export function CommandPalette() {
         router.push("/studio");
         setOpen(false);
       },
-      keywords: ["studyo", "stüdyo", "studio", "tasarim", "design", "web", "sunum", "slayt", "tuval", "afis", "poster", "sosyal"],
+      keywords: ["studyo", "stüdyo", "studio", "tasarim", "design", "web", "tuval", "sablon", "şablon", "sosyal"],
     },
     {
       id: "open-docs",
@@ -322,9 +322,11 @@ export function CommandPalette() {
      ayrı bir manuel focus efekti gerekmiyor. */
   useModalA11y(modalRef, open, () => setOpen(false));
 
-  // Global Ctrl+K listener
+  // Global Ctrl+K listener — bu paletin AÇMA/KAPAMA kısayolunun TEK kaynağı
+  // (app/page.tsx'in genel kısayol dinleyicisi kasıtlı olarak "k"yı ele almaz).
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       /* Ctrl/Cmd+K → komut paleti, Ctrl/Cmd+P → hızlı dosya bulucu (ikisi de
          aynı paleti açar; dosya araması yazdıkça çalışır). */
       if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "p")) {
