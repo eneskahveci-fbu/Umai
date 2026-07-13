@@ -6,8 +6,11 @@ import type { ReactElement } from "react";
    kullanılmaz). Yüksek çözünürlükte keskin: tüm boyutlar tek bir 100×100
    viewBox'tan ölçeklenir.
 
-   Tasarım: koyu, premium bir kart üzerinde amber bir "craft" altıgeni ve
-   merkezde dört köşeli bir parıltı (AI kıvılcımı). Sade, yüksek kontrastlı. */
+   Tasarım: "Taş & Çam" (Stone & Pine) temasının koyu kart tonları üzerinde,
+   sitede HER YERDE (Sidebar, giriş/açılış sayfaları, yayınlanan artifact
+   üst çubuğu) kullanılan GERÇEK marka işareti — pin yeşili (#5c9478) elmas
+   çerçeve + merkez nokta. Eski amber "craft altıgeni" tasarımı rebrand
+   sonrası bayatlamıştı; artık tek marka görseli tutarlı. */
 export function LogoTile({
   size,
   rounded = true,
@@ -28,23 +31,20 @@ export function LogoTile({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "linear-gradient(140deg, #24201a 0%, #16140f 60%, #100f0d 100%)",
+        background: "linear-gradient(140deg, #1c2016 0%, #14170f 55%, #0d0f0b 100%)",
         borderRadius: rounded ? Math.round(size * 0.225) : 0,
       }}
     >
       <svg width={mark} height={mark} viewBox="0 0 100 100" fill="none">
-        {/* dış altıgen — "craft" mücevheri */}
+        {/* elmas çerçeve — sitedeki gerçek marka işaretiyle aynı geometri */}
         <path
-          d="M50 5.5 L88.6 27.75 V72.25 L50 94.5 L11.4 72.25 V27.75 Z"
-          stroke="#cda57c"
-          strokeWidth="6.5"
+          d="M50 17.86 L78.57 37.5 V62.5 L50 82.14 L21.43 62.5 V37.5 Z"
+          stroke="#5c9478"
+          strokeWidth="6"
           strokeLinejoin="round"
         />
-        {/* merkez parıltı — dört köşeli AI kıvılcımı */}
-        <path
-          d="M50 29 C52.2 43 57 47.8 71 50 C57 52.2 52.2 57 50 71 C47.8 57 43 52.2 29 50 C43 47.8 47.8 43 50 29 Z"
-          fill="#ecd2a8"
-        />
+        {/* merkez nokta */}
+        <circle cx="50" cy="50" r="10" fill="#5c9478" fillOpacity="0.9" />
       </svg>
     </div>
   );
