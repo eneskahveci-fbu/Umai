@@ -29,7 +29,6 @@ import {
   Sun,
   Tag,
   Trash2,
-  Wrench,
   X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -215,10 +214,16 @@ export function Sidebar() {
   const sections = toSections(unassignedHistory);
   const activeProjectSections = toSections(activeProjectHistory);
 
+  /* Mobilde sidebar tam-ekran overlay olduğundan, bir sohbet seçmek/başlatmak
+     onu otomatik kapatmalı — aksi halde kullanıcı ayrıca "X"e basmak zorunda
+     kalıyordu. Masaüstünde (>=768px, Tailwind md) sidebar sabit bir panel
+     olduğundan dokunulmaz. */
+  const closeOnMobile = () => { if (window.innerWidth < 768) setSidebarOpen(false); };
+
   const renderRow = (c: Chat) => (
     <div
       key={c.id}
-      onClick={() => selectChat(c.id)}
+      onClick={() => { selectChat(c.id); closeOnMobile(); }}
       className={`group/item flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-all duration-100 ${
         currentId === c.id
           ? "bg-brand/10 border border-brand/25 border-l-2 border-l-brand shadow-sm text-ink"
@@ -392,13 +397,6 @@ export function Sidebar() {
             <Sparkles size={14} />
           </button>
           <button
-            onClick={() => setSidebarOpen(true)}
-            title="Araçlar"
-            className="w-full h-9 rounded-xl border border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink grid place-items-center transition-colors"
-          >
-            <Wrench size={14} />
-          </button>
-          <button
             onClick={() => router.push("/settings")}
             title="Ayarlar (Ctrl+,)"
             className={`w-full h-9 rounded-xl border grid place-items-center transition-colors ${
@@ -441,7 +439,7 @@ export function Sidebar() {
       {/* New session */}
       <div className="px-3 py-3 border-b border-line/60 shrink-0 space-y-2">
         <button
-          onClick={() => newChat(false)}
+          onClick={() => { newChat(false); closeOnMobile(); }}
           className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-brand hover:bg-branddim text-[#111110] font-semibold text-sm transition-colors"
         >
           <Plus size={15} /> Yeni Sohbet
@@ -473,27 +471,31 @@ export function Sidebar() {
 
       {/* Workspace accordion (Projects + History) */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        <AccordionSection
-          id="projects"
-          title="Projeler"
-          icon={<FolderOpen size={11} />}
-          badge={config.projects.length > 0 ? String(config.projects.length) : undefined}
-          defaultOpen={!!activeProject}
-          action={
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setAddingProject(true);
-                setTimeout(() => document.getElementById("new-project-input")?.focus(), 30);
-              }}
-              title="Yeni proje"
-              className="text-muted/50 hover:text-brand p-0.5 transition-colors"
-            >
-              <FolderPlus size={12} />
-            </button>
-          }
-        >
-          <div className="space-y-0.5">
+        {/* Projeler — Sohbetler ile aynı sebeple artık katlanamaz (eskiden
+           AccordionSection'dı; localStorage'da bir kez kapatılırsa kalıcı
+           kapalı kalıyordu — aktif projenin iç içe sohbetlerini gizleyebilirdi). */}
+        <div className="pt-1 border-b border-line/40">
+          <div className="flex items-stretch group/acc">
+            <div className="flex-1 flex items-center gap-2 px-3 py-2">
+              <FolderOpen size={11} className="text-muted/60 shrink-0" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted/60 flex-1 truncate">Projeler</span>
+              {config.projects.length > 0 && <span className="text-[10px] text-muted/40 font-mono shrink-0">{config.projects.length}</span>}
+            </div>
+            <div className="flex items-center pr-2 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/acc:opacity-100 transition-opacity">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAddingProject(true);
+                  setTimeout(() => document.getElementById("new-project-input")?.focus(), 30);
+                }}
+                title="Yeni proje"
+                className="text-muted/50 hover:text-brand p-0.5 transition-colors"
+              >
+                <FolderPlus size={12} />
+              </button>
+            </div>
+          </div>
+          <div className="px-2 pb-2 space-y-0.5">
             {/* Projesiz görünüme dön — aktif bir proje varsa onu kapatır (klasörler
                tek seferde yalnız biri açık kalır, ChatGPT'nin Projects'i gibi). */}
             <button
@@ -588,8 +590,20 @@ export function Sidebar() {
                   {/* Nested: proje aktifken kendi sohbetleri hemen altında girintili görünür. */}
                   {active && (
                     <div className="pl-4 ml-3.5 border-l border-line/40 mt-0.5 mb-1 space-y-2">
+                      {/* Bu projeye özel yeni sohbet — proje zaten aktif olduğundan
+                         setActiveProject'e gerek yok, doğrudan newChat çağırmak yeterli
+                         (yeni sohbet, oluşturulduğu anda mevcut activeProject'i alır). */}
+                      <button
+                        onClick={() => { newChat(false); closeOnMobile(); }}
+                        className="w-full flex items-center gap-2 px-2 py-1 rounded-md text-[11px] text-muted/60 hover:text-brand hover:bg-bgsoft/60 transition-colors"
+                      >
+                        <Plus size={12} className="shrink-0" />
+                        <span>Yeni sohbet</span>
+                      </button>
                       {activeProjectSections.length === 0 ? (
-                        <p className="text-[11px] text-muted/40 italic px-2 py-1">Bu projede henüz sohbet yok.</p>
+                        <p className="text-[11px] text-muted/40 italic px-2 py-1">
+                          {search && count > 0 ? "Eşleşen sohbet yok." : "Bu projede henüz sohbet yok."}
+                        </p>
                       ) : (
                         activeProjectSections.map((sec) => (
                           <div key={sec.label}>
@@ -657,7 +671,7 @@ export function Sidebar() {
               </button>
             )}
           </div>
-        </AccordionSection>
+        </div>
 
         {/* Sohbet listesi — ChatGPT'nin ana listesi gibi her zaman açık, katlanamaz
            (eskiden AccordionSection'dı; kapalı kalıp yanlışlıkla gizlenebiliyordu).
