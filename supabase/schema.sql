@@ -237,6 +237,69 @@ create policy "analitik - insert"
   on public.analytics_events for insert with check (auth.uid() = user_id);
 
 -- ─────────────────────────────────────────────────────────────────────────
+-- ANKET YANIT TOPLAMA (Anket Stüdyosu — opsiyonel merkezî yanıtlar)
+-- Dışa aktarılan form HTML'i sunucusuz çalışmaya DEVAM eder (localStorage +
+-- CSV). Form sahibi GİRİŞLİYKEN yayınlar/indirirse HTML'e ek olarak merkezî
+-- toplama kancası gömülür: her gönderim /api/forms/respond'a da POST edilir.
+--   • published_forms: form sahipliği kaydı — yalnız sahibi okur/yazar.
+--   • form_responses: anonim yanıtlar — insert herkese açık (hız sınırı API
+--     katmanında), okuma/silme YALNIZ formun sahibine (published_forms
+--     üzerinden doğrulanır). owner_id yanıt satırında TUTULMAZ → dışa
+--     aktarılan HTML'e hiçbir kullanıcı kimliği gömülmez/sızmaz.
+-- ─────────────────────────────────────────────────────────────────────────
+create table if not exists public.published_forms (
+  id         text primary key,
+  owner_id   uuid not null references auth.users(id) on delete cascade,
+  title      text not null default 'Anket',
+  questions  jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists published_forms_owner_idx on public.published_forms (owner_id);
+
+alter table public.published_forms enable row level security;
+
+drop policy if exists "kendi formları - all" on public.published_forms;
+create policy "kendi formları - all"
+  on public.published_forms for all
+  using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+
+drop trigger if exists published_forms_set_updated_at on public.published_forms;
+create trigger published_forms_set_updated_at
+  before update on public.published_forms
+  for each row execute function public.set_updated_at();
+
+create table if not exists public.form_responses (
+  id         bigint generated always as identity primary key,
+  form_id    text not null,
+  answers    jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists form_responses_form_idx on public.form_responses (form_id, created_at desc);
+
+alter table public.form_responses enable row level security;
+
+-- Anonim dolduran dahil herkes yanıt EKLEYEBİLİR (hız sınırı API katmanında).
+drop policy if exists "yanıt - insert" on public.form_responses;
+create policy "yanıt - insert"
+  on public.form_responses for insert with check (true);
+
+-- Yanıtları YALNIZ formun sahibi okuyabilir/silebilir.
+drop policy if exists "yanıt - select" on public.form_responses;
+create policy "yanıt - select"
+  on public.form_responses for select
+  using (exists (select 1 from public.published_forms f
+                 where f.id = form_id and f.owner_id = auth.uid()));
+
+drop policy if exists "yanıt - delete" on public.form_responses;
+create policy "yanıt - delete"
+  on public.form_responses for delete
+  using (exists (select 1 from public.published_forms f
+                 where f.id = form_id and f.owner_id = auth.uid()));
+
+-- ─────────────────────────────────────────────────────────────────────────
 -- PUSH BİLDİRİM ABONELİKLERİ (Web Push — sekme/tarayıcı KAPALIYKEN bile)
 -- Arka plan görevi (background_jobs) tamamlanınca sunucu buradaki uç
 -- noktalara push gönderir. Yalnız sahibi okuyup/silebilir; ekleme kendi

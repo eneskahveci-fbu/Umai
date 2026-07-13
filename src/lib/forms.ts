@@ -133,11 +133,20 @@ function questionHtml(q: FormQuestion, i: number): string {
   return `<div class="q" id="qw${i}">${body}</div>`;
 }
 
+export interface FormExportOptions {
+  /** Merkezî yanıt toplama: doldurulan her yanıt bu uca da POST edilir
+      (/api/forms/respond). Yalnız form sahibi girişliyken (published_forms
+      kaydı yazılabildiyse) etkinleştirilir; yoksa form saf sunucusuz kalır. */
+  collect?: { url: string };
+}
+
 /** Sunucusuz, kendi kendine yeten anket HTML'i: yanıtlar tarayıcıda birikir,
-    CSV indirilebilir. Ağ bağımlılığı yok. */
-export function formToHtml(form: CraftForm): string {
+    CSV indirilebilir. Ağ bağımlılığı yok — `collect` verilirse EK OLARAK
+    merkezî uca gönderim denenir (başarısızlık formu etkilemez). */
+export function formToHtml(form: CraftForm, exportOpts?: FormExportOptions): string {
   const storageKey = `craft_form_${form.id}`;
   const headers = form.questions.map((q) => q.label);
+  const collect = exportOpts?.collect ? { url: exportOpts.collect.url, formId: form.id } : null;
   /* Koşul kuralları: hedef indeks + kaynak indeks + beklenen değer. Geçersiz
      (silinmiş kaynak, kendinden sonraki soru) kurallar dışa aktarımda elenir. */
   const logic = form.questions
@@ -195,13 +204,16 @@ ${form.questions.map(questionHtml).join("\n")}
 <div class="foot">
   <span id="cnt"></span>
   <a href="#" id="csv">Yanıtları CSV indir</a>
-  <span>· craft anketi — sunucusuz, yanıtlar bu cihazda saklanır</span>
+  <span>${collect
+    ? "· craft anketi — yanıtın form sahibine iletilir (bu cihazda da saklanır)"
+    : "· craft anketi — sunucusuz, yanıtlar bu cihazda saklanır"}</span>
 </div>
 <script>
 (function () {
   var KEY = ${JSON.stringify(storageKey)};
   var HEADERS = ${JSON.stringify(headers)};
   var LOGIC = ${JSON.stringify(logic)};
+  var COLLECT = ${JSON.stringify(collect)};
   var form = document.getElementById("f");
   function all() { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) { return []; } }
   function refresh() { var n = all().length; document.getElementById("cnt").textContent = n + " yanıt"; }
@@ -241,6 +253,15 @@ ${form.questions.map(questionHtml).join("\n")}
     }
     var rows = all(); rows.push({ t: new Date().toISOString(), a: row });
     try { localStorage.setItem(KEY, JSON.stringify(rows)); } catch (err) {}
+    /* Merkezî toplama (opsiyonel): başarısızlık sessizdir — form sunucusuz da
+       tam çalışır. Sandbox iframe/file:// origin'i "null" olduğundan uç CORS
+       açık; kimlik bilgisi taşınmaz. */
+    if (COLLECT) {
+      try {
+        fetch(COLLECT.url, { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ formId: COLLECT.formId, answers: row }) }).catch(function () {});
+      } catch (err) {}
+    }
     form.reset(); form.style.display = "none";
     document.getElementById("ok").style.display = "block";
     refresh();
