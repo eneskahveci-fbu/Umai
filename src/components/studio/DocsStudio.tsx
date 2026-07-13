@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import {
-  ArrowDown, ArrowUp, Download, FileCode, FileText, FolderOpen, Loader2,
-  Plus, Save, Sparkles, Trash2, Wand2,
+  ArrowDown, ArrowUp, Check, Download, FileCode, FileText, FolderOpen, Loader2,
+  Plus, Save, SpellCheck, Sparkles, Trash2, Wand2, X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
@@ -17,6 +17,7 @@ import {
 } from "@/lib/docs";
 import { downloadTemplate, pickTemplateFile } from "@/lib/templateShare";
 import { useStudioProject } from "@/lib/useStudioProject";
+import { applyIssue, proofread, type ProofIssue } from "@/lib/proofread";
 
 /* Doküman Stüdyosu — Notion'dan İLHAM alan craft yorumu (klon değil):
    doküman = düzenlenebilir blok listesi. AI taslağı JSON bloklar olarak üretir;
@@ -55,6 +56,9 @@ export function DocsStudio() {
   const [contBusy, setContBusy] = useState(false);
   const [contText, setContText] = useState("");
   const [savedOpen, setSavedOpen] = useState(false);
+  /* Yazım Asistanı: doğrulanmış öneriler + uygulanacakları blok id'leri. */
+  const [proofBusy, setProofBusy] = useState(false);
+  const [proofRows, setProofRows] = useState<{ issue: ProofIssue; blockId: string }[] | null>(null);
 
   /* Hub'dan taşınan brief'i al (tek stüdyo hissi). */
   useEffect(() => {
@@ -137,6 +141,59 @@ export function DocsStudio() {
     setDoc(save(doc, "Doküman kaydedildi."));
   };
 
+  /* ── Yazım Asistanı (Grammarly'den ilham) ─────────────────────────────
+     Metin taşıyan bloklar denetlenir (kod/görsel/ayraç hariç); öneriler
+     validateIssues'tan DOĞRULANMIŞ gelir, yine de uygulama anında blok
+     metni değişmişse applyIssue null döner ve öneri düşürülür. */
+  const PROOF_TYPES: DocBlockType[] = ["h1", "h2", "h3", "p", "bullet", "todo", "quote", "callout"];
+
+  const runProofread = async () => {
+    if (!doc || proofBusy) return;
+    const segBlocks = doc.blocks.filter((b) => PROOF_TYPES.includes(b.type) && b.text.trim());
+    if (!segBlocks.length) { addToast("Denetlenecek metin yok.", "info"); return; }
+    setProofBusy(true);
+    try {
+      const issues = await proofread(segBlocks.map((b) => b.text));
+      if (!issues.length) { setProofRows(null); addToast("Sorun bulunamadı — metin temiz.", "success"); }
+      else setProofRows(issues.map((issue) => ({ issue, blockId: segBlocks[issue.blockIndex].id })));
+    } catch (e) {
+      addToast(`Denetim başarısız: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+    } finally { setProofBusy(false); }
+  };
+
+  const dropProofRow = (row: { issue: ProofIssue; blockId: string }) => {
+    setProofRows((rows) => {
+      const next = (rows ?? []).filter((r) => r !== row);
+      return next.length ? next : null;
+    });
+  };
+
+  const applyProofRow = (row: { issue: ProofIssue; blockId: string }) => {
+    if (!doc) return;
+    const block = doc.blocks.find((b) => b.id === row.blockId);
+    const next = block ? applyIssue(block.text, row.issue) : null;
+    if (next === null) addToast("Metin değişmiş — öneri uygulanamadı.", "info");
+    else patchBlock(row.blockId, { text: next });
+    dropProofRow(row);
+  };
+
+  const applyAllProof = () => {
+    if (!doc || !proofRows) return;
+    let blocks = doc.blocks;
+    let applied = 0;
+    for (const row of proofRows) {
+      const block = blocks.find((b) => b.id === row.blockId);
+      const next = block ? applyIssue(block.text, row.issue) : null;
+      if (next !== null) {
+        blocks = blocks.map((b) => (b.id === row.blockId ? { ...b, text: next } : b));
+        applied++;
+      }
+    }
+    patchDoc({ ...doc, blocks });
+    setProofRows(null);
+    addToast(`${applied}/${proofRows.length} öneri uygulandı.`, "success");
+  };
+
   const openDoc = (d: CraftDoc) => { setDoc(d); setView("work"); setSavedOpen(false); };
   const removeDoc = remove;
 
@@ -206,6 +263,9 @@ export function DocsStudio() {
       <div className="ml-auto flex items-center gap-1 shrink-0">
         <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
         <button onClick={saveDoc} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+        <button onClick={() => void runProofread()} title="Yazım denetimi (AI)" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors disabled:opacity-40" disabled={proofBusy}>
+          {proofBusy ? <Loader2 size={15} className="animate-spin" /> : <SpellCheck size={15} />}
+        </button>
         <button
           onClick={() => pickTemplateFile((t) => { if (t.kind === "doc") openDoc(t.data); else addToast("Bu dosya bir doküman şablonu değil.", "error"); }, (m) => addToast(m, "error"))}
           title="Şablon içe aktar (.json)"
@@ -281,6 +341,36 @@ export function DocsStudio() {
               placeholder="Doküman başlığı"
               className="w-full bg-transparent outline-none text-2xl sm:text-3xl font-extrabold tracking-tight placeholder:text-muted/40 mb-6"
             />
+            {/* Yazım Asistanı önerileri */}
+            {proofRows && (
+              <div className="mb-5 rounded-xl border border-brand/25 bg-brand/5 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-brand/80 flex items-center gap-1.5">
+                    <SpellCheck size={12} /> Yazım denetimi — {proofRows.length} öneri
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button onClick={applyAllProof} className="text-[11px] px-2 py-1 rounded-lg bg-brand text-[#111110] font-semibold hover:bg-branddim transition-colors">Tümünü uygula</button>
+                    <button onClick={() => setProofRows(null)} aria-label="Kapat" className="w-6 h-6 grid place-items-center rounded text-muted/50 hover:text-ink"><X size={12} /></button>
+                  </div>
+                </div>
+                {proofRows.map((row, i) => (
+                  <div key={`${row.blockId}-${i}`} className="flex items-start gap-2 text-[12px] bg-surface border border-line/60 rounded-lg px-2.5 py-2">
+                    <span className="shrink-0 text-[9.5px] uppercase tracking-wide font-bold text-muted/50 border border-line rounded px-1 py-0.5 mt-0.5">
+                      {row.issue.kind === "dilbilgisi" ? "Dilbilgisi" : row.issue.kind === "noktalama" ? "Noktalama" : row.issue.kind === "uslup" ? "Üslup" : "Yazım"}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="line-through text-red/80">{row.issue.find}</span>
+                      {" → "}
+                      <span className="text-green font-medium">{row.issue.replace}</span>
+                      {row.issue.reason && <span className="block text-[10.5px] text-muted/60 mt-0.5">{row.issue.reason}</span>}
+                    </span>
+                    <button onClick={() => applyProofRow(row)} aria-label="Öneriyi uygula" title="Uygula" className="w-6 h-6 grid place-items-center rounded text-muted/50 hover:text-green shrink-0"><Check size={13} /></button>
+                    <button onClick={() => dropProofRow(row)} aria-label="Öneriyi yoksay" title="Yoksay" className="w-6 h-6 grid place-items-center rounded text-muted/50 hover:text-ink shrink-0"><X size={13} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="space-y-1.5">
               {doc.blocks.map((b) => (
                 <div key={b.id} className="group/blk flex items-start gap-1.5 -mx-2 px-2 py-0.5 rounded-lg hover:bg-bgsoft/40 transition-colors">
