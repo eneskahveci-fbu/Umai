@@ -1138,8 +1138,10 @@ export async function POST(req: Request) {
   if (!baseUrl) baseUrl = "https://router.huggingface.co/v1";
 
   if (!model) return new Response("Model seçilmedi.", { status: 400 });
-  /* pollinations ve ollama API anahtarı gerektirmez */
-  if (!apiKey && provider !== "pollinations" && provider !== "ollama") return new Response("API anahtarı yok.", { status: 400 });
+  /* KEYLESS_CHAT_PROVIDERS ile aynı kaynağı kullan (ovh/local/custom da
+     anahtarsız çalışır) — bu satır ayrı, bayat bir liste tuttuğu için OVH
+     (ve local/custom) anahtarsızken burada yanlışlıkla reddediliyordu. */
+  if (!apiKey && !KEYLESS_CHAT_PROVIDERS.has(provider)) return new Response("API anahtarı yok.", { status: 400 });
 
   /* Proje-başına örnekleme parametreleri (temperature/max_tokens). Tanımsızsa
      sağlayıcı varsayılanı kullanılır. max_tokens için cömert bir varsayılan
