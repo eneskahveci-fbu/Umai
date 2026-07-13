@@ -1,5 +1,5 @@
 import type { ModelProfile, Provider } from "./types";
-import { POLLINATIONS_DEFAULT_MODEL } from "./constants";
+import { POLLINATIONS_DEFAULT_MODEL, OVH_FREE_MODEL } from "./constants";
 
 /**
  * Çok-sağlayıcılı otomatik fallback zinciri.
@@ -21,6 +21,7 @@ export interface FallbackCandidate {
 /** Anahtar gerektirmeyen (anonim/yerel) sağlayıcılar — anahtarsız da denenebilir. */
 export const KEYLESS_PROVIDERS: ReadonlySet<Provider> = new Set<Provider>([
   "pollinations",
+  "ovh",
   "ollama",
   "custom",
 ]);
@@ -38,6 +39,7 @@ const PROVIDER_RANK: Partial<Record<Provider, number>> = {
   github: 3, // GitHub Models — ücretsiz
   openrouter: 4, // birçok ücretsiz model
   pollinations: 5, // anahtarsız taban
+  ovh: 5.5, // anahtarsız (anonim 2 istek/dk — paylaşımlı, bu yüzden tabandan sonra)
   mistral: 6,
   together: 7,
   deepseek: 8,
@@ -115,6 +117,20 @@ export function buildFallbackChain(
     if (!seen.has(dedupeKey(backstop))) {
       seen.add(dedupeKey(backstop));
       out.push(backstop);
+    }
+    /* İkinci anahtarsız halka: OVHcloud AI Endpoints (anonim, AB). Anonim
+       oran sınırı IP başına 2 istek/dk olduğundan (sunucudan proxy'lenince
+       PAYLAŞIMLI) Pollinations'ın ÖNÜNE geçmez — yalnız zincirde yer kaldıysa
+       en sona eklenir; mevcut davranış değişmez, yedek derinleşir. */
+    const ovh: FallbackCandidate = {
+      provider: "ovh",
+      baseUrl: OVH_FREE_MODEL.baseUrl,
+      model: OVH_FREE_MODEL.model,
+      apiKey: "",
+    };
+    if (!seen.has(dedupeKey(ovh))) {
+      seen.add(dedupeKey(ovh));
+      out.push(ovh);
     }
   }
 
