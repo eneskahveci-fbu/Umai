@@ -2424,27 +2424,56 @@ export function CoderView() {
       setActiveAgent(null);
       store.pushMessage({ role: "user", content: imgPrompt });
       const seed = Math.floor(Math.random() * 1_000_000);
-      const url = pollinationsImageUrl(imgPrompt, { seed });
+
+      /* BYOK: kullanıcının anahtarı olan görüntü-yetenekli sağlayıcı varsa
+         (Gemini/OpenAI/xAI/HF, /api/image proxy'siyle) onunla üret; anahtar
+         yoksa VEYA üretim başarısız olursa Pollinations tabanına düş —
+         metindeki fallback zinciriyle aynı "istek asla düşmez" sözleşmesi. */
+      const { pickImageProvider, generateImageBYOK, compressDataUrl, IMAGE_PROVIDER_LABEL } = await import("@/lib/imageGen");
+      let url = "";
+      let providerNote = "";
+      const byok = await pickImageProvider(store.config).catch(() => null);
+      if (byok) {
+        const label = IMAGE_PROVIDER_LABEL[byok.provider];
+        store.pushMessage({ role: "assistant", content: `🎨 ${label} ile üretiliyor…` });
+        try {
+          const raw = await generateImageBYOK(imgPrompt, byok.provider, byok.apiKey);
+          url = await compressDataUrl(raw);
+          providerNote = ` _(${label})_`;
+        } catch (e) {
+          addToast(`${label} üretimi başarısız (${friendlyError((e as Error).message)}) — Pollinations'a düşüldü.`, "info");
+        }
+        useStore.getState().popLastMessage(); // "üretiliyor…" yer tutucusu
+      }
+      if (!url) url = pollinationsImageUrl(imgPrompt, { seed });
+
       store.pushMessage({
         role: "assistant",
-        content: `**"${imgPrompt}"** için oluşturdum:`,
+        content: `**"${imgPrompt}"** için oluşturdum:${providerNote}`,
         images: [url],
       });
       const chatId = useStore.getState().currentId ?? undefined;
       const config = useStore.getState().config;
+      /* Kütüphane kaydı: BYOK sonucu data-URL'dir (sıkıştırılmış JPEG) —
+         localStorage kotasını korumak için data-URL girdileri 20 ile sınırlı
+         (Pollinations URL'leri küçüktür, genel 200 sınırı yeter). */
+      const allAssets = [{
+        id: `img_${Date.now().toString(36)}_${seed}`,
+        title: imgPrompt.slice(0, 72) || "Görsel",
+        url,
+        prompt: imgPrompt,
+        seed,
+        createdAt: Date.now(),
+        projectId: config.activeProjectId ?? undefined,
+        chatId,
+        source: "image-gen" as const,
+      }, ...(config.mediaAssets ?? [])];
+      let dataCount = 0;
       useStore.getState().saveConfig({
         ...config,
-        mediaAssets: [{
-          id: `img_${Date.now().toString(36)}_${seed}`,
-          title: imgPrompt.slice(0, 72) || "Görsel",
-          url,
-          prompt: imgPrompt,
-          seed,
-          createdAt: Date.now(),
-          projectId: config.activeProjectId ?? undefined,
-          chatId,
-          source: "image-gen" as const,
-        }, ...(config.mediaAssets ?? [])].slice(0, 200),
+        mediaAssets: allAssets
+          .filter((a) => !a.url.startsWith("data:") || ++dataCount <= 20)
+          .slice(0, 200),
       });
       void store.persistCurrent();
       return;
