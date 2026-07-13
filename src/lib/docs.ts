@@ -9,11 +9,14 @@ import { streamChat, extractJsonObject } from "./genChat";
 export const DOC_BLOCK_TYPES: { id: DocBlockType; name: string }[] = [
   { id: "h1", name: "Başlık 1" },
   { id: "h2", name: "Başlık 2" },
+  { id: "h3", name: "Başlık 3" },
   { id: "p", name: "Paragraf" },
   { id: "bullet", name: "Madde" },
   { id: "todo", name: "Yapılacak" },
   { id: "quote", name: "Alıntı" },
+  { id: "callout", name: "Bilgi kutusu" },
   { id: "code", name: "Kod" },
+  { id: "image", name: "Görsel (URL)" },
   { id: "divider", name: "Ayraç" },
 ];
 
@@ -31,7 +34,9 @@ export function newBlock(type: DocBlockType = "p", text = ""): DocBlock {
 
 /* ── LLM çıktısını güvenli dokümana çevirme ─────────────────────────── */
 
-const VALID_TYPES: DocBlockType[] = ["h1", "h2", "p", "bullet", "todo", "quote", "code", "divider"];
+/* "image" LLM şemasında YOK (URL uydururdu) — yalnız elle eklenir ama
+   normalize onu da tanır (şablon içe aktarma / kayıtlı doküman yüklerken). */
+const VALID_TYPES: DocBlockType[] = ["h1", "h2", "h3", "p", "bullet", "todo", "quote", "code", "divider", "callout", "image"];
 
 function normalizeBlock(raw: unknown): DocBlock | null {
   if (!raw || typeof raw !== "object") return null;
@@ -78,10 +83,13 @@ export function docToMarkdown(doc: CraftDoc): string {
     switch (b.type) {
       case "h1": lines.push(`# ${b.text}`, ""); break;
       case "h2": lines.push(`## ${b.text}`, ""); break;
+      case "h3": lines.push(`### ${b.text}`, ""); break;
       case "bullet": lines.push(`- ${b.text}`); break;
       case "todo": lines.push(`- [${b.checked ? "x" : " "}] ${b.text}`); break;
       case "quote": lines.push(`> ${b.text}`, ""); break;
+      case "callout": lines.push(`> 💡 ${b.text}`, ""); break;
       case "code": lines.push("```", b.text, "```", ""); break;
+      case "image": lines.push(`![](${b.text})`, ""); break;
       case "divider": lines.push("---", ""); break;
       default: lines.push(b.text, "");
     }
@@ -96,10 +104,15 @@ export function docToHtml(doc: CraftDoc): string {
     switch (b.type) {
       case "h1": return `<h1>${t}</h1>`;
       case "h2": return `<h2>${t}</h2>`;
+      case "h3": return `<h3>${t}</h3>`;
       case "bullet": return `<li>${t}</li>`;
       case "todo": return `<p class="todo"><input type="checkbox" disabled${b.checked ? " checked" : ""}> ${t}</p>`;
       case "quote": return `<blockquote>${t}</blockquote>`;
+      case "callout": return `<div class="callout">💡 ${t}</div>`;
       case "code": return `<pre><code>${t}</code></pre>`;
+      case "image":
+        /* Yalnız http(s) URL kabul edilir (javascript: vb. şemalar dışlanır). */
+        return /^https?:\/\//i.test(b.text) ? `<img src="${t}" alt="" loading="lazy">` : "";
       case "divider": return `<hr>`;
       default: return `<p>${t}</p>`;
     }
@@ -117,7 +130,10 @@ export function docToHtml(doc: CraftDoc): string {
          color: #1f1e1b; background: #faf8f2; line-height: 1.65; }
   h1 { font-size: 2rem; letter-spacing: -0.02em; line-height: 1.2; }
   h2 { font-size: 1.35rem; margin-top: 2.2rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.6rem; }
   h1::after, h2::after { content: ""; display: block; width: 3rem; height: 3px; background: #b45309; margin-top: .5rem; border-radius: 2px; }
+  .callout { background: #fdf3e3; border: 1px solid #f0dcb8; border-radius: .6rem; padding: .8rem 1rem; margin: 1.2rem 0; }
+  img { max-width: 100%; border-radius: .6rem; display: block; margin: 1.2rem 0; }
   blockquote { border-left: 4px solid #b45309; margin: 1.2rem 0; padding: .3rem 1rem; color: #6b675e; font-style: italic; }
   pre { background: #1c1c1a; color: #f4f2ec; padding: 1rem 1.2rem; border-radius: .6rem; overflow-x: auto; font-size: .9rem; }
   ul { padding-left: 1.4rem; } li { margin: .3rem 0; }
@@ -127,6 +143,7 @@ export function docToHtml(doc: CraftDoc): string {
   @media (prefers-color-scheme: dark) {
     body { background: #111110; color: #f4f2ec; }
     blockquote { color: #a8a396; } hr { border-top-color: #33322e; }
+    .callout { background: #201b12; border-color: #3d3222; }
   }
 </style>
 </head>
@@ -140,7 +157,7 @@ ${body}
 /* ── Üretim ─────────────────────────────────────────────────────────── */
 
 const DOC_SCHEMA =
-  '{"title": "doküman başlığı", "blocks": [{"type": "h1|h2|p|bullet|todo|quote|code|divider", "text": "içerik", "checked": false}]}';
+  '{"title": "doküman başlığı", "blocks": [{"type": "h1|h2|h3|p|bullet|todo|quote|callout|code|divider", "text": "içerik", "checked": false}]}';
 
 export interface DocGenOptions {
   brief: string;
@@ -153,9 +170,10 @@ export async function generateDoc(opts: DocGenOptions): Promise<CraftDoc> {
     "Sen kıdemli bir teknik yazar ve editörsün. Kullanıcının brief'inden iyi yapılandırılmış, " +
     "TÜRKÇE bir doküman üret. SADECE geçerli JSON döndür (istersen tek ```json bloğu) — açıklama yazma. Şema:\n" +
     DOC_SCHEMA + "\n" +
-    "Kurallar: h2 ile bölümle; paragrafları kısa tut (≤4 cümle); listelenebilir içeriği bullet yap; " +
-    "eylem maddelerini todo yap; önemli tek cümleyi quote yap. Bilgi uydurma; brief'te olmayan " +
-    "sayısal iddia ekleme. 8-30 blok arası, taranabilir ve öz.";
+    "Kurallar: h2 ile bölümle (alt başlık gerekirse h3); paragrafları kısa tut (≤4 cümle); " +
+    "listelenebilir içeriği bullet yap; eylem maddelerini todo yap; önemli tek cümleyi quote, " +
+    "kritik uyarı/ipucunu callout yap. Bilgi uydurma; brief'te olmayan sayısal iddia ekleme. " +
+    "8-30 blok arası, taranabilir ve öz.";
   const full = await streamChat({ system: sys, messages: [{ role: "user", content: opts.brief }], onDelta: opts.onDelta, signal: opts.signal, temperature: 0.6 });
   const doc = parseDocJson(full, opts.brief.slice(0, 48));
   doc.brief = opts.brief;
