@@ -1,0 +1,86 @@
+/* BYOK görsel üretimi — metindeki çok-sağlayıcılı felsefenin görsele taşınması.
+   Kullanıcının EKLEDİĞİ modellerden görüntü-yetenekli ilk sağlayıcı seçilir,
+   anahtar istemcide çözülür ve mevcut /api/image proxy'sine (sunucu yalnız
+   iletir, anahtar saklanmaz) gönderilir. Anahtar yoksa ya da üretim başarısız
+   olursa çağıran Pollinations'a (anahtarsız taban) düşer — fallback.ts'teki
+   metin zinciriyle aynı "istek asla düşmez" sözleşmesi. */
+
+import type { Config, ModelProfile } from "./types";
+import { resolveModelApiKey } from "./secureKeys";
+
+/* Öncelik sırası: kalite/hız dengesi — Gemini (native, hızlı) → OpenAI
+   (gpt-image-1) → xAI (grok-2-image) → HF (FLUX.1-schnell, cold-start olabilir). */
+export const IMAGE_PROVIDERS = ["gemini", "openai", "xai", "hf"] as const;
+export type ImageProvider = (typeof IMAGE_PROVIDERS)[number];
+
+export const IMAGE_PROVIDER_LABEL: Record<ImageProvider, string> = {
+  gemini: "Gemini",
+  openai: "OpenAI",
+  xai: "xAI",
+  hf: "Hugging Face",
+};
+
+/** Kullanıcının modelleri arasından görüntü-yetenekli ilk sağlayıcının modelini
+    seçer (öncelik sırasıyla). SAF — anahtar çözümü çağıranda. */
+export function pickImageModel(models: ModelProfile[]): ModelProfile | null {
+  for (const p of IMAGE_PROVIDERS) {
+    const m = models.find((x) => x.provider === p);
+    if (m) return m;
+  }
+  return null;
+}
+
+/** Config'ten kullanılabilir BYOK görsel sağlayıcısını + çözülmüş anahtarını
+    döndürür; uygun model veya anahtar yoksa null (→ Pollinations tabanı). */
+export async function pickImageProvider(config: Config): Promise<{ provider: ImageProvider; apiKey: string } | null> {
+  const model = pickImageModel(config.models);
+  if (!model) return null;
+  const apiKey = await resolveModelApiKey(model, config.providerKeys);
+  if (!apiKey) return null;
+  return { provider: model.provider as ImageProvider, apiKey };
+}
+
+/** /api/image üzerinden üretim — data URL döndürür, hatada throw eder. */
+export async function generateImageBYOK(
+  prompt: string,
+  provider: ImageProvider,
+  apiKey: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const res = await fetch("/api/image", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider, apiKey, prompt }),
+    signal,
+  });
+  const data = await res.json().catch(() => ({})) as { image?: string; error?: string };
+  if (!res.ok || !data.image) throw new Error(data.error || `Görüntü üretimi başarısız (${res.status}).`);
+  return data.image;
+}
+
+/** Büyük data-URL görselleri (PNG ~1-2MB) localStorage kalıcılığını şişirmesin
+    diye tarayıcıda JPEG'e sıkıştırır (canvas). Başarısızlıkta girdiyi döndürür. */
+export function compressDataUrl(dataUrl: string, maxDim = 1024, quality = 0.82): Promise<string> {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const w = Math.max(1, Math.round(img.width * scale));
+          const h = Math.max(1, Math.round(img.height * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) { resolve(dataUrl); return; }
+          ctx.drawImage(img, 0, 0, w, h);
+          const out = canvas.toDataURL("image/jpeg", quality);
+          /* Sıkıştırma büyüttüyse (küçük/az renkli görsel) orijinali koru. */
+          resolve(out.length < dataUrl.length ? out : dataUrl);
+        } catch { resolve(dataUrl); }
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    } catch { resolve(dataUrl); }
+  });
+}
