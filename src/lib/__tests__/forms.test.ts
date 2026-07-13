@@ -88,3 +88,56 @@ describe("templateShare — şablon dışa/içe aktarma (Canva'dan ilham)", () =
     expect(() => parseTemplate('{"craftTemplate":1,"kind":"resim","data":{}}')).toThrow(/Bilinmeyen/);
   });
 });
+
+describe("Faz 6 — yeni soru türleri + koşullu mantık", () => {
+  it("dropdown/date türlerini normalize eder, dropdown seçenek alır", () => {
+    const f = normalizeForm({ questions: [
+      { type: "dropdown", label: "Şehir?", options: ["Ankara", "İzmir"] },
+      { type: "date", label: "Tarih?" },
+    ] })!;
+    expect(f.questions[0].type).toBe("dropdown");
+    expect(f.questions[0].options).toEqual(["Ankara", "İzmir"]);
+    expect(f.questions[1].type).toBe("date");
+  });
+
+  it("showIf indeksini gerçek questionId'ye çevirir (yalnız önceki choice/dropdown)", () => {
+    const f = normalizeForm({ questions: [
+      { type: "choice", label: "Katıldın mı?", options: ["Evet", "Hayır"] },
+      { type: "long", label: "Neden?", showIf: { q: 0, equals: "Hayır" } },
+      { type: "short", label: "Geçersiz koşul", showIf: { q: 5, equals: "x" } },
+      { type: "short", label: "İleri referans", showIf: { q: 3, equals: "x" } },
+    ] })!;
+    expect(f.questions[1].showIf).toEqual({ questionId: f.questions[0].id, equals: "Hayır" });
+    expect(f.questions[2].showIf).toBeUndefined();
+    expect(f.questions[3].showIf).toBeUndefined();
+  });
+
+  it("formToHtml dropdown'a select, date'e input[type=date] üretir", () => {
+    const f = normalizeForm({ questions: [
+      { type: "dropdown", label: "Şehir?", options: ["Ankara", "İzmir"] },
+      { type: "date", label: "Ne zaman?" },
+    ] })!;
+    const html = formToHtml(f);
+    expect(html).toContain("<select");
+    expect(html).toContain("Seçiniz…");
+    expect(html).toContain('type="date"');
+  });
+
+  it("formToHtml koşul kurallarını LOGIC olarak gömer ve sarmalayıcı id'leri üretir", () => {
+    const f = normalizeForm({ questions: [
+      { type: "choice", label: "Katıldın mı?", options: ["Evet", "Hayır"] },
+      { type: "long", label: "Neden?", showIf: { q: 0, equals: "Hayır" } },
+    ] })!;
+    const html = formToHtml(f);
+    expect(html).toContain('"t":1');
+    expect(html).toContain('"s":0');
+    expect(html).toContain('"eq":"Hayır"');
+    expect(html).toContain('id="qw1"');
+    expect(html).toContain("applyLogic");
+  });
+
+  it("koşulsuz ankette LOGIC boş kalır (mevcut davranış değişmez)", () => {
+    const f = normalizeForm({ questions: [{ type: "short", label: "Ad?" }] })!;
+    expect(formToHtml(f)).toContain("var LOGIC = []");
+  });
+});

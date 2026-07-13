@@ -330,7 +330,7 @@ export interface SlideDeck extends StudioProjectBase {
 }
 
 /** Doküman Stüdyosu — Notion'dan ilhamla blok tabanlı doküman (craft yorumu). */
-export type DocBlockType = "h1" | "h2" | "p" | "bullet" | "todo" | "quote" | "code" | "divider";
+export type DocBlockType = "h1" | "h2" | "h3" | "p" | "bullet" | "todo" | "quote" | "code" | "divider" | "callout" | "image";
 
 export interface DocBlock {
   id: string;
@@ -350,15 +350,19 @@ export interface CraftDoc extends StudioProjectBase {
 }
 
 /** Anket Stüdyosu — Google Forms'tan ilhamla (craft yorumu). */
-export type FormQuestionType = "short" | "long" | "choice" | "multi" | "rating";
+export type FormQuestionType = "short" | "long" | "choice" | "multi" | "rating" | "dropdown" | "date";
 
 export interface FormQuestion {
   id: string;
   type: FormQuestionType;
   label: string;
-  /** choice/multi için seçenekler. */
+  /** choice/multi/dropdown için seçenekler. */
   options?: string[];
   required?: boolean;
+  /** Koşullu görünürlük: önceki bir choice/dropdown sorusu belirli bir
+      değeri aldığında göster (Google Forms'un "bölüme atla"sının craft
+      yorumu — sunucusuz HTML'de de çalışır). */
+  showIf?: { questionId: string; equals: string };
 }
 
 export interface CraftForm extends StudioProjectBase {

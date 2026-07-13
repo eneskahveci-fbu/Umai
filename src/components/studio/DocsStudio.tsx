@@ -147,6 +147,30 @@ export function DocsStudio() {
         return <input value={b.text} onChange={(e) => patchBlock(b.id, { text: e.target.value })} placeholder="Başlık 1" className={`${common} text-xl font-extrabold tracking-tight`} />;
       case "h2":
         return <input value={b.text} onChange={(e) => patchBlock(b.id, { text: e.target.value })} placeholder="Başlık 2" className={`${common} text-base font-bold`} />;
+      case "h3":
+        return <input value={b.text} onChange={(e) => patchBlock(b.id, { text: e.target.value })} placeholder="Başlık 3" className={`${common} text-sm font-bold`} />;
+      case "callout":
+        return (
+          <div className="flex items-start gap-2 bg-brand/5 border border-brand/20 rounded-lg px-3 py-2">
+            <span className="mt-0.5 shrink-0">💡</span>
+            <textarea value={b.text} onChange={(e) => patchBlock(b.id, { text: e.target.value })} placeholder="Bilgi kutusu" rows={2} className={`${common} text-sm resize-none`} />
+          </div>
+        );
+      case "image":
+        return (
+          <div className="space-y-1.5">
+            <input
+              value={b.text}
+              onChange={(e) => patchBlock(b.id, { text: e.target.value })}
+              placeholder="https://… (görsel URL'i)"
+              className={`${common} text-xs font-mono bg-bgsoft border border-line rounded-lg px-3 py-2`}
+            />
+            {/^https?:\/\//i.test(b.text) && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={b.text} alt="" loading="lazy" className="max-w-full max-h-64 rounded-lg border border-line/60" />
+            )}
+          </div>
+        );
       case "quote":
         return (
           <div className="border-l-[3px] border-brand/60 pl-3">
