@@ -286,6 +286,9 @@ export interface StudioProject {
   versions?: string[];
   createdAt: number;
   updatedAt: number;
+  /** Bağlı olduğu proje (bkz. Project — Claude Projects tarzı klasörleme).
+      Tanımsız = hiçbir projeye bağlı değil. */
+  projectId?: string;
 }
 
 /** Sunum Stüdyosu — slayt düzenleri (Google Slides'tan ilhamla, craft yorumu). */
