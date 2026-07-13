@@ -6,7 +6,9 @@ import {
   BookOpen,
   FileText,
   FolderGit2,
+  Link2,
   ListChecks,
+  Loader2,
   MessageSquare,
   Plus,
   Settings2,
@@ -57,6 +59,9 @@ export function ProjectModal() {
 
   const project = config.projects.find((p) => p.id === projectId) ?? null;
   const [tab, setTab] = useState<Tab>("chats");
+  /* Bilgi Tabanı: URL'den içe aktarma + PDF çıkarımı meşgul durumu. */
+  const [kbUrl, setKbUrl] = useState("");
+  const [kbBusy, setKbBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   useModalA11y(modalRef, !!project, () => setProjectModalId(null));
@@ -86,6 +91,18 @@ export function ProjectModal() {
   const readFiles = (files: FileList | null) => {
     if (!files) return;
     for (const f of Array.from(files)) {
+      /* PDF: Defter'le AYNI istemci-taraflı çıkarım (pdf.js, veri sunucuya
+         gitmez) — bilgi tabanına düz metin olarak girer. */
+      if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
+        if (f.size > 20_000_000) { addToast(`PDF 20MB'den büyük: ${f.name}`, "error"); continue; }
+        setKbBusy(true);
+        void import("@/lib/pdf")
+          .then(({ extractPdfText }) => extractPdfText(f))
+          .then((text) => addProjectFile(project.id, { name: f.name, content: text }))
+          .catch(() => addToast(`PDF okunamadı: ${f.name}`, "error"))
+          .finally(() => setKbBusy(false));
+        continue;
+      }
       const reader = new FileReader();
       reader.onload = () => {
         addProjectFile(project.id, { name: f.name, content: String(reader.result ?? "") });
@@ -93,6 +110,24 @@ export function ProjectModal() {
       reader.onerror = () => addToast(`Okunamadı: ${f.name}`, "error");
       reader.readAsText(f);
     }
+  };
+
+  /* URL'den içe aktar — Defter'in kullandığı AYNI sunucu ucu (/api/fetch-text,
+     sayfanın okunur metnini döndürür). */
+  const addKbUrl = async () => {
+    const u = kbUrl.trim();
+    if (!u || kbBusy) return;
+    setKbBusy(true);
+    try {
+      const res = await fetch(`/api/fetch-text?url=${encodeURIComponent(u)}`);
+      const data = await res.json() as { text?: string; error?: string };
+      if (!res.ok || !data.text) throw new Error(data.error || `Hata ${res.status}`);
+      addProjectFile(project.id, { name: u.replace(/^https?:\/\//, "").slice(0, 60), content: data.text });
+      setKbUrl("");
+      addToast("Sayfa bilgi tabanına eklendi.", "success");
+    } catch (e) {
+      addToast(`URL getirilemedi: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+    } finally { setKbBusy(false); }
   };
 
   const tabs: { id: Tab; label: string; icon: typeof Settings2 }[] = [
@@ -384,15 +419,35 @@ export function ProjectModal() {
           {tab === "knowledge" && (
             <>
               <p className="text-[12px] text-muted/80 leading-relaxed">
-                Yüklenen dosyalar bu projedeki <strong>her sohbete</strong> referans bağlam olarak verilir
-                (dosya başına ~6.000 karakter).
+                Dosyalar, PDF&apos;ler ve web sayfaları bu projedeki <strong>her sohbete</strong> bağlam
+                olarak verilir. Bilgi tabanı büyüyünce soruya <strong>en ilgili parçalar</strong> otomatik
+                seçilir (RAG) — tamamı gömülmez, token israfı olmaz.
               </p>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl border border-dashed border-line hover:border-brand/40 text-muted hover:text-brand transition-colors text-sm"
+                disabled={kbBusy}
+                className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl border border-dashed border-line hover:border-brand/40 text-muted hover:text-brand transition-colors text-sm disabled:opacity-50"
               >
-                <Upload size={15} /> Dosya yükle
+                {kbBusy ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />} Dosya yükle (PDF dahil)
               </button>
+              {/* URL'den içe aktar — Defter'deki kaynak-ekleme deseninin aynısı. */}
+              <div className="flex items-center gap-1.5">
+                <input
+                  value={kbUrl}
+                  onChange={(e) => setKbUrl(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") void addKbUrl(); }}
+                  placeholder="https://… — sayfanın metni içe aktarılır"
+                  className="flex-1 min-w-0 bg-bgsoft border border-line rounded-lg px-3 py-2 text-[12px] outline-none focus:border-brand/50 placeholder:text-muted/40"
+                  aria-label="URL'den bilgi tabanına ekle"
+                />
+                <button
+                  onClick={() => void addKbUrl()}
+                  disabled={!kbUrl.trim() || kbBusy}
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand/10 text-brand text-[12px] font-semibold hover:bg-brand/20 disabled:opacity-40 transition-colors"
+                >
+                  {kbBusy ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />} Getir
+                </button>
+              </div>
               <input
                 ref={fileInputRef}
                 type="file"
