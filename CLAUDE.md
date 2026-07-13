@@ -127,6 +127,13 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   ilhamla kaynak-temelli sohbet — metin yapıştır / URL getir (`/api/fetch-text`),
   yalnız kaynaklardan [n] atıflı yanıt, Pollinations TTS "sesli özet",
   `config.craftNotebooks`.
+- **Kroki** (`studio/MapStudio.tsx`, `/studio/kroki`): zihin haritası —
+  brief → AI ağaç (`lib/mindmap.ts`: normalize + derinlik/dal sınırları),
+  tıkla-düzenle (yeniden adlandır / dal ekle / AI "Dallandır" / sil).
+  Yerleşim TEK kaynaktan (`layoutMap` saf fonksiyonu): uygulama içi React
+  SVG'si de dışa aktarılan bağımsız `.svg` de aynı geometriyi kullanır.
+  Dışa aktarma: .svg / Markdown taslak / `/api/publish` (type "svg");
+  `config.craftMaps`.
 - **Şablon paylaşımı** (`lib/templateShare.ts`): doküman/anket JSON olarak
   dışa/içe aktarılır (Canva'nın şablon paylaşımından ilham, sunucusuz). Bu,
   Tasarım Stüdyosu'nun kendi hazır-şablon galerisinden (`studioTemplates.ts`)

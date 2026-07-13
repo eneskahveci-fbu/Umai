@@ -26,14 +26,15 @@ export function openInTab(html: string): boolean {
   return !!w;
 }
 
-/** HTML'i /api/publish ile paylaşılabilir bağlantıya çevirir, panoya kopyalar.
-    Başarısızlıkta null döner; toast metni çağırana bırakılır. */
-export async function publishArtifact(title: string, html: string): Promise<string | null> {
+/** İçeriği /api/publish ile paylaşılabilir bağlantıya çevirir, panoya kopyalar.
+    Başarısızlıkta null döner; toast metni çağırana bırakılır. Varsayılan tür
+    "html"; Kroki gibi SVG yüzeyler "svg" geçer (/a/<id> ikisini de işler). */
+export async function publishArtifact(title: string, content: string, type: "html" | "svg" = "html"): Promise<string | null> {
   try {
     const res = await fetch("/api/publish", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: title || "craft", type: "html", content: html }),
+      body: JSON.stringify({ title: title || "craft", type, content }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.id) return null;

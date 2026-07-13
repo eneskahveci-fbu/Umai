@@ -17,7 +17,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useStore } from "./store";
 
-export type Surface = "studio" | "slides" | "docs" | "forms" | "canvas" | "notebook";
+export type Surface = "studio" | "slides" | "docs" | "forms" | "canvas" | "notebook" | "map";
 
 /* Yeni rota yapısı — slides ve canvas artık /studio'ya yönlendirilir */
 export const SURFACE_ROUTES: Record<Surface, string> = {
@@ -27,6 +27,7 @@ export const SURFACE_ROUTES: Record<Surface, string> = {
   forms: "/studio/anket",
   canvas: "/studio",       // ← Redirect: birleşik stüdyo
   notebook: "/studio/defter",
+  map: "/studio/kroki",
 };
 
 /* Yüzeyler arası brief taşıma (hub'dan araca): sessionStorage, 60 sn tazelik. */
@@ -87,6 +88,7 @@ export function useSurfaceNav() {
     s.setDocsStudioOpen(which === "docs");
     s.setFormsStudioOpen(which === "forms");
     s.setNotebookStudioOpen(which === "notebook");
+    s.setMapStudioOpen(which === "map");
   };
 
   const close = () => {
@@ -99,6 +101,7 @@ export function useSurfaceNav() {
     s.setDocsStudioOpen(false);
     s.setFormsStudioOpen(false);
     s.setNotebookStudioOpen(false);
+    s.setMapStudioOpen(false);
   };
 
   return { routed, go, close };
