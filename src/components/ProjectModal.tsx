@@ -19,20 +19,24 @@ import { useStore } from "@/lib/store";
 import { useModalA11y } from "@/lib/useModalA11y";
 import { PROJECT_COLORS, projectColorHex } from "@/lib/constants";
 import { setSurfaceOpenItem } from "@/lib/surfaceNav";
-import type { StudioProjectBase } from "@/lib/types";
-
 type Tab = "chats" | "settings" | "knowledge" | "skills" | "stats";
 
 const EMOJI_CHOICES = ["📁", "🌐", "🔌", "📊", "📱", "⚙️", "🧪", "🚀", "🔬", "🧩", "📦", "🛠️", "💡", "🎨", "🔐", "📝"];
 
 /* Doküman/Anket/Defter'in "Sohbetler" sekmesindeki projeye bağlama —
    üçü de config'te ayrı bir StudioProjectBase[] listesi (bkz. useStudioProject.ts),
-   bu yüzden tek generic satır bileşeni (ContentSection) üçüne de hizmet eder. */
-type ContentKind = "doc" | "form" | "notebook";
-const CONTENT_META: Record<ContentKind, { key: "craftDocs" | "craftForms" | "craftNotebooks"; label: string; icon: typeof FileText; route: string }> = {
-  doc: { key: "craftDocs", label: "Dokümanlar", icon: FileText, route: "/studio/dokuman" },
-  form: { key: "craftForms", label: "Anketler", icon: ListChecks, route: "/studio/anket" },
-  notebook: { key: "craftNotebooks", label: "Defterler", icon: BookOpen, route: "/studio/defter" },
+   bu yüzden tek generic satır bileşeni (ContentSection) üçüne de hizmet eder.
+   Tasarım (Design Studio) `StudioProject` tipini kullanır — StudioProjectBase'i
+   EXTEND ETMEZ (name yerine title alanı yok) — bu yüzden generic satırlar
+   yalnız {id, projectId, title|name} gibi asgari bir şekle bağlı; başlık her
+   öğe için getTitle ile okunur. */
+type ContentKind = "doc" | "form" | "notebook" | "design";
+type ContentItem = { id: string; projectId?: string; title?: string; name?: string };
+const CONTENT_META: Record<ContentKind, { key: "craftDocs" | "craftForms" | "craftNotebooks" | "studioProjects"; label: string; icon: typeof FileText; route: string; getTitle: (x: ContentItem) => string }> = {
+  doc: { key: "craftDocs", label: "Dokümanlar", icon: FileText, route: "/studio/dokuman", getTitle: (x) => x.title ?? "" },
+  form: { key: "craftForms", label: "Anketler", icon: ListChecks, route: "/studio/anket", getTitle: (x) => x.title ?? "" },
+  notebook: { key: "craftNotebooks", label: "Defterler", icon: BookOpen, route: "/studio/defter", getTitle: (x) => x.title ?? "" },
+  design: { key: "studioProjects", label: "Tasarımlar", icon: Sparkles, route: "/studio", getTitle: (x) => x.name ?? "" },
 };
 
 export function ProjectModal() {
@@ -119,26 +123,27 @@ export function ProjectModal() {
      dropdown'uyla aynı fikir, yalnız config'teki ilgili listeye uygulanır. */
   const setContentProject = (kind: ContentKind, itemId: string, pid: string | undefined) => {
     const { key } = CONTENT_META[kind];
-    const list = ((config[key] as StudioProjectBase[] | undefined) ?? []).map((item) =>
+    const list = ((config[key] as ContentItem[] | undefined) ?? []).map((item) =>
       item.id === itemId ? { ...item, projectId: pid } : item
     );
     saveConfig({ ...config, [key]: list });
   };
 
-  /* Bir dokümanı/anketi/defteri aç: modalı kapat, ilgili stüdyoya git (⌘K'nın
-     kullandığı AYNI "belirli öğeyi aç" köprüsü — bkz. surfaceNav.ts). */
+  /* Bir dokümanı/anketi/defteri/tasarımı aç: modalı kapat, ilgili stüdyoya git
+     (⌘K'nın kullandığı AYNI "belirli öğeyi aç" köprüsü — bkz. surfaceNav.ts). */
   const openContent = (kind: ContentKind, itemId: string) => {
-    setSurfaceOpenItem(kind === "doc" ? "docs" : kind === "form" ? "forms" : "notebook", itemId);
+    setSurfaceOpenItem(kind === "doc" ? "docs" : kind === "form" ? "forms" : kind === "notebook" ? "notebook" : "studio", itemId);
     router.push(CONTENT_META[kind].route);
     setProjectModalId(null);
   };
 
-  /* Doküman/Anket/Defter'in kendi bölümü: proje.id'ye bağlı olanları listeler,
-     boş bir "+ Ekle" açılır menüsüyle henüz bağlı olmayanlardan birini bağlar. */
+  /* Doküman/Anket/Defter/Tasarım'ın kendi bölümü: proje.id'ye bağlı olanları
+     listeler, boş bir "+ Ekle" açılır menüsüyle henüz bağlı olmayanlardan
+     birini bağlar. */
   const renderContentSection = (kind: ContentKind) => {
     const meta = CONTENT_META[kind];
     const Icon = meta.icon;
-    const all = ((config[meta.key] as StudioProjectBase[] | undefined) ?? []);
+    const all = ((config[meta.key] as ContentItem[] | undefined) ?? []);
     const inProject = all.filter((x) => x.projectId === project.id);
     const notInProject = all.filter((x) => x.projectId !== project.id);
     return (
@@ -155,7 +160,7 @@ export function ProjectModal() {
               aria-label={`${meta.label} ekle`}
             >
               <option value="">+ Ekle</option>
-              {notInProject.map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}
+              {notInProject.map((x) => <option key={x.id} value={x.id}>{meta.getTitle(x)}</option>)}
             </select>
           )}
         </div>
@@ -166,7 +171,7 @@ export function ProjectModal() {
             {inProject.map((x) => (
               <div key={x.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-bgsoft border border-line/60">
                 <button onClick={() => openContent(kind, x.id)} className="flex-1 min-w-0 text-left text-[12px] font-medium truncate hover:text-brand transition-colors">
-                  {x.title}
+                  {meta.getTitle(x)}
                 </button>
                 <button onClick={() => setContentProject(kind, x.id, undefined)} aria-label="Projeden çıkar" title="Projeden çıkar" className="text-muted/40 hover:text-red p-0.5 shrink-0">
                   <X size={12} />
@@ -264,6 +269,7 @@ export function ProjectModal() {
                 {renderContentSection("doc")}
                 {renderContentSection("form")}
                 {renderContentSection("notebook")}
+                {renderContentSection("design")}
               </div>
             </>
           )}
