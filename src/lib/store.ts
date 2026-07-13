@@ -12,7 +12,6 @@ import type {
   McpServer,
   MemoryItem,
   ModelProfile,
-  OpenFile,
   Project,
   RepoState,
   Skill,
@@ -349,7 +348,6 @@ interface StoreState {
       metin anahtarları şifreli forma migrate eder. Eski veri asla bozulmaz. */
   rehydrateSecrets: () => Promise<void>;
   syncConfig: (userId: string) => Promise<void>;
-  addModel: (m: Omit<ModelProfile, "id">) => void;
   updateModel: (id: string, patch: Partial<ModelProfile>) => void;
   removeModel: (id: string) => void;
   setActiveModel: (id: string) => void;
@@ -384,7 +382,6 @@ interface StoreState {
   // memory (legacy — kept for back-compat)
   addMemory: (content: string) => void;
   removeMemory: (id: string) => void;
-  editMemory: (id: string, content: string) => void;
 
   // skills
   skillsOpen: boolean;
@@ -459,20 +456,13 @@ interface StoreState {
   setFinishReasonOnLast: (finishReason: string | undefined) => void;
   setSourcesOnLast: (sources: { title: string; url: string }[]) => void;
   updateLastTokens: (tokenIn: number, tokenOut: number) => void;
-  setLastAgentId: (agentId: string | undefined) => void;
   popLastMessage: () => void;
-  editMessageAt: (index: number, content: string) => void;
-  truncateAfter: (index: number) => void;
   editMessageBranch: (index: number, content: string) => void;
   switchMessageVersion: (index: number, branchIndex: number) => void;
   maybeSetTitle: (text: string) => void;
   persistCurrent: () => Promise<void>;
   exportChat: (id: string) => void;
   copyChatMarkdown: (id: string) => Promise<void>;
-
-  // follow-up
-  followUpSuggestions: string[];
-  setFollowUpSuggestions: (s: string[]) => void;
 
   // artifact
   artifact: Artifact | null;
@@ -486,10 +476,8 @@ interface StoreState {
   // coder
   repo: RepoState | null;
   tree: TreeNode | null;
-  currentFile: OpenFile | null;
   setRepo: (r: RepoState | null) => void;
   setTree: (t: TreeNode | null) => void;
-  setCurrentFile: (f: OpenFile | null) => void;
 
   pendingInput: string | null;
   setPendingInput: (s: string | null) => void;
@@ -713,15 +701,6 @@ export const useStore = create<StoreState>()((set, get) => ({
       get().addToast("Hesap senkronu sırasında hata oluştu.", "error");
     }
   },
-  addModel: (m) => {
-    const model: ModelProfile = { ...m, id: uid() };
-    const config = get().config;
-    get().saveConfig({
-      ...config,
-      models: [...config.models, model],
-      activeModelId: config.activeModelId ?? model.id,
-    });
-  },
   updateModel: (id, patch) => {
     const config = get().config;
     get().saveConfig({
@@ -909,13 +888,6 @@ export const useStore = create<StoreState>()((set, get) => ({
     get().saveConfig({
       ...config,
       memories: config.memories.filter((m) => m.id !== id),
-    });
-  },
-  editMemory: (id, content) => {
-    const config = get().config;
-    get().saveConfig({
-      ...config,
-      memories: config.memories.map((m) => m.id === id ? { ...m, content } : m),
     });
   },
   skillsOpen: false,
@@ -1119,12 +1091,11 @@ export const useStore = create<StoreState>()((set, get) => ({
       currentId: chat.id,
       incognito,
       view: "chat",
-      followUpSuggestions: [],
     }));
   },
 
   selectChat: (id) =>
-    set({ currentId: id, incognito: false, view: "chat", followUpSuggestions: [] }),
+    set({ currentId: id, incognito: false, view: "chat" }),
 
   deleteChat: async (id) => {
     const { userId } = get();
@@ -1372,39 +1343,10 @@ export const useStore = create<StoreState>()((set, get) => ({
       }),
     })),
 
-  setLastAgentId: (agentId) =>
-    set((s) => ({
-      chats: s.chats.map((c) => {
-        if (c.id !== s.currentId) return c;
-        const messages = c.messages.slice();
-        if (messages.length) {
-          messages[messages.length - 1] = { ...messages[messages.length - 1], agentId };
-        }
-        return { ...c, messages };
-      }),
-    })),
-
   popLastMessage: () =>
     set((s) => ({
       chats: s.chats.map((c) =>
         c.id === s.currentId ? { ...c, messages: c.messages.slice(0, -1) } : c,
-      ),
-    })),
-
-  editMessageAt: (index, content) =>
-    set((s) => ({
-      chats: s.chats.map((c) => {
-        if (c.id !== s.currentId) return c;
-        const messages = c.messages.slice();
-        if (messages[index]) messages[index] = { ...messages[index], content };
-        return { ...c, messages };
-      }),
-    })),
-
-  truncateAfter: (index) =>
-    set((s) => ({
-      chats: s.chats.map((c) =>
-        c.id === s.currentId ? { ...c, messages: c.messages.slice(0, index + 1) } : c,
       ),
     })),
 
@@ -1480,9 +1422,6 @@ export const useStore = create<StoreState>()((set, get) => ({
     }
   },
 
-  followUpSuggestions: [],
-  setFollowUpSuggestions: (s) => set({ followUpSuggestions: s }),
-
   artifact: null,
   setArtifact: (a) => set({ artifact: a }),
 
@@ -1496,7 +1435,6 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   repo: null,
   tree: null,
-  currentFile: null,
   setRepo: (r) => {
     set({ repo: r });
     /* Claude Code tarzı: repo bağlanınca araçları (Tools) OTOMATİK aç —
@@ -1507,7 +1445,6 @@ export const useStore = create<StoreState>()((set, get) => ({
     }
   },
   setTree: (t) => set({ tree: t }),
-  setCurrentFile: (f) => set({ currentFile: f }),
 
   pendingInput: null,
   setPendingInput: (s) => set({ pendingInput: s }),

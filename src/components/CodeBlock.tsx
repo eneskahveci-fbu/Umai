@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BookmarkPlus, Check, ChevronDown, ChevronUp, Copy, Download, Eye, GitCompareArrows, Loader2, Play, Terminal } from "lucide-react";
+import { BookmarkPlus, Check, ChevronDown, ChevronUp, Copy, Download, Eye, Loader2, Play, Terminal } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { buildSingleBlockPreview } from "@/lib/preview";
 import { runPython } from "@/lib/python";
@@ -122,21 +122,6 @@ export function CodeBlock({
     setPyRunning(false);
   };
 
-  const showDiff = () => {
-    /* Editörde açık olan dosyayla karşılaştır — eski window.prompt yerine. */
-    const open = useStore.getState().currentFile;
-    if (!open) {
-      useStore.getState().addToast("Karşılaştırmak için önce editörde bir dosya aç", "info");
-      return;
-    }
-    useStore.getState().setDiffModal({
-      original: open.content,
-      newCode: getText(),
-      language: lang || "text",
-      path: open.path,
-    });
-  };
-
   return (
     <div className="relative group/code">
       <div className="flex items-center justify-between px-4 py-1.5 bg-codebg rounded-t-[10px] border border-b-0 border-line text-xs text-muted">
@@ -165,9 +150,6 @@ export function CodeBlock({
               {pyRunning ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />} Çalıştır
             </button>
           )}
-          <button onClick={showDiff} className="flex items-center gap-1 hover:text-brand transition-colors" title="Editörde açık dosya ile karşılaştır (salt-okunur — değişiklik uygulamaz, yalnız kopyalayabilirsin)">
-            <GitCompareArrows size={12} /> Diff
-          </button>
           <button onClick={saveSnippet} className="flex items-center gap-1 hover:text-brand transition-colors" title="Snippet kütüphanesine kaydet">
             {saved ? <><Check size={12} /> Kaydedildi</> : <><BookmarkPlus size={12} /> Kaydet</>}
           </button>
