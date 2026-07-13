@@ -59,6 +59,38 @@ document.getElementById('doc').innerHTML=marked.parse(raw);
     : `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;margin:1rem;}</style></head><body>${content}</body></html>`;
 }
 
+/* Annotation Mode ("İşaretle & Değiştir", Google AI Studio'nun Annotation
+   Mode'undan ilham) — YALNIZ canlı önizleme iframe'ine eklenir; yayınlanan
+   /a/[id] sayfası buildArtifactSrcDoc'u script'siz kullanmaya devam eder.
+   Sandbox allow-same-origin İÇERMEZ (opak origin) → çocuk, parent'a yalnız
+   targetOrigin '*' ile postMessage edebilir; güven doğrulaması PARENT'ta
+   yapılır (e.source === iframe.contentWindow + veri şekli kontrolü). */
+export function withAnnotationScript(srcdoc: string): string {
+  const script = `<script>(function(){
+var HL=';outline:2px dashed #d97757;outline-offset:2px;cursor:crosshair';
+var prev=null,prevStyle=null;
+function clear(){if(prev){if(prevStyle===null)prev.removeAttribute('style');else prev.setAttribute('style',prevStyle);prev=null;prevStyle=null;}}
+function skip(el){return !el||el===document.body||el===document.documentElement;}
+document.addEventListener('mouseover',function(e){var el=e.target;if(el===prev||skip(el))return;clear();prev=el;prevStyle=el.getAttribute('style');el.setAttribute('style',(prevStyle||'')+HL);},true);
+document.addEventListener('mouseout',function(){clear();},true);
+document.addEventListener('click',function(e){
+  e.preventDefault();e.stopPropagation();
+  var el=e.target;if(skip(el))return;
+  clear();
+  var d='<'+el.tagName.toLowerCase();
+  if(el.id)d+=' id="'+el.id+'"';
+  var cls=(el.getAttribute('class')||'').split(/\\s+/).filter(Boolean).slice(0,2).join(' ');
+  if(cls)d+=' class="'+cls+'"';
+  d+='>';
+  var t=(el.textContent||'').replace(/\\s+/g,' ').trim().slice(0,60);
+  if(t)d+=' “'+t+'”';
+  try{parent.postMessage({__umaiAnnotate:true,descriptor:d},'*');}catch(err){/* yok say */}
+},true);
+})();<\/script>`;
+  const i = srcdoc.lastIndexOf("</body>");
+  return i === -1 ? srcdoc + script : srcdoc.slice(0, i) + script + srcdoc.slice(i);
+}
+
 const CODE_EXT: Record<string, string> = {
   python: "py", py: "py", javascript: "js", js: "js", typescript: "ts", ts: "ts",
   go: "go", golang: "go", rust: "rs", rs: "rs", java: "java", c: "c", cpp: "cpp",

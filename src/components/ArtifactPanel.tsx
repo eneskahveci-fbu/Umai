@@ -43,6 +43,13 @@ export function ArtifactPanel() {
       onPrevVersion={() => setVIndex((i) => Math.max(0, i - 1))}
       onNextVersion={() => setVIndex((i) => Math.min(versions.length - 1, i + 1))}
       onClose={() => setArtifact(null)}
+      onAnnotate={(descriptor) => {
+        /* İşaretlenen öğeyi ana composer'a taşı — CoderView'ın zaten dinlediği
+           prefill olayı (odaklama dahil) gerisini halleder. */
+        window.dispatchEvent(new CustomEvent("craftai:composer-prefill", {
+          detail: { text: `Önizlemedeki şu öğeyi değiştir: ${descriptor} — ` },
+        }));
+      }}
     />
   );
 }

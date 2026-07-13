@@ -1,10 +1,10 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, Eye, Link2, Maximize2, Minimize2, RotateCw, X } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { Check, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, Eye, Link2, Maximize2, Minimize2, MousePointerClick, RotateCw, X } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useStore } from "@/lib/store";
 import type { Artifact } from "@/lib/types";
-import { buildArtifactSrcDoc, artifactDownload } from "@/lib/artifactDoc";
+import { buildArtifactSrcDoc, withAnnotationScript, artifactDownload } from "@/lib/artifactDoc";
 import { ExportMenu } from "./studio/ExportMenu";
 
 /* Paylaşılan Artifact görüntüleyici — sohbetin ArtifactPanel'i ile Tasarım
@@ -21,9 +21,15 @@ export interface ArtifactCanvasProps {
   onClose?: () => void;
   /** Örn. Tasarım Stüdyosu'nun "PDF (yazdır)" seçeneği — sohbetin panelinde yok. */
   extraExportOptions?: { key: string; label: string; icon: ReactNode; onSelect: () => void }[];
+  /** İşaretle & Değiştir (AI Studio Annotation Mode paraleli): verilirse araç
+      çubuğunda toggle çıkar; kullanıcı önizlemede bir öğeye tıklayınca kısa,
+      okunur bir tanımlayıcı (`<h2 class="hero"> "Başlık"`) ile çağrılır.
+      Composer'a taşımak ÇAĞIRANIN işi (DesignStudio → kendi sohbeti,
+      ArtifactPanel → craftai:composer-prefill). */
+  onAnnotate?: (descriptor: string) => void;
 }
 
-export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVersion, onNextVersion, onClose, extraExportOptions }: ArtifactCanvasProps) {
+export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVersion, onNextVersion, onClose, extraExportOptions, onAnnotate }: ArtifactCanvasProps) {
   const addToast = useStore((s) => s.addToast);
   const [expanded, setExpanded] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -41,7 +47,32 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
     setPublishedUrl(null);
   }
 
-  const srcdoc = buildArtifactSrcDoc(artifact.type, artifact.content, artifact.language);
+  /* İşaretle & Değiştir — yalnız görsel türlerde anlamlı (html/svg; kod ve
+     markdown'da "öğe" kavramı yok). Script YALNIZ canlı iframe'e enjekte
+     edilir; indirme/yayın/yeni-sekme her zaman temiz baseSrcdoc kullanır. */
+  const [annotating, setAnnotating] = useState(false);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const canAnnotate = !!onAnnotate && (artifact.type === "html" || artifact.type === "svg");
+
+  useEffect(() => {
+    if (!annotating || !onAnnotate) return;
+    const onMsg = (e: MessageEvent) => {
+      /* Sandbox'lı (opak origin) iframe '*' hedefiyle yollamak zorunda; güven
+         burada kurulur: kaynak pencere bizim iframe'imiz mi + veri şekli doğru
+         mu? İçerik LLM üretimi olduğundan descriptor'a asla kod gibi davranma —
+         yalnız kırpılmış düz metin olarak composer'a taşınır. */
+      if (e.source !== frameRef.current?.contentWindow) return;
+      const data = e.data as { __umaiAnnotate?: boolean; descriptor?: unknown } | null;
+      if (!data || data.__umaiAnnotate !== true || typeof data.descriptor !== "string") return;
+      onAnnotate(data.descriptor.slice(0, 200));
+      setAnnotating(false);
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, [annotating, onAnnotate]);
+
+  const baseSrcdoc = buildArtifactSrcDoc(artifact.type, artifact.content, artifact.language);
+  const srcdoc = annotating && canAnnotate ? withAnnotationScript(baseSrcdoc) : baseSrcdoc;
   const { ext, body: downloadBody } = artifactDownload(artifact.type, artifact.content, artifact.language);
 
   const copySource = async () => {
@@ -115,6 +146,15 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
             <button onClick={() => setView("code")} className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${view === "code" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`} title="Kaynak kod"><Code2 size={12} /> Kod</button>
           </div>
 
+          {canAnnotate && view === "preview" && (
+            <button
+              onClick={() => setAnnotating((a) => !a)}
+              className={annotating ? "text-brand bg-brand/10 p-1 rounded transition-colors" : iconBtn}
+              title="İşaretle & Değiştir — önizlemede bir öğeye tıkla, değişiklik talimatını yaz"
+              aria-label="İşaretle & Değiştir"
+              aria-pressed={annotating}
+            ><MousePointerClick size={15} /></button>
+          )}
           <button onClick={copySource} className={iconBtn} title="Kaynağı kopyala">{copied ? <Check size={15} className="text-brand" /> : <Copy size={15} />}</button>
           <ExportMenu
             triggerLabel="Dışa aktar"
@@ -125,7 +165,7 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
               ...(view === "preview" ? [
                 { key: "reload", label: "Yenile", icon: <RotateCw size={14} />, onSelect: () => setReloadKey((k) => k + 1), separatorBefore: true },
                 { key: "open-tab", label: "Yeni sekmede aç", icon: <ExternalLink size={14} />, onSelect: () => {
-                  const blob = new Blob([srcdoc], { type: "text/html" });
+                  const blob = new Blob([baseSrcdoc], { type: "text/html" });
                   const url = URL.createObjectURL(blob);
                   window.open(url, "_blank", "noopener");
                   setTimeout(() => URL.revokeObjectURL(url), 10000);
@@ -150,10 +190,19 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
         </div>
       )}
 
+      {annotating && canAnnotate && view === "preview" && (
+        <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-line bg-brand/5 text-[11px] text-brand">
+          <MousePointerClick size={12} className="shrink-0" />
+          <span className="min-w-0 flex-1 truncate">Değiştirmek istediğin öğeye önizlemede tıkla — seçim sohbete taşınır.</span>
+          <button onClick={() => setAnnotating(false)} className="shrink-0 text-muted hover:text-ink font-semibold">Vazgeç</button>
+        </div>
+      )}
+
       <div className="flex-1 min-h-0 bg-white">
         {view === "preview" ? (
           <iframe
-            key={`${reloadKey}-${versionIndex ?? 0}`}
+            ref={frameRef}
+            key={`${reloadKey}-${versionIndex ?? 0}-${annotating && canAnnotate ? "a" : "n"}`}
             srcDoc={srcdoc}
             sandbox="allow-scripts allow-modals"
             allow=""
