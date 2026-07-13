@@ -418,6 +418,9 @@ interface StoreState {
   /** Anket Stüdyosu (Google Forms'tan ilhamla). */
   formsStudioOpen: boolean;
   setFormsStudioOpen: (b: boolean) => void;
+  /** Kroki (zihin haritası; brief → AI ağaç → SVG). */
+  mapStudioOpen: boolean;
+  setMapStudioOpen: (b: boolean) => void;
   /** Defter (NotebookLM'den ilhamla; kaynak-temelli sohbet). */
   notebookStudioOpen: boolean;
   setNotebookStudioOpen: (b: boolean) => void;
@@ -1006,6 +1009,8 @@ export const useStore = create<StoreState>()((set, get) => ({
   setDocsStudioOpen: (b) => set({ docsStudioOpen: b }),
   formsStudioOpen: false,
   setFormsStudioOpen: (b) => set({ formsStudioOpen: b }),
+  mapStudioOpen: false,
+  setMapStudioOpen: (b) => set({ mapStudioOpen: b }),
   notebookStudioOpen: false,
   setNotebookStudioOpen: (b) => set({ notebookStudioOpen: b }),
   streaming: false,

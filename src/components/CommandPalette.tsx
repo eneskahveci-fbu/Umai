@@ -16,6 +16,7 @@ import {
   Image as ImageIcon,
   Images,
   ListChecks,
+  Network,
   RefreshCw,
   Zap,
   Code2,
@@ -147,6 +148,16 @@ export function CommandPalette() {
         setOpen(false);
       },
       keywords: ["defter", "notebook", "kaynak", "arastirma", "araştırma", "notebooklm", "ozet", "özet"],
+    },
+    {
+      id: "open-map",
+      label: "Kroki'yi aç (AI zihin haritası)",
+      icon: <Network size={16} />,
+      action: () => {
+        router.push("/studio/kroki");
+        setOpen(false);
+      },
+      keywords: ["kroki", "harita", "zihin", "mindmap", "mind map", "beyin", "firtinasi", "fırtınası", "dal"],
     },
     {
       id: "open-image",
@@ -312,7 +323,20 @@ export function CommandPalette() {
         }))
     : [];
 
-  const filtered: Row[] = [...commandRows, ...chatRows, ...docRows, ...formRows, ...notebookRows, ...fileRows];
+  const mapRows: Row[] = query.length >= 1
+    ? (config.craftMaps ?? [])
+        .filter((m) => m.title.toLowerCase().includes(q))
+        .slice(0, 5)
+        .map((m) => ({
+          id: "map:" + m.id,
+          label: m.title,
+          sub: "Kroki",
+          icon: <Network size={16} />,
+          run: () => { setSurfaceOpenItem("map", m.id); router.push("/studio/kroki"); setOpen(false); },
+        }))
+    : [];
+
+  const filtered: Row[] = [...commandRows, ...chatRows, ...docRows, ...formRows, ...notebookRows, ...mapRows, ...fileRows];
 
   /* Reset the highlighted row when the query changes, and clear search when
      the palette (re)opens — both adjusted during render rather than in an

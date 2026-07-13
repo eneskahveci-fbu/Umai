@@ -15,7 +15,7 @@ import { BackgroundJobs } from "@/components/BackgroundJobs";
 import { trackEvent } from "@/lib/analytics";
 
 export type SurfaceFlag =
-  | "studioOpen" | "docsStudioOpen" | "formsStudioOpen" | "notebookStudioOpen";
+  | "studioOpen" | "docsStudioOpen" | "formsStudioOpen" | "notebookStudioOpen" | "mapStudioOpen";
 
 export function SurfacePage({ flag, children }: {
   flag: SurfaceFlag;
@@ -32,6 +32,7 @@ export function SurfacePage({ flag, children }: {
       docsStudioOpen: s.setDocsStudioOpen,
       formsStudioOpen: s.setFormsStudioOpen,
       notebookStudioOpen: s.setNotebookStudioOpen,
+      mapStudioOpen: s.setMapStudioOpen,
     };
     const set = setters[flag];
     set(true);

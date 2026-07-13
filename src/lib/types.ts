@@ -393,6 +393,20 @@ export interface CraftNotebook extends StudioProjectBase {
   embeddingVersion?: number;
 }
 
+/** Kroki (mind-map) düğümü — özyinelemeli ağaç. */
+export interface MindNode {
+  id: string;
+  text: string;
+  children: MindNode[];
+}
+
+/** Kroki: brief'ten AI ile üretilen / elle düzenlenen zihin haritası.
+    Tek kök düğüm; dışa aktarma SVG/Markdown (bkz. lib/mindmap.ts). */
+export interface CraftMap extends StudioProjectBase {
+  root: MindNode;
+  brief?: string;
+}
+
 /** Görüntü Stüdyosu'nda kaydedilen tek bir oturum — sohbet akışı (prompt +
     üretilen görsel URL'leri) tekrar açılabilir olsun diye. URL'ler
     deterministik (Pollinations seed'e bağlı) olduğundan görsel verisinin
@@ -522,6 +536,8 @@ export interface Config {
   craftForms?: CraftForm[];
   /** Defter: kaydedilen kaynak defterleri. */
   craftNotebooks?: CraftNotebook[];
+  /** Kroki: kaydedilen zihin haritaları. */
+  craftMaps?: CraftMap[];
   /** Görüntü Stüdyosu: kaydedilen üretim oturumları. */
   craftImages?: CraftImageSession[];
   /** Kütüphane: sohbetten/stüdyodan üretilen görseller ve dosya sonuçları. */
