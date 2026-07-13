@@ -531,8 +531,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     github: "https://github.com/settings/tokens",
     nvidia: "https://build.nvidia.com",
   };
-  /* Anahtarsız çalışabilen sağlayıcılar (anahtar alanı opsiyonel). */
-  const KEY_OPTIONAL: Provider[] = ["pollinations", "ollama", "custom"];
   /* PRESET etiketinden kısa, temiz ad (emoji + parantez kırpılır). */
   const cleanLabel = (p: Provider) => PRESETS[p].label.replace(/\s*\([^)]*\)\s*$/, "").replace(/^[^\p{L}]*/u, "").trim();
 
@@ -569,7 +567,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
        ("test edilmiyor / ücretsiz model bile hata veriyor" şikayeti). Artık
        kullanım anında çözülür; çözülemiyorsa boş sayılır. */
     const key = await usableKey(apiKey.trim() || config.providerKeys?.[provider] || "");
-    if (!key && !KEY_OPTIONAL.includes(provider)) { addToast("Önce API anahtarını yapıştır.", "error"); return; }
+    if (!key && !KEYLESS_PROVIDERS.has(provider)) { addToast("Önce API anahtarını yapıştır.", "error"); return; }
     const bu = baseUrl.trim() || PRESETS[provider].baseUrl;
     let mdl = model.trim() || PRESETS[provider].model;
     if (!bu || !mdl) { addToast("Base URL ve model gerekli (Gelişmiş bölümünden gir).", "error"); return; }
@@ -860,12 +858,31 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 />
                 <button
                   onClick={addAndTest}
-                  disabled={quickBusy || (!apiKey.trim() && !config.providerKeys?.[provider] && !KEY_OPTIONAL.includes(provider))}
+                  disabled={quickBusy || (!apiKey.trim() && !config.providerKeys?.[provider] && !KEYLESS_PROVIDERS.has(provider))}
                   className="px-3 py-2 rounded-lg bg-brand hover:bg-branddim text-[#111110] text-xs font-semibold disabled:opacity-40 flex items-center gap-1.5 shrink-0"
                 >
                   {quickBusy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Ekle ve test et
                 </button>
               </div>
+              {/* Anahtar alanını boşaltmak TEK BAŞINA önbellekteki (providerKeys)
+                 kayıtlı anahtarı SİLMEZ (addAndTest boşsa oraya düşer) — anahtarsız
+                 sağlayıcıda (ör. OVH) yanlışlıkla kaydedilmiş bir anahtar, alan
+                 boşaltılsa bile kullanılmaya devam ederdi. Bu link tek self-servis
+                 çıkış yolu. */}
+              {config.providerKeys?.[provider] && (
+                <button
+                  onClick={() => {
+                    const next = { ...config.providerKeys };
+                    delete next[provider];
+                    saveConfig({ ...config, providerKeys: next });
+                    setApiKey(""); setKeyCheck(null); setQuickResult(null);
+                    addToast("Bu sağlayıcı için kayıtlı anahtar temizlendi.", "success");
+                  }}
+                  className="mt-1.5 text-[11px] text-muted/70 hover:text-red underline"
+                >
+                  Kayıtlı {cleanLabel(provider)} anahtarını temizle
+                </button>
+              )}
               {/* Anahtarın CANLI doğrulama durumu — yazmayı bırakınca otomatik
                  test edilir; başarı da hata da burada görünür (sessiz kalmaz). */}
               {!quickResult && keyCheck && (
