@@ -11,7 +11,7 @@ import {
   AlertCircle, BookMarked, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
   Circle, CircleDot, Compass, FlaskConical, ListChecks, Microscope, MoreHorizontal, Settings2,
   Code2, Copy, FileText, FolderOpen, GitBranch, GitCommit, Globe,
-  Loader2, Pencil, RefreshCw, Search, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, Users, Volume2, VolumeX, Wrench, X,
+  Highlighter, Loader2, Pencil, RefreshCw, Search, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, Users, Volume2, VolumeX, Wrench, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ChatMessage, SwarmState } from "@/lib/types";
@@ -509,6 +509,7 @@ function MessageBubbleImpl({
   const taRef = useRef<HTMLTextAreaElement>(null);
   const rateMessage = useStore((s) => s.rateMessage);
   const addSkill = useStore((s) => s.addSkill);
+  const addHighlight = useStore((s) => s.addHighlight);
   const addToast = useStore((s) => s.addToast);
   const [speakingTts, setSpeakingTts] = useState(false);
   const speakingRef = useRef(false);
@@ -528,6 +529,18 @@ function MessageBubbleImpl({
     addSkill({ title: skillTitle.trim(), content: skillContent, tags: [], enabled: true, source: "manual" });
     addToast("Skill kaydedildi", "success");
     setSkillSaveOpen(false);
+  };
+
+  /* Vurgula (Readwise'dan ilham): balondaki SEÇİLİ metni, seçim yoksa
+     yanıtın başını kaydeder. Seçim, buton mousedown'unda (odak değişip
+     seçim temizlenmeden) okunur — preventDefault seçimi korur. */
+  const saveHighlight = () => {
+    const sel = typeof window !== "undefined" ? window.getSelection()?.toString().trim() : "";
+    const text = sel || message.content.replace(/^#+\s*/, "").slice(0, 280);
+    if (!text) return;
+    const chatTitle = chatId ? useStore.getState().chats.find((c) => c.id === chatId)?.title : undefined;
+    addHighlight(text, chatTitle || "Sohbet");
+    addToast("Vurgu kaydedildi — Kartlar → Vurgular'da.", "success");
   };
 
   const copyMessage = async () => {
@@ -870,6 +883,14 @@ function MessageBubbleImpl({
                   title="Skill olarak kaydet"
                 >
                   <BookMarked size={12} />
+                </button>
+                <button
+                  onMouseDown={(e) => { e.preventDefault(); saveHighlight(); }}
+                  className="flex items-center gap-1 text-[11px] text-muted/40 hover:text-yellow hover:bg-bgsoft p-2.5 rounded-lg transition-colors"
+                  aria-label="Vurgula (seçili metni ya da yanıt başını kaydet)"
+                  title="Vurgula — seçili metni kaydet (Kartlar → Vurgular)"
+                >
+                  <Highlighter size={12} />
                 </button>
               </>
             )}

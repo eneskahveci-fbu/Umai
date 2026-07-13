@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, ChevronDown, FileText, ListChecks, Network, Wrench } from "lucide-react";
+import { BookOpen, ChevronDown, FileText, ListChecks, Layers, Network, Wrench } from "lucide-react";
 
 /* Sidebar "Araçlar" satırı — kullanıcı anketi (Tem 2026) kararı: içerik
    araçları (Doküman/Anket/Defter) stüdyodan çıkarıldı; burada TEK satır,
@@ -16,6 +16,7 @@ const TOOLS: { href: string; label: string; desc: string; icon: typeof FileText 
   { href: "/studio/anket", label: "Anket", desc: "AI anket + HTML form", icon: ListChecks },
   { href: "/studio/defter", label: "Defter", desc: "kaynaklı sohbet + sesli özet", icon: BookOpen },
   { href: "/studio/kroki", label: "Kroki", desc: "AI zihin haritası + SVG", icon: Network },
+  { href: "/studio/kartlar", label: "Kartlar", desc: "AI kartlarla aralıklı tekrar", icon: Layers },
   /* Dönüştürücü bu listede DEĞİL (kullanıcı onayı): girişi Kütüphane
      başlığındaki buton + ⌘K — aynı araca üç ayrı yol gereksizdi. */
 ];
