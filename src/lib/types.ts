@@ -144,6 +144,7 @@ export type Provider =
   | "pollinations"
   | "github"
   | "nvidia"
+  | "ovh"
   | "custom";
 
 export interface ModelProfile {

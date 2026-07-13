@@ -61,6 +61,24 @@ describe("buildFallbackChain", () => {
     expect(chain.length).toBe(2);
   });
 
+  it("hiç model yokken iki anahtarsız halka kurulur: önce Pollinations, sonra OVH", () => {
+    const chain = buildFallbackChain([], null);
+    expect(chain.map((c) => c.provider)).toEqual(["pollinations", "ovh"]);
+    expect(chain.every((c) => c.apiKey === "")).toBe(true);
+  });
+
+  it("OVH tabanı Pollinations'ın ÖNÜNE geçmez (yalnız yer kaldıysa en sona eklenir)", () => {
+    /* 2 kullanılabilir aday + Pollinations = 3 (maxFallbacks) → OVH kesilir;
+       mevcut davranış değişmedi, yalnız yedek derinleşti. */
+    const models = [
+      m({ id: "active", provider: "deepseek" }),
+      m({ id: "g", provider: "gemini" }),
+      m({ id: "q", provider: "groq" }),
+    ];
+    const chain = buildFallbackChain(models, "active");
+    expect(chain.map((c) => c.provider)).toEqual(["gemini", "groq", "pollinations"]);
+  });
+
   it("yinelenen (aynı provider+url+model) adayları teklerleştirir", () => {
     const dup = { provider: "groq" as const, baseUrl: "https://api.groq.test/v1", model: "groq-model", apiKey: "k" };
     const models = [

@@ -117,7 +117,7 @@ interface Candidate {
   apiKey: string;
 }
 
-const KEYLESS_CHAT_PROVIDERS = new Set<string>(["pollinations", "ollama", "local", "custom"]);
+const KEYLESS_CHAT_PROVIDERS = new Set<string>(["pollinations", "ovh", "ollama", "local", "custom"]);
 
 /** Sağlayıcıya göre upstream istek başlıklarını kurar. */
 function buildCandidateHeaders(c: Candidate, req: Request): Record<string, string> {
@@ -1113,7 +1113,7 @@ export async function POST(req: Request) {
      kendi anahtarsız çalışabilen OpenAI-uyumlu ucu) buradan hariç
      tutulmazsa, anahtarsız custom istek sessizce Pollinations'a düşer ve
      kullanıcının gerçek endpoint'i hiç kullanılmaz. */
-  const providerNeedsKey = provider !== "pollinations" && provider !== "ollama" && provider !== "local" && provider !== "custom";
+  const providerNeedsKey = provider !== "pollinations" && provider !== "ovh" && provider !== "ollama" && provider !== "local" && provider !== "custom";
   const hasServerKey = !!process.env.LLM_API_KEY;
 
   const access = resolveModelAccess({
