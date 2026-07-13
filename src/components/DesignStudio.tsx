@@ -63,15 +63,26 @@ function newDesignProject(): StudioProject {
 /* ── Sol Panel: AI Sohbet (ilk gönderimden sonra — anasayfa artık StudioHomeScreen) ── */
 
 function ChatPanel({
-  messages, busy, phase, onFollowup, onStop,
+  messages, busy, phase, onFollowup, onStop, prefill,
 }: {
   messages: DesignMsg[];
   busy: boolean;
   phase: StudioPhase | null;
   onFollowup: (text: string) => void;
   onStop: () => void;
+  /** İşaretle & Değiştir'den gelen seçim — nonce her seçimde değişir, metin
+      composer'a EKLENIR (yazılmakta olan taslak ezilmez). */
+  prefill?: { text: string; nonce: number } | null;
 }) {
   const [input, setInput] = useState("");
+
+  /* Önceki-değer deseni (render-anı türetme, effect yok): yeni bir seçim
+     gelince composer'a ekle. */
+  const [prevNonce, setPrevNonce] = useState(0);
+  if (prefill && prefill.nonce !== prevNonce) {
+    setPrevNonce(prefill.nonce);
+    setInput((cur) => (cur ? `${cur} ` : "") + prefill.text);
+  }
 
   const submit = () => {
     const t = input.trim();
@@ -177,6 +188,8 @@ export function DesignStudio() {
   const [homeBrief, setHomeBrief] = useState("");
   /* Mobilde sohbet/tuval arası basit geçiş — masaüstünde ikisi de her zaman görünür. */
   const [mobileView, setMobileView] = useState<"chat" | "canvas">("chat");
+  /* İşaretle & Değiştir seçimi → ChatPanel composer'ına ek (bkz. ChatPanel.prefill). */
+  const [annotatePrefill, setAnnotatePrefill] = useState<{ text: string; nonce: number } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   /* Henüz hiç mesaj VE tasarım yoksa Claude'un anasayfasına paralel tam-ekran
@@ -444,6 +457,7 @@ export function DesignStudio() {
               phase={phase}
               onFollowup={(t) => runGenerate(t, true)}
               onStop={stop}
+              prefill={annotatePrefill}
             />
           </div>
 
@@ -462,6 +476,12 @@ export function DesignStudio() {
                   onPrevVersion={() => setVersionIndex((i) => Math.max(0, i - 1))}
                   onNextVersion={() => setVersionIndex((i) => Math.min(versions.length - 1, i + 1))}
                   extraExportOptions={[printPdfOption, openInEditorOption]}
+                  onAnnotate={(descriptor) => {
+                    /* Seçim sohbet composer'ına eklenir; mobilde tuval tam ekran
+                       olduğundan sohbete de geçilir ki kullanıcı sonucu görsün. */
+                    setAnnotatePrefill({ text: `Seçtiğim öğe ${descriptor} —`, nonce: Date.now() });
+                    setMobileView("chat");
+                  }}
                 />
               ) : (
                 <EmptyCanvas busy={busy} phase={phase} />
