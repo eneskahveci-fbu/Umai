@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseDesignMd, parseSkillMd, looksLikeSkillMd } from "../odFormat";
+import { parseSkillMd, looksLikeSkillMd } from "../odFormat";
 
 const DESIGN = `# Warm Editorial
 > Category: Starter
@@ -23,21 +23,6 @@ od:
 # Workflow
 1. Hero kur.
 `;
-
-describe("parseDesignMd", () => {
-  it("başlık, kategori ve accent hex'ini çıkarır", () => {
-    const d = parseDesignMd(DESIGN);
-    expect(d.name).toBe("Warm Editorial");
-    expect(d.category).toBe("Starter");
-    expect(d.accent.toLowerCase()).toBe("#c4622d");
-    expect(d.designMd).toContain("## Color Palette");
-  });
-  it("eksik alanlarda güvenli varsayılanlar", () => {
-    const d = parseDesignMd("içerik yalnız");
-    expect(d.name).toBe("İçe aktarılan sistem");
-    expect(d.accent).toBe("#c8a87e");
-  });
-});
 
 describe("parseSkillMd", () => {
   it("frontmatter alanlarını ve gövdeyi ayırır", () => {

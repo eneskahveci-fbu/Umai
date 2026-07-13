@@ -4,26 +4,6 @@
    Tam YAML kütüphanesi YOK — ihtiyaç duyulan alt küme toleranslı çözülür.
    Saf fonksiyonlar → birim testli. */
 
-export interface ParsedDesignMd {
-  name: string;
-  category: string;
-  /** Renk paletindeki ilk vurgu hex'i (yoksa marka amber'i). */
-  accent: string;
-  designMd: string;
-}
-
-export function parseDesignMd(md: string): ParsedDesignMd {
-  const text = (md || "").trim();
-  const name = text.match(/^#\s+(.+)$/m)?.[1]?.trim() || "İçe aktarılan sistem";
-  const category = text.match(/^>\s*Category:\s*(.+)$/mi)?.[1]?.trim() || "İçe aktarılan";
-  /* Vurgu: önce "Accent" satırındaki hex, yoksa paletteki ilk hex. */
-  const accent =
-    text.match(/accent[^#\n]*(#[0-9a-f]{6})/i)?.[1] ??
-    text.match(/#[0-9a-f]{6}\b/i)?.[0] ??
-    "#c8a87e";
-  return { name: name.slice(0, 60), category: category.slice(0, 30), accent, designMd: text };
-}
-
 export interface ParsedSkillMd {
   name: string;
   description: string;
