@@ -1,4 +1,4 @@
-import type { Config, DesignSystem } from "./types";
+import type { DesignSystem } from "./types";
 
 /* Stüdyo tasarım sistemleri — Open Design'ın DESIGN.md marka sözleşmelerine paralel.
    Her sistem: kısa marka prozası (designMd) + CSS değişkenleri (tokensCss). Üretimde
@@ -93,15 +93,9 @@ export const bundledDesignSystems: DesignSystem[] = [
   },
 ];
 
-/* Bundled + kullanıcının özel sistemleri (config.customDesignSystems). */
-export function allDesignSystems(config: Config): DesignSystem[] {
-  const custom = config.customDesignSystems ?? [];
-  return [...bundledDesignSystems, ...custom];
-}
-
-export function designSystemById(config: Config, id: string | null | undefined): DesignSystem | undefined {
+export function designSystemById(id: string | null | undefined): DesignSystem | undefined {
   if (!id) return undefined;
-  return allDesignSystems(config).find((s) => s.id === id);
+  return bundledDesignSystems.find((s) => s.id === id);
 }
 
 /* Üretim sistem promptu için marka sözleşmesi metni. */

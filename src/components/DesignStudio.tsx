@@ -213,7 +213,7 @@ export function DesignStudio() {
     /* Marka seçici kaldırıldı — Stüdyo artık her zaman sabit "Claude" tasarım
        sistemini kullanır (çıktılar da arayüz gibi Claude Design'a paralel). */
     const designSystemId = "claude";
-    const system = designSystemById(config, designSystemId);
+    const system = designSystemById(designSystemId);
 
     try {
       let boostInstruction: string | undefined;
@@ -296,7 +296,7 @@ export function DesignStudio() {
       setPhase(null);
       abortRef.current = null;
     }
-  }, [busy, project, fusionEnabled, config, addToast]);
+  }, [busy, project, fusionEnabled, addToast]);
 
   const stop = useCallback(() => { abortRef.current?.abort(); }, []);
 
