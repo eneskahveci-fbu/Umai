@@ -130,9 +130,17 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   akışlı LLM çağrısı + JSON ayıklama; anahtarsızda Pollinations'a düşer.
 - **Sandbox / Artifacts** (`preview.ts` + `ArtifactPanel.tsx`): kod bloğu →
   sandbox'lı iframe canlı önizleme. React/JSX/TSX (Babel standalone CDN),
-  HTML+CSS+JS, SVG, mermaid. İframe-içi **console paneli** (parent'a mesaj yok →
-  sandbox basit). Panel: önizleme↔kod geçişi, kaynağı kopyala, indir, yenile,
-  yeni sekmede aç, büyüt.
+  HTML+CSS+JS, SVG, mermaid. İframe-içi **console paneli** (parent'a mesaj
+  yollamaz). Panel: önizleme↔kod geçişi, kaynağı kopyala, indir, yenile,
+  yeni sekmede aç, büyüt. **İşaretle & Değiştir** (AI Studio Annotation Mode
+  paraleli, `ArtifactCanvas` + `artifactDoc.ts`'teki `withAnnotationScript`):
+  html/svg önizlemesinde toggle → tıklanan öğenin tanımlayıcısı postMessage
+  ile parent'a gelir (TEK istisna mesaj yolu; doğrulama parent'ta —
+  e.source + veri şekli) ve composer'a taşınır. Script yalnız CANLI iframe'e
+  enjekte edilir; yayınlanan `/a/[id]` sayfası temiz `buildArtifactSrcDoc`
+  kullanır. Composer'da ayrıca **AI Chips** (girdi boşken 5 küratörlü
+  slash-agent çipi, `CoderView.tsx` → `CHIP_AGENTS`) ve sesli dikte
+  (`VoiceButton.tsx`) var.
 - **Öğrenme Modu** (`config.learningMode`): açıkken sistem prompt'una eğitsel
   yönerge eklenir (adım adım açıklama, kavram tanımı, "neden", "Sırada öğren").
   MoreMenu'den toggle; durum çubuğunda rozet. Üniversite öğrencileri için.
