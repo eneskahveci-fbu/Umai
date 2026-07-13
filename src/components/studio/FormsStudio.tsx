@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import {
-  ArrowDown, ArrowUp, Download, FolderOpen, GitBranch, Globe, ListChecks, Loader2,
+  ArrowDown, ArrowUp, BarChart3, Download, FolderOpen, GitBranch, Globe, ListChecks, Loader2,
   Plus, Save, Sparkles, Trash2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
 import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { SavedItemsModal } from "./SavedItemsModal";
+import { FormResponsesModal } from "./FormResponses";
 import { ExportMenu } from "./ExportMenu";
 import { safeFileName } from "./DocsStudio";
 import type { CraftForm, FormQuestion, FormQuestionType } from "@/lib/types";
@@ -41,6 +43,7 @@ export function FormsStudio() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [savedOpen, setSavedOpen] = useState(false);
+  const [responsesOpen, setResponsesOpen] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
 
@@ -121,10 +124,34 @@ export function FormsStudio() {
     setForm(save(form, "Anket kaydedildi."));
   };
 
-  const exportHtml = () => {
+  /* Merkezî yanıt toplama için form sahipliği kaydı (published_forms).
+     Yalnız girişliyken mümkündür; başarısızlık SESSİZDİR — form her durumda
+     sunucusuz (cihaz içi CSV) çalışır, yalnız merkezî toplama açılmaz. */
+  const registerForm = async (f: CraftForm): Promise<boolean> => {
+    try {
+      const sb = createClient();
+      if (!sb) return false;
+      const { data: { user } } = await sb.auth.getUser();
+      if (!user) return false;
+      const { error } = await sb.from("published_forms").upsert({
+        id: f.id,
+        owner_id: user.id,
+        title: f.title || "Anket",
+        questions: f.questions.map((q) => ({ id: q.id, type: q.type, label: q.label, options: q.options ?? null })),
+      });
+      return !error;
+    } catch { return false; }
+  };
+
+  const buildExportHtml = async (f: CraftForm): Promise<string> => {
+    const collect = await registerForm(f);
+    return formToHtml(f, collect ? { collect: { url: `${window.location.origin}/api/forms/respond` } } : undefined);
+  };
+
+  const exportHtml = async () => {
     if (!form) return;
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([formToHtml(form)], { type: "text/html;charset=utf-8" }));
+    a.href = URL.createObjectURL(new Blob([await buildExportHtml(form)], { type: "text/html;charset=utf-8" }));
     a.download = `${safeFileName(form.title, "anket")}.html`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
@@ -133,8 +160,10 @@ export function FormsStudio() {
   /* Paylaşılabilir bağlantı — mevcut /api/publish altyapısı (Stüdyo ile aynı). */
   const publish = async () => {
     if (!form) return;
-    const url = await publishArtifact(form.title || "craft anketi", formToHtml(form));
-    if (url) addToast("Yayınlandı — bağlantı kopyalandı.", "success");
+    const html = await buildExportHtml(form);
+    const collecting = html.includes("/api/forms/respond");
+    const url = await publishArtifact(form.title || "craft anketi", html);
+    if (url) addToast(collecting ? "Yayınlandı — bağlantı kopyalandı. Yanıtlar 'Yanıtlar' panelinde birikecek." : "Yayınlandı — bağlantı kopyalandı.", "success");
     else addToast("Yayınlama başarısız.", "error");
   };
 
@@ -147,6 +176,7 @@ export function FormsStudio() {
       <div className="ml-auto flex items-center gap-1 shrink-0">
         <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
         <button onClick={saveForm} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+        <button onClick={() => setResponsesOpen(true)} title="Yanıtlar — merkezî toplananlar" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><BarChart3 size={15} /></button>
         <button
           onClick={() => pickTemplateFile((t) => { if (t.kind === "form") openForm(t.data); else addToast("Bu dosya bir anket şablonu değil.", "error"); }, (m) => addToast(m, "error"))}
           title="Şablon içe aktar (.json)"
@@ -154,7 +184,7 @@ export function FormsStudio() {
         ><Download size={15} className="rotate-180" /></button>
         <ExportMenu
           options={[
-            { key: "html", label: "Bağımsız HTML indir", icon: <Download size={14} className="text-brand" />, onSelect: exportHtml },
+            { key: "html", label: "Bağımsız HTML indir", icon: <Download size={14} className="text-brand" />, onSelect: () => void exportHtml() },
             { key: "template", label: "Şablon olarak dışa aktar (.json)", icon: <Sparkles size={14} className="text-brand" />, onSelect: () => form && downloadTemplate({ kind: "form", data: form }, form.title), separatorBefore: true },
           ]}
         />
@@ -355,6 +385,10 @@ export function FormsStudio() {
         onExportTemplate={(f) => downloadTemplate({ kind: "form", data: f }, f.title)}
         emptyLabel="Henüz kayıtlı anket yok."
       />
+
+      {/* Merkezî yanıt özeti (form_responses — yalnız form sahibi görür).
+          Yalnız açıkken mount: her açılışta taze veri/state. */}
+      {form && responsesOpen && <FormResponsesModal form={form} open onClose={() => setResponsesOpen(false)} />}
     </>
   );
 
