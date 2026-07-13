@@ -506,8 +506,6 @@ export interface Config {
   terminalSetupCommand?: string;
   /** Olaya bağlı otomasyonlar (Claude Code hooks benzeri). */
   automations?: Automation[];
-  /** Stüdyo: kullanıcının eklediği özel tasarım sistemleri (bundled'a ek). */
-  customDesignSystems?: DesignSystem[];
   /** Stüdyo: kaydedilen projeler (çok-proje çalışma alanı). */
   studioProjects?: StudioProject[];
   /** Doküman Stüdyosu: kaydedilen dokümanlar. */
@@ -559,11 +557,6 @@ export interface TreeFile {
 export interface TreeNode {
   dirs: Record<string, TreeNode>;
   files: TreeFile[];
-}
-
-export interface OpenFile {
-  path: string;
-  content: string;
 }
 
 export interface Toast {
