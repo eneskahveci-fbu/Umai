@@ -77,3 +77,29 @@ describe("newBlock", () => {
     expect(newBlock("p").checked).toBeUndefined();
   });
 });
+
+describe("Faz 6 — yeni blok türleri", () => {
+  it("h3/callout markdown'a doğru çevrilir, image URL'i taşır", () => {
+    const d = normalizeDoc({ blocks: [
+      { type: "h3", text: "Alt başlık" },
+      { type: "callout", text: "Önemli ipucu" },
+      { type: "image", text: "https://ornek.dev/a.png" },
+    ] })!;
+    const md = docToMarkdown(d);
+    expect(md).toContain("### Alt başlık");
+    expect(md).toContain("> 💡 Önemli ipucu");
+    expect(md).toContain("![](https://ornek.dev/a.png)");
+  });
+
+  it("docToHtml image'de yalnız http(s) kabul eder (javascript: dışlanır)", () => {
+    const d = normalizeDoc({ blocks: [
+      { type: "image", text: "https://ornek.dev/a.png" },
+      { type: "image", text: "javascript:alert(1)" },
+      { type: "callout", text: "Kutu" },
+    ] })!;
+    const html = docToHtml(d);
+    expect(html).toContain('<img src="https://ornek.dev/a.png"');
+    expect(html).not.toContain("javascript:alert");
+    expect(html).toContain('class="callout"');
+  });
+});

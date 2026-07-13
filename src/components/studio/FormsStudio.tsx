@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  ArrowDown, ArrowUp, Download, FolderOpen, Globe, ListChecks, Loader2,
+  ArrowDown, ArrowUp, Download, FolderOpen, GitBranch, Globe, ListChecks, Loader2,
   Plus, Save, Sparkles, Trash2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -11,7 +11,7 @@ import { SavedItemsModal } from "./SavedItemsModal";
 import { ExportMenu } from "./ExportMenu";
 import { safeFileName } from "./DocsStudio";
 import type { CraftForm, FormQuestion, FormQuestionType } from "@/lib/types";
-import { FORM_QUESTION_TYPES, formToHtml, generateForm, MAX_FORM_QUESTIONS, newQuestion } from "@/lib/forms";
+import { CONDITION_SOURCE_QTYPES, FORM_QUESTION_TYPES, formToHtml, generateForm, MAX_FORM_QUESTIONS, newQuestion, OPTION_QTYPES } from "@/lib/forms";
 import { downloadTemplate, pickTemplateFile } from "@/lib/templateShare";
 import { publishArtifact } from "@/lib/studioExport";
 import { useStudioProject } from "@/lib/useStudioProject";
@@ -103,10 +103,17 @@ export function FormsStudio() {
 
   const changeType = (q: FormQuestion, type: FormQuestionType) => {
     const patch: Partial<FormQuestion> = { type };
-    if ((type === "choice" || type === "multi") && (!q.options || q.options.length < 2)) {
+    if (OPTION_QTYPES.has(type) && (!q.options || q.options.length < 2)) {
       patch.options = ["Seçenek 1", "Seçenek 2"];
     }
     patchQ(q.id, patch);
+  };
+
+  /* Koşul kaynağı adayları: bu sorudan ÖNCEKİ tek-değerli seçim soruları. */
+  const conditionSources = (qId: string): FormQuestion[] => {
+    if (!form) return [];
+    const i = form.questions.findIndex((x) => x.id === qId);
+    return form.questions.slice(0, Math.max(0, i)).filter((x) => CONDITION_SOURCE_QTYPES.has(x.type));
   };
 
   const saveForm = () => {
@@ -244,7 +251,7 @@ export function FormsStudio() {
                       className="flex-1 min-w-0 bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-sm outline-none focus:border-brand/50"
                     />
                   </div>
-                  {(q.type === "choice" || q.type === "multi") && (
+                  {OPTION_QTYPES.has(q.type) && (
                     <textarea
                       value={(q.options ?? []).join("\n")}
                       onChange={(e) => patchQ(q.id, { options: e.target.value.split("\n").filter((o) => o.trim()).slice(0, 10) })}
@@ -252,6 +259,41 @@ export function FormsStudio() {
                       placeholder={"Seçenek 1\nSeçenek 2"}
                       className="w-full ml-7 max-w-[calc(100%-1.75rem)] bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50 resize-none"
                     />
+                  )}
+                  {/* Koşullu görünürlük — önceki bir choice/dropdown sorusuna bağlanır. */}
+                  {conditionSources(q.id).length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 ml-7 text-[11px] text-muted">
+                      <GitBranch size={11} className="shrink-0 text-muted/60" />
+                      <span>Koşul:</span>
+                      <select
+                        value={q.showIf?.questionId ?? ""}
+                        onChange={(e) => {
+                          const srcId = e.target.value;
+                          if (!srcId) { patchQ(q.id, { showIf: undefined }); return; }
+                          const src = form.questions.find((x) => x.id === srcId);
+                          patchQ(q.id, { showIf: { questionId: srcId, equals: src?.options?.[0] ?? "" } });
+                        }}
+                        className="bg-bgsoft border border-line rounded-lg px-2 py-1 outline-none cursor-pointer max-w-[180px] truncate"
+                        aria-label="Koşul kaynağı"
+                      >
+                        <option value="">her zaman göster</option>
+                        {conditionSources(q.id).map((src) => (
+                          <option key={src.id} value={src.id}>&quot;{src.label.slice(0, 32)}&quot; şuysa:</option>
+                        ))}
+                      </select>
+                      {q.showIf && (
+                        <select
+                          value={q.showIf.equals}
+                          onChange={(e) => patchQ(q.id, { showIf: { questionId: q.showIf!.questionId, equals: e.target.value } })}
+                          className="bg-bgsoft border border-line rounded-lg px-2 py-1 outline-none cursor-pointer max-w-[140px] truncate"
+                          aria-label="Koşul değeri"
+                        >
+                          {(form.questions.find((x) => x.id === q.showIf!.questionId)?.options ?? []).map((o) => (
+                            <option key={o} value={o}>{o}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                   )}
                   <div className="flex items-center gap-1.5 ml-7">
                     <select

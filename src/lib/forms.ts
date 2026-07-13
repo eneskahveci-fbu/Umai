@@ -13,8 +13,16 @@ export const FORM_QUESTION_TYPES: { id: FormQuestionType; name: string }[] = [
   { id: "long", name: "Uzun yanıt" },
   { id: "choice", name: "Çoktan seçmeli" },
   { id: "multi", name: "Çoklu seçim" },
+  { id: "dropdown", name: "Açılır liste" },
   { id: "rating", name: "Derecelendirme (1-5)" },
+  { id: "date", name: "Tarih" },
 ];
+
+/** Seçenek listesi taşıyan soru türleri (editör + normalize ortak kullanır). */
+export const OPTION_QTYPES: ReadonlySet<FormQuestionType> = new Set(["choice", "multi", "dropdown"]);
+
+/** Koşul kaynağı olabilen türler: tek-değerli seçim soruları. */
+export const CONDITION_SOURCE_QTYPES: ReadonlySet<FormQuestionType> = new Set(["choice", "dropdown"]);
 
 export const MAX_FORM_QUESTIONS = 40;
 
@@ -24,28 +32,35 @@ export function newQuestionId(): string {
 
 export function newQuestion(type: FormQuestionType = "short"): FormQuestion {
   const q: FormQuestion = { id: newQuestionId(), type, label: "Yeni soru" };
-  if (type === "choice" || type === "multi") q.options = ["Seçenek 1", "Seçenek 2"];
+  if (OPTION_QTYPES.has(type)) q.options = ["Seçenek 1", "Seçenek 2"];
   return q;
 }
 
 /* ── LLM çıktısını güvenli ankete çevirme ───────────────────────────── */
 
-const VALID_QTYPES: FormQuestionType[] = ["short", "long", "choice", "multi", "rating"];
+const VALID_QTYPES: FormQuestionType[] = ["short", "long", "choice", "multi", "rating", "dropdown", "date"];
 
-function normalizeQuestion(raw: unknown): FormQuestion | null {
+function normalizeQuestion(raw: unknown): (FormQuestion & { _showIfIndex?: number; _showIfEquals?: string }) | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   const label = typeof r.label === "string" ? r.label.trim() : "";
   if (!label) return null;
   const type = VALID_QTYPES.includes(r.type as FormQuestionType) ? (r.type as FormQuestionType) : "short";
-  const q: FormQuestion = { id: newQuestionId(), type, label };
-  if (type === "choice" || type === "multi") {
+  const q: FormQuestion & { _showIfIndex?: number; _showIfEquals?: string } = { id: newQuestionId(), type, label };
+  if (OPTION_QTYPES.has(type)) {
     const opts = Array.isArray(r.options)
       ? r.options.filter((o): o is string => typeof o === "string" && !!o.trim()).map((o) => o.trim()).slice(0, 10)
       : [];
     q.options = opts.length >= 2 ? opts : ["Evet", "Hayır"];
   }
   if (r.required === true) q.required = true;
+  /* Koşul, LLM şemasında İNDEKS ile gelir (LLM bizim üreteceğimiz id'leri
+     bilemez) — normalizeForm ikinci geçişte gerçek questionId'ye çevirir. */
+  const si = r.showIf as Record<string, unknown> | undefined;
+  if (si && typeof si === "object" && typeof si.q === "number" && typeof si.equals === "string" && si.equals.trim()) {
+    q._showIfIndex = si.q;
+    q._showIfEquals = si.equals.trim();
+  }
   return q;
 }
 
@@ -54,9 +69,20 @@ export function normalizeForm(raw: unknown, fallbackTitle = "Anket"): CraftForm 
   const r = raw as Record<string, unknown>;
   const questions = (Array.isArray(r.questions) ? r.questions : [])
     .map(normalizeQuestion)
-    .filter((q): q is FormQuestion => q !== null)
+    .filter((q): q is FormQuestion & { _showIfIndex?: number; _showIfEquals?: string } => q !== null)
     .slice(0, MAX_FORM_QUESTIONS);
   if (!questions.length) return null;
+  /* İkinci geçiş: indeks-tabanlı koşulları id'ye bağla. Yalnız DAHA ÖNCEKİ ve
+     tek-değerli (choice/dropdown) bir soru hedefse geçerli; değilse at. */
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i];
+    const idx = q._showIfIndex;
+    if (idx != null && q._showIfEquals && idx >= 0 && idx < i && CONDITION_SOURCE_QTYPES.has(questions[idx].type)) {
+      q.showIf = { questionId: questions[idx].id, equals: q._showIfEquals };
+    }
+    delete q._showIfIndex;
+    delete q._showIfEquals;
+  }
   const now = Date.now();
   return {
     id: `form_${now.toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
@@ -82,21 +108,29 @@ function questionHtml(q: FormQuestion, i: number): string {
   const name = `q${i}`;
   const req = q.required ? " required" : "";
   const label = `<label class="ql">${i + 1}. ${escapeHtml(q.label)}${q.required ? ' <em title="Zorunlu">*</em>' : ""}</label>`;
+  let body: string;
   switch (q.type) {
     case "long":
-      return `<div class="q">${label}<textarea name="${name}" rows="4"${req}></textarea></div>`;
+      body = `${label}<textarea name="${name}" rows="4"${req}></textarea>`; break;
     case "choice":
-      return `<div class="q">${label}${(q.options ?? []).map((o) =>
-        `<label class="opt"><input type="radio" name="${name}" value="${escapeHtml(o)}"${req}> ${escapeHtml(o)}</label>`).join("")}</div>`;
+      body = `${label}${(q.options ?? []).map((o) =>
+        `<label class="opt"><input type="radio" name="${name}" value="${escapeHtml(o)}"${req}> ${escapeHtml(o)}</label>`).join("")}`; break;
     case "multi":
-      return `<div class="q">${label}${(q.options ?? []).map((o) =>
-        `<label class="opt"><input type="checkbox" name="${name}" value="${escapeHtml(o)}"> ${escapeHtml(o)}</label>`).join("")}</div>`;
+      body = `${label}${(q.options ?? []).map((o) =>
+        `<label class="opt"><input type="checkbox" name="${name}" value="${escapeHtml(o)}"> ${escapeHtml(o)}</label>`).join("")}`; break;
+    case "dropdown":
+      body = `${label}<select name="${name}"${req}><option value="">Seçiniz…</option>${(q.options ?? []).map((o) =>
+        `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("")}</select>`; break;
     case "rating":
-      return `<div class="q">${label}<div class="rate">${[1, 2, 3, 4, 5].map((n) =>
-        `<label><input type="radio" name="${name}" value="${n}"${req}><span>${n}</span></label>`).join("")}</div></div>`;
+      body = `${label}<div class="rate">${[1, 2, 3, 4, 5].map((n) =>
+        `<label><input type="radio" name="${name}" value="${n}"${req}><span>${n}</span></label>`).join("")}</div>`; break;
+    case "date":
+      body = `${label}<input type="date" name="${name}"${req}>`; break;
     default:
-      return `<div class="q">${label}<input type="text" name="${name}"${req}></div>`;
+      body = `${label}<input type="text" name="${name}"${req}>`;
   }
+  /* Koşullu sorular id'li sarmalayıcı alır; görünürlüğü script yönetir. */
+  return `<div class="q" id="qw${i}">${body}</div>`;
 }
 
 /** Sunucusuz, kendi kendine yeten anket HTML'i: yanıtlar tarayıcıda birikir,
@@ -104,6 +138,16 @@ function questionHtml(q: FormQuestion, i: number): string {
 export function formToHtml(form: CraftForm): string {
   const storageKey = `craft_form_${form.id}`;
   const headers = form.questions.map((q) => q.label);
+  /* Koşul kuralları: hedef indeks + kaynak indeks + beklenen değer. Geçersiz
+     (silinmiş kaynak, kendinden sonraki soru) kurallar dışa aktarımda elenir. */
+  const logic = form.questions
+    .map((q, i) => {
+      if (!q.showIf) return null;
+      const s = form.questions.findIndex((x) => x.id === q.showIf!.questionId);
+      if (s === -1 || s >= i || !CONDITION_SOURCE_QTYPES.has(form.questions[s].type)) return null;
+      return { t: i, s, eq: q.showIf.equals };
+    })
+    .filter((r): r is { t: number; s: number; eq: string } => r !== null);
   return `<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -120,8 +164,8 @@ export function formToHtml(form: CraftForm): string {
   .desc { color: var(--muted); margin-bottom: 1.6rem; }
   .q { background: #fff; border: 1px solid var(--line); border-radius: .8rem; padding: 1rem 1.2rem; margin: .9rem 0; }
   .ql { display: block; font-weight: 600; margin-bottom: .6rem; } .ql em { color: var(--accent); font-style: normal; }
-  input[type=text], textarea { width: 100%; border: 1px solid var(--line); border-radius: .5rem; padding: .55rem .7rem;
-    font: inherit; background: #faf8f2; } input:focus, textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  input[type=text], input[type=date], textarea, select { width: 100%; border: 1px solid var(--line); border-radius: .5rem; padding: .55rem .7rem;
+    font: inherit; background: #faf8f2; } input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); border-color: transparent; }
   .opt { display: flex; align-items: center; gap: .5rem; padding: .25rem 0; cursor: pointer; }
   .rate { display: flex; gap: .5rem; } .rate label { cursor: pointer; }
   .rate input { position: absolute; opacity: 0; } .rate span { display: grid; place-items: center; width: 2.4rem; height: 2.4rem;
@@ -135,7 +179,7 @@ export function formToHtml(form: CraftForm): string {
   @media (prefers-color-scheme: dark) {
     :root { --line: #33322e; --muted: #a8a396; }
     body { background: #111110; color: #f4f2ec; } .q { background: #1c1c1a; }
-    input[type=text], textarea { background: #111110; color: #f4f2ec; }
+    input[type=text], input[type=date], textarea, select { background: #111110; color: #f4f2ec; }
     #ok { background: #10231c; border-color: #14532d; color: #a7f3d0; }
   }
 </style>
@@ -157,9 +201,31 @@ ${form.questions.map(questionHtml).join("\n")}
 (function () {
   var KEY = ${JSON.stringify(storageKey)};
   var HEADERS = ${JSON.stringify(headers)};
+  var LOGIC = ${JSON.stringify(logic)};
   var form = document.getElementById("f");
   function all() { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) { return []; } }
   function refresh() { var n = all().length; document.getElementById("cnt").textContent = n + " yanıt"; }
+  /* Koşullu görünürlük: kaynak sorunun değeri beklenene eşitse hedef görünür;
+     gizliyken girdiler disabled olur (required engellemez, yanıt CSV'ye girmez). */
+  function srcValue(i) {
+    var checked = form.querySelector('input[name="q' + i + '"]:checked');
+    if (checked) return checked.value;
+    var sel = form.querySelector('select[name="q' + i + '"]');
+    return sel ? sel.value : "";
+  }
+  function applyLogic() {
+    LOGIC.forEach(function (r) {
+      var wrap = document.getElementById("qw" + r.t);
+      if (!wrap) return;
+      var show = srcValue(r.s) === r.eq;
+      wrap.style.display = show ? "" : "none";
+      wrap.querySelectorAll("input, textarea, select").forEach(function (el) {
+        el.disabled = !show;
+        if (!show) { if (el.type === "radio" || el.type === "checkbox") el.checked = false; else el.value = ""; }
+      });
+    });
+  }
+  if (LOGIC.length) { form.addEventListener("change", applyLogic); applyLogic(); }
   form.addEventListener("submit", function (e) {
     e.preventDefault();
     var row = [];
@@ -167,6 +233,7 @@ ${form.questions.map(questionHtml).join("\n")}
       var els = form.querySelectorAll('[name="q' + i + '"]');
       var vals = [];
       els.forEach(function (el) {
+        if (el.disabled) return;
         if ((el.type === "radio" || el.type === "checkbox") && !el.checked) return;
         if (el.value) vals.push(el.value);
       });
@@ -197,8 +264,11 @@ ${form.questions.map(questionHtml).join("\n")}
 /* ── Üretim ─────────────────────────────────────────────────────────── */
 
 const FORM_SCHEMA =
-  '{"title": "anket başlığı", "desc": "kısa açıklama", "questions": [{"type": "short|long|choice|multi|rating", ' +
-  '"label": "soru metni", "options": ["choice/multi için 2-6 seçenek"], "required": true|false}]}';
+  '{"title": "anket başlığı", "desc": "kısa açıklama", "questions": [{"type": "short|long|choice|multi|dropdown|rating|date", ' +
+  '"label": "soru metni", "options": ["choice/multi/dropdown için 2-6 seçenek"], "required": true|false, ' +
+  '"showIf": {"q": 0, "equals": "Evet"}}]}\n' +
+  'showIf OPSİYONELDİR: soru yalnız, DAHA ÖNCEKİ bir choice/dropdown sorusu (0-tabanlı indeks "q") ' +
+  '"equals" değerini aldığında görünür — takip soruları için kullan.';
 
 export interface FormGenOptions {
   brief: string;
