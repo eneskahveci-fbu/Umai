@@ -124,6 +124,15 @@ declare global {
 
 /* ─── helpers ─── */
 
+/* AI Chips (Google AI Studio'nun özellik çiplerine paralel): en çok kullanılan
+   yetenekler, "/" yazmayı bilmeyen kullanıcı için tek tıkla. Küratörlü alt
+   küme — tam liste SlashMenu'de. Tıklama, SlashMenu seçimiyle AYNI yolu izler
+   (setActiveAgent), yani ayrı bir gönderim mantığı YOK. */
+const CHIP_AGENT_IDS = ["image-gen", "research", "explain", "fix", "refactor"];
+const CHIP_AGENTS = CHIP_AGENT_IDS
+  .map((id) => ALL_AGENTS.find((a) => a.id === id))
+  .filter((a): a is Agent => !!a);
+
 /* "⋯ Daha fazla" — az kullanılan eylemleri tek menüde toplar.
    Açılır menü createPortal ile body'e render edilir (overflow kabı kırpmasın).
    placement: "top" (composer, yukarı açılır) | "bottom" (header, aşağı açılır). */
@@ -649,6 +658,7 @@ export function CoderView() {
     }, 400);
     return () => clearTimeout(t);
   }, [input]);
+
   const [improvingPrompt, setImprovingPrompt] = useState(false);
 
   /* Prompt geliştirici — composer'daki taslağı ücretsiz LLM ile daha net/etkili
@@ -3312,6 +3322,24 @@ export function CoderView() {
                       <X size={10} />
                     </button>
                   </div>
+                </div>
+              )}
+
+              {/* AI Chips — yalnız girdi boşken görünür (yazmaya başlayınca
+                 kaybolur, akışta hiç görünmez); böylece kalabalık yapmadan
+                 yetenekleri keşfettirir. */}
+              {!activeAgent && !input && !streaming && (
+                <div className="flex items-center gap-1.5 mb-2 overflow-x-auto no-scrollbar">
+                  {CHIP_AGENTS.map((a) => (
+                    <button
+                      key={a.id}
+                      onClick={() => { setActiveAgent(a); taRef.current?.focus(); }}
+                      className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-line/60 bg-surface/60 text-[11px] font-medium text-muted hover:text-ink hover:border-brand/40 transition-colors"
+                    >
+                      <span className="text-[12px] leading-none">{a.icon}</span>
+                      {a.label}
+                    </button>
+                  ))}
                 </div>
               )}
 
