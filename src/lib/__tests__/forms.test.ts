@@ -141,3 +141,23 @@ describe("Faz 6 — yeni soru türleri + koşullu mantık", () => {
     expect(formToHtml(f)).toContain("var LOGIC = []");
   });
 });
+
+describe("Faz 7 — merkezî yanıt toplama (collect)", () => {
+  const f = () => normalizeForm({ questions: [{ type: "short", label: "Ad?" }] })!;
+
+  it("collect verilince COLLECT config + fetch gömülür ve dolduran bilgilendirilir", () => {
+    const form = f();
+    const html = formToHtml(form, { collect: { url: "https://umai.app/api/forms/respond" } });
+    expect(html).toContain('"url":"https://umai.app/api/forms/respond"');
+    expect(html).toContain(`"formId":"${form.id}"`);
+    expect(html).toContain("fetch(COLLECT.url");
+    expect(html).toContain("form sahibine iletilir");
+  });
+
+  it("collect YOKKEN form saf sunucusuz kalır (COLLECT null, fetch tetiklenmez)", () => {
+    const html = formToHtml(f());
+    expect(html).toContain("var COLLECT = null");
+    expect(html).toContain("sunucusuz, yanıtlar bu cihazda saklanır");
+    expect(html).not.toContain("api/forms/respond");
+  });
+});

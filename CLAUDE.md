@@ -116,7 +116,13 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
 - **Anket Stüdyosu** (`studio/FormsStudio.tsx`, `/studio/anket`): Google
   Forms'tan ilhamla (`lib/forms.ts`) — AI soru üretimi, canlı önizleme,
   SUNUCUSUZ bağımsız HTML form (yanıtlar dolduranın tarayıcısında + CSV),
-  `/api/publish` ile bağlantı, `config.craftForms`.
+  `/api/publish` ile bağlantı, `config.craftForms`. **Merkezî yanıt toplama
+  (opsiyonel)**: sahibi girişliyken yayınlanan/indirilen HTML'e toplama
+  kancası gömülür → her gönderim CORS'lu anonim `/api/forms/respond` ucuna
+  da POST edilir (`published_forms` sahiplik + `form_responses` tabloları;
+  okuma RLS ile yalnız sahibe, HTML'e kullanıcı kimliği gömülmez); özet
+  `studio/FormResponses.tsx` ("Yanıtlar" butonu), soru bazlı agregasyon
+  `lib/formAnalytics.ts` (saf, test edilebilir).
 - **Defter** (`studio/NotebookStudio.tsx`, `/studio/defter`): NotebookLM'den
   ilhamla kaynak-temelli sohbet — metin yapıştır / URL getir (`/api/fetch-text`),
   yalnız kaynaklardan [n] atıflı yanıt, Pollinations TTS "sesli özet",
