@@ -274,7 +274,7 @@ export function RightPanel(props: RightPanelProps) {
         </div>
       ) : (
         /* Single tool view */
-        <div className="flex-1 min-h-0 overflow-hidden">
+        <div key={effectiveActive} className="flex-1 min-h-0 overflow-hidden animate-fade-in">
           {effectiveActive === "editor" && props.editorFile && (
             <div className="h-full flex flex-col min-h-0">
               <FileTabsBar

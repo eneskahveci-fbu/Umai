@@ -354,9 +354,15 @@ function StatusBar({
           )}
         </button>
       )}
-      {expanded && badges.slice(1).map((b) => (
-        <span key={b.key} className={`flex items-center gap-1 font-medium ${b.className}`} title={b.title}>{b.icon} {b.label}</span>
-      ))}
+      {badges.length > 1 && (
+        <div className={`grid transition-[grid-template-columns] duration-200 ease-out ${expanded ? "grid-cols-[1fr]" : "grid-cols-[0fr]"}`}>
+          <div className="min-w-0 overflow-hidden flex items-center gap-1.5">
+            {badges.slice(1).map((b) => (
+              <span key={b.key} className={`flex items-center gap-1 font-medium whitespace-nowrap ${b.className}`} title={b.title}>{b.icon} {b.label}</span>
+            ))}
+          </div>
+        </div>
+      )}
       {sensitiveHits.length > 0 && (
         <span className="flex items-center gap-1 text-yellow font-medium" title={`Mesajında hassas veri olabilir (${sensitiveHits.join(", ")}). API anahtarlarını/kart bilgilerini sohbete yazma.`}>
           <ShieldCheck size={12} /> Hassas veri?
