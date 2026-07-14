@@ -558,6 +558,15 @@ html.light .user-bubble {
   animation: modal-content 0.2s ease-out;
 }
 
+/* ─── Modal kapanış (bkz. useExitAnimation) — açılışın tam tersi, kısa ve
+   "ease-in" (kapanış her zaman girişten biraz daha hızlı hissettirir). ─── */
+.animate-modal-bg-out {
+  animation: modal-bg 0.15s ease-in reverse both;
+}
+.animate-modal-content-out {
+  animation: modal-content 0.15s ease-in reverse both;
+}
+
 /* Yatay kaydırılabilir şeritlerde (örn. modal sekmeleri) kaydırma çubuğunu
    gizle — iOS/Safari dahil. Erişilebilirlik için kaydırma yine çalışır. */
 .no-scrollbar {

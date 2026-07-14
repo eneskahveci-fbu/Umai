@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { BarChart3, Download, Loader2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useModalA11y } from "@/lib/useModalA11y";
+import { useExitAnimation } from "@/lib/useExitAnimation";
 import type { CraftForm } from "@/lib/types";
 import { responsesToCsv, summarizeResponses, type FormResponseRow } from "@/lib/formAnalytics";
 import { safeFileName } from "./DocsStudio";
@@ -23,12 +24,15 @@ export function FormResponsesModal({ form, open, onClose }: {
   const [rows, setRows] = useState<FormResponseRow[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  /* Parent modali yalnız açıkken mount eder (FormsStudio) → başlangıç state'i
-     her açılışta taze; efekt yalnız veri çeker (senkron setState yok). */
+  /* Modal artık kapanış animasyonu oynayabilsin diye `form` var oldukça mounted
+     kalır (bkz. FormsStudio.tsx) — bu yüzden her açılışta state'i burada elle
+     tazeleriz (eskiden tam unmount/remount bunu bedavaya veriyordu). */
   useEffect(() => {
     if (!open) return;
     let alive = true;
     (async () => {
+      setRows(null);
+      setErr(null);
       const sb = createClient();
       if (!sb) { if (alive) setErr("Supabase yapılandırılmamış."); return; }
       const { data: { user } } = await sb.auth.getUser();
@@ -49,7 +53,8 @@ export function FormResponsesModal({ form, open, onClose }: {
     return () => { alive = false; };
   }, [open, form.id]);
 
-  if (!open) return null;
+  const { mounted, closing } = useExitAnimation(open);
+  if (!mounted) return null;
 
   const summaries = rows ? summarizeResponses(form, rows) : [];
 
@@ -63,7 +68,7 @@ export function FormResponsesModal({ form, open, onClose }: {
   };
 
   return (
-    <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-modal-bg" onClick={onClose}>
+    <div className={`fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 ${closing ? "animate-modal-bg-out" : "animate-modal-bg"}`} onClick={onClose}>
       <div
         ref={ref}
         role="dialog"
