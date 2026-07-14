@@ -3088,12 +3088,7 @@ export function CoderView() {
           <SelectionQuoteBar containerRef={scrollRef} onQuote={quoteSelection} />
           <div ref={scrollRef} onScroll={onMessagesScroll} className="flex-1 overflow-y-auto overscroll-contain" style={{ overflowAnchor: "none" }}>
             {messages.length === 0 ? (
-              <EmptyChat
-                hasModel={config.models.length > 0}
-                hasRepo={!!repo}
-                onAddModel={() => setSettingsOpen(true)}
-                onPrompt={(text) => setInput(text)}
-              />
+              <EmptyChat />
             ) : (
               <div className="max-w-3xl mx-auto px-5 py-6">
                 {messages.map((m, i) => {

@@ -1,19 +1,22 @@
 "use client";
 
 /* ═══════════════════════════════════════════════════════════════════════
-   TASARIM STÜDYOSU — Claude Design'a birebir paralel: sol sohbet, sağ TEK
-   canlı tasarım tuvali. "OpenDesignStudio" (çoklu sayfa/format/deck/katman
-   editörü) sadeleştirilerek buna dönüştürüldü — tek tasarım alanı, hazır
-   şablonlar (studioTemplates.ts). Marka seçici YOK: üretim her zaman sabit
-   "claude" tasarım sistemini kullanır (designSystems.ts) — çıktı da arayüz
-   gibi Claude Design'a paralel olsun diye. Arayüz kendisi de `.theme-claude`
-   ile Claude'un gerçek paletini uygular (bkz. globals.css). Tuval, sohbetin
-   ArtifactPanel'iyle AYNI ArtifactCanvas bileşenini paylaşır (önizleme/kod,
-   sürüm gezinme, kopyala/indir/yayınla — tek kaynak).
+   TASARIM STÜDYOSU — Claude Design'ın ETKİLEŞİM desenine paralel: sol
+   sohbet, sağ TEK canlı tasarım tuvali. "OpenDesignStudio" (çoklu sayfa/
+   format/deck/katman editörü) sadeleştirilerek buna dönüştürüldü — tek
+   tasarım alanı, hazır şablonlar (studioTemplates.ts). Marka seçici YOK:
+   ÜRETİM her zaman sabit "claude" tasarım sistemini kullanır
+   (designSystems.ts) — çıktı kalitesi kanıtlanmış bir sistemden gelsin diye
+   (Temmuz 2026 kararı: bu, ÇIKTI için sabit tutuldu). Arayüzün KENDİSİ artık
+   `.theme-claude` TAŞIMIYOR (Tem 2026 kullanıcı kararı) — kroma Umai'nin
+   kendi teması uygulanır, yalnız üretilen artifact'in KENDİ gömülü CSS'i
+   (iframe içinde, ayrı) Claude'un paletini kullanmaya devam eder. Tuval,
+   sohbetin ArtifactPanel'iyle AYNI ArtifactCanvas bileşenini paylaşır
+   (önizleme/kod, sürüm gezinme, kopyala/indir/yayınla — tek kaynak).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FileCode2, FileText, FolderOpen, Loader2, Save, Send, Sparkles, Square, User, X } from "lucide-react";
+import { FileCode2, FileText, FolderOpen, Loader2, Save, Send, Sparkles, Square, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
@@ -98,20 +101,27 @@ function ChatPanel({
           <EmptyChatHint />
         ) : (
           <div className="space-y-3">
-            {messages.map((m, i) => (
-              <div key={i} className="flex gap-2.5 text-sm">
-                <div className="shrink-0 w-6 h-6 rounded-full grid place-items-center mt-0.5 border border-line bg-bgsoft">
-                  {m.role === "user"
-                    ? <User size={12} className="text-muted" />
-                    : <Sparkles size={12} className="text-brand" />}
+            {messages.map((m, i) =>
+              m.role === "user" ? (
+                /* Klasik sohbet balonu — sağda, ana sohbetteki .user-bubble ile
+                   AYNI görsel dil (bkz. MessageBubble.tsx). */
+                <div key={i} className="flex justify-end">
+                  <div className="max-w-[85%] min-w-0">
+                    <div className="user-bubble px-3 py-2 rounded-xl text-sm leading-relaxed whitespace-pre-wrap break-words">
+                      {m.text}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0 whitespace-pre-wrap break-words leading-relaxed text-ink/90">
+              ) : (
+                /* Asistan — solda, avatarsız düz-metin akışı (ana sohbetteki
+                   asistan mesajlarıyla aynı desen). */
+                <div key={i} className="text-sm whitespace-pre-wrap break-words leading-relaxed text-ink/90">
                   {m.text || <span className="text-muted/60">…</span>}
                 </div>
-              </div>
-            ))}
+              )
+            )}
             {busy && phase && (
-              <div className="flex items-center gap-2 text-xs text-brand pl-8">
+              <div className="flex items-center gap-2 text-xs text-brand">
                 <Loader2 size={12} className="animate-spin" /> {PHASE_LABEL[phase]}
               </div>
             )}
@@ -119,8 +129,9 @@ function ChatPanel({
         )}
       </div>
 
-      <div className="shrink-0 border-t border-line p-2.5 space-y-1.5">
-        <div className="flex items-end gap-1.5 rounded-xl border border-line bg-surface focus-within:border-brand/50 px-2 py-1.5">
+      {/* Yüzen/gölgeli composer — CoderView'ın composer'ıyla aynı dil (elev-2). */}
+      <div className="shrink-0 p-2.5">
+        <div className="flex items-end gap-1.5 rounded-2xl border border-line bg-surface elev-2 focus-within:border-brand/50 transition-colors px-3 py-2">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -132,12 +143,18 @@ function ChatPanel({
             className="flex-1 bg-transparent resize-none outline-none text-sm py-1 max-h-28"
           />
           {busy ? (
-            <button onClick={onStop} className="shrink-0 p-1.5 rounded-lg text-muted hover:text-red" title="Durdur" aria-label="Durdur">
-              <Square size={15} />
+            <button onClick={onStop} className="shrink-0 w-8 h-8 grid place-items-center rounded-full text-muted hover:text-red hover:bg-bgsoft transition-colors" title="Durdur" aria-label="Durdur">
+              <Square size={14} />
             </button>
           ) : (
-            <button onClick={submit} disabled={!input.trim()} className="shrink-0 p-1.5 rounded-lg text-brand disabled:opacity-30 hover:bg-brand/10" title="Gönder" aria-label="Gönder">
-              <Send size={15} />
+            <button
+              onClick={submit}
+              disabled={!input.trim()}
+              className="shrink-0 w-8 h-8 grid place-items-center rounded-full bg-brand text-bg disabled:opacity-30 hover:bg-branddim transition-colors"
+              title="Gönder"
+              aria-label="Gönder"
+            >
+              <Send size={14} />
             </button>
           )}
         </div>
@@ -421,7 +438,7 @@ export function DesignStudio() {
   );
 
   return (
-    <div className="theme-claude fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+    <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       <StudioTopBar
         icon={Sparkles}
         label="Tasarım"
