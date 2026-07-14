@@ -1207,11 +1207,21 @@ export async function POST(req: Request) {
 
   /* Bir adayı çağırır (Anthropic native ucu ayrı; diğerleri OpenAI-uyumlu fetch).
      Pollinations anonim istekleri için `referrer` ekler. */
-  const openCandidate = (c: Candidate, messages: unknown, extra: Record<string, unknown> = {}): Promise<Response> => {
+  const openCandidate = async (c: Candidate, messages: unknown, extra: Record<string, unknown> = {}): Promise<Response> => {
     const b: Record<string, unknown> = { model: c.model, messages, stream: true, ...sampling, ...extra };
     if (c.provider === "pollinations") b.referrer = "craft-coder";
     if (c.provider === "anthropic") return anthropicUpstream(c.baseUrl, c.apiKey, b as unknown as OpenAIChatBody);
-    return fetch(candidateUrl(c), { method: "POST", headers: buildCandidateHeaders(c, req), body: JSON.stringify(b) });
+    const res = await fetch(candidateUrl(c), { method: "POST", headers: buildCandidateHeaders(c, req), body: JSON.stringify(b) });
+    /* Kendi kendine kurtarma: anahtarsız da çalışabilen bir sağlayıcıda (ör. OVH)
+       saklı/bayat bir anahtar 401/403 alırsa AYNI adayı anonim (anahtarsız) bir
+       kez daha dene. Eski bir hatadan (bkz. KEYLESS_CHAT_PROVIDERS senkron
+       düzeltmesi) zaten kaydedilmiş bozuk anahtarlı model satırları, kullanıcı
+       hiçbir şey yapmadan kendi kendine düzelsin. */
+    if (!res.ok && (res.status === 401 || res.status === 403) && c.apiKey && KEYLESS_CHAT_PROVIDERS.has(c.provider)) {
+      const anon = { ...c, apiKey: "" };
+      return fetch(candidateUrl(anon), { method: "POST", headers: buildCandidateHeaders(anon, req), body: JSON.stringify(b) });
+    }
+    return res;
   };
 
   let sysPrompt = body.systemPrompt || DEFAULT_SYSTEM_PROMPT;

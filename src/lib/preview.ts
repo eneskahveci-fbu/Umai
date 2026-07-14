@@ -48,6 +48,11 @@ const CONSOLE_UI =
   `})();<\/script>`;
 
 function reactDoc(code: string, css: string): string {
+  /* buildPreview zaten <html> içeren (Next.js layout benzeri, tek başına
+     anlamsız render eden) bloklardan kaçınmaya çalışır; ama TEK aday oysa
+     yine de buraya düşer — sessizce boş render etmek yerine net bir mesaj
+     göster (kullanıcı "önizleme çalışmıyor" sanıp aramasın). */
+  const isNextRootFile = /<html[\s>]/i.test(code);
   /* ESM import/export CDN-global yaklaşımıyla uyumsuz → temizle. */
   const src = code
     .replace(/^\s*import[^\n]*\n/gm, "")
@@ -59,7 +64,9 @@ function reactDoc(code: string, css: string): string {
     const names = [...src.matchAll(/(?:function|const|class)\s+([A-Z]\w*)/g)].map((x) => x[1]);
     comp = names[names.length - 1] || "";
   }
-  const mount = comp
+  const mount = isNextRootFile
+    ? `document.getElementById('root').innerHTML='<p style="font-family:system-ui;color:#666;padding:1rem;line-height:1.5">Bu dosya kendi &lt;html&gt;/&lt;body&gt; etiketlerini tanımlıyor (ör. Next.js <code>layout.tsx</code>) — çok dosyalı bir projenin parçası olduğundan tek başına canlı önizlenemez. Gerçek bir sayfa/bileşen bloğu (ör. <code>page.tsx</code>) varsa o gösterilir; yoksa bu dosyayı bağımsız bir HTML olarak indirip tarayıcıda aç.</p>';`
+    : comp
     ? `try{ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(${comp}));}catch(e){document.getElementById('root').innerHTML='<pre style="color:#c00;white-space:pre-wrap;padding:1rem">'+(e&&e.stack||e)+'</pre>';}`
     : `document.getElementById('root').innerHTML='<p style="font-family:system-ui;color:#666;padding:1rem">Önizlenecek bir React bileşeni bulunamadı (App veya büyük-harfli bir bileşen tanımla).</p>';`;
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -103,7 +110,15 @@ export function buildPreview(markdown: string): Artifact | null {
   const css = blocks.filter((b) => isCss(b.lang)).map((b) => b.code).join("\n");
   const js = blocks.filter((b) => isJs(b.lang)).map((b) => b.code).join("\n");
   const html = blocks.find((b) => isHtml(b.lang));
-  const react = blocks.find((b) => isReact(b.lang) || (isTs(b.lang) && /<[A-Za-z]/.test(b.code)));
+  /* Yanıtta birden fazla .tsx/.jsx bloğu olabilir (ör. çok dosyalı bir Next.js
+     projesi: layout.tsx + gerçek bir sayfa/bileşen). layout.tsx gibi Next.js
+     kök dosyaları kendi <html>/<body> etiketlerini tanımlar — tek başına
+     mount edilince (children prop'u boş) tamamen BOŞ render eder, hata da
+     vermez. Böyle bloklar elenir; kalan adaylardan SONUNCUSU (genelde asıl
+     önizlenecek bileşen) seçilir. Tek aday varsa davranış değişmez. */
+  const reactCandidates = blocks.filter((b) => isReact(b.lang) || (isTs(b.lang) && /<[A-Za-z]/.test(b.code)));
+  const previewable = reactCandidates.filter((b) => !/<html[\s>]/i.test(b.code));
+  const react = previewable[previewable.length - 1] ?? reactCandidates[reactCandidates.length - 1];
   const svg = blocks.find((b) => b.lang === "svg" || (!b.lang && b.code.trimStart().startsWith("<svg")));
   const mermaid = blocks.find((b) => b.lang === "mermaid");
 

@@ -142,8 +142,8 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
 
         <div className="flex items-center gap-1 shrink-0">
           <div className="flex items-center bg-bgsoft border border-line/60 rounded-lg p-0.5 mr-1">
-            <button onClick={() => setView("preview")} className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${view === "preview" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`} title="Önizleme"><Eye size={12} /> Önizleme</button>
-            <button onClick={() => setView("code")} className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${view === "code" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`} title="Kaynak kod"><Code2 size={12} /> Kod</button>
+            <button onClick={() => setView("preview")} className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${view === "preview" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`} title="Önizleme"><Eye size={12} /> <span className="hidden sm:inline">Önizleme</span></button>
+            <button onClick={() => setView("code")} className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${view === "code" ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"}`} title="Kaynak kod"><Code2 size={12} /> <span className="hidden sm:inline">Kod</span></button>
           </div>
 
           {canAnnotate && view === "preview" && (
