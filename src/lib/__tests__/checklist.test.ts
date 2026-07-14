@@ -42,4 +42,27 @@ describe("toggleChecklistLine", () => {
     const content = "- [ ] üst\n  - [ ] alt madde";
     expect(toggleChecklistLine(content, 2)).toBe("- [ ] üst\n  - [x] alt madde");
   });
+
+  it("numaralı liste işaretçisiyle (1.) çalışır — AI'nın canlıda ürettiği asıl bug", () => {
+    const content = "1. [ ] Tek dil / Fiyat (USD)\n2. [ ] Çokdilli (İNG, TR) + Döviz API";
+    expect(toggleChecklistLine(content, 1)).toBe("1. [x] Tek dil / Fiyat (USD)\n2. [ ] Çokdilli (İNG, TR) + Döviz API");
+    expect(toggleChecklistLine(content, 2)).toBe("1. [ ] Tek dil / Fiyat (USD)\n2. [x] Çokdilli (İNG, TR) + Döviz API");
+  });
+
+  it("numaralı liste işaretçisiyle (1)) parantez varyantında da çalışır", () => {
+    const content = "1) [ ] seçenek";
+    expect(toggleChecklistLine(content, 1)).toBe("1) [x] seçenek");
+  });
+
+  it("girintili numaralı alt-liste checkbox'ında çalışır (iç içe liste)", () => {
+    const content = "1. **Çoklu dil / Para birimi**\n   1. [ ] Tek dil / Fiyat (USD)\n   2. [ ] Çokdilli (İNG, TR) + Döviz API";
+    expect(toggleChecklistLine(content, 2)).toBe(
+      "1. **Çoklu dil / Para birimi**\n   1. [x] Tek dil / Fiyat (USD)\n   2. [ ] Çokdilli (İNG, TR) + Döviz API",
+    );
+  });
+
+  it("çift haneli numaralarla da çalışır", () => {
+    const content = "10. [ ] onuncu madde";
+    expect(toggleChecklistLine(content, 1)).toBe("10. [x] onuncu madde");
+  });
 });
