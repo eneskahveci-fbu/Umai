@@ -54,7 +54,7 @@ function SidebarToolsButton({ variant, onNavigate }: { variant: "rail" | "nav"; 
   }, [open]);
 
   const items = [
-    { icon: <BookOpen size={14} />, label: "Kütüphane", onClick: () => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); } },
+    { icon: <BookOpen size={14} />, label: "Snippet'ler", onClick: () => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); } },
     { icon: <Activity size={14} />, label: "Etkinlik Günlüğü", onClick: () => useStore.getState().setActivityOpen(true) },
     { icon: <Keyboard size={14} />, label: "Kısayollar", onClick: () => useStore.getState().setShortcutsOpen(true) },
   ];
@@ -289,7 +289,7 @@ export function Sidebar() {
           <span className="flex-1 text-left">Sohbetler</span>
         </button>
         <button
-          onClick={() => router.push("/studio")}
+          onClick={() => { router.push("/studio"); closeOnMobile(); }}
           aria-current={pathname.startsWith("/studio") ? "page" : undefined}
           className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors ${
             pathname.startsWith("/studio") ? "bg-brand/10 text-brand" : "text-ink/85 hover:bg-bgsoft/70 hover:text-ink"
@@ -301,7 +301,7 @@ export function Sidebar() {
         {/* Kütüphane üst seviyede (Codex IA önerisi): üretilen çıktılar
            keşfedilebilir olsun — Araçlar açılır listesine gömülmesin. */}
         <button
-          onClick={() => router.push("/library")}
+          onClick={() => { router.push("/library"); closeOnMobile(); }}
           aria-current={pathname.startsWith("/library") ? "page" : undefined}
           className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors ${
             pathname.startsWith("/library") ? "bg-brand/10 text-brand" : "text-ink/85 hover:bg-bgsoft/70 hover:text-ink"
@@ -311,7 +311,7 @@ export function Sidebar() {
           <span className="flex-1 text-left">Kütüphane</span>
         </button>
         <button
-          onClick={() => router.push("/projects")}
+          onClick={() => { router.push("/projects"); closeOnMobile(); }}
           aria-current={pathname.startsWith("/projects") ? "page" : undefined}
           className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors ${
             pathname.startsWith("/projects") ? "bg-brand/10 text-brand" : "text-ink/85 hover:bg-bgsoft/70 hover:text-ink"
