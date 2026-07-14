@@ -8,6 +8,7 @@ import {
 import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
+import { GenSkeleton } from "./GenSkeleton";
 import { SavedItemsModal } from "./SavedItemsModal";
 import { FormResponsesModal } from "./FormResponses";
 import { ExportMenu } from "./ExportMenu";
@@ -222,7 +223,12 @@ export function FormsStudio() {
                 </button>
               </div>
             </div>
-            {busy && <p className="text-center text-xs text-muted/60 animate-pulse">Sorular kurgulanıyor… ({progress} karakter)</p>}
+            {busy && (
+              <div className="flex flex-col items-center gap-2.5">
+                <GenSkeleton />
+                <p className="text-center text-xs text-muted/60">Sorular kurgulanıyor… ({progress} karakter)</p>
+              </div>
+            )}
             <div className="grid sm:grid-cols-2 gap-2">
               {SUGGESTIONS.map((s) => (
                 <button key={s} onClick={() => setBrief(s)} className="text-left text-[12.5px] leading-snug px-3 py-2.5 rounded-xl border border-line/60 hover:border-brand/50 hover:bg-bgsoft/60 text-muted hover:text-ink transition-colors">{s}</button>
