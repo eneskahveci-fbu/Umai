@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogIn, LogOut, Settings } from "lucide-react";
+import { LogIn, LogOut, Settings, UserRound } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { createClient, supabaseConfigured } from "@/lib/supabase/client";
 
+/* İkon-yalnız hesap düğmesi (Claude'un sol alt köşedeki yuvarlak avatar
+   rozeti gibi) — tıklayınca aynı yerde yukarı açılan bir menü gösterir. */
 export function AuthButton() {
   const userEmail = useStore((s) => s.userEmail);
   const [busy, setBusy] = useState(false);
@@ -31,8 +33,11 @@ export function AuthButton() {
 
   if (!supabaseConfigured) {
     return (
-      <div className="text-xs text-muted px-2 py-1.5 rounded-lg bg-bgsoft border border-line text-center">
-        Yerel mod · sohbetler bu tarayıcıda
+      <div
+        title="Yerel mod · sohbetler bu tarayıcıda"
+        className="w-10 h-10 rounded-full border border-line bg-bgsoft grid place-items-center text-muted/60 shrink-0"
+      >
+        <UserRound size={16} />
       </div>
     );
   }
@@ -49,16 +54,14 @@ export function AuthButton() {
         <button
           onClick={() => setMenuOpen((v) => !v)}
           aria-expanded={menuOpen}
+          aria-label={userEmail}
           title={userEmail}
-          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl border border-line hover:border-brand/40 hover:bg-bgsoft text-sm transition-colors"
+          className="w-10 h-10 rounded-full bg-brand/15 border border-brand/25 grid place-items-center text-brand text-sm font-bold hover:bg-brand/25 transition-colors shrink-0"
         >
-          <span className="w-7 h-7 rounded-full bg-brand/15 border border-brand/25 grid place-items-center text-brand text-xs font-bold shrink-0">
-            {initial}
-          </span>
-          <span className="flex-1 truncate text-left text-muted">{userEmail}</span>
+          {initial}
         </button>
         {menuOpen && (
-          <div className="animate-fade-in absolute bottom-full left-0 right-0 mb-1.5 z-20 rounded-xl border border-line bg-surface elev-2 overflow-hidden text-sm">
+          <div className="animate-fade-in absolute bottom-full left-0 mb-1.5 z-20 w-56 rounded-xl border border-line bg-surface elev-2 overflow-hidden text-sm">
             <div className="px-3 py-2.5 border-b border-line/50">
               <p className="text-[11px] text-muted/60">Oturum açık</p>
               <p className="truncate font-medium text-ink">{userEmail}</p>
@@ -88,10 +91,11 @@ export function AuthButton() {
     <button
       onClick={() => { setBusy(true); window.location.href = "/login"; }}
       disabled={busy}
-      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-line bg-bgsoft hover:border-brand text-sm font-semibold disabled:opacity-50"
+      title="Giriş Yap / Kayıt Ol"
+      aria-label="Giriş Yap / Kayıt Ol"
+      className="w-10 h-10 rounded-full border border-line bg-bgsoft hover:border-brand grid place-items-center disabled:opacity-50 shrink-0 transition-colors"
     >
-      <LogIn size={15} />
-      {busy ? "Yönlendiriliyor…" : "Giriş Yap / Kayıt Ol"}
+      <LogIn size={16} />
     </button>
   );
 }

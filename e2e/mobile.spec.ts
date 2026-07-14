@@ -2,8 +2,8 @@ import { test, expect } from "@playwright/test";
 import { hasAuthState, AUTH_STATE_PATH } from "./fixtures/auth";
 import { expectNoSeriousA11yViolations } from "./fixtures/a11y";
 
-/* Mobil alt sekme (3 öğe: Sohbet/Stüdyo/Ayarlar) + Ayarlar modalı + genel
-   üst-üste-binme kontrolü. İçerik araçları (Doküman/Anket/Defter/Kroki/
+/* Mobil alt sekme (4 öğe: Sohbet/Stüdyo/Kütüphane/Ayarlar) + Ayarlar modalı +
+   genel üst-üste-binme kontrolü. İçerik araçları (Doküman/Anket/Defter/Kroki/
    Kartlar) ayrı bir "Araçlar" sekmesi olmaktan çıktı — Stüdyo ana ekranındaki
    büyük araç kartlarından erişiliyor (bkz. studio.spec.ts). Kimlik gerektirir
    — bkz. global-setup.ts. */
@@ -11,11 +11,11 @@ test.describe("Mobil alt sekme + Ayarlar", () => {
   test.skip(!hasAuthState(), "E2E test hesabıyla oturum açılamadı (bkz. global-setup.ts konsol uyarısı) — kimlik gerektiren testler atlandı.");
   test.use({ storageState: AUTH_STATE_PATH, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
-  test("3 öğeli alt sekme görünür, yatay taşma yok", async ({ page }) => {
+  test("4 öğeli alt sekme görünür, yatay taşma yok", async ({ page }) => {
     await page.goto("/app");
     const nav = page.getByRole("navigation", { name: "Alt gezinme" });
     await expect(nav).toBeVisible({ timeout: 15_000 });
-    for (const label of ["Sohbet", "Stüdyo", "Ayarlar"]) {
+    for (const label of ["Sohbet", "Stüdyo", "Kütüphane", "Ayarlar"]) {
       await expect(nav.getByText(label, { exact: true })).toBeVisible();
     }
     const overflow = await page.evaluate(
