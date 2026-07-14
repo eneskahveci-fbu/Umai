@@ -9,7 +9,7 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import {
   AlertCircle, BookMarked, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-  Circle, CircleDot, Compass, FlaskConical, ImageOff, ListChecks, Microscope, MoreHorizontal, Settings2,
+  Circle, CircleCheck, Compass, FlaskConical, ImageOff, ListChecks, Microscope, MoreHorizontal, Settings2,
   Code2, Copy, FileText, FolderOpen, GitBranch, GitCommit, Globe,
   Highlighter, Loader2, Pencil, RefreshCw, Search, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, Users, Volume2, VolumeX, Wrench, X,
 } from "lucide-react";
@@ -251,9 +251,9 @@ function PlanPanel({ plan }: { plan: string }) {
         {steps.map((s, i) => (
           <div key={i} className="flex items-start gap-2 text-xs">
             {s.status === "done" ? (
-              <Check size={12} className="text-green shrink-0 mt-0.5" />
+              <CircleCheck size={12} className="text-green shrink-0 mt-0.5" />
             ) : s.status === "active" ? (
-              <CircleDot size={12} className="text-brand shrink-0 mt-0.5 animate-pulse" />
+              <Loader2 size={12} className="text-brand shrink-0 mt-0.5 animate-spin" />
             ) : (
               <Circle size={12} className="text-muted/30 shrink-0 mt-0.5" />
             )}
@@ -749,11 +749,11 @@ function MessageBubbleImpl({
               {/* Hover actions */}
               <div className="flex items-center gap-0.5 mt-1.5 justify-end [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 transition-opacity duration-150">
                 <button onClick={copyMessage} aria-label="Kopyala" className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-2.5 rounded-lg hover:bg-bgsoft transition-colors">
-                  {copied ? <Check size={11} /> : <Copy size={11} />}
+                  {copied ? <Check size={12} /> : <Copy size={12} />}
                 </button>
                 {onEdit && (
                   <button onClick={startEdit} aria-label="Düzenle" className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-2.5 rounded-lg hover:bg-bgsoft transition-colors">
-                    <Pencil size={11} />
+                    <Pencil size={12} />
                   </button>
                 )}
                 {onSwitchVersion && message.branches && message.branches.length > 1 && (
@@ -791,8 +791,8 @@ function MessageBubbleImpl({
   return (
     <div className="group/msg flex gap-3 py-3 animate-fade-in">
       {/* Avatar — bu mesaj akarken hafif bir halka parıltısı alır (transient). */}
-      <div className={`shrink-0 w-7 h-7 rounded-full bg-bgsoft border border-brand/20 grid place-items-center text-brand text-sm mt-0.5 shadow-sm${streamingNow ? " animate-stream-glow" : ""}`}>
-        ✦
+      <div className={`shrink-0 w-7 h-7 rounded-full bg-bgsoft border border-brand/20 grid place-items-center text-brand mt-0.5 shadow-sm${streamingNow ? " animate-stream-glow" : ""}`}>
+        <Sparkles size={14} />
       </div>
 
       <div className="flex-1 min-w-0 pt-0.5">
@@ -960,10 +960,10 @@ function MessageBubbleImpl({
             )}
           </div>
         ) : streamingNow && !message.thinking && !message.toolCalls?.length ? (
-          <span className="inline-flex items-center gap-1 py-1 text-muted/50" aria-label="Yazıyor">
-            <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:-0.3s]" />
-            <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:-0.15s]" />
-            <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce" />
+          <span className="inline-flex items-center gap-1.5 py-1 text-muted/50" aria-label="Yazıyor">
+            <span className="typing-dot" />
+            <span className="typing-dot delay-1" />
+            <span className="typing-dot delay-2" />
           </span>
         ) : (
           <span className="caret" />

@@ -338,8 +338,8 @@ export function FormsStudio() {
                       <input type="checkbox" checked={!!q.required} onChange={(e) => patchQ(q.id, { required: e.target.checked || undefined })} /> Zorunlu
                     </label>
                     <div className="ml-auto flex items-center gap-0.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/q:opacity-100 transition-opacity">
-                      <button onClick={() => moveQ(q.id, -1)} className="w-6 h-6 grid place-items-center rounded text-muted/50 hover:text-ink" title="Yukarı"><ArrowUp size={12} /></button>
-                      <button onClick={() => moveQ(q.id, 1)} className="w-6 h-6 grid place-items-center rounded text-muted/50 hover:text-ink" title="Aşağı"><ArrowDown size={12} /></button>
+                      <button onClick={() => moveQ(q.id, -1)} className="w-6 h-6 grid place-items-center rounded text-muted/50 hover:text-ink hover:bg-bgsoft transition-colors" title="Yukarı"><ArrowUp size={12} /></button>
+                      <button onClick={() => moveQ(q.id, 1)} className="w-6 h-6 grid place-items-center rounded text-muted/50 hover:text-ink hover:bg-bgsoft transition-colors" title="Aşağı"><ArrowDown size={12} /></button>
                       <button onClick={() => deleteQ(q.id)} className="w-6 h-6 grid place-items-center rounded text-muted/50 hover:text-red" title="Sil"><Trash2 size={12} /></button>
                     </div>
                   </div>

@@ -39,7 +39,7 @@ export function StudioTopBar({
       {showWorkActions && (
         <>
           {onNew && (
-            <button onClick={onNew} className="text-xs px-2.5 py-2 sm:py-1 rounded-lg border border-line text-muted hover:text-ink ml-1 shrink-0">
+            <button onClick={onNew} className="text-xs px-2.5 py-2 sm:py-1 rounded-lg border border-line text-muted hover:text-ink hover:bg-bgsoft ml-1 shrink-0 transition-colors">
               {newLabel}
             </button>
           )}
