@@ -22,7 +22,8 @@ GÖRÜNÜMLER
 
 YAN PANEL (Sidebar) — Claude.ai'ye paralel, Umai renklerinde
 - Üstte düz nav listesi: Ara (⌘K), Sohbetler, Stüdyo, Kütüphane, Projeler, Eklentiler.
-- Sohbetler ve Projeler artık Sidebar'da İNLİNE DEĞİL — kendi ayrı sayfalarında (/chats, /projects); Sidebar yalnız bu nav listesini + (varsa) "İlgili" sohbet önerilerini tutar.
+- Eklentiler Ayarlar'ı AÇMAZ — Ayarlar → Eklentiler ile aynı veriyi paylaşan hafif bir "Eklenti Mağazası" modalı açar.
+- Sohbetler ve Projeler'in TAM listesi Sidebar'da İNLİNE DEĞİL — kendi ayrı sayfalarında (/chats, /projects). Ancak Sidebar gövdesinde "Son Sohbetler" HER ZAMAN görünür: en son 7 sohbet, tıkla-aç; ardından (varsa) "İlgili" sohbet önerileri.
 - Altta iki yuvarlak ikon düğme: sol hesap avatarı (giriş/çıkış/Ayarlar menüsü), sağ "+" yeni sohbet.
 - Giriş/oturum: Supabase ile e-posta + şifre girişi (geçmiş senkronu için). Giriş yapılmazsa her şey yerelde (localStorage) çalışır.
 
@@ -56,7 +57,7 @@ AYARLAR (⚙️) — 11 sekme (Gelişmiş/Kancalar yalnızca admin'e görünür,
 - Hesap: e-posta/şifre/görünen ad, oturum yönetimi, kullanım istatistikleri, hesabı silme.
 - Model: "+ Yeni Model Ekle" ile sağlayıcı seç, görünen ad (opsiyonel), Base URL (sağlayıcıya göre otomatik dolar), API anahtarı yapıştır; anahtar girilince o anahtarla erişilebilen GERÇEK modeller otomatik listelenir ("↻ modelleri getir/yenile"). Sağlayıcılar: Hugging Face, DeepSeek, OpenRouter, Groq, Google Gemini, Mistral, Cerebras, Together AI, xAI (Grok), Ollama (yerel), Özel. Birden fazla model eklenebilir; eklenen modeller kullanıcı silmedikçe kalıcıdır.
 - Git: Çoklu GitHub/GitLab hesabı (kullanıcı adı + token), depolar (sahip/depo[:dal]), CLI modu (otomatik bağlan, terminali otomatik aç), ".rules" proje kuralları.
-- Eklentiler: iki bölüm — (1) Uygulama Bağlantıları: Notion/Slack/Google Drive/Calendar/Linear/Jira/Figma/PostgreSQL/Özel sunucu gibi uygulamaları MCP (Model Context Protocol) üzerinden bağlama galerisi + genel MCP sunucu ekle/listele/aç-kapat/test/sil (gerçek servis-özel OAuth değildir — kullanıcı her servisin kendi MCP sunucu adresini+kimliğini girer); (2) Dahili Araç Paketleri: yerleşik araçları modüler paketlere gruplayıp toplu açar/kapatır. Sidebar'dan da doğrudan erişilir ("Eklentiler" nav girişi).
+- Eklentiler: iki bölüm — (1) Uygulama Bağlantıları: Notion/Slack/Google Drive/Calendar/Linear/Jira/Figma/PostgreSQL/Obsidian/Dosya Sistemi/Bellek/Docker/Redis/Todoist/Discord/Spotify ve daha bir sürü açık kaynaklı uygulamayı MCP (Model Context Protocol) üzerinden bağlama galerisi — her kartın kendi aç/kapat anahtarı var; açınca sunucu otomatik oluşur (kullanıcı hemen URL'sini girer), kapatınca silinmez. Her bağlı sunucu için "Modeller" kontrolüyle hangi eklenen modellerin o eklentiye erişebileceği seçilebilir (boş bırakılırsa varsayılan olarak TÜM modeller erişir — ör. Obsidian açıkken tüm modeller ona bağlıdır, istenirse belirli modellerle sınırlanabilir); (2) Dahili Araç Paketleri: yerleşik araçları modüler paketlere gruplayıp toplu açar/kapatır. Gerçek servis-özel OAuth değildir — kullanıcı her servisin kendi MCP sunucu adresini+kimliğini girer. Sidebar'daki "Eklentiler" butonu bunu Ayarlar'ı AÇMADAN, aynı veriyi paylaşan bir "Eklenti Mağazası" modalında da sunar.
 - Temel: Otomatik Pilot, davranış anahtarları (web arama, otomatik hatırlama, kalite modu, Öğrenme Modu…), tema/vurgu rengi/yazı boyutu, bildirimler, yedekle/geri yükle, yanıt stili, bellek, sistem promptu, bağlam penceresi (token), klavye kısayolları.
 - Kullanım: Model/istek başına kullanım ve maliyet istatistikleri.
 - Plan: Abonelik/plan bilgisi.

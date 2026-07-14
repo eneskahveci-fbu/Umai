@@ -134,26 +134,30 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   `/library` hedefine gider.
 - **Sidebar** (`Sidebar.tsx`): genişletilmiş panelde Claude.ai'nin sol menüsüne
   paralel bir yapı — üstte düz simge+metin nav satırları (Ara/Sohbetler/
-  Stüdyo/Kütüphane/Projeler/**Eklentiler**, kart/pill değil — Eklentiler
-  `/settings?tab=extensions`'a gider, bkz. Ayarlar → Eklentiler bölümü),
-  daraltılmış rail'de de Stüdyo/Eklentiler/Ayarlar ikon-buton üçlüsü var,
-  ALTTA Claude'un sol-alt hesap
-  avatarı + sağ-alt "New chat" düğmesine paralel iki yuvarlak ikon düğme
-  (hesap menüsü `AuthButton` — artık tam-genişlik e-posta metni değil, yalnız
-  baş harf/ikon; yeni sohbet — artık üstteki "Yeni Sohbet" metin butonu
-  değil, alttaki yuvarlak `+` ikon düğmesi), Umai renklerinde. **Sohbetler ve
-  Projeler artık Sidebar'da İNLİNE DEĞİL** (Tem 2026 kullanıcı kararı) —
-  kendi ayrı sayfalarına taşındı: `/chats` (tarih-gruplu liste, arama, satır
-  eylemleri — pin/etiket/paylaş/indir/projeye taşı/sil; eski inline listenin
-  BİREBİR taşınmış hâli) ve `/projects` (kart ızgarası; bir projeye tıklamak
+  Stüdyo/Kütüphane/Projeler/**Eklentiler**, kart/pill değil), daraltılmış
+  rail'de de Stüdyo/Eklentiler/Ayarlar ikon-buton üçlüsü var, ALTTA Claude'un
+  sol-alt hesap avatarı + sağ-alt "New chat" düğmesine paralel iki yuvarlak
+  ikon düğme (hesap menüsü `AuthButton` — artık tam-genişlik e-posta metni
+  değil, yalnız baş harf/ikon; yeni sohbet — artık üstteki "Yeni Sohbet" metin
+  butonu değil, alttaki yuvarlak `+` ikon düğmesi), Umai renklerinde.
+  **Eklentiler artık Ayarlar'ı AÇMAZ** (Tem 2026 kullanıcı kararı) — hem
+  daraltılmış rail hem genişletilmiş nav'daki buton `setExtensionStoreOpen(true)`
+  ile `ExtensionStoreModal.tsx`'i açar (Ayarlar → Eklentiler ile AYNI
+  `McpGallery.tsx` bileşenini/veriyi paylaşan hafif bir modal — Settings'i hiç
+  mount etmez). **Sohbetler ve Projeler tam listesi Sidebar'da İNLİNE DEĞİL**
+  (Tem 2026 kullanıcı kararı) — kendi ayrı sayfalarına taşındı: `/chats`
+  (tarih-gruplu liste, arama, satır eylemleri — pin/etiket/paylaş/indir/
+  projeye taşı/sil) ve `/projects` (kart ızgarası; bir projeye tıklamak
   `ProjectModal`'ı açar — o zaten kendi "Sohbetler" sekmesiyle Claude Projects
-  tarzı çalışıyordu, bkz. task #65). Sidebar'ın gövdesinde yalnız "İlgili"
-  (varsa) kalır. Arama artık TEK kaynak: ⌘K (`CommandPalette.tsx`) başlık VE
-  içerik kapsıyor (Sidebar'ın eski inline "Sohbetlerde ara" kutusuyla aynı
-  kapsam) — ayrı bir arama kutusu yok. Gizlilik/Şartlar/Çerezler linkleri
-  Sidebar'dan kaldırıldı — TEK kaynak olarak yalnız Ayarlar → Hakkında'da
-  (`SettingsModal.tsx`, zaten oradaydı; aynı işleve iki yol bırakmamak için
-  Sidebar'ın kendi `DevCredit` alt-bilgisi silindi).
+  tarzı çalışıyordu, bkz. task #65). **Ancak Sidebar gövdesinde "Son
+  Sohbetler" HER ZAMAN görünür** (kullanıcı kararıyla geri getirildi, Tem
+  2026): en son oluşturulan 7 sohbet, accordion DEĞİL sabit bir liste, tıkla-aç
+  (silme/pin/etiket yok — o eylemler yalnız `/chats`'te); ardından (varsa)
+  "İlgili" gelir. Arama artık TEK kaynak: ⌘K (`CommandPalette.tsx`) başlık VE
+  içerik kapsıyor — ayrı bir arama kutusu yok. Gizlilik/Şartlar/Çerezler
+  linkleri Sidebar'dan kaldırıldı — TEK kaynak olarak yalnız Ayarlar →
+  Hakkında'da (`SettingsModal.tsx`, zaten oradaydı; aynı işleve iki yol
+  bırakmamak için Sidebar'ın kendi `DevCredit` alt-bilgisi silindi).
 - **Sohbet ekranı** (`EmptyChat.tsx`): boş durumda artık yalnız karşılama
   başlığı + "kaldığın yerden devam" bağlantısı (Tem 2026 kullanıcı kararı) —
   öneri çipleri (Kodumu daha iyi yap/Yeni özellik/Hata çöz/Açıkla) ve
@@ -292,21 +296,40 @@ Playwright ile.
   istatistikleri, hesabı silme. Silme `POST /api/account/delete`: servis anahtarı
   (`SUPABASE_SERVICE_ROLE_KEY`, **yalnız sunucu env**) ile; yoksa 501 ile nazikçe
   reddeder. Kullanıcı kendi access token'ıyla doğrulanır → yalnız kendini siler.
-- **Eklentiler:** `ExtensionsSettings.tsx`, artık iki bölüm (Tem 2026 kullanıcı
-  kararı — "ChatGPT gibi eklenti bağlama"). (1) **Uygulama Bağlantıları**:
-  `src/lib/mcpCatalog.ts`'teki `MCP_CATALOG` (Notion/Slack/Drive/Calendar/
-  Linear/Jira/Figma/PostgreSQL/Özel sunucu) küratörlü kart galerisi + genel MCP
-  sunucu yönetimi (ekle/listele/aç-kapat/test/sil) — bu, eskiden admin-only ayrı
-  bir "MCP" Settings sekmesindeydi, o sekme TAMAMEN KALDIRILDI ve buraya
-  TAŞINDI (herkese açık). Galeri kartına tıklamak yalnızca "Yeni Sunucu Ekle"
-  formunun ad alanını doldurur — **gerçek servis-özel OAuth YOKTUR** (bilinçli
-  kapsam kararı: her servisin kendi MCP sunucu adresini+kimliğini kullanıcı
-  girer). Katalog verisi bilinçli olarak hiçbir varsayılan sunucu URL'si/harici
-  link içermez (`mcpCatalog.test.ts`'te test edilen bir değişmez). (2) **Dahili
-  Araç Paketleri**: `EXTENSION_PACKS` (registry) — orijinal, değişmeyen
-  modüler yetenek paketi aç/kapat mantığı, yalnızca bu dosya içinde yeniden
-  etiketlendi. Sidebar'ın genişletilmiş nav listesine + daraltılmış rail'ine
-  `Blocks` ikonlu bir "Eklentiler" girişi eklendi (`/settings?tab=extensions`).
+- **Eklentiler:** `McpGallery.tsx` — Ayarlar → Eklentiler (`ExtensionsSettings.tsx`)
+  VE Sidebar → Eklentiler'in açtığı `ExtensionStoreModal.tsx` arasında
+  PAYLAŞILAN tek bileşen (Tem 2026 kullanıcı kararı — "ChatGPT gibi eklenti
+  bağlama" + "mağaza Ayarlar'ı açmasın ama aynı MCP'ye bağlı olsun"): iki
+  yüzey de `config.mcpServers` üzerinde çalışır, aralarında senkron sorunu
+  olmaz. `src/lib/mcpCatalog.ts`'teki `MCP_CATALOG` ~30 girdilik küratörlü bir
+  galeri (Notion/Slack/Drive/Calendar/Linear/Jira/Figma/PostgreSQL/Obsidian/
+  Dosya Sistemi/Bellek/Web İçeriği/Tarayıcı Otomasyonu/Docker/Kubernetes/
+  Sentry/Cloudflare/Redis/Todoist/Trello/Discord/Spotify/Brave Search/
+  Airtable/Confluence/Stripe/Everything/Özel sunucu — GitHub/GitLab BİLİNÇLİ
+  OLARAK YOK, uygulamanın kendi gerçek OAuth'lu Git entegrasyonuyla
+  karışmasın diye). Her kartın kendi **aç/kapat anahtarı** var (`McpServer.
+  catalogId` ile eşlenir): açınca eşleşen sunucu yoksa boş URL'li yeni bir
+  `config.mcpServers` girdisi oluşturur (aşağıdaki "Bağlı Sunucular"
+  listesinde URL alanı artık DÜZENLENEBİLİR — kullanıcı hemen doldurur),
+  varsa yalnız `enabled` değişir (URL/kısıtlama korunur); kapatınca sunucuyu
+  SİLMEZ. Galeri kartına tıklamak servis-özel gerçek bir OAuth AÇMAZ —
+  kullanıcı hâlâ kendi MCP sunucu adresini+kimliğini girer. Katalog verisi
+  bilinçli olarak hiçbir varsayılan sunucu URL'si/harici link içermez
+  (`mcpCatalog.test.ts`'te test edilen bir değişmez). **Model bazlı erişim**
+  (Tem 2026 kullanıcı kararı — "obsidian açıkken tüm modeller ona bağlı
+  olsun ama opsiyonel seçimli olsun"): her bağlı sunucunun `allowedModelIds?:
+  string[]` alanı var — boş/undefined = TÜM modeller (varsayılan, önceki
+  davranışla aynı), doluysa yalnız seçilen model profilleri (`config.models`)
+  o sunucunun araçlarını görür. Filtre `src/lib/mcpScope.ts`'teki saf
+  `filterMcpServersForModel()` ile uygulanır, `CoderView.tsx`'in `/api/chat`
+  isteğine `mcpServers` eklerken aktif modele göre çağrılır (istemci taraflı,
+  sunucu tarafında ek değişiklik gerekmez). "Dahili Araç Paketleri"
+  (`ExtensionsSettings.tsx`'te ayrı bölüm, `EXTENSION_PACKS`/registry) —
+  orijinal, değişmeyen modüler yetenek paketi aç/kapat mantığı. Sidebar'ın
+  genişletilmiş nav listesine + daraltılmış rail'ine `Blocks` ikonlu bir
+  "Eklentiler" girişi eklendi — `store.extensionStoreOpen` ile modalı açar
+  (route DEĞİL, `src/app/app/page.tsx`'te `SkillsPanel` ile aynı lazy-mount
+  deseniyle).
 - **Git bağlama:** Settings → Git'te tek tıkla OAuth (`linkIdentity`;
   `/app?gitlink=...` dönüşünde `provider_token` yakalanıp hesap eklenir)
   **veya** token ile manuel ekleme.

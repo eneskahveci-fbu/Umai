@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import { buildFallbackChain } from "@/lib/fallback";
+import { filterMcpServersForModel } from "@/lib/mcpScope";
 import {
   Activity,
   ArrowDown,
@@ -2001,7 +2002,7 @@ export function CoderView() {
                     }
                   : undefined)
             : undefined,
-          mcpServers: (store.config.mcpServers ?? []).filter((s) => s.enabled).map((s) => ({
+          mcpServers: filterMcpServersForModel(store.config.mcpServers ?? [], active.id).map((s) => ({
             url: s.url,
             headers: s.headers,
             enabled: s.enabled,

@@ -30,9 +30,12 @@ function SidebarLogo({ size = 22 }: { size?: number }) {
 }
 
 /* Sidebar (Tem 2026 kullanıcı kararı — Claude'a paralel bilgi mimarisi):
-   Sohbetler VE Projeler artık burada inline gösterilmiyor — kendi ayrı
-   sayfalarına taşındı (/chats, /projects), Sidebar yalnız düz bir nav
-   listesi + "İlgili" + hesap/yeni-sohbet ikonlarını tutar. */
+   Sohbetler VE Projeler artık burada inline LİSTELENMİYOR (arama/etiket/pin/
+   vb. tam liste hâlâ yalnız /chats, /projects'te) — ancak kullanıcı isteğiyle
+   "Son Sohbetler" (en son 7, her zaman görünür, tıkla-aç) gövdeye geri
+   eklendi (bkz. aşağıdaki recentChats). "Eklentiler" butonu artık Ayarlar'ı
+   AÇMAZ — ExtensionStoreModal'ı (aynı McpGallery verisini paylaşan hafif bir
+   modal) açar. */
 export function Sidebar() {
   const chats = useStore((s) => s.chats);
   const currentId = useStore((s) => s.currentId);
@@ -44,6 +47,8 @@ export function Sidebar() {
   const sidebarOpen = useStore((s) => s.sidebarOpen);
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
   const setCommandPaletteOpen = useStore((s) => s.setCommandPaletteOpen);
+  const extensionStoreOpen = useStore((s) => s.extensionStoreOpen);
+  const setExtensionStoreOpen = useStore((s) => s.setExtensionStoreOpen);
 
   /* Mobilde sidebar tam-ekran overlay olduğundan, yeni sohbet başlatmak onu
      otomatik kapatmalı — aksi halde kullanıcı ayrıca "X"e basmak zorunda
@@ -55,6 +60,11 @@ export function Sidebar() {
      olmayan) sohbetler havuzunda arar — Sidebar artık aktif-proje modu
      tutmuyor (bkz. yukarıdaki not). */
   const history = chats.filter((c) => !c.incognito);
+
+  /* Son 7 sohbet (Tem 2026 kullanıcı kararı — geri getirildi): Sidebar
+     gövdesinde HER ZAMAN görünen, en son oluşturulan 7 sohbet — "Sohbetler"
+     nav'ı hâlâ /chats'e gider (arama/etiket/pin dahil TÜM sohbetler orada). */
+  const recentChats = [...history].sort((a, b) => b.created_at - a.created_at).slice(0, 7);
 
   /* ── Collapsed icon-only ── */
   if (!sidebarOpen) {
@@ -110,9 +120,13 @@ export function Sidebar() {
             <Sparkles size={14} />
           </button>
           <button
-            onClick={() => router.push("/settings?tab=extensions")}
-            title="Eklentiler"
-            className="w-full h-9 rounded-xl border border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink grid place-items-center transition-colors"
+            onClick={() => setExtensionStoreOpen(true)}
+            title="Eklenti Mağazası"
+            className={`w-full h-9 rounded-xl border grid place-items-center transition-colors ${
+              extensionStoreOpen
+                ? "border-brand/40 bg-brand/10 text-brand"
+                : "border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink"
+            }`}
           >
             <Blocks size={14} />
           </button>
@@ -215,17 +229,39 @@ export function Sidebar() {
           <span className="flex-1 text-left">Projeler</span>
         </button>
         <button
-          onClick={() => { router.push("/settings?tab=extensions"); closeOnMobile(); }}
-          className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors text-ink/85 hover:bg-bgsoft/70 hover:text-ink"
+          onClick={() => { setExtensionStoreOpen(true); closeOnMobile(); }}
+          className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+            extensionStoreOpen ? "bg-brand/10 text-brand" : "text-ink/85 hover:bg-bgsoft/70 hover:text-ink"
+          }`}
         >
           <Blocks size={16} className="shrink-0" />
           <span className="flex-1 text-left">Eklentiler</span>
         </button>
       </nav>
 
-      {/* "İlgili" (Obsidian-lite) — yalnız aktif bir sohbet ve karşılaştıracak
-          başka sohbet varsa gösterilir. Panel açılınca (lazy mount) hesaplanır. */}
+      {/* "Son Sohbetler" — her zaman görünen, en son 7 sohbet (Tem 2026
+          kullanıcı kararı ile geri getirildi). Accordion DEĞİL, sabit liste;
+          tüm sohbetler (arama/etiket/pin) hâlâ yalnız /chats'te. */}
       <div className="flex-1 overflow-y-auto min-h-0">
+        {recentChats.length > 0 && (
+          <div className="px-2 pt-3 pb-1">
+            <div className="px-1.5 pb-1.5 text-[11px] font-semibold text-muted/50 uppercase tracking-wide">Son Sohbetler</div>
+            <div className="space-y-0.5">
+              {recentChats.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => { selectChat(c.id); closeOnMobile(); }}
+                  className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors ${
+                    c.id === currentId ? "bg-brand/10 text-brand" : "text-muted hover:text-ink hover:bg-bgsoft/60"
+                  }`}
+                >
+                  <MessageSquare size={12} className="shrink-0 opacity-50" />
+                  <span className="flex-1 text-[12.5px] truncate">{c.title}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {currentId && history.length > 1 && (
           <AccordionSection id="related" title="İlgili" icon={<Link2 size={11} />}>
             <RelatedChats
