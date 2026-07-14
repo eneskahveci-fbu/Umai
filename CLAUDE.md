@@ -134,17 +134,25 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   `/library` hedefine gider.
 - **Sidebar** (`Sidebar.tsx`): genişletilmiş panelde Claude.ai'nin sol menüsüne
   paralel bir yapı — üstte düz simge+metin nav satırları (Ara/Sohbetler/
-  Stüdyo/Kütüphane/Projeler/**Eklentiler**, kart/pill değil), daraltılmış
-  rail'de de Stüdyo/Eklentiler/Ayarlar ikon-buton üçlüsü var, ALTTA Claude'un
-  sol-alt hesap avatarı + sağ-alt "New chat" düğmesine paralel iki yuvarlak
-  ikon düğme (hesap menüsü `AuthButton` — artık tam-genişlik e-posta metni
-  değil, yalnız baş harf/ikon; yeni sohbet — artık üstteki "Yeni Sohbet" metin
-  butonu değil, alttaki yuvarlak `+` ikon düğmesi), Umai renklerinde.
-  **Eklentiler artık Ayarlar'ı AÇMAZ** (Tem 2026 kullanıcı kararı) — hem
-  daraltılmış rail hem genişletilmiş nav'daki buton `setExtensionStoreOpen(true)`
-  ile `ExtensionStoreModal.tsx`'i açar (Ayarlar → Eklentiler ile AYNI
-  `McpGallery.tsx` bileşenini/veriyi paylaşan hafif bir modal — Settings'i hiç
-  mount etmez). **Sohbetler ve Projeler tam listesi Sidebar'da İNLİNE DEĞİL**
+  Stüdyo/Kütüphane/Projeler/**Eklentiler**/**Araçlar**, kart/pill değil),
+  daraltılmış rail'de de Stüdyo/Eklentiler/**Araçlar**/Ayarlar ikon-buton
+  dörtlüsü var, ALTTA Claude'un sol-alt hesap avatarı + sağ-alt "New chat"
+  düğmesine paralel iki yuvarlak ikon düğme (hesap menüsü `AuthButton` —
+  artık tam-genişlik e-posta metni değil, yalnız baş harf/ikon; yeni sohbet —
+  artık üstteki "Yeni Sohbet" metin butonu değil, alttaki yuvarlak `+` ikon
+  düğmesi), Umai renklerinde. **Eklentiler artık Ayarlar'ı AÇMAZ** (Tem 2026
+  kullanıcı kararı) — hem daraltılmış rail hem genişletilmiş nav'daki buton
+  `setExtensionStoreOpen(true)` ile `ExtensionStoreModal.tsx`'i açar (Ayarlar →
+  Eklentiler ile AYNI `McpGallery.tsx` bileşenini/veriyi paylaşan hafif bir
+  modal — Settings'i hiç mount etmez). **Araçlar** (Tem 2026 kullanıcı kararı
+  — "sağ üst menüdeki bazı şeyleri sidebara taşı"): `SidebarToolsButton`
+  (`AuthButton`'daki AYNI hafif açılır-panel deseni — ref + dışarı tıklama/
+  Escape ile kapanır) Kütüphane/Etkinlik Günlüğü/Kısayollar'ı açar — bunlar
+  sohbet ekranındaki "⋯" (`MoreMenu`) menüsünün eski "Araçlar" sekmesinden
+  BURAYA taşındı (o sekme tamamen kaldırıldı); "Efor" ve composer-bağlı
+  "Prompt geliştir" (canlı taslak metnini işlediği için taşınamaz) "⋯"
+  menüsünde kaldı, artık yalnız "Çalışma"/"Modlar" 2 sekmesi var. **Sohbetler
+  ve Projeler tam listesi Sidebar'da İNLİNE DEĞİL**
   (Tem 2026 kullanıcı kararı) — kendi ayrı sayfalarına taşındı: `/chats`
   (tarih-gruplu liste, arama, satır eylemleri — pin/etiket/paylaş/indir/
   projeye taşı/sil) ve `/projects` (kart ızgarası; bir projeye tıklamak
@@ -315,7 +323,24 @@ Playwright ile.
   SİLMEZ. Galeri kartına tıklamak servis-özel gerçek bir OAuth AÇMAZ —
   kullanıcı hâlâ kendi MCP sunucu adresini+kimliğini girer. Katalog verisi
   bilinçli olarak hiçbir varsayılan sunucu URL'si/harici link içermez
-  (`mcpCatalog.test.ts`'te test edilen bir değişmez). **Model bazlı erişim**
+  (`mcpCatalog.test.ts`'te test edilen bir değişmez). **Yerleşik (built-in)
+  araçlar** (Tem 2026 kullanıcı kararı — "açık kaynak olan ve doğrudan
+  varsayılan olarak yükleyebileceğin eklentiler varsa doğrudan ekle"): Zaman,
+  Adım Adım Düşünme, Everything (Test) katalog girdilerinin `builtinUrl`
+  alanı var (`/api/mcp/builtin/<id>`) — gerçek açık kaynak MCP referans
+  sunucularının İŞLEVİ dış bir URL uydurmadan `src/lib/mcpBuiltins.ts`'te
+  (saf, test edilebilir) + `src/app/api/mcp/builtin/[server]/tools/[action]/
+  route.ts`'te yeniden uygulandı — bu kartlar GERÇEKTEN kurulum gerektirmeden
+  çalışır (kart açılınca `McpGallery.tsx` boş URL yerine doğrudan bu URL'i
+  kullanır, galeri kartında "Yerleşik" rozeti gösterilir). Zaman + Adım Adım
+  Düşünme yeni kullanıcılarda `DEFAULT_CONFIG.mcpServers`'ta varsayılan açık;
+  Everything yalnızca bir MCP-plumbing demosu olduğundan toggle'lanabilir
+  kalır ama varsayılan kapalı. Göreli `/api/mcp/builtin/*` yolu HER ZAMAN aynı
+  dağıtımın kendi route'una işaret eder (dış host'a asla erişemez) — bu
+  yüzden `isSafeRemoteUrl`'in localhost/private-IP SSRF engelinden muaf
+  tutulur (`chat/route.ts`'teki `isSafeMcpServerUrl()` + `api/mcp/route.ts`,
+  muafiyet yalnızca URL GERÇEKTEN isteğin kendi origin'iyle eşleşiyorsa
+  uygulanır — sahte taklit URL'ler yine reddedilir). **Model bazlı erişim**
   (Tem 2026 kullanıcı kararı — "obsidian açıkken tüm modeller ona bağlı
   olsun ama opsiyonel seçimli olsun"): her bağlı sunucunun `allowedModelIds?:
   string[]` alanı var — boş/undefined = TÜM modeller (varsayılan, önceki

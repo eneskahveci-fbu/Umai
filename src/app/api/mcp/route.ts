@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { checkLimit } from "@/lib/rate-limit";
 import { isSafeRemoteUrl } from "@/lib/urlSafety";
+import { isBuiltinMcpServerId } from "@/lib/mcpBuiltins";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,16 +55,23 @@ export async function POST(req: NextRequest) {
   if (limited) return Response.json(limited.body, { status: limited.status, headers: { "Retry-After": String(limited.retryAfter) } });
   try {
     const body = await req.json() as { action: "list" | "call"; server: McpServerConfig; tool?: string; args?: Record<string, unknown> };
+    const rawUrl = body.server?.url ?? "";
+    /* Yerleşik (self-hosted) sunucular göreli bir yol (/api/mcp/builtin/*)
+       taşır — bu isteğin kendi origin'iyle mutlaklaştırılır ve SSRF
+       kontrolünden muaf tutulur (dış host'a asla erişemez, bkz. mcpBuiltins.ts). */
+    const isBuiltin = rawUrl.startsWith("/api/mcp/builtin/") && isBuiltinMcpServerId(rawUrl.slice("/api/mcp/builtin/".length));
+    const url = isBuiltin ? new URL(rawUrl, req.url).toString() : rawUrl;
     /* SSRF: MCP sunucu URL'i iç ağa/loopback'e işaret edemez. */
-    if (!body.server?.url || !isSafeRemoteUrl(body.server.url)) {
+    if (!rawUrl || (!isBuiltin && !isSafeRemoteUrl(url))) {
       return Response.json({ error: "Geçersiz veya güvenli olmayan MCP sunucu adresi." }, { status: 400 });
     }
+    const server = { ...body.server, url };
     if (body.action === "list") {
-      const tools = await fetchMcpTools(body.server);
+      const tools = await fetchMcpTools(server);
       return Response.json({ tools });
     }
     if (body.action === "call" && body.tool) {
-      const result = await callMcpTool(body.server, body.tool, body.args ?? {});
+      const result = await callMcpTool(server, body.tool, body.args ?? {});
       return Response.json({ result });
     }
     return Response.json({ error: "Invalid action" }, { status: 400 });
