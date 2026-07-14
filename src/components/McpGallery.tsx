@@ -104,7 +104,7 @@ export function McpGallery() {
                 aria-checked={on}
                 aria-label={`${e.name} ${on ? "açık" : "kapalı"}`}
                 onClick={() => toggleCatalogEntry(e)}
-                className={`absolute top-2 right-2 w-8 h-[18px] rounded-full relative transition-colors ${on ? "bg-brand" : "bg-line"}`}
+                className={`absolute top-2 right-2 w-8 h-[18px] rounded-full transition-colors ${on ? "bg-brand" : "bg-line"}`}
                 title={on ? "Kapat" : "Aç"}
               >
                 <span className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white grid place-items-center transition-all ${on ? "left-[17px]" : "left-0.5"}`}>
