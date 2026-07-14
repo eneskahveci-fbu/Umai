@@ -479,6 +479,35 @@ html { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--color-mu
   }
 }
 
+/* ─── animate-in / fade-in / zoom-in-95 / slide-in-from-bottom-* ───
+   `tailwindcss-animate` paketi kurulu değil ama birkaç bileşen (OfflineBanner,
+   OnboardingTour, RightPanel mobil, InstallPrompt, sürükle-bırak overlay'i,
+   sağ-tık menüsü) bu sınıfları kullanıyordu — hiçbiri gerçekte tanımlı
+   olmadığından o öğeler animasyonsuz, aniden beliriyordu. Bu, o eksik
+   paketin GERÇEKTEN kullanılan kombinasyonlarının (fade-in, zoom-in-95,
+   slide-in-from-bottom-2/4, duration-100/150/200) minimal, el yapımı bir
+   karşılığı — yeni bağımlılık gerektirmez. */
+@keyframes enter {
+  from {
+    opacity: var(--tw-enter-opacity, 1);
+    transform:
+      translate3d(0, var(--tw-enter-translate-y, 0), 0)
+      scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), 1);
+  }
+}
+.animate-in {
+  animation-name: enter;
+  animation-duration: 150ms;
+  animation-fill-mode: both;
+}
+.fade-in { --tw-enter-opacity: 0; }
+.zoom-in-95 { --tw-enter-scale: .95; }
+.slide-in-from-bottom-2 { --tw-enter-translate-y: 0.5rem; }
+.slide-in-from-bottom-4 { --tw-enter-translate-y: 1rem; }
+.animate-in.duration-100 { animation-duration: 100ms; }
+.animate-in.duration-150 { animation-duration: 150ms; }
+.animate-in.duration-200 { animation-duration: 200ms; }
+
 /* ─── Genel geçişler ─── */
 * {
   -webkit-tap-highlight-color: transparent;
