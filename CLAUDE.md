@@ -44,7 +44,7 @@ src/
 │   ├── CoderView.tsx         # Editör + sohbet + terminal görünümü
 │   ├── SettingsModal.tsx     # GNOME tarzı dikey sekmeli ayarlar (arama + admin gating)
 │   ├── AccountSettings.tsx   # Hesap: şifre/e-posta/ad, oturum, istatistik, silme
-│   ├── ExtensionsSettings.tsx# Modüler eklenti paketleri (aç/kapat)
+│   ├── ExtensionsSettings.tsx# MCP uygulama galerisi + sunucu yönetimi + dahili araç paketleri (aç/kapat)
 │   ├── DesignStudio.tsx      # Claude Design'a birebir paralel (arayüz+çıktı): tek tasarım tuvali + hazır şablonlar
 │   ├── ArtifactPanel.tsx     # Canlı önizleme/Artifacts (preview↔kod, kopya, indir)
 │   └── ...
@@ -56,6 +56,7 @@ src/
     ├── agents.ts             # Slash komut agent'ları (/refactor, /test...)
     ├── fallback.ts           # buildFallbackChain — çok-sağlayıcılı oto-fallback
     ├── preview.ts            # Kod → canlı sandbox (React/JSX/HTML/SVG/mermaid + console)
+    ├── mcpCatalog.ts          # MCP uygulama galerisi verisi (Notion/Slack/Drive... — URL içermez)
     └── extensions/registry.ts# EXTENSION_TOOLS/AGENTS/CATALOG + EXTENSION_PACKS
 ```
 
@@ -133,7 +134,10 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   `/library` hedefine gider.
 - **Sidebar** (`Sidebar.tsx`): genişletilmiş panelde Claude.ai'nin sol menüsüne
   paralel bir yapı — üstte düz simge+metin nav satırları (Ara/Sohbetler/
-  Stüdyo/Kütüphane/Projeler, kart/pill değil), ALTTA Claude'un sol-alt hesap
+  Stüdyo/Kütüphane/Projeler/**Eklentiler**, kart/pill değil — Eklentiler
+  `/settings?tab=extensions`'a gider, bkz. Ayarlar → Eklentiler bölümü),
+  daraltılmış rail'de de Stüdyo/Eklentiler/Ayarlar ikon-buton üçlüsü var,
+  ALTTA Claude'un sol-alt hesap
   avatarı + sağ-alt "New chat" düğmesine paralel iki yuvarlak ikon düğme
   (hesap menüsü `AuthButton` — artık tam-genişlik e-posta metni değil, yalnız
   baş harf/ikon; yeni sohbet — artık üstteki "Yeni Sohbet" metin butonu
@@ -288,9 +292,21 @@ Playwright ile.
   istatistikleri, hesabı silme. Silme `POST /api/account/delete`: servis anahtarı
   (`SUPABASE_SERVICE_ROLE_KEY`, **yalnız sunucu env**) ile; yoksa 501 ile nazikçe
   reddeder. Kullanıcı kendi access token'ıyla doğrulanır → yalnız kendini siler.
-- **Eklentiler:** `ExtensionsSettings.tsx` + `EXTENSION_PACKS` (registry). Araçları
-  modüler paketlere gruplar; aç/kapat `config.toolPermissions`'ı toplu ayarlar
-  (yeni durum yok). Herkese açık (teknik araç tablosu admin'de kalır).
+- **Eklentiler:** `ExtensionsSettings.tsx`, artık iki bölüm (Tem 2026 kullanıcı
+  kararı — "ChatGPT gibi eklenti bağlama"). (1) **Uygulama Bağlantıları**:
+  `src/lib/mcpCatalog.ts`'teki `MCP_CATALOG` (Notion/Slack/Drive/Calendar/
+  Linear/Jira/Figma/PostgreSQL/Özel sunucu) küratörlü kart galerisi + genel MCP
+  sunucu yönetimi (ekle/listele/aç-kapat/test/sil) — bu, eskiden admin-only ayrı
+  bir "MCP" Settings sekmesindeydi, o sekme TAMAMEN KALDIRILDI ve buraya
+  TAŞINDI (herkese açık). Galeri kartına tıklamak yalnızca "Yeni Sunucu Ekle"
+  formunun ad alanını doldurur — **gerçek servis-özel OAuth YOKTUR** (bilinçli
+  kapsam kararı: her servisin kendi MCP sunucu adresini+kimliğini kullanıcı
+  girer). Katalog verisi bilinçli olarak hiçbir varsayılan sunucu URL'si/harici
+  link içermez (`mcpCatalog.test.ts`'te test edilen bir değişmez). (2) **Dahili
+  Araç Paketleri**: `EXTENSION_PACKS` (registry) — orijinal, değişmeyen
+  modüler yetenek paketi aç/kapat mantığı, yalnızca bu dosya içinde yeniden
+  etiketlendi. Sidebar'ın genişletilmiş nav listesine + daraltılmış rail'ine
+  `Blocks` ikonlu bir "Eklentiler" girişi eklendi (`/settings?tab=extensions`).
 - **Git bağlama:** Settings → Git'te tek tıkla OAuth (`linkIdentity`;
   `/app?gitlink=...` dönüşünde `provider_token` yakalanıp hesap eklenir)
   **veya** token ile manuel ekleme.
