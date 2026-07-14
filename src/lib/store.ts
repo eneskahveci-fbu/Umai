@@ -388,6 +388,10 @@ interface StoreState {
   skillsOpen: boolean;
   setSkillsOpen: (b: boolean) => void;
 
+  // eklenti mağazası (Sidebar → Eklentiler, Settings'i açmadan hızlı erişim)
+  extensionStoreOpen: boolean;
+  setExtensionStoreOpen: (b: boolean) => void;
+
   // editör (IDE) paneli — CommandPalette'in de erişebilmesi için global
   editorOpen: boolean;
   setEditorOpen: (b: boolean) => void;
@@ -903,6 +907,8 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
   skillsOpen: false,
   setSkillsOpen: (b) => set({ skillsOpen: b }),
+  extensionStoreOpen: false,
+  setExtensionStoreOpen: (b) => set({ extensionStoreOpen: b }),
 
   editorOpen: false,
   setEditorOpen: (b) => set({ editorOpen: b }),

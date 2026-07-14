@@ -27,6 +27,7 @@ import { registerServiceWorker, watchConnection } from "@/lib/sw-register";
 const SettingsModal = dynamic(() => import("@/components/SettingsModal").then((m) => m.SettingsModal), { ssr: false });
 const SkillsPanel = dynamic(() => import("@/components/SkillsPanel").then((m) => m.SkillsPanel), { ssr: false });
 const LibraryModal = dynamic(() => import("@/components/LibraryModal").then((m) => m.LibraryModal), { ssr: false });
+const ExtensionStoreModal = dynamic(() => import("@/components/ExtensionStoreModal").then((m) => m.ExtensionStoreModal), { ssr: false });
 
 /* "Hiç açıldı mı?" mandalı — render sırasında durum ayarlama (önceki-değer deseni). */
 function useEverOpened(open: boolean) {
@@ -44,6 +45,7 @@ export default function AppPage() {
   const everSettings = useEverOpened(useStore((s) => s.settingsOpen));
   const everSkills = useEverOpened(useStore((s) => s.skillsOpen));
   const everLibrary = useEverOpened(useStore((s) => s.libraryOpen));
+  const everExtensionStore = useEverOpened(useStore((s) => s.extensionStoreOpen));
   const kbOpen = useKeyboardOpen();
   const router = useRouter();
   /* Giriş zorunlu: Supabase yapılandırılmışsa oturumsuz kullanıcı uygulamayı
@@ -267,6 +269,7 @@ export default function AppPage() {
         <CommandPalette />
         <KeyboardShortcuts />
         {everSkills && <SkillsPanel />}
+        {everExtensionStore && <ExtensionStoreModal />}
         <ProjectModal />
         <ActivityLog />
         <DiffModal />
