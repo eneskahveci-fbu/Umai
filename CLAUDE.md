@@ -85,19 +85,28 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   birebir paralel — hem ARAYÜZ hem ÇIKTI. Sol AI sohbet, sağ TEK canlı tasarım
   tuvali (`ArtifactCanvas`, sohbetteki `ArtifactPanel` ile PAYLAŞILAN bileşen:
   önizleme↔kod, sürüm gezinme, kopyala/indir/PDF/yayınla). Kök sarmalayıcı
-  `.theme-claude` sınıfını taşır (`globals.css`) — Claude.ai'nin gerçek
-  paletini (kremsi/koyu-antrasit yüzey + terracotta `#d97757` vurgu) yalnız
-  CSS değişken override'ıyla uygular, alt bileşenlerin hiçbiri değişmedi (tek
-  kaynak). Boş durumda hazır şablon ızgarası (`lib/studioTemplates.ts`, 19
-  şablon). Marka SEÇİCİSİ YOK — üretim her zaman sabit "claude" tasarım
+  ARTIK `.theme-claude` TAŞIMIYOR (Tem 2026 kullanıcı kararı, `globals.css`'ten
+  o CSS bloğu silindi) — arayüz kroması Umai'nin kendi temasını kullanır;
+  yalnızca ÜRETİLEN ÇIKTININ (artifact'in kendi gömülü CSS'i, iframe içinde
+  ayrı) görsel kimliği hâlâ sabit "claude" tasarım sistemi (kanıtlanmış kalite
+  için bilinçli tutuldu — bkz. aşağı). Sol sohbet paneli (`ChatPanel`) ana
+  sohbetteki `.user-bubble` ile AYNI görsel dili kullanır (kullanıcı mesajı
+  sağda yuvarlak balon, asistan solda düz-metin akışı, composer yüzen/
+  gölgeli `elev-2`). Boş durumda hazır şablon ızgarası (`lib/studioTemplates.ts`,
+  19 şablon). Marka SEÇİCİSİ YOK — üretim her zaman sabit "claude" tasarım
   sistemini kullanır (`lib/designSystems.ts`'teki `claude` girdisi, otoriter
-  marka sözleşmesi olarak `studioGen.ts`'e enjekte edilir) — çıktı da arayüz
-  gibi Claude Design'a paralel olsun diye. Fusion (3 model + hakem) opsiyonel
-  toggle. Üretim `lib/studioGen.ts`'in `generateArtifact()`'ı (brief + skill +
-  yön + Fusion → tek HTML artifact, `/api/chat` üzerinden); "sunum" ayrı bir
-  yüzey DEĞİL, yalnızca kendi kendine gezinen tek-HTML-sayfa üreten bir şablon
-  kategorisi (`STUDIO_SKILLS`'teki `deck`). Kayıtlı projeler
-  `config.studioProjects`'te.
+  marka sözleşmesi olarak `studioGen.ts`'e enjekte edilir) — çıktı kalitesi
+  kanıtlanmış bir sistemden gelsin diye. Ayrıca `studioCraft.ts`'teki
+  `CATEGORY_CRAFT` (Tem 2026 "görünmez süpervizör" kararı): STUDIO_SKILLS'in
+  kategorisine göre (Web/Uygulama/İçerik/Akademik/Bileşen) kategori lideri
+  araçlardan (Gamma, Google AI Studio, LibreOffice, en iyi SaaS landing
+  sayfaları, Linear/Notion) damıtılmış somut kompozisyon ilkeleri —
+  KULLANICIYA HİÇ GÖSTERİLMEDEN yalnız sistem promptuna eklenir. Fusion (3
+  model + hakem) opsiyonel toggle. Üretim `lib/studioGen.ts`'in
+  `generateArtifact()`'ı (brief + skill + yön + kategori mükemmelliği + Fusion
+  → tek HTML artifact, `/api/chat` üzerinden); "sunum" ayrı bir yüzey DEĞİL,
+  yalnızca kendi kendine gezinen tek-HTML-sayfa üreten bir şablon kategorisi
+  (`STUDIO_SKILLS`'teki `deck`). Kayıtlı projeler `config.studioProjects`'te.
 - **Görüntü üretimi** — artık ayrı bir Stüdyo yüzeyi DEĞİL: genel sohbette
   `/gorsel <brief>` slash komutuyla üretilir (`lib/agents.ts`'teki `image-gen`
   girdisi + `CoderView.tsx`'in `send()`'inde özel-durum intercept — LLM'e
@@ -123,16 +132,29 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   ızgarasına götürüyor; "Kütüphane" masaüstü Sidebar'ın nav listesiyle aynı
   `/library` hedefine gider.
 - **Sidebar** (`Sidebar.tsx`): genişletilmiş panelde Claude.ai'nin sol menüsüne
-  paralel bir yapı — üstte düz simge+metin nav satırları (Ara/Stüdyo/
-  Kütüphane, kart/pill değil), ortada Projeler + Sohbetler, ALTTA Claude'un
-  sol-alt hesap avatarı + sağ-alt "New chat" düğmesine paralel iki yuvarlak
-  ikon düğme (hesap menüsü `AuthButton` — artık tam-genişlik e-posta metni
-  değil, yalnız baş harf/ikon; yeni sohbet — artık üstteki "Yeni Sohbet"
-  metin butonu değil, alttaki yuvarlak `+` ikon düğmesi), Umai renklerinde.
-  Gizlilik/Şartlar/Çerezler linkleri Sidebar'dan kaldırıldı — TEK kaynak
-  olarak yalnız Ayarlar → Hakkında'da (`SettingsModal.tsx`, zaten oradaydı;
-  aynı işleve iki yol bırakmamak için Sidebar'ın kendi `DevCredit` alt-bilgisi
-  silindi).
+  paralel bir yapı — üstte düz simge+metin nav satırları (Ara/Sohbetler/
+  Stüdyo/Kütüphane/Projeler, kart/pill değil), ALTTA Claude'un sol-alt hesap
+  avatarı + sağ-alt "New chat" düğmesine paralel iki yuvarlak ikon düğme
+  (hesap menüsü `AuthButton` — artık tam-genişlik e-posta metni değil, yalnız
+  baş harf/ikon; yeni sohbet — artık üstteki "Yeni Sohbet" metin butonu
+  değil, alttaki yuvarlak `+` ikon düğmesi), Umai renklerinde. **Sohbetler ve
+  Projeler artık Sidebar'da İNLİNE DEĞİL** (Tem 2026 kullanıcı kararı) —
+  kendi ayrı sayfalarına taşındı: `/chats` (tarih-gruplu liste, arama, satır
+  eylemleri — pin/etiket/paylaş/indir/projeye taşı/sil; eski inline listenin
+  BİREBİR taşınmış hâli) ve `/projects` (kart ızgarası; bir projeye tıklamak
+  `ProjectModal`'ı açar — o zaten kendi "Sohbetler" sekmesiyle Claude Projects
+  tarzı çalışıyordu, bkz. task #65). Sidebar'ın gövdesinde yalnız "İlgili"
+  (varsa) kalır. Arama artık TEK kaynak: ⌘K (`CommandPalette.tsx`) başlık VE
+  içerik kapsıyor (Sidebar'ın eski inline "Sohbetlerde ara" kutusuyla aynı
+  kapsam) — ayrı bir arama kutusu yok. Gizlilik/Şartlar/Çerezler linkleri
+  Sidebar'dan kaldırıldı — TEK kaynak olarak yalnız Ayarlar → Hakkında'da
+  (`SettingsModal.tsx`, zaten oradaydı; aynı işleve iki yol bırakmamak için
+  Sidebar'ın kendi `DevCredit` alt-bilgisi silindi).
+- **Sohbet ekranı** (`EmptyChat.tsx`): boş durumda artık yalnız karşılama
+  başlığı + "kaldığın yerden devam" bağlantısı (Tem 2026 kullanıcı kararı) —
+  öneri çipleri (Kodumu daha iyi yap/Yeni özellik/Hata çöz/Açıkla) ve
+  "Stüdyo'ya geç" bağlantısı kaldırıldı, Claude'un kendi sade boş-sohbet
+  ekranına paralel.
 - **Doküman Stüdyosu** (`studio/DocsStudio.tsx`, `/studio/dokuman`): Notion'dan
   ilhamla blok tabanlı doküman (`lib/docs.ts`) — AI taslak + "devam et",
   Markdown/bağımsız HTML dışa aktarma, `config.craftDocs`. **Yazım Asistanı**

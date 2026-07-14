@@ -65,39 +65,6 @@ html.light {
   --color-purple: #7c3aed;
 }
 
-/* ─── Tasarım Stüdyosu — Claude Design skin ───────────────────────────────
-   Yalnızca DesignStudio.tsx'in kök sarmalayıcısına uygulanır (.theme-claude).
-   Stüdyo'nun tüm alt bileşenleri (StudioTopBar, TemplateGallery, ChatPanel,
-   ArtifactCanvas) zaten bg-, text- ve border- Tailwind token'larını kullanıyor
-   — burada yalnızca bu CSS değişkenlerini Claude.ai'nin gerçek paletiyle
-   override ediyoruz, hiçbir bileşen sınıfı değişmedi (tek kaynak, sıfır
-   markup tekrarı). Rengin geri kalanı (kırmızı/mavi/mor vb.) uygulamanın
-   kendi temasından miras kalır — yalnız marka/yüzey/metin renkleri değişir. */
-.theme-claude {
-  --color-bg: #262624;
-  --color-bgsoft: #333230;
-  --color-surface: #2b2a28;
-  --color-surface2: #3a3936;
-  --color-line: #45443f;
-  --color-ink: #f2efe9;
-  --color-muted: #a39d94;
-  --color-brand: #d97757;
-  --color-branddim: #c2653f;
-  --color-accent: #d97757;
-}
-html.light .theme-claude {
-  --color-bg: #faf9f5;
-  --color-bgsoft: #f4f2ec;
-  --color-surface: #ffffff;
-  --color-surface2: #eeece4;
-  --color-line: #e5e2d9;
-  --color-ink: #262624;
-  --color-muted: #83807b;
-  --color-brand: #bf5d3d;
-  --color-branddim: #a84b2e;
-  --color-accent: #bf5d3d;
-}
-
 /* ─── Gradyanlar ─── */
 .brand-gradient {
   background: linear-gradient(135deg, #5c9478 0%, #93c2ac 50%, #4a7a62 100%);

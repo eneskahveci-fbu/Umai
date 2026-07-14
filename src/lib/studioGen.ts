@@ -2,7 +2,7 @@ import { useStore } from "./store";
 import { buildFallbackChain } from "./fallback";
 import { decryptField, isEncrypted } from "./secureKeys";
 import { buildSingleBlockPreview, parseBlocks } from "./preview";
-import { CRAFT_RULES, lintArtifact } from "./studioCraft";
+import { CATEGORY_CRAFT, CRAFT_RULES, lintArtifact } from "./studioCraft";
 import { skillById, directionById } from "./studioConstants";
 import type { Artifact } from "./types";
 
@@ -89,7 +89,13 @@ export function buildStudioSystem(opts: Pick<GenerateOptions, "skillId" | "direc
   if (opts.designSystemPrompt?.trim()) sys += `\n\n[Marka tasarım sistemi — YALNIZCA görsel/HTML çıktı üretiyorsan renk/tipografi/boşlukta OTORİTER, buna UY; kod/doküman/diyagram üretiyorsan bu bölümü YOK SAY]:\n${opts.designSystemPrompt.trim()}`;
   sys += CRAFT_RULES;
   const skill = skillById(opts.skillId);
-  if (skill) sys += `\n\n[Çıktı türü — ${skill.name}]: ${skill.instructions}`;
+  if (skill) {
+    sys += `\n\n[Çıktı türü — ${skill.name}]: ${skill.instructions}`;
+    /* Kategori bazlı mükemmellik bilgisi (Gamma/Google AI Studio/LibreOffice
+       vb. kategori liderlerinden damıtılmış, görünmez referans) — bkz.
+       studioCraft.ts. */
+    sys += CATEGORY_CRAFT[skill.category] ?? "";
+  }
   if (opts.skillId === "deck") sys += DECK_INSTRUCTION;
   if (opts.animate) sys += ANIMATE_INSTRUCTION;
   const dir = directionById(opts.directionId);
