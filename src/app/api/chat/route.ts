@@ -1248,6 +1248,18 @@ export async function POST(req: Request) {
     `"düşünme"/"analiz" adımlarını, kendi kendine notları ("we need…", "user wants…", ` +
     `"provide answer", "no code", "ok") veya sahte konuşma dökümlerini (User:/Assistant:) ` +
     `ASLA yanıt metnine yazma. Doğrudan sonucu ver.`;
+  /* Açıklayıcı diyalog (Claude Code'un plan-onay döngüsü gibi): belirsiz
+     isteklerde rastgele varsayımla ilerlemek yerine tıklanabilir bir seçenek
+     listesi sun ve kullanıcının kararını bekle — ask_user aracı yokken (araç
+     kullanımı kapalı/repo bağlı değil) bile GFM checkbox listesi sohbette
+     gerçekten tıklanabilir olduğundan bu her modda işler. */
+  sysPrompt +=
+    `\n\n[Açıklayıcı diyalog] İstek belirsizse veya birden fazla makul yorumu/parametresi ` +
+    `varsa hemen bir varsayımla ilerleme: kullanıcıya kısa, işaretlenebilir bir seçenek listesi ` +
+    `sun (GFM checkbox biçiminde, ör. "- [ ] Seçenek A") ve kararını bekle. Kullanıcı kutucukları ` +
+    `işaretleyip devam edince seçimlerine göre ilerle; hâlâ netlik gerekiyorsa yeni bir kısa ` +
+    `açıklayıcı liste daha sunarak bu turu birkaç kez tekrarlayabilirsin — ama gereksiz yere sorma, ` +
+    `istek zaten netse doğrudan işe koyul.`;
   /* Eklenen her model, içinde çalıştığı platformun tüm özelliklerini bilsin. */
   sysPrompt += `\n\n${PLATFORM_KNOWLEDGE}`;
   if (body.projectPrompt) sysPrompt += `\n\n[Proje talimatları]: ${body.projectPrompt}`;
