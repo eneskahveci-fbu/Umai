@@ -108,8 +108,19 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   model kataloğu, TTS (ses seçimi + tarayıcı yedeği), `speakableText`. Sohbette
   her asistan yanıtında "Seslendir" butonu bunu kullanır.
 - **Stüdyo anahtarı** (`studio/StudioSwitcher.tsx`): tek yüzey (Tasarım) kaldığı
-  için kendini gizler — render etmez (2026 kullanıcı anketiyle içerik araçları
-  Doküman/Anket/Defter Sidebar → Araçlar'a, Görüntü genel sohbete taşındı).
+  için kendini gizler — render etmez. İçerik araçları (Anket/Defter/Kroki/
+  Kartlar) Sidebar'ın "Araçlar" açılır listesinden ÇIKARILDI (o liste ve mobil
+  "Araçlar" alt-sekmesi tamamen kaldırıldı — `SidebarTools.tsx`/
+  `MobileToolsSheet.tsx` silindi) — artık Stüdyo ana ekranındaki
+  (`studio/StudioHomeScreen.tsx`) büyük, Claude Design şablon galerisine
+  paralel kart ızgarasından erişiliyor: 5 "prefill" kartı (Tasarım/Kod/
+  Doküman/Diyagram/Sunum, composer'ı örnek brief ile doldurur) + 4 "tool"
+  kartı (Anket/Defter/Kroki/Kartlar, `useSurfaceNav().go(surface)` ile
+  doğrudan kendi kalıcı yüzeyine gider — kaydetme/koşullu mantık/aralıklı
+  tekrar gibi özellikler tek-seferlik üretimle karşılanamayacağından ayrı
+  tam sayfalarında kalır). Mobil alt sekme artık 3 öğe (Sohbet/Stüdyo/
+  Ayarlar) — "Araçlar" sekmesi kaldırıldı, Stüdyo sekmesi zaten aynı kart
+  ızgarasına götürüyor.
 - **Doküman Stüdyosu** (`studio/DocsStudio.tsx`, `/studio/dokuman`): Notion'dan
   ilhamla blok tabanlı doküman (`lib/docs.ts`) — AI taslak + "devam et",
   Markdown/bağımsız HTML dışa aktarma, `config.craftDocs`. **Yazım Asistanı**

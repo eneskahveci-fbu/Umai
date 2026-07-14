@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { SidebarTools } from "./SidebarTools";
 import {
   Check,
   ChevronDown,
@@ -477,9 +476,6 @@ export function Sidebar() {
             <Images size={15} className="text-brand shrink-0" /> <span className="truncate">Kütüphane</span>
           </button>
         </div>
-        {/* İçerik araçları (Doküman/Anket/Defter/Dönüştürücü) — anket kararıyla
-           stüdyodan buraya taşındı; kendi açılır listesinde. */}
-        <SidebarTools />
       </div>
 
       {/* Workspace accordion (Projects + History) */}
