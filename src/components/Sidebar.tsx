@@ -10,6 +10,7 @@ import {
   Images,
   Keyboard,
   Link2,
+  Loader2,
   MessageSquare,
   Plus,
   Search,
@@ -427,7 +428,11 @@ function RelatedChats({
   }, [chats, currentId]);
 
   if (state === "loading") {
-    return <p className="text-[11px] text-muted/40 px-2 py-1.5">Aranıyor…</p>;
+    return (
+      <p className="flex items-center gap-1.5 text-[11px] text-muted/40 px-2 py-1.5">
+        <Loader2 size={11} className="animate-spin shrink-0" /> Aranıyor…
+      </p>
+    );
   }
   if (state === "empty") {
     return <p className="text-[11px] text-muted/40 px-2 py-1.5">İlgili sohbet bulunamadı.</p>;
