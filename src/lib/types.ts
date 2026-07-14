@@ -86,6 +86,12 @@ export interface McpServer {
   url: string;
   headers?: Record<string, string>;
   enabled: boolean;
+  /** Mağaza kartından oluşturulduysa o katalog girdisinin id'si (mcpCatalog.ts)
+      — kartın aç/kapat durumunu bu sunucuya güvenilir şekilde eşlemek için. */
+  catalogId?: string;
+  /** Bu sunucunun araçlarını hangi model profilleri (ModelProfile.id) görebilir.
+      undefined veya boş dizi = TÜM modeller (varsayılan, önceki davranışla aynı). */
+  allowedModelIds?: string[];
 }
 
 /** Olay kancası (Claude Code "hooks" benzeri): ajan bir turu bitirince otomatik
