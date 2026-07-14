@@ -9,7 +9,7 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import {
   AlertCircle, BookMarked, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-  Circle, CircleDot, Compass, FlaskConical, ListChecks, Microscope, MoreHorizontal, Settings2,
+  Circle, CircleDot, Compass, FlaskConical, ImageOff, ListChecks, Microscope, MoreHorizontal, Settings2,
   Code2, Copy, FileText, FolderOpen, GitBranch, GitCommit, Globe,
   Highlighter, Loader2, Pencil, RefreshCw, Search, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, Users, Volume2, VolumeX, Wrench, X,
 } from "lucide-react";
@@ -486,6 +486,82 @@ function ToolCallGroup({ calls }: { calls: NonNullable<ChatMessage["toolCalls"]>
   );
 }
 
+/* ── AI görsel üretimi (ChatGPT/Gemini tarzı) ──────────────────────────
+   Pollinations/BYOK görselleri İSTEK ANINDA üretilir (statik dosya değil) —
+   bu yüzden `<img>` yüklenmesi 5-40sn sürebilir ve bazen (aşırı yük/NSFW
+   filtresi/zaman aşımı) başarısız olur. Eskiden çıplak bir <img> vardı:
+   yavaşken hiçbir gösterge yoktu, başarısız olunca sessizce kayboluyordu.
+   Artık: yüklenirken nabız atan shimmer iskelet, gelince yumuşak geçiş,
+   başarısız olursa 2 kez sessizce otomatik yeniden dener, hâlâ olmazsa
+   elle "Tekrar dene" gösterir. */
+const IMAGE_AUTO_RETRY_DELAYS_MS = [1500, 3000];
+
+/* `key`'i çağıran tarafta `src`'e bağlayarak (bkz. kullanım yeri) prompt
+   değişince bileşen tamamen yeniden monte olur — durumu sıfırlamak için
+   ayrı bir "prop değişince state resetle" effect'ine gerek kalmaz. */
+function GeneratedImage({ src, alt }: { src: string; alt?: string }) {
+  const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
+  const [bust, setBust] = useState(0);
+  const autoRetriesRef = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (retryTimerRef.current) clearTimeout(retryTimerRef.current); }, []);
+
+  const handleError = () => {
+    if (autoRetriesRef.current < IMAGE_AUTO_RETRY_DELAYS_MS.length) {
+      const delay = IMAGE_AUTO_RETRY_DELAYS_MS[autoRetriesRef.current];
+      autoRetriesRef.current += 1;
+      retryTimerRef.current = setTimeout(() => setBust((b) => b + 1), delay);
+    } else {
+      setStatus("error");
+    }
+  };
+
+  const retryManually = () => {
+    autoRetriesRef.current = 0;
+    setStatus("loading");
+    setBust((b) => b + 1);
+  };
+
+  const loadSrc = bust === 0 ? src : `${src}${src.includes("?") ? "&" : "?"}_r=${bust}`;
+
+  return (
+    <div className="relative w-full max-w-[280px] aspect-square overflow-hidden rounded-xl border border-line bg-surface mb-3">
+      {status !== "error" && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={bust}
+          src={loadSrc}
+          alt={alt ?? ""}
+          onLoad={() => setStatus("loaded")}
+          onError={handleError}
+          className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-500 ${
+            status === "loaded" ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      )}
+      {status === "loading" && (
+        <div className="absolute inset-0 grid place-items-center gap-2 shimmer">
+          <Sparkles size={20} className="text-brand animate-breathe" />
+          <span className="text-[11px] text-muted font-medium">Görsel oluşturuluyor…</span>
+        </div>
+      )}
+      {status === "error" && (
+        <div className="absolute inset-0 grid place-items-center gap-2 bg-bgsoft px-4 text-center">
+          <ImageOff size={18} className="text-muted" />
+          <span className="text-[11px] text-muted">Görsel oluşturulamadı</span>
+          <button
+            onClick={retryManually}
+            className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg bg-brand text-[#111110] font-semibold hover:bg-branddim transition-colors"
+          >
+            <RefreshCw size={11} /> Tekrar dene
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── MessageBubble ─────────────────────────────────────────────────── */
 
 function MessageBubbleImpl({
@@ -801,13 +877,7 @@ function MessageBubbleImpl({
 
         {/* Images */}
         {message.images?.map((img, i) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            key={i}
-            src={img}
-            alt=""
-            className="max-w-[320px] max-h-[220px] object-contain rounded-xl border border-line mb-3"
-          />
+          <GeneratedImage key={`${i}-${img}`} src={img} />
         ))}
 
         {/* Content */}
