@@ -118,9 +118,21 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   kartı (Anket/Defter/Kroki/Kartlar, `useSurfaceNav().go(surface)` ile
   doğrudan kendi kalıcı yüzeyine gider — kaydetme/koşullu mantık/aralıklı
   tekrar gibi özellikler tek-seferlik üretimle karşılanamayacağından ayrı
-  tam sayfalarında kalır). Mobil alt sekme artık 3 öğe (Sohbet/Stüdyo/
+  tam sayfalarında kalır). Mobil alt sekme 4 öğe (Sohbet/Stüdyo/Kütüphane/
   Ayarlar) — "Araçlar" sekmesi kaldırıldı, Stüdyo sekmesi zaten aynı kart
-  ızgarasına götürüyor.
+  ızgarasına götürüyor; "Kütüphane" masaüstü Sidebar'ın nav listesiyle aynı
+  `/library` hedefine gider.
+- **Sidebar** (`Sidebar.tsx`): genişletilmiş panelde Claude.ai'nin sol menüsüne
+  paralel bir yapı — üstte düz simge+metin nav satırları (Ara/Stüdyo/
+  Kütüphane, kart/pill değil), ortada Projeler + Sohbetler, ALTTA Claude'un
+  sol-alt hesap avatarı + sağ-alt "New chat" düğmesine paralel iki yuvarlak
+  ikon düğme (hesap menüsü `AuthButton` — artık tam-genişlik e-posta metni
+  değil, yalnız baş harf/ikon; yeni sohbet — artık üstteki "Yeni Sohbet"
+  metin butonu değil, alttaki yuvarlak `+` ikon düğmesi), Umai renklerinde.
+  Gizlilik/Şartlar/Çerezler linkleri Sidebar'dan kaldırıldı — TEK kaynak
+  olarak yalnız Ayarlar → Hakkında'da (`SettingsModal.tsx`, zaten oradaydı;
+  aynı işleve iki yol bırakmamak için Sidebar'ın kendi `DevCredit` alt-bilgisi
+  silindi).
 - **Doküman Stüdyosu** (`studio/DocsStudio.tsx`, `/studio/dokuman`): Notion'dan
   ilhamla blok tabanlı doküman (`lib/docs.ts`) — AI taslak + "devam et",
   Markdown/bağımsız HTML dışa aktarma, `config.craftDocs`. **Yazım Asistanı**

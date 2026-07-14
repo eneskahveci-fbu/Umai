@@ -434,49 +434,41 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* New session */}
-      <div className="px-3 py-3 border-b border-line/60 shrink-0 space-y-2">
-        <button
-          onClick={() => { newChat(false); closeOnMobile(); }}
-          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-brand hover:bg-branddim text-[#111110] font-semibold text-sm transition-colors"
-        >
-          <Plus size={15} /> Yeni Sohbet
-        </button>
+      {/* Nav — Claude'un sol menüsüne paralel: düz simge+metin satırları
+         (kart/pill değil), Umai renklerinde. "Yeni sohbet" artık burada değil
+         — Claude'daki gibi alttaki ikon düğmeye taşındı (bkz. Bottom). */}
+      <nav className="px-2 py-2 border-b border-line/60 shrink-0 space-y-0.5">
         <button
           onClick={() => setCommandPaletteOpen(true)}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink text-sm transition-colors"
+          className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-ink/85 hover:bg-bgsoft/70 hover:text-ink text-sm font-medium transition-colors"
         >
-          <Search size={14} className="shrink-0" />
+          <Search size={16} className="text-muted/60 shrink-0" />
           <span className="flex-1 text-left">Ara</span>
           <span className="text-[10px] text-muted/40 font-mono shrink-0">⌘K</span>
         </button>
-        <div className="flex gap-2">
-          <button
-            onClick={() => router.push("/studio")}
-            aria-current={pathname.startsWith("/studio") ? "page" : undefined}
-            className={`premium-card flex-1 min-w-0 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-              pathname.startsWith("/studio")
-                ? "border-brand/40 bg-brand/10 text-ink"
-                : "text-ink/80 hover:text-ink hover:border-brand/40"
-            }`}
-          >
-            <Sparkles size={15} className="text-brand shrink-0" /> <span className="truncate">Stüdyo</span>
-          </button>
-          {/* Kütüphane üst seviyede (Codex IA önerisi): üretilen çıktılar
-             keşfedilebilir olsun — Araçlar açılır listesine gömülmesin. */}
-          <button
-            onClick={() => router.push("/library")}
-            aria-current={pathname.startsWith("/library") ? "page" : undefined}
-            className={`premium-card flex-1 min-w-0 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-              pathname.startsWith("/library")
-                ? "border-brand/40 bg-brand/10 text-ink"
-                : "text-ink/80 hover:text-ink hover:border-brand/40"
-            }`}
-          >
-            <Images size={15} className="text-brand shrink-0" /> <span className="truncate">Kütüphane</span>
-          </button>
-        </div>
-      </div>
+        <button
+          onClick={() => router.push("/studio")}
+          aria-current={pathname.startsWith("/studio") ? "page" : undefined}
+          className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+            pathname.startsWith("/studio") ? "bg-brand/10 text-brand" : "text-ink/85 hover:bg-bgsoft/70 hover:text-ink"
+          }`}
+        >
+          <Sparkles size={16} className="shrink-0" />
+          <span className="flex-1 text-left">Stüdyo</span>
+        </button>
+        {/* Kütüphane üst seviyede (Codex IA önerisi): üretilen çıktılar
+           keşfedilebilir olsun — Araçlar açılır listesine gömülmesin. */}
+        <button
+          onClick={() => router.push("/library")}
+          aria-current={pathname.startsWith("/library") ? "page" : undefined}
+          className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+            pathname.startsWith("/library") ? "bg-brand/10 text-brand" : "text-ink/85 hover:bg-bgsoft/70 hover:text-ink"
+          }`}
+        >
+          <Images size={16} className="shrink-0" />
+          <span className="flex-1 text-left">Kütüphane</span>
+        </button>
+      </nav>
 
       {/* Workspace accordion (Projects + History) */}
       <div className="flex-1 overflow-y-auto min-h-0">
@@ -741,16 +733,23 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* Bottom */}
-      <div className="border-t border-line/60 shrink-0">
-        <div className="px-3 pt-3 pb-2 space-y-1">
-          {/* Ayarlar butonu ve tema anahtarı burada YOK (bilinçli, kullanıcı
-             kararı): Ayarlar hesap menüsünün içinde (AuthButton), tema tercihi
-             Ayarlar → Temel'de. Aynı hedefe/ayara birden çok komşu girdi kafa
-             karıştırıyordu. Hızlı erişim: Ctrl+, kısayolu ve ⌘K komutları. */}
-          <AuthButton />
-        </div>
-        <DevCredit />
+      {/* Bottom — Claude'un sol alt köşesindeki hesap avatarı + sağ alttaki
+         "New chat" ikon düğmesine paralel: iki yuvarlak ikon düğme, aynı
+         satırda. Ayarlar butonu burada YOK (bilinçli, kullanıcı kararı):
+         Ayarlar hesap menüsünün içinde (AuthButton), tema tercihi Ayarlar →
+         Temel'de. Gizlilik/Şartlar/Çerezler linkleri de burada YOK — tek
+         kaynak olarak yalnız Ayarlar → Hakkında'da (aynı işleve iki yol
+         bırakmamak için). Hızlı erişim: Ctrl+, kısayolu ve ⌘K komutları. */}
+      <div className="border-t border-line/60 shrink-0 px-3 py-3 flex items-center justify-between">
+        <AuthButton />
+        <button
+          onClick={() => { newChat(false); closeOnMobile(); }}
+          title="Yeni sohbet (Ctrl+N)"
+          aria-label="Yeni sohbet"
+          className="w-10 h-10 rounded-full bg-brand hover:bg-branddim text-[#111110] grid place-items-center transition-colors shrink-0"
+        >
+          <Plus size={18} />
+        </button>
       </div>
     </aside>
   );
@@ -834,16 +833,3 @@ function ActionIcon({
   );
 }
 
-export function DevCredit() {
-  return (
-    <div className="text-center text-[10px] text-muted/30 leading-relaxed px-3 pb-3">
-      <div className="flex justify-center gap-3">
-        <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-brand transition-colors">Gizlilik</a>
-        <span>·</span>
-        <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-brand transition-colors">Şartlar</a>
-        <span>·</span>
-        <a href="/cookies" target="_blank" rel="noopener noreferrer" className="hover:text-brand transition-colors">Çerezler</a>
-      </div>
-    </div>
-  );
-}
