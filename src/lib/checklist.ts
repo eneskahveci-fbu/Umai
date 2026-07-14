@@ -17,3 +17,15 @@ export function toggleChecklistLine(content: string, line: number): string {
   lines[li] = `${m[1]}[${checked ? " " : "x"}]${m[3]}`;
   return lines.join("\n");
 }
+
+/* İşaretli (`[x]`/`[X]`) checklist satırlarının metnini (madde imi/numara ve
+   [x] öneki temizlenmiş hâliyle) sırayla döndürür — anket/checklist otomatik-
+   devam özelliğinin AI'ya "kullanıcı şunları seçti" özetini üretmesi için. */
+export function extractCheckedItems(content: string): string[] {
+  const items: string[] = [];
+  for (const line of content.split("\n")) {
+    const m = line.match(/^\s*(?:(?:[-*+]|\d+[.)])\s+)?\[([xX])\](.*)$/);
+    if (m) items.push(m[2].trim());
+  }
+  return items;
+}
