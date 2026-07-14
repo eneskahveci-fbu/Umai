@@ -473,6 +473,10 @@ interface StoreState {
   updateLastTokens: (tokenIn: number, tokenOut: number) => void;
   popLastMessage: () => void;
   editMessageBranch: (index: number, content: string) => void;
+  /** Dallanma YARATMADAN bir mesajın içeriğini yerinde düzeltir (ör. sohbet
+      içi bir işaretleme kutusuna tıklanınca) — editMessageBranch'ten farklı
+      olarak yeni bir sürüm/dal açmaz, sonraki mesajları etkilemez. */
+  updateMessageContentAt: (index: number, content: string) => void;
   switchMessageVersion: (index: number, branchIndex: number) => void;
   maybeSetTitle: (text: string) => void;
   persistCurrent: () => Promise<void>;
@@ -1386,6 +1390,17 @@ export const useStore = create<StoreState>()((set, get) => ({
         c.id === s.currentId ? { ...c, messages: applyEditBranch(c.messages, index, content) } : c,
       ),
     })),
+
+  updateMessageContentAt: (index, content) => {
+    set((s) => ({
+      chats: s.chats.map((c) =>
+        c.id === s.currentId
+          ? { ...c, messages: c.messages.map((m, i) => (i === index ? { ...m, content } : m)) }
+          : c,
+      ),
+    }));
+    void get().persistCurrent();
+  },
 
   switchMessageVersion: (index, branchIndex) => {
     set((s) => ({
