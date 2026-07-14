@@ -165,7 +165,7 @@ export function McpGallery() {
                   <div className="border-t border-line/60 px-3 py-2">
                     <button
                       onClick={() => setScopeOpenId(scopeOpen ? null : srv.id)}
-                      className="w-full flex items-center justify-between text-[11px] text-muted hover:text-ink transition-colors"
+                      className="w-full flex items-center justify-between text-[11px] text-muted hover:text-ink border border-line rounded-lg px-2.5 py-1.5 bg-surface hover:border-brand/40 transition-colors"
                     >
                       <span>Modeller: {restricted ? `${srv.allowedModelIds!.length} model` : "Tümü"}</span>
                       <ChevronDown size={12} className={`transition-transform ${scopeOpen ? "rotate-180" : ""}`} />

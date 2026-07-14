@@ -29,7 +29,7 @@ import { ArtifactCanvas } from "./ArtifactCanvas";
 import { StudioTopBar } from "./studio/StudioTopBar";
 import { SavedItemsModal } from "./studio/SavedItemsModal";
 import { printPdf } from "@/lib/studioExport";
-import { artifactDownload } from "@/lib/artifactDoc";
+import { artifactDownload, buildArtifactSrcDoc } from "@/lib/artifactDoc";
 import { pickDraftModels, fillSelfConsistency, generateDrafts, judgeDrafts, buildBoostInstruction, type DraftJudge } from "@/lib/boost";
 import { buildFallbackChain } from "@/lib/fallback";
 import { resolveModelApiKey } from "@/lib/secureKeys";
@@ -384,7 +384,10 @@ export function DesignStudio() {
     key: "pdf",
     label: "PDF (yazdır)",
     icon: <FileText size={14} />,
-    onSelect: () => { if (!printPdf(shownArtifact.content)) addToast("Yazdırma penceresi açılamadı — pop-up engelleyiciyi kontrol et.", "error"); },
+    onSelect: () => {
+      const doc = buildArtifactSrcDoc(shownArtifact.type, shownArtifact.content, shownArtifact.language);
+      if (!printPdf(doc)) addToast("Yazdırma penceresi açılamadı — pop-up engelleyiciyi kontrol et.", "error");
+    },
   };
 
   /* Üretimi gerçek proje dosyasına çevirme yolu (Codex önerisi, teslim akışı):
@@ -440,7 +443,6 @@ export function DesignStudio() {
   return (
     <div className="fixed inset-0 z-50 bg-bg text-ink flex flex-col pb-[var(--surface-pb,0px)] sm:pb-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       <StudioTopBar
-        icon={Sparkles}
         label="Tasarım"
         activeSurface="studio"
         showWorkActions

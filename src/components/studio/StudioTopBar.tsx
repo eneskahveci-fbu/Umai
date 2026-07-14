@@ -1,7 +1,6 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
 import { X } from "lucide-react";
 import { StudioSwitcher } from "./StudioSwitcher";
 import type { Surface } from "@/lib/surfaceNav";
@@ -25,7 +24,6 @@ export function StudioTopBar({
   actions,
   onClose,
 }: {
-  icon: LucideIcon;
   label: string;
   activeSurface: Surface;
   showWorkActions: boolean;
