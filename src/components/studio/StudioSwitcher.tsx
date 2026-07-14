@@ -8,8 +8,9 @@ import { useSurfaceNav, type Surface } from "@/lib/surfaceNav";
    stüdyoda tek mod kaldı: Tasarım (Claude Design'a paralel tek tuval — slayt,
    afiş, sosyal, story, sunum destesi hepsi orada). Görüntü üretimi Stüdyo'dan
    kaldırıldı, genel sohbette "/gorsel" komutuyla üretiliyor. İçerik araçları
-   (Doküman/Anket/Defter) stüdyodan çıktı → Sidebar'daki "Araçlar" satırından
-   açılır. Tek yüzey kaldığından bileşen kendini gizler (bkz. aşağı). */
+   (Doküman/Anket/Defter/Kroki/Kartlar) stüdyodan çıktı → Stüdyo ana ekranındaki
+   (StudioHomeScreen) büyük araç kartlarından açılır. Tek yüzey kaldığından
+   bileşen kendini gizler (bkz. aşağı). */
 
 export const STUDIO_SURFACES: { id: Surface; name: string; icon: LucideIcon; title: string }[] = [
   { id: "studio", name: "Tasarım", icon: Sparkles, title: "Slayt · Afiş · Sosyal · Tuval — tek tuval" },
