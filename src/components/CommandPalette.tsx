@@ -15,12 +15,14 @@ import {
   Sparkles,
   Image as ImageIcon,
   Images,
+  Keyboard,
   Layers,
   ListChecks,
   Network,
   RefreshCw,
   Zap,
   Code2,
+  Blocks,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useModalA11y } from "@/lib/useModalA11y";
@@ -247,6 +249,26 @@ export function CommandPalette() {
         setOpen(false);
       },
       keywords: ["prompt", "kutuphane", "library", "sablon", "template", "snippet"],
+    },
+    {
+      id: "extension-store",
+      label: "Eklenti Mağazası",
+      icon: <Blocks size={16} />,
+      action: () => {
+        useStore.getState().setExtensionStoreOpen(true);
+        setOpen(false);
+      },
+      keywords: ["eklenti", "extension", "mcp", "uygulama", "bağlantı", "connector", "store", "magaza"],
+    },
+    {
+      id: "keyboard-shortcuts",
+      label: "Kısayollar",
+      icon: <Keyboard size={16} />,
+      action: () => {
+        useStore.getState().setShortcutsOpen(true);
+        setOpen(false);
+      },
+      keywords: ["kisayol", "shortcut", "klavye", "keyboard"],
     },
   ];
 

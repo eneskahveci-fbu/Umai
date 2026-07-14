@@ -149,6 +149,7 @@ function ToolCallCard({
 }) {
   const [open, setOpen] = useState(false);
   const isRunning = call.status === "pending";
+  const isError = call.status === "error";
   const args = (() => { try { return JSON.parse(call.arguments || "{}"); } catch { return {}; } })();
   const label = isRunning ? (TOOL_LABEL[call.name] ?? call.name) : (TOOL_DONE_LABEL[call.name] ?? call.name);
   const keyArg = getKeyArg(call.name, args);
@@ -168,6 +169,10 @@ function ToolCallCard({
         <div className="shrink-0 mt-0.5 w-5 h-5 flex items-center justify-center">
           {isRunning ? (
             <Loader2 size={11} className="animate-spin text-brand" />
+          ) : isError ? (
+            <div className="w-4 h-4 rounded-full bg-red/10 border border-red/40 flex items-center justify-center">
+              <AlertCircle size={9} className="text-red/80" strokeWidth={2.5} />
+            </div>
           ) : (
             <div className="w-4 h-4 rounded-full bg-bgsoft border border-line/50 flex items-center justify-center">
               <Check size={7} className="text-green/70" strokeWidth={3} />
@@ -644,11 +649,11 @@ function MessageBubbleImpl({
               </div>
               {/* Hover actions */}
               <div className="flex items-center gap-0.5 mt-1.5 justify-end [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 transition-opacity duration-150">
-                <button onClick={copyMessage} aria-label="Kopyala" className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink px-2 py-1 rounded-lg hover:bg-bgsoft transition-colors">
+                <button onClick={copyMessage} aria-label="Kopyala" className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-2.5 rounded-lg hover:bg-bgsoft transition-colors">
                   {copied ? <Check size={11} /> : <Copy size={11} />}
                 </button>
                 {onEdit && (
-                  <button onClick={startEdit} aria-label="Düzenle" className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink px-2 py-1 rounded-lg hover:bg-bgsoft transition-colors">
+                  <button onClick={startEdit} aria-label="Düzenle" className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-2.5 rounded-lg hover:bg-bgsoft transition-colors">
                     <Pencil size={11} />
                   </button>
                 )}
@@ -658,7 +663,7 @@ function MessageBubbleImpl({
                       onClick={() => onSwitchVersion(Math.max(0, (message.branchIndex ?? 0) - 1))}
                       disabled={(message.branchIndex ?? 0) === 0}
                       aria-label="Önceki sürüm"
-                      className="p-0.5 rounded hover:bg-bgsoft disabled:opacity-30 transition-colors"
+                      className="p-1.5 rounded hover:bg-bgsoft disabled:opacity-30 transition-colors"
                     >
                       <ChevronLeft size={12} />
                     </button>
@@ -669,7 +674,7 @@ function MessageBubbleImpl({
                       onClick={() => onSwitchVersion(Math.min(message.branches!.length - 1, (message.branchIndex ?? 0) + 1))}
                       disabled={(message.branchIndex ?? 0) === message.branches.length - 1}
                       aria-label="Sonraki sürüm"
-                      className="p-0.5 rounded hover:bg-bgsoft disabled:opacity-30 transition-colors"
+                      className="p-1.5 rounded hover:bg-bgsoft disabled:opacity-30 transition-colors"
                     >
                       <ChevronRight size={12} />
                     </button>

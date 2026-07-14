@@ -208,10 +208,10 @@ function MoreMenu({ active, children, placement = "top", icon, title = "Daha faz
   );
 }
 
-function MoreItem({ onClick, icon, label, desc, active }: { onClick: () => void; icon: React.ReactNode; label: string; desc?: string; active?: boolean }) {
+function MoreItem({ onClick, icon, label, desc, active, keepOpen }: { onClick: () => void; icon: React.ReactNode; label: string; desc?: string; active?: boolean; keepOpen?: boolean }) {
   return (
     <button
-      onClick={onClick}
+      onClick={keepOpen ? (e) => { e.stopPropagation(); onClick(); } : onClick}
       className={`flex items-center gap-2.5 text-[12px] px-2.5 py-2 rounded-lg text-left transition-colors ${
         active ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
       }`}
@@ -660,10 +660,12 @@ export function CoderView() {
   const [improvingPrompt, setImprovingPrompt] = useState(false);
 
   /* Prompt geliştirici — composer'daki taslağı ücretsiz LLM ile daha net/etkili
-     bir isteme dönüştürür (akışı doğrudan input'a yazar). ⋯ → Modlar'dan tetiklenir. */
+     bir isteme dönüştürür (akışı doğrudan input'a yazar). ⋯ menüsünün üst-seviye
+     hızlı eylemlerinden (Efor'un yanında) tetiklenir. */
   const improvePrompt = async () => {
     const base = input.trim();
-    if (!base || improvingPrompt) return;
+    if (improvingPrompt) return;
+    if (!base) { addToast("Önce composer'a bir taslak yaz.", "info"); return; }
     setImprovingPrompt(true);
     try {
       const store = useStore.getState();
@@ -2162,8 +2164,15 @@ export function CoderView() {
                 });
                 fireHooks("preToolUse");
               } else if (ev.phase === "end") {
+                /* Sunucu hata sonuçlarını ayrı bir alan olarak DEĞİL, kendi kabul
+                   ettiği "Hata:"/"MCP hata:"/"Bilinmeyen araç:" önekli metin
+                   olarak döner (bkz. api/chat/route.ts executeTool) — burada
+                   aynı sözleşmeyle status'u "error" olarak işaretleriz ki
+                   MessageBubble görsel olarak ayırt edebilsin. */
+                const resultText = String(ev.result ?? "");
+                const isError = /^(Hata:|MCP hata:|Bilinmeyen araç:)/.test(resultText);
                 useStore.getState().updateToolCallOnLast(ev.id, {
-                  result: ev.result, status: "done",
+                  result: ev.result, status: isError ? "error" : "done",
                   endedAt: Date.now(),
                 });
                 fireHooks("postToolUse");
@@ -2683,7 +2692,9 @@ export function CoderView() {
               <VenetianMask size={9} /> Gizli
             </span>
           )}
-          {/* Birleşik ⋯ menüsü — gruplu: Hızlı eylemler · Çalışma Alanı · Modlar · Araçlar */}
+          {/* Birleşik ⋯ menüsü — gruplu: Efor + hızlı eylemler · Çalışma · Modlar
+             (eski "Araçlar" sekmesi — Kütüphane/Etkinlik Günlüğü/Kısayollar —
+             Sidebar'ın "Araçlar" popover'ına taşındı, bkz. Sidebar.tsx). */}
           {/* Aktif-parıltı yalnız panel aç/kapa durumlarını yansıtır — mod durumları
              (toolsEnabled/safeMode/swarmMode/researchMode) zaten StatusBar'da rozet
              olarak görünür, burada tekrar sinyal vermeye gerek yok. */}
@@ -2710,6 +2721,7 @@ export function CoderView() {
               label="Prompt geliştir"
               desc="yazdığın istemi iyileştirir"
               onClick={() => void improvePrompt()}
+              keepOpen
             />
 
             {/* Sekme çubuğu — tıklanınca menü açık kalır */}

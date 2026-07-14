@@ -1,6 +1,6 @@
 "use client";
 
-import { Blocks, Check, Plug } from "lucide-react";
+import { Check, Package, Plug } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { EXTENSION_PACKS } from "@/lib/extensions/registry";
 import { McpGallery } from "@/components/McpGallery";
@@ -43,7 +43,7 @@ export function ExtensionsSettings() {
       {/* ── Dahili araç paketleri ── */}
       <div className="space-y-4 pt-2 border-t border-line/40">
         <div>
-          <h4 className="text-sm font-bold flex items-center gap-2"><Blocks size={16} className="text-brand" /> Dahili Araç Paketleri</h4>
+          <h4 className="text-sm font-bold flex items-center gap-2"><Package size={16} className="text-brand" /> Dahili Araç Paketleri</h4>
           <p className="text-xs text-muted/70 mt-1 leading-relaxed">
             Modüler yetenek paketleri. Her paketi tek anahtarla açıp kapatabilirsin; açık paketlerin araçları ajana sunulur.
           </p>
