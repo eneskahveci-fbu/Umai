@@ -280,11 +280,16 @@ export function CommandPalette() {
         }))
     : [];
 
-  /* Birleşik arama: sohbetler + Doküman/Anket/Defter kayıtları — yalnız
-     dosya bulucuyla aynı eşikte (en az 1 karakter), her tür en fazla 5 sonuç. */
+  /* Birleşik arama: sohbetler (başlık + içerik — Sidebar'ın kaldırılan inline
+     "Sohbetlerde ara" kutusuyla AYNI kapsam, Tem 2026 kararı: tek arama
+     kaynağı burası) + Doküman/Anket/Defter kayıtları — yalnız dosya
+     bulucuyla aynı eşikte (en az 1 karakter), her tür en fazla 5 sonuç. */
   const chatRows: Row[] = query.length >= 1
     ? chats
-        .filter((c) => !c.incognito && c.title.toLowerCase().includes(q))
+        .filter((c) => !c.incognito && (
+          c.title.toLowerCase().includes(q) ||
+          c.messages.some((m) => typeof m.content === "string" && m.content.toLowerCase().includes(q))
+        ))
         .slice(0, 5)
         .map((c) => ({
           id: "chat:" + c.id,
