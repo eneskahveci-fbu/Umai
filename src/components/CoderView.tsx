@@ -7,6 +7,7 @@ import { buildFallbackChain } from "@/lib/fallback";
 import { filterMcpServersForModel } from "@/lib/mcpScope";
 import {
   ArrowDown,
+  AlertTriangle,
   ArrowUp,
   Brain,
   Camera,
@@ -26,6 +27,7 @@ import {
   GitPullRequest,
   Globe,
   MoreHorizontal,
+  OctagonAlert,
   Image as ImageIcon,
   Loader2 as Loader2Icon,
   MessageSquare,
@@ -189,7 +191,7 @@ function MoreMenu({ active, children, placement = "top", icon, title = "Daha faz
           <div
             ref={menuRef}
             onClick={() => setOpen(false)}
-            className="fixed inset-x-0 bottom-0 z-[80] bg-surface border-t border-line rounded-t-2xl shadow-2xl shadow-black/40 p-2 pt-1.5 flex flex-col gap-0.5 max-h-[75dvh] overflow-y-auto animate-modal-bg"
+            className="fixed inset-x-0 bottom-0 z-[80] bg-surface border-t border-line rounded-t-2xl shadow-2xl shadow-black/40 p-2 pt-1.5 flex flex-col gap-0.5 max-h-[75dvh] overflow-y-auto animate-in fade-in slide-in-from-bottom-4 duration-200"
             style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
           >
             <div className="mx-auto w-10 h-1 rounded-full bg-line/80 mb-1.5 shrink-0" />
@@ -412,11 +414,11 @@ function EffortMenuControl() {
    checkbox'ı TEK, her zaman görünen bir kontrole birleştiriyoruz. */
 type AgentMode = "auto" | "plan" | "accept";
 const AGENT_MODES: { key: AgentMode; label: string; short: string; icon: React.ReactNode; desc: string }[] = [
-  { key: "auto", label: "Oto", short: "Oto", icon: <Zap size={13} />,
+  { key: "auto", label: "Oto", short: "Oto", icon: <Zap size={12} />,
     desc: "Ajan dosyaları doğrudan yazar/commit eder. İstersen sonradan “Geri Al” ile eski haline döndürebilirsin." },
-  { key: "plan", label: "Plan", short: "Plan", icon: <ListChecks size={13} />,
+  { key: "plan", label: "Plan", short: "Plan", icon: <ListChecks size={12} />,
     desc: "Önce ayrıntılı bir plan sunar ve durur — sen “Onayla & Uygula” demeden hiçbir dosyaya dokunmaz." },
-  { key: "accept", label: "Düzenlemeleri Onayla", short: "Onay", icon: <FileCheck2 size={13} />,
+  { key: "accept", label: "Düzenlemeleri Onayla", short: "Onay", icon: <FileCheck2 size={12} />,
     desc: "Değişiklikleri doğrudan yazmaz; kod bloğu olarak önerir, sen inceleyip kendin uygularsın." },
 ];
 
@@ -460,7 +462,7 @@ function AgentModeButton() {
         <ChevronDown size={11} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute right-0 top-[calc(100%+6px)] z-30 w-72 max-w-[85vw] rounded-2xl border border-line bg-surface/95 backdrop-blur-xl shadow-2xl p-1.5">
+        <div className="absolute right-0 top-[calc(100%+6px)] z-30 w-72 max-w-[85vw] rounded-2xl border border-line bg-surface/95 backdrop-blur-xl shadow-2xl p-1.5 animate-fade-in">
           {AGENT_MODES.map((m) => (
             <button
               key={m.key}
@@ -3206,7 +3208,7 @@ export function CoderView() {
                   ? "bg-red/5 border-red/20 text-red"
                   : "bg-yellow/5 border-yellow/20 text-yellow"
               }`}>
-                <span>{isDanger ? "⛔" : "⚠️"}</span>
+                {isDanger ? <OctagonAlert size={14} className="shrink-0" /> : <AlertTriangle size={14} className="shrink-0" />}
                 <span>
                   Bağlam dolumu {pct.toFixed(0)}% — {isDanger
                     ? "Limit aşılmak üzere, yeni sohbet başlatmanı öneririm."
@@ -3634,7 +3636,7 @@ export function CoderView() {
                   />
                 )}
                 {streaming ? (
-                  <button onClick={stop} className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-red hover:bg-red/80 active:bg-red/70 text-white grid place-items-center transition-colors" title="Durdur">
+                  <button onClick={stop} className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-red hover:bg-red/80 active:bg-red/70 text-white grid place-items-center transition-all hover:scale-105 active:scale-95" title="Durdur">
                     <Square size={13} />
                   </button>
                 ) : (

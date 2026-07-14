@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  ArrowDown, ArrowUp, Check, Download, FileCode, FileText, FolderOpen, Loader2,
+  ArrowDown, ArrowUp, Check, Download, FileCode, FileText, FolderOpen, Lightbulb, Loader2,
   Plus, Save, SpellCheck, Sparkles, Trash2, Wand2, X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -209,7 +209,7 @@ export function DocsStudio() {
       case "callout":
         return (
           <div className="flex items-start gap-2 bg-brand/5 border border-brand/20 rounded-lg px-3 py-2">
-            <span className="mt-0.5 shrink-0">💡</span>
+            <Lightbulb size={14} className="mt-0.5 shrink-0 text-brand" />
             <textarea value={b.text} onChange={(e) => patchBlock(b.id, { text: e.target.value })} placeholder="Bilgi kutusu" rows={2} className={`${common} text-sm resize-none`} />
           </div>
         );
@@ -385,8 +385,8 @@ export function DocsStudio() {
                     >
                       {DOC_BLOCK_TYPES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
-                    <button onClick={() => moveBlock(b.id, -1)} className="w-6 h-6 grid place-items-center rounded text-muted/50 hover:text-ink" title="Yukarı"><ArrowUp size={12} /></button>
-                    <button onClick={() => moveBlock(b.id, 1)} className="w-6 h-6 grid place-items-center rounded text-muted/50 hover:text-ink" title="Aşağı"><ArrowDown size={12} /></button>
+                    <button onClick={() => moveBlock(b.id, -1)} className="w-6 h-6 grid place-items-center rounded text-muted/50 hover:text-ink hover:bg-bgsoft transition-colors" title="Yukarı"><ArrowUp size={12} /></button>
+                    <button onClick={() => moveBlock(b.id, 1)} className="w-6 h-6 grid place-items-center rounded text-muted/50 hover:text-ink hover:bg-bgsoft transition-colors" title="Aşağı"><ArrowDown size={12} /></button>
                     <button onClick={() => addBlockAfter(b.id)} className="w-6 h-6 grid place-items-center rounded text-muted/50 hover:text-brand" title="Altına blok ekle"><Plus size={12} /></button>
                     <button onClick={() => deleteBlock(b.id)} className="w-6 h-6 grid place-items-center rounded text-muted/50 hover:text-red" title="Sil"><Trash2 size={12} /></button>
                   </div>

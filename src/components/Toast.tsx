@@ -33,7 +33,8 @@ function ToastItem({ id, type, message, action, duration }: { id: string; type: 
       )}
       <button
         onClick={() => removeToast(id)}
-        className="shrink-0 text-muted hover:text-ink"
+        aria-label="Kapat"
+        className="shrink-0 text-muted hover:text-ink hover:bg-bgsoft rounded-md p-0.5 transition-colors"
       >
         <X size={14} />
       </button>
