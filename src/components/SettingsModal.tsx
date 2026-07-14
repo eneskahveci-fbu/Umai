@@ -31,7 +31,6 @@ import {
   Cpu,
   SlidersHorizontal,
   Wrench,
-  Plug,
   Webhook,
   Blocks,
   BarChart3,
@@ -74,9 +73,9 @@ import { pickReplacementModel } from "@/lib/modelPicker";
 import { isPushSubscribed, pushSupported, subscribeToPush, unsubscribeFromPush } from "@/lib/sw-register";
 import type { Provider, ResponseStyle } from "@/lib/types";
 
-export type SettingsTab = "model" | "github" | "general" | "fusion" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim";
+export type SettingsTab = "model" | "github" | "general" | "fusion" | "advanced" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim";
 
-export const SETTINGS_TAB_KEYS: SettingsTab[] = ["model", "github", "general", "fusion", "advanced", "mcp", "hooks", "hesap", "extensions", "plan", "hakkinda", "kullanim"];
+export const SETTINGS_TAB_KEYS: SettingsTab[] = ["model", "github", "general", "fusion", "advanced", "hooks", "hesap", "extensions", "plan", "hakkinda", "kullanim"];
 
 /* routeMode: /settings gerçek rotası olarak render — store bayrağı yok sayılır,
    kapatma /app'e döner, sekme değişimi onTabChange ile URL'e yansır.
@@ -114,18 +113,9 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   const removeMemory = useStore((s) => s.removeMemory);
   const setAutoMemoryFacts = useStore((s) => s.setAutoMemoryFacts);
   const updateProject = useStore((s) => s.updateProject);
-  const addMcpServer = useStore((s) => s.addMcpServer);
-  const removeMcpServer = useStore((s) => s.removeMcpServer);
-  const updateMcpServer = useStore((s) => s.updateMcpServer);
   const addHook = useStore((s) => s.addHook);
   const removeHook = useStore((s) => s.removeHook);
   const updateHook = useStore((s) => s.updateHook);
-
-  const [mcpName, setMcpName] = useState("");
-  const [mcpUrl, setMcpUrl] = useState("");
-  const [mcpHeaderKey, setMcpHeaderKey] = useState("");
-  const [mcpHeaderVal, setMcpHeaderVal] = useState("");
-  const [mcpTesting, setMcpTesting] = useState<string | null>(null);
 
   const [hookLabel, setHookLabel] = useState("");
   const [hookCommand, setHookCommand] = useState("");
@@ -196,18 +186,17 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
 
   /* Keyword index — typing in the search box jumps to whichever tab
      contains the matching keyword (first hit wins). */
-  const SEARCH_INDEX: Record<"model" | "github" | "general" | "fusion" | "advanced" | "mcp" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim", string[]> = {
+  const SEARCH_INDEX: Record<"model" | "github" | "general" | "fusion" | "advanced" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim", string[]> = {
     hesap:    ["hesap", "account", "e-posta", "email", "giriş", "çıkış", "oturum", "admin"],
     fusion:   ["fusion", "füzyon", "taslak", "draft", "hakem", "judge", "kalite", "quality", "birleştir", "model seç", "yedek", "fallback", "kota", "kredi", "credit"],
     kullanim: ["kullanım", "usage", "analitik", "analytics", "token", "maliyet", "cost", "istatistik", "grafik", "pano"],
     plan:     ["plan", "pro", "abonelik", "yükselt", "upgrade", "ödeme", "fatura", "stripe", "premium"],
     hakkinda: ["hakkında", "about", "sürüm", "version", "gizlilik", "şartlar", "lisans", "iletişim", "destek"],
-    extensions: ["eklenti", "extension", "paket", "pack", "git", "ci", "cd", "kural", "web", "modül", "modular"],
+    extensions: ["eklenti", "extension", "paket", "pack", "git", "ci", "cd", "kural", "web", "modül", "modular", "mcp", "model context", "protocol", "sunucu", "server", "bağlantı", "connector", "notion", "slack", "drive"],
     model:    ["model", "api", "anahtar", "key", "openai", "anthropic", "huggingface", "hf", "nvidia", "nim", "provider", "test"],
     github:   ["github", "gitlab", "token", "depo", "repo", "branch", "dal", "kullanıcı", "username"],
     general:  ["otomatik", "pilot", "auto", "davranış", "web", "arama", "search", "bildirim", "notification", "ses", "sound", "kalite", "quality", "hatırla", "bellek", "memori", "memory", "sistem", "prompt", "stil", "style", "tema", "theme", "renk", "color", "accent", "font", "yazı", "boyut", "bağlam", "context", "yedek", "backup", "skill", "ayar", "kısayol", "öğrenme", "öğren", "learning", "eğitim", "ders"],
     advanced: ["webcontainer", "gelişmiş", "guest", "misafir", "terminal", "hibrit", "köprü", "bridge", "otomasyon", "automation", "yerel", "local", "hata", "error", "kural", "rules", "rulesfile"],
-    mcp:      ["mcp", "model context", "protocol", "sunucu", "server", "araç", "tool", "entegrasyon"],
     hooks:    ["hook", "kanca", "olay", "event", "lint", "test", "otomatik", "afteredit", "onfinish", "komut", "command"],
   };
   const matchingTabs = (() => {
@@ -229,8 +218,8 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   if (search !== prevSearch) {
     setPrevSearch(search);
     if (search.trim() && matchingTabs.size > 0) {
-      const adminOnly = new Set(["advanced", "mcp", "hooks"]);
-      const first = (["model", "fusion", "github", "extensions", "general", "kullanim", "plan", "hakkinda", "advanced", "mcp", "hooks", "hesap"] as const)
+      const adminOnly = new Set(["advanced", "hooks"]);
+      const first = (["model", "fusion", "github", "extensions", "general", "kullanim", "plan", "hakkinda", "advanced", "hooks", "hesap"] as const)
         .find((k) => matchingTabs.has(k) && (isAdmin || !adminOnly.has(k)));
       if (first && first !== tab) { changeTab(first); setSearchJump(true); }
     }
@@ -658,7 +647,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     { key: "kullanim", label: "Kullanım", icon: BarChart3, admin: false, group: "Kullanım & Plan" },
     { key: "plan", label: "Plan", icon: Crown, admin: false, group: undefined },
     { key: "advanced", label: "Geliştirici", icon: Wrench, admin: true, group: "Yönetici" },
-    { key: "mcp", label: "MCP", icon: Plug, admin: true, group: undefined },
     { key: "hooks", label: "Kancalar", icon: Webhook, admin: true, group: undefined },
     { key: "hakkinda", label: "Hakkında", icon: Info, admin: false, group: undefined },
   ] as const;
@@ -2155,88 +2143,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   </div>
                 );
               })()}
-            </div>
-          </section>
-        )}
-
-        {/* MCP */}
-        {tab === "mcp" && (
-          <section className="space-y-5">
-            <div>
-              <h4 className="text-sm font-bold mb-1">MCP Sunucuları</h4>
-              <p className="text-xs text-muted mb-3">Model Context Protocol — AI&apos;ya harici araçlar bağla (veritabanı, dosya sistemi, API vb.). Sunucu JSON-RPC 2.0 üzerinden HTTP ile erişilebilir olmalı.</p>
-
-              {(config.mcpServers ?? []).length > 0 && (
-                <div className="flex flex-col gap-2 mb-4">
-                  {(config.mcpServers ?? []).map((srv) => (
-                    <div key={srv.id} className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-line bg-bgsoft">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold truncate">{srv.name}</div>
-                        <div className="text-xs text-muted font-mono truncate">{srv.url}</div>
-                      </div>
-                      <label className="flex items-center gap-1.5 text-xs text-muted cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={srv.enabled}
-                          onChange={() => updateMcpServer(srv.id, { enabled: !srv.enabled })}
-                          className="accent-brand"
-                        />
-                        Aktif
-                      </label>
-                      <button
-                        onClick={async () => {
-                          setMcpTesting(srv.id);
-                          try {
-                            const res = await fetch("/api/mcp", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ action: "list", server: { url: srv.url, headers: srv.headers } }),
-                            });
-                            const data = await res.json() as { tools?: { name: string }[]; error?: string };
-                            if (data.tools) addToast(`${data.tools.length} araç bulundu`, "success");
-                            else addToast(data.error ?? "Bağlanamadı", "error");
-                          } catch { addToast("Bağlantı hatası", "error"); }
-                          finally { setMcpTesting(null); }
-                        }}
-                        disabled={mcpTesting === srv.id}
-                        className="text-xs px-2.5 py-1.5 rounded-lg border border-line text-muted hover:text-brand hover:border-brand transition-colors disabled:opacity-50"
-                      >
-                        {mcpTesting === srv.id ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-                      </button>
-                      <button onClick={() => removeMcpServer(srv.id)} className="text-muted hover:text-red/80 transition-colors"><Trash2 size={14} /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="space-y-2 border border-line/60 rounded-xl p-3 bg-bgsoft/40">
-                <div className="text-xs font-semibold text-muted mb-2">Yeni Sunucu Ekle</div>
-                <input value={mcpName} onChange={(e) => setMcpName(e.target.value)} placeholder="Sunucu adı (örn. My DB Tools)" className="input-mono w-full" />
-                <input value={mcpUrl} onChange={(e) => setMcpUrl(e.target.value)} placeholder="URL (örn. http://localhost:3001)" className="input-mono w-full" />
-                <div className="flex gap-2">
-                  <input value={mcpHeaderKey} onChange={(e) => setMcpHeaderKey(e.target.value)} placeholder="Header adı (opsiyonel)" className="input-mono flex-1" />
-                  <input value={mcpHeaderVal} onChange={(e) => setMcpHeaderVal(e.target.value)} placeholder="Değer" className="input-mono flex-1" />
-                </div>
-                <button
-                  onClick={() => {
-                    if (!mcpName.trim() || !mcpUrl.trim()) { addToast("Ad ve URL zorunlu.", "error"); return; }
-                    const headers: Record<string, string> = {};
-                    if (mcpHeaderKey.trim()) headers[mcpHeaderKey.trim()] = mcpHeaderVal.trim();
-                    addMcpServer({ name: mcpName.trim(), url: mcpUrl.trim(), headers: Object.keys(headers).length ? headers : undefined, enabled: true });
-                    setMcpName(""); setMcpUrl(""); setMcpHeaderKey(""); setMcpHeaderVal("");
-                    addToast("MCP sunucusu eklendi.", "success");
-                  }}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-brand text-[#111110] text-sm font-semibold hover:bg-branddim transition-colors"
-                >
-                  <Plus size={14} /> Ekle
-                </button>
-              </div>
-            </div>
-
-            <div className="p-3 bg-brand/5 border border-brand/20 rounded-xl text-xs text-muted space-y-1.5">
-              <div className="font-semibold text-brand">MCP nedir?</div>
-              <p>Model Context Protocol, Anthropic tarafından geliştirilen bir standarttır. Kendi araçlarını (veritabanı sorgu, dosya okuma, API çağrısı vb.) UMAI&apos;ye bağlayarak AI&apos;ın bunları otomatik kullanmasını sağlar.</p>
-              <p>Aktif sunucuların araçları, araç kullanımı açıkken her sohbette AI&apos;a sunulur.</p>
             </div>
           </section>
         )}
