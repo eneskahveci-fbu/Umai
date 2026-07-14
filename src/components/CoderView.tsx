@@ -9,12 +9,14 @@ import {
   ArrowDown,
   ArrowUp,
   Brain,
+  Camera,
   ChevronDown,
   GitBranch,
   ChevronRight,
   Code2,
   Copy,
   File,
+  FileCheck2,
   FolderGit2,
   FolderOpen,
   Folder,
@@ -72,7 +74,9 @@ const RealTerminal = dynamic(() => import("./RealTerminal").then((m) => m.RealTe
     </div>
   ),
 });
+const CameraCaptureModal = dynamic(() => import("./CameraCapture").then((m) => m.CameraCaptureModal), { ssr: false });
 import { useStore } from "@/lib/store";
+import { isMobile as isMobileDevice } from "@/lib/webcontainer";
 import { isAdminEmail } from "@/lib/admin";
 import { MessageBubble } from "./MessageBubble";
 import { SlashMenu } from "./SlashMenu";
@@ -395,6 +399,85 @@ function EffortMenuControl() {
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* Ajan modu (Claude Code'daki Normal/Auto-accept/Plan üçlüsüne paralel) —
+   composer'da her zaman görünür, tek tıkla açılan bir küçük panelden 3
+   modun birinden seçim yapılır. Sunucu tarafındaki gerçek davranış zaten
+   var (planApprovalMode/requireWriteApproval, bkz. api/chat/route.ts) —
+   burada yalnızca ⋯ menüsüne/Ayarlar'a gömülü, düşük görünürlüklü iki ayrı
+   checkbox'ı TEK, her zaman görünen bir kontrole birleştiriyoruz. */
+type AgentMode = "auto" | "plan" | "accept";
+const AGENT_MODES: { key: AgentMode; label: string; short: string; icon: React.ReactNode; desc: string }[] = [
+  { key: "auto", label: "Oto", short: "Oto", icon: <Zap size={13} />,
+    desc: "Ajan dosyaları doğrudan yazar/commit eder. İstersen sonradan “Geri Al” ile eski haline döndürebilirsin." },
+  { key: "plan", label: "Plan", short: "Plan", icon: <ListChecks size={13} />,
+    desc: "Önce ayrıntılı bir plan sunar ve durur — sen “Onayla & Uygula” demeden hiçbir dosyaya dokunmaz." },
+  { key: "accept", label: "Düzenlemeleri Onayla", short: "Onay", icon: <FileCheck2 size={13} />,
+    desc: "Değişiklikleri doğrudan yazmaz; kod bloğu olarak önerir, sen inceleyip kendin uygularsın." },
+];
+
+function AgentModeButton() {
+  const config = useStore((s) => s.config);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const mode: AgentMode = config.planApprovalMode ? "plan" : config.requireWriteApproval ? "accept" : "auto";
+  const current = AGENT_MODES.find((m) => m.key === mode)!;
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+
+  const choose = (next: AgentMode) => {
+    const store = useStore.getState();
+    store.saveConfig({
+      ...store.config,
+      planApprovalMode: next === "plan",
+      requireWriteApproval: next === "accept",
+    });
+    setOpen(false);
+  };
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title="Ajan modu — dosya değişiklikleri nasıl uygulansın?"
+        className={`flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg border transition-colors ${
+          mode === "auto" ? "border-line text-muted hover:text-ink hover:border-brand/40" : "border-brand/40 text-brand bg-brand/5"
+        }`}
+      >
+        {current.icon}
+        <span className="hidden sm:inline">{current.short}</span>
+        <ChevronDown size={11} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-[calc(100%+6px)] z-30 w-72 max-w-[85vw] rounded-2xl border border-line bg-surface/95 backdrop-blur-xl shadow-2xl p-1.5">
+          {AGENT_MODES.map((m) => (
+            <button
+              key={m.key}
+              onClick={() => choose(m.key)}
+              className={`w-full flex items-start gap-2.5 text-left px-2.5 py-2 rounded-xl transition-colors ${
+                mode === m.key ? "bg-brand/10" : "hover:bg-bgsoft"
+              }`}
+            >
+              <span className={`shrink-0 mt-0.5 ${mode === m.key ? "text-brand" : "text-muted"}`}>{m.icon}</span>
+              <span className="min-w-0 flex-1">
+                <span className={`block text-[12.5px] font-semibold ${mode === m.key ? "text-brand" : "text-ink"}`}>{m.label}</span>
+                <span className="block text-[10.5px] text-muted/60 leading-snug mt-0.5">{m.desc}</span>
+              </span>
+              {mode === m.key && <Check size={13} className="text-brand shrink-0 mt-0.5" />}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -867,6 +950,8 @@ export function CoderView() {
   };
   const fileRef = useRef<HTMLInputElement>(null);
   const imgRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const [cameraModalOpen, setCameraModalOpen] = useState(false);
 
   const current = chats.find((c) => c.id === currentId) || null;
   const messages = current?.messages ?? [];
@@ -2692,6 +2777,9 @@ export function CoderView() {
               <VenetianMask size={9} /> Gizli
             </span>
           )}
+          {/* Ajan modu — Claude Code'daki Normal/Auto-accept/Plan üçlüsüne
+             paralel, her zaman görünür (yalnızca araçlar açıkken anlamlı). */}
+          {toolsEnabled && <AgentModeButton />}
           {/* Birleşik ⋯ menüsü — gruplu: Efor + hızlı eylemler · Çalışma · Modlar
              (eski "Araçlar" sekmesi — Kütüphane/Etkinlik Günlüğü/Kısayollar —
              Sidebar'ın "Araçlar" popover'ına taşındı, bkz. Sidebar.tsx). */}
@@ -3146,7 +3234,12 @@ export function CoderView() {
                           <button
                             onClick={async () => {
                               planApprovedRef.current = true;
-                              useStore.getState().pushMessage({ role: "user", content: "Planı onaylıyorum, uygula." });
+                              /* Claude Code'daki gibi: onaylayınca Plan modundan çıkılır
+                                 (Oto'ya döner) — her turda yeniden plan istemek yerine
+                                 kullanıcı isterse Ajan modu düğmesinden tekrar açar. */
+                              const store = useStore.getState();
+                              store.saveConfig({ ...store.config, planApprovalMode: false });
+                              store.pushMessage({ role: "user", content: "Planı onaylıyorum, uygula." });
                               try { await callApi(); } finally { planApprovedRef.current = false; }
                             }}
                             className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand text-[#111110] hover:bg-branddim font-semibold transition-colors shrink-0"
@@ -3409,6 +3502,11 @@ export function CoderView() {
                 onChange={(e) => { for (const f of Array.from(e.target.files ?? [])) readFileIntoInput(f); e.target.value = ""; }} />
               <input ref={imgRef} type="file" multiple accept="image/*" className="hidden"
                 onChange={(e) => { for (const f of Array.from(e.target.files ?? [])) readFileIntoInput(f); e.target.value = ""; }} />
+              {/* Mobilde `capture` native kamera uygulamasını doğrudan açar;
+                  masaüstünde bu öznitelik yok sayılır (o yüzden orada
+                  CameraCaptureModal'ın canlı getUserMedia önizlemesine düşülür). */}
+              <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) readFileIntoInput(f); e.target.value = ""; }} />
 
               {/* Yüzen composer — camsı zemin, gölge odak halkasıyla vurgu rengini izler */}
               <div className="composer-glow flex items-end gap-2 bg-surface/85 backdrop-blur-xl border border-line rounded-[20px] pl-4 pr-2 py-2.5 sm:py-2">
@@ -3484,7 +3582,19 @@ export function CoderView() {
                 <MoreMenu icon={<Paperclip size={16} />} title="Dosya veya görsel ekle">
                   <MoreItem icon={<Paperclip size={14} />} label="Dosya ekle" desc="kod, metin, belge" onClick={() => fileRef.current?.click()} />
                   <MoreItem icon={<ImageIcon size={14} />} label="Görsel ekle" desc="fotoğraf, ekran görüntüsü" onClick={() => imgRef.current?.click()} />
+                  <MoreItem
+                    icon={<Camera size={14} />}
+                    label="Fotoğraf çek"
+                    desc="kamerayla anında çek"
+                    onClick={() => { if (isMobileDevice()) cameraRef.current?.click(); else setCameraModalOpen(true); }}
+                  />
                 </MoreMenu>
+                {cameraModalOpen && (
+                  <CameraCaptureModal
+                    onCapture={(f) => { readFileIntoInput(f); setCameraModalOpen(false); }}
+                    onClose={() => setCameraModalOpen(false)}
+                  />
+                )}
                 {streaming ? (
                   <button onClick={stop} className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-red hover:bg-red/80 active:bg-red/70 text-white grid place-items-center transition-colors" title="Durdur">
                     <Square size={13} />

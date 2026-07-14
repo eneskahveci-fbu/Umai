@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useRef, useState } from "react";
+import { createContext, memo, useContext, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -19,6 +19,12 @@ import { useStore } from "@/lib/store";
 import { CodeBlock } from "./CodeBlock";
 import { ALL_AGENTS } from "@/lib/agents";
 import { playTts, speakableText, stopTts } from "@/lib/pollinations";
+import { toggleChecklistLine } from "@/lib/checklist";
+
+/* `<li>` (task-list-item) render'ında bulunan güvenilir satır numarasını,
+   içindeki checkbox `<input>`'a taşımak için — bkz. MessageBubbleImpl'deki
+   ReactMarkdown components.li/input. */
+const ChecklistLineContext = createContext<number | undefined>(undefined);
 
 /* ── Kod-fence dili normalizasyonu ─────────────────────────────────────
    AI, kod bloğunu `dil:dosya/yolu` biçiminde yazabilir (sistem prompt'u bunu
@@ -333,13 +339,13 @@ function SwarmPanel({ swarm }: { swarm: SwarmState }) {
                 {a.status === "done" ? (
                   <Check size={12} className="text-green shrink-0 mt-0.5" />
                 ) : a.status === "error" ? (
-                  <X size={12} className="text-red-400 shrink-0 mt-0.5" />
+                  <X size={12} className="text-red shrink-0 mt-0.5" />
                 ) : (
                   <Loader2 size={12} className="text-brand shrink-0 mt-0.5 animate-spin" />
                 )}
                 <span className={`flex-1 min-w-0 ${
                   a.status === "done" ? "text-muted/60" :
-                  a.status === "error" ? "text-red-400/80" :
+                  a.status === "error" ? "text-red/80" :
                   "text-ink font-medium"
                 }`}>
                   {a.title}
@@ -376,7 +382,7 @@ function CommandRow({ cmd }: { cmd: NonNullable<ChatMessage["commands"]>[number]
         {cmd.status === "running" ? (
           <Loader2 size={12} className="text-brand shrink-0 mt-0.5 animate-spin" />
         ) : cmd.status === "error" ? (
-          <X size={12} className="text-red-400 shrink-0 mt-0.5" />
+          <X size={12} className="text-red shrink-0 mt-0.5" />
         ) : (
           <Check size={12} className="text-green shrink-0 mt-0.5" />
         )}
@@ -554,6 +560,17 @@ function MessageBubbleImpl({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch { /* yoksay */ }
+  };
+
+  /* GFM işaretleme kutuları (`- [ ] madde`) react-markdown'da varsayılan
+     olarak disabled render edilir — tıklanamaz. Burada gerçek metindeki
+     satırı (ChecklistLineContext üzerinden `<li>`'den gelen güvenilir
+     satır numarası) bulup [ ]/[x] arasında değiştiriyoruz ve dallanma
+     YARATMADAN mesaj içeriğine geri yazıyoruz. */
+  const toggleContentCheckbox = (line?: number) => {
+    if (typeof line !== "number") return;
+    const next = toggleChecklistLine(message.content, line);
+    if (next !== message.content) useStore.getState().updateMessageContentAt(index, next);
   };
 
   /* Seslendirme — Pollinations openai-audio (ücretsiz); hata olursa tarayıcı
@@ -807,6 +824,35 @@ function MessageBubbleImpl({
                       <table {...props} />
                     </div>
                   ),
+                  /* `<li>` düğümünün konumu güvenilir (mdast/hast position
+                     korunuyor) — react-markdown'ın sentezlediği alt `<input>`
+                     düğümünde ise HER ZAMAN undefined (doğrulandı). Satır
+                     numarasını burada Context ile alt checkbox'a taşıyoruz;
+                     mutasyona uğrayan bir sayaç (React Strict Mode'da render
+                     iki kez çağrıldığından güvenilmez sonuç verir) KULLANMIYORUZ. */
+                  li: function ChecklistLi({ node, children, ...rest }) {
+                    return (
+                      <ChecklistLineContext.Provider value={node?.position?.start?.line}>
+                        <li {...rest}>{children}</li>
+                      </ChecklistLineContext.Provider>
+                    );
+                  },
+                  /* GFM işaretleme kutuları varsayılan olarak disabled gelir —
+                     burada gerçek, tıklanabilir bir kutuya çeviriyoruz. */
+                  input: function ChecklistInput({ node, ...rest }) {
+                    void node; // rest.type ile ayrım yapılır; DOM'a sızmasın diye ayrıştırıldı
+                    const line = useContext(ChecklistLineContext);
+                    if (rest.type !== "checkbox") return <input {...rest} />;
+                    return (
+                      <input
+                        type="checkbox"
+                        checked={!!rest.checked}
+                        disabled={streamingNow}
+                        onChange={() => toggleContentCheckbox(line)}
+                        className="mr-1.5 align-middle accent-brand cursor-pointer disabled:cursor-default"
+                      />
+                    );
+                  },
                 }}
               >
                 {message.content}

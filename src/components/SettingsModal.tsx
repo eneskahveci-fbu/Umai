@@ -1222,13 +1222,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   </div>
                 </label>
                 <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
-                  <input type="checkbox" checked={!!config.requireWriteApproval} onChange={() => saveConfig({ ...config, requireWriteApproval: !config.requireWriteApproval })} className="accent-brand mt-0.5" />
-                  <div>
-                    <div className="text-sm font-semibold">Yazma için onay iste</div>
-                    <div className="text-xs text-muted mt-0.5">Açıkken ajan dosyaları doğrudan commit etmez; değişiklikleri kod bloğu olarak önerir, sen commit arayüzüyle uygularsın.</div>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
                   <input type="checkbox" checked={!!config.autoRunCommands} onChange={() => saveConfig({ ...config, autoRunCommands: !config.autoRunCommands })} className="accent-brand mt-0.5" />
                   <div>
                     <div className="text-sm font-semibold">Güvenli oto-çalıştır</div>
@@ -1252,13 +1245,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   <div>
                     <div className="text-sm font-semibold">Tehlikeli komut kalkanı</div>
                     <div className="text-xs text-muted mt-0.5">Açıkken (varsayılan) ajanın çalıştırmak istediği <b>katastrofik</b> komutlar (<code>rm -rf /</code>, fork bomb, <code>mkfs</code>, <code>curl | sh</code>, sistem kapatma…) çalıştırılmadan engellenir ve ajana geri bildirilir. Normal komutlar (<code>npm test</code>, <code>rm -rf node_modules</code>…) etkilenmez.</div>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
-                  <input type="checkbox" checked={!!config.planApprovalMode} onChange={() => saveConfig({ ...config, planApprovalMode: !config.planApprovalMode })} className="accent-brand mt-0.5" />
-                  <div>
-                    <div className="text-sm font-semibold">Plan onay modu</div>
-                    <div className="text-xs text-muted mt-0.5">Ajan önce bir plan sunar ve durur; değişiklik yapmaz. Sen &quot;Onayla &amp; Uygula&quot; deyince uygulamaya başlar.</div>
                   </div>
                 </label>
                 <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
