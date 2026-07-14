@@ -598,8 +598,10 @@ export interface Config {
   commandGuard?: boolean;
   /** Fusion taslak modeli seçimi: "auto" (varsayılan) craft en uygun 1-3 modeli
       kendisi seçer; "manual" kullanıcının `fusionModelIds`'te seçtiği modelleri
-      kullanır (herhangi bir kullanıcı seçebilir — admin şartı yok). */
-  fusionMode?: "auto" | "manual";
+      kullanır (herhangi bir kullanıcı seçebilir — admin şartı yok); "off"
+      Fusion'ı tamamen devre dışı bırakır (Otomatik Pilot/Kalite Modu tetiklese
+      bile çoklu-model taslak+hakem hattı hiç çalışmaz — bkz. CoderView.tsx). */
+  fusionMode?: "auto" | "manual" | "off";
   /** Manuel Fusion modunda taslak üretecek `models` id'leri (en fazla 3). */
   fusionModelIds?: string[];
 }
