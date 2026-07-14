@@ -1,30 +1,75 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowUp, ChevronDown, LayoutTemplate, Sparkles } from "lucide-react";
+import {
+  ArrowUp, BarChart3, BookOpen, ChevronDown, Code2, FileText, LayoutTemplate,
+  Layers, ListChecks, Network, Palette, Presentation, Sparkles,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { TemplateGallery } from "./TemplateGallery";
+import { useSurfaceNav, type Surface } from "@/lib/surfaceNav";
 import type { StudioTemplate } from "@/lib/studioTemplates";
 
 /* Stüdyo anasayfası — claude.ai'yi açınca gelen ilk ekrana birebir paralel:
-   ortalanmış karşılama + TEK büyük prompt kutusu + biçim öneren kısa çipler.
-   19 şablonluk ızgara (TemplateGallery) burada İKİNCİL bir yol — varsayılan
-   olarak kapalı, "Hazır şablonlar" ile açılır. Kullanıcı gönderince ana
-   bileşen (DesignStudio) mevcut sohbet+ArtifactCanvas görünümüne geçer —
-   tıpkı Claude'da bir isteğe Artifacts panelinin açılması gibi. */
+   ortalanmış karşılama + TEK büyük prompt kutusu + biçim/araç kartları ızgarası
+   (Claude'un gerçek şablon galerisine yakın büyük kartlar — Umai renklerinde).
+   İki kart TÜRÜ var:
+     - "prefill": composer'a örnek bir brief doldurur, kullanıcı Gönder'e basınca
+       AYNI tek tuval (DesignStudio) tek seferlik bir HTML/SVG artifact üretir
+       (Tasarım/Kod/Doküman/Diyagram/Sunum — var olan davranış, dokunulmadı).
+     - "tool": kalıcı/durumlu GERÇEK bir stüdyo yüzeyine (Anket/Defter/Kroki/
+       Kartlar) doğrudan gider — bunlar kaydetme/koşullu mantık/aralıklı tekrar
+       gibi tek-seferlik üretimle ASLA karşılanamayacak özellikler taşıdığından
+       tek tuval üzerinden değil kendi tam sayfalarında açılırlar (eskiden
+       Sidebar → "Araçlar" açılır listesindeydi, artık buradan erişiliyor).
+   19 şablonluk ızgara (TemplateGallery) burada ayrı, İKİNCİL bir yol olarak
+   kalır — varsayılan kapalı, "Hazır şablonlar" ile açılır. */
 
-interface QuickStart {
+interface QuickCard {
   label: string;
-  icon: string;
-  brief: string;
+  desc: string;
+  icon: LucideIcon;
 }
+interface PrefillCard extends QuickCard { kind: "prefill"; brief: string }
+interface ToolCard extends QuickCard { kind: "tool"; surface: Surface }
 
-const QUICK_STARTS: QuickStart[] = [
-  { label: "Tasarım", icon: "🎨", brief: "Bir SaaS analitik aracı için modern bir landing sayfası tasarla — net hero, 3 özellik ve güçlü bir CTA." },
-  { label: "Kod", icon: "💻", brief: "Python ile bir CSV dosyasındaki yinelenen satırları temizleyip özet istatistik basan bir script yaz." },
-  { label: "Doküman", icon: "📄", brief: "Yeni bir ürün özelliği için kısa bir teknik tasarım dokümanı (RFC) yaz: amaç, yaklaşım, riskler." },
-  { label: "Diyagram", icon: "📊", brief: "Bir kullanıcı kayıt/giriş akışının mimari diyagramını çiz (istemci → API → veritabanı)." },
-  { label: "Sunum", icon: "📽️", brief: "Bir startup için 6 slaytlık kısa bir yatırımcı sunumu hazırla: kapak, problem, çözüm, pazar, ekip, CTA." },
+const PREFILL_CARDS: PrefillCard[] = [
+  { kind: "prefill", label: "Tasarım", icon: Palette, desc: "Landing, dashboard, mobil ekran",
+    brief: "Bir SaaS analitik aracı için modern bir landing sayfası tasarla — net hero, 3 özellik ve güçlü bir CTA." },
+  { kind: "prefill", label: "Kod", icon: Code2, desc: "Script, fonksiyon, küçük araç",
+    brief: "Python ile bir CSV dosyasındaki yinelenen satırları temizleyip özet istatistik basan bir script yaz." },
+  { kind: "prefill", label: "Doküman", icon: FileText, desc: "Tek seferlik RFC/özet sayfası",
+    brief: "Yeni bir ürün özelliği için kısa bir teknik tasarım dokümanı (RFC) yaz: amaç, yaklaşım, riskler." },
+  { kind: "prefill", label: "Diyagram", icon: BarChart3, desc: "Mimari/akış görseli",
+    brief: "Bir kullanıcı kayıt/giriş akışının mimari diyagramını çiz (istemci → API → veritabanı)." },
+  { kind: "prefill", label: "Sunum", icon: Presentation, desc: "Kaydırmalı tek sayfa sunum",
+    brief: "Bir startup için 6 slaytlık kısa bir yatırımcı sunumu hazırla: kapak, problem, çözüm, pazar, ekip, CTA." },
 ];
+
+const TOOL_CARDS: ToolCard[] = [
+  { kind: "tool", label: "Anket", icon: ListChecks, surface: "forms", desc: "AI soru üretimi + koşullu mantık, kaydet" },
+  { kind: "tool", label: "Defter", icon: BookOpen, surface: "notebook", desc: "Kaynaklı sohbet + sesli özet" },
+  { kind: "tool", label: "Kroki", icon: Network, surface: "map", desc: "Zihin haritası, tıkla-düzenle" },
+  { kind: "tool", label: "Kartlar", icon: Layers, surface: "cards", desc: "Çalışma kartları, aralıklı tekrar" },
+];
+
+function Card({ card, onClick }: { card: QuickCard; onClick: () => void }) {
+  const Icon = card.icon;
+  return (
+    <button
+      onClick={onClick}
+      className="group text-left rounded-2xl border border-line/70 bg-surface hover:border-brand/50 hover:bg-bgsoft/40 transition-colors p-4 flex flex-col gap-2.5"
+    >
+      <span className="w-9 h-9 rounded-xl bg-brand/10 text-brand grid place-items-center group-hover:bg-brand/15 transition-colors shrink-0">
+        <Icon size={17} />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[13.5px] font-semibold text-ink">{card.label}</span>
+        <span className="block text-[11.5px] text-muted/80 leading-snug mt-0.5">{card.desc}</span>
+      </span>
+    </button>
+  );
+}
 
 export function StudioHomeScreen({
   brief, setBrief, onSubmit, onPickTemplate, busy,
@@ -36,6 +81,7 @@ export function StudioHomeScreen({
   busy: boolean;
 }) {
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const nav = useSurfaceNav();
 
   const submit = () => {
     const t = brief.trim();
@@ -45,8 +91,8 @@ export function StudioHomeScreen({
 
   return (
     <div className="flex-1 min-h-0 overflow-auto">
-      <div className="min-h-full flex flex-col items-center justify-center px-4 sm:px-6 py-12">
-        <div className="w-full max-w-2xl flex flex-col items-center gap-6">
+      <div className="min-h-full flex flex-col items-center px-4 sm:px-6 py-12">
+        <div className="w-full max-w-3xl flex flex-col items-center gap-8">
           <div className="text-center">
             <h1 className="font-serif text-[28px] sm:text-4xl font-medium tracking-tight text-ink text-balance">
               Bugün ne oluşturalım?
@@ -57,7 +103,7 @@ export function StudioHomeScreen({
           </div>
 
           {/* Büyük prompt kutusu — Claude'un anasayfa besteci kutusuna paralel */}
-          <div className="w-full rounded-[24px] border border-line bg-surface elev-2 focus-within:border-brand/50 transition-colors">
+          <div className="w-full max-w-2xl rounded-[24px] border border-line bg-surface elev-2 focus-within:border-brand/50 transition-colors">
             <textarea
               value={brief}
               onChange={(e) => setBrief(e.target.value)}
@@ -79,17 +125,12 @@ export function StudioHomeScreen({
             </div>
           </div>
 
-          {/* Biçim önerileri — tek tıkla kutuyu doldurur (Claude'un kategori çipleri) */}
-          <div className="flex items-center gap-1.5 flex-wrap justify-center">
-            {QUICK_STARTS.map((q) => (
-              <button
-                key={q.label}
-                onClick={() => setBrief(q.brief)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-line/60 hover:border-brand/50 hover:bg-bgsoft/60 text-xs text-muted hover:text-ink transition-colors"
-              >
-                <span aria-hidden>{q.icon}</span> {q.label}
-              </button>
-            ))}
+          {/* Biçim + araç kartları — Claude'un gerçek şablon galerisine yakın
+              büyük kartlar (Umai renklerinde). Biçim kartları composer'ı
+              doldurur; araç kartları kendi kalıcı yüzeylerine götürür. */}
+          <div className="w-full grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            {PREFILL_CARDS.map((c) => <Card key={c.label} card={c} onClick={() => setBrief(c.brief)} />)}
+            {TOOL_CARDS.map((c) => <Card key={c.label} card={c} onClick={() => nav.go(c.surface)} />)}
           </div>
 
           {/* Hazır şablonlar — ikincil yol, varsayılan kapalı */}
