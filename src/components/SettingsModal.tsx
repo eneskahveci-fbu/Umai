@@ -370,7 +370,16 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     setProvider(p);
     setFetchedModels([]);
     setKeyCheck(null);
-    if (p !== "custom") { setBaseUrl(PRESETS[p].baseUrl); setModel(PRESETS[p].model); }
+    setQuickResult(null);
+    setQuickSwapNote(null);
+    /* Görünen ad her sağlayıcıya özeldir — eski sağlayıcıdan kalan taslak adı
+       yeni sağlayıcıya sızıp yanlış etiketle kaydedilmesin. */
+    setLabel("");
+    /* "custom" için de preset değerleri uygulanır (boş string) — böylece bir
+       önceki sağlayıcının Base URL/model'i "Özel" seçilince ekranda asılı
+       kalmaz; kullanıcı gerçekten temiz bir sayfadan başlar. */
+    setBaseUrl(PRESETS[p].baseUrl);
+    setModel(PRESETS[p].model);
     /* Sağlayıcı için daha önce kaydedilmiş anahtar varsa otomatik doldur →
        aynı sağlayıcıya tekrar anahtar girmeye gerek kalmaz. Bellekteki değer
        şifreli (enc:1:) olabilir — input'a/sağlayıcıya sızmadan önce çöz. */
@@ -812,7 +821,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 {(["pollinations", "gemini", "groq", "nvidia", "cerebras", "openrouter"] as Provider[]).map((p) => (
                   <button
                     key={p}
-                    onClick={() => { onProvider(p); setQuickResult(null); }}
+                    onClick={() => onProvider(p)}
                     className={`px-2.5 py-1 rounded-full border text-[11px] font-semibold transition-colors ${provider === p ? "border-brand/50 bg-brand/12 text-brand" : "border-line/60 text-muted hover:text-ink hover:border-brand/30"}`}
                   >
                     {cleanLabel(p)}
@@ -821,7 +830,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               </div>
               <select
                 value={provider}
-                onChange={(e) => { onProvider(e.target.value as Provider); setQuickResult(null); }}
+                onChange={(e) => onProvider(e.target.value as Provider)}
                 className="input-mono w-full mb-2.5"
               >
                 {(Object.keys(PRESETS) as Provider[]).map((p) => (
@@ -841,7 +850,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               <div className="flex gap-1.5">
                 <input
                   value={apiKey}
-                  onChange={(e) => { setApiKey(e.target.value); setQuickResult(null); setKeyCheck(null); }}
+                  onChange={(e) => { setApiKey(e.target.value); setQuickResult(null); setKeyCheck(null); setFetchedModels([]); }}
                   placeholder={PRESETS[provider].keyHint}
                   className="input-mono flex-1"
                   onKeyDown={(e) => { if (e.key === "Enter" && !quickBusy) addAndTest(); }}
@@ -915,7 +924,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               {(advOpen || provider === "custom" || provider === "pollinations") && (
                 <div className="grid gap-2 mt-2">
                   <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Görünen ad (opsiyonel)" className="input-mono" />
-                  <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="Base URL" className="input-mono" />
+                  <input value={baseUrl} onChange={(e) => { setBaseUrl(e.target.value); setFetchedModels([]); setKeyCheck(null); }} placeholder="Base URL" className="input-mono" />
                   {fetchedModels.length > 0 ? (
                     <select value={model} onChange={(e) => setModel(e.target.value)} className="input-mono">
                       {!fetchedModels.includes(model) && model && <option value={model}>{model}</option>}
@@ -976,7 +985,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                           {ed ? <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} className="input-mono !py-1 text-sm" /> : <><div className="text-sm font-semibold truncate">{m.label}</div><div className="text-xs text-muted font-mono truncate">{m.model}</div></>}
                         </div>
                         <div className="flex items-center gap-1">
-                          {ed ? <button onClick={() => { updateModel(editId!, { label: editLabel.trim() || undefined, apiKey: editKey.trim() }); addToast("Güncellendi.", "success"); setEditId(null); }} className="text-muted hover:text-green p-1"><Check size={14} /></button>
+                          {ed ? <button onClick={() => { updateModel(editId!, { label: editLabel.trim() || cleanLabel(m.provider), apiKey: editKey.trim() }); addToast("Güncellendi.", "success"); setEditId(null); }} className="text-muted hover:text-green p-1"><Check size={14} /></button>
                             : <>
                               <button onClick={() => testModel(m)} disabled={testing} className="text-muted hover:text-green p-1 disabled:opacity-40" title="Test et"><Play size={14} /></button>
                               <button onClick={() => { setEditId(m.id); setEditLabel(m.label); setEditKey(m.apiKey); }} className="text-muted hover:text-ink p-1"><Pencil size={14} /></button>
