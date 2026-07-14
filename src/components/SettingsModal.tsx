@@ -1726,7 +1726,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 bir hakem en iyisini seçer, nihai yanıt bu taslaklar birleştirilerek yazılır —
                 sen yalnızca sonucu görürsün. Bu ayar taslakları HANGİ modellerin üreteceğini belirler.
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <button
                   onClick={() => saveConfig({ ...config, fusionMode: "auto" })}
                   className={`flex-1 py-2.5 px-3 rounded-lg border text-sm font-semibold transition-colors text-left ${
@@ -1745,7 +1745,22 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   Manuel
                   <span className="block text-[11px] font-normal text-muted/60 mt-0.5">kendi modellerini seç (en fazla 3)</span>
                 </button>
+                <button
+                  onClick={() => saveConfig({ ...config, fusionMode: "off" })}
+                  className={`flex-1 py-2.5 px-3 rounded-lg border text-sm font-semibold transition-colors text-left ${
+                    config.fusionMode === "off" ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
+                  }`}
+                >
+                  Kapalı
+                  <span className="block text-[11px] font-normal text-muted/60 mt-0.5">Fusion hiç çalışmasın, tek modelli yanıt üret</span>
+                </button>
               </div>
+              {config.fusionMode === "off" && (
+                <p className="text-xs text-muted/70 leading-relaxed mt-3">
+                  Fusion artık Otomatik Pilot tetiklese bile devreye girmeyecek. Kalite Modu ayrı bir ayardır (Ayarlar → Genel) —
+                  açıksa yine de tek modelli, ekstra API çağrısı gerektirmeyen hafif bir taslak→öz-eleştiri→düzeltme turu uygular.
+                </p>
+              )}
             </div>
 
             {config.fusionMode === "manual" && (

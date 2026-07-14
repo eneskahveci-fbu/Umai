@@ -1928,8 +1928,11 @@ export function CoderView() {
     const toolsWanted = store.toolsEnabled && (!!store.repo || !!(store.config.localMode && store.config.localBridgeUrl?.trim()));
     const qualityForced = !!store.config.qualityMode;
     /* FÜZYON yalnız üretim işlerinde (pilot.fusion) ya da kullanıcı Kalite/Füzyon
-       çipini elle açtıysa. Normal sohbet turlarında ekstra taslak çağrısı YOK. */
-    if ((pilot?.fusion || qualityForced) && !useSwarm && !useResearch && !toolsWanted && !isContinuation) {
+       çipini elle açtıysa. Normal sohbet turlarında ekstra taslak çağrısı YOK.
+       Kullanıcı Ayarlar → Fusion'da "Kapalı" seçtiyse bu hat hiç çalışmaz —
+       qualityMode/pilot.quality yine de aşağıdaki tek-geçişli (ekstra API
+       çağrısı olmayan) hafif kalite talimatına düşer, bkz. finalSystemPrompt. */
+    if (store.config.fusionMode !== "off" && (pilot?.fusion || qualityForced) && !useSwarm && !useResearch && !toolsWanted && !isContinuation) {
       try {
         useStore.getState().updateLastThinking("✦ Füzyon: 3 iç taslak hazırlanıyor…");
         const freeModelNames = await fetchTextModels();
