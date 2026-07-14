@@ -329,7 +329,13 @@ export function NotebookStudio() {
                   <div key={i} className="flex items-start gap-2">
                     <Sparkles size={13} className="text-brand mt-1.5 shrink-0" />
                     <div className="flex-1 min-w-0 text-[13.5px] leading-relaxed whitespace-pre-wrap">
-                      {m.content || <Loader2 size={14} className="animate-spin text-brand" />}
+                      {m.content || (
+                        <span className="inline-flex items-center gap-1.5 py-1" aria-label="Yazıyor">
+                          <span className="typing-dot" />
+                          <span className="typing-dot delay-1" />
+                          <span className="typing-dot delay-2" />
+                        </span>
+                      )}
                     </div>
                   </div>
                 )

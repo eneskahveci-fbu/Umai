@@ -10,6 +10,7 @@ import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav"
 import { SavedItemsModal } from "./SavedItemsModal";
 import { ExportMenu } from "./ExportMenu";
 import { CrossTypeRelated } from "./CrossTypeRelated";
+import { GenSkeleton } from "./GenSkeleton";
 import type { CraftDoc, DocBlock, DocBlockType } from "@/lib/types";
 import {
   continueDoc, DOC_BLOCK_TYPES, docToHtml, docToMarkdown, generateDoc,
@@ -311,7 +312,12 @@ export function DocsStudio() {
                 </button>
               </div>
             </div>
-            {busy && <p className="text-center text-xs text-muted/60 animate-pulse">Doküman kurgulanıyor… ({progress} karakter)</p>}
+            {busy && (
+              <div className="flex flex-col items-center gap-2.5">
+                <GenSkeleton />
+                <p className="text-center text-xs text-muted/60">Doküman kurgulanıyor… ({progress} karakter)</p>
+              </div>
+            )}
             <div className="grid sm:grid-cols-2 gap-2">
               {SUGGESTIONS.map((s) => (
                 <button key={s} onClick={() => setBrief(s)} className="text-left text-[12.5px] leading-snug px-3 py-2.5 rounded-xl border border-line/60 hover:border-brand/50 hover:bg-bgsoft/60 text-muted hover:text-ink transition-colors">{s}</button>
