@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toggleChecklistLine } from "../checklist";
+import { extractCheckedItems, toggleChecklistLine } from "../checklist";
 
 describe("toggleChecklistLine", () => {
   it("işaretsiz bir kutuyu işaretler", () => {
@@ -64,5 +64,21 @@ describe("toggleChecklistLine", () => {
   it("çift haneli numaralarla da çalışır", () => {
     const content = "10. [ ] onuncu madde";
     expect(toggleChecklistLine(content, 1)).toBe("10. [x] onuncu madde");
+  });
+});
+
+describe("extractCheckedItems", () => {
+  it("yalnızca işaretli satırların metnini döner", () => {
+    const content = "- [x] süt al\n- [ ] ekmek al\n- [X] yumurta al";
+    expect(extractCheckedItems(content)).toEqual(["süt al", "yumurta al"]);
+  });
+
+  it("numaralı liste işaretçilerinde de çalışır", () => {
+    const content = "1. [x] Tek dil / Fiyat (USD)\n2. [ ] Çokdilli (İNG, TR) + Döviz API";
+    expect(extractCheckedItems(content)).toEqual(["Tek dil / Fiyat (USD)"]);
+  });
+
+  it("işaretli satır yoksa boş dizi döner", () => {
+    expect(extractCheckedItems("- [ ] madde\nBu normal bir paragraf.")).toEqual([]);
   });
 });

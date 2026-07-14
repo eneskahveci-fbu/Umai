@@ -76,8 +76,9 @@ const RealTerminal = dynamic(() => import("./RealTerminal").then((m) => m.RealTe
 });
 const CameraCaptureModal = dynamic(() => import("./CameraCapture").then((m) => m.CameraCaptureModal), { ssr: false });
 import { useStore } from "@/lib/store";
-import { isMobile as isMobileDevice } from "@/lib/webcontainer";
+import { isMobile as isMobileDevice, isSupported as isWebContainerSupported } from "@/lib/webcontainer";
 import { isAdminEmail } from "@/lib/admin";
+import { extractCheckedItems } from "@/lib/checklist";
 import { MessageBubble } from "./MessageBubble";
 import { SlashMenu } from "./SlashMenu";
 import { MentionMenu } from "./MentionMenu";
@@ -1138,6 +1139,33 @@ export function CoderView() {
     if (due.length > 0) runInTerminal(due.join(" && "));
   };
 
+  /* Anket/checklist otomatik devam (Claude tarzı): AI'nın son mesajındaki bir
+     checkbox işaretlenince, ard arda gelen tıklamaları tek turda toplamak için
+     kısa bir sessizlik (debounce) bekler, sonra seçimleri özetleyen bir
+     kullanıcı mesajı gönderip sohbeti kendiliğinden sürdürür — kullanıcının
+     elle yazıp göndermesine gerek kalmaz. */
+  const checklistDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleChecklistAutoContinue = (msgIndex: number) => {
+    if (checklistDebounceRef.current) clearTimeout(checklistDebounceRef.current);
+    checklistDebounceRef.current = setTimeout(() => {
+      checklistDebounceRef.current = null;
+      const store = useStore.getState();
+      if (store.streaming) return;
+      const chat = store.current();
+      const msg = chat?.messages[msgIndex];
+      /* Bu arada yeni bir mesaj geldiyse (artık son mesaj değilse) sessizce vazgeç. */
+      if (!chat || !msg || msg.role !== "assistant" || msgIndex !== chat.messages.length - 1) return;
+      const checked = extractCheckedItems(msg.content);
+      const text = checked.length > 0
+        ? `Seçtiklerim:\n${checked.map((c) => `- ${c}`).join("\n")}`
+        : "Seçimimi güncelledim, listeye göre devam et.";
+      store.pushMessage({ role: "user", content: text });
+      /* callApi is a stable useCallback defined below; only invoked here from
+         a timer that fires after mount, so the forward reference is safe. */
+      void callApi();
+    }, 1400);
+  };
+
   /* Bir REPO bağlanınca terminali HER ZAMAN ARKAPLANDA boot et (gizli) → ajan
      komutları hazır olur; repo yokken boşa kaynak harcanmaz. Ön plana ASLA
      kendiliğinden açılmaz; kullanıcı isterse butonla açar. Komut çıktıları
@@ -1695,11 +1723,20 @@ export function CoderView() {
   /* Otonom Doğrula-Düzelt: ajan bir turda dosya düzenlediyse, arka plandaki terminalde
      doğrulama komutunu çalıştırır. Çıktı craftai:terminal-output ile ajana OTOMATİK
      döner → hata varsa düzeltir (sonraki tur tekrar doğrulanır), temizse onaylar.
-     En çok 5 tur (verifyRunsRef) → döngü güvenliği. WS terminal yoksa sessizce atlar. */
+     En çok 5 tur (verifyRunsRef) → döngü güvenliği. İki arka uçtan biri gerekir:
+     Hibrit Köprü (terminalWsUrl, admin) VEYA WebContainer (tarayıcı desteği + bağlı
+     repo, HERKESE açık — bkz. webcontainer.ts'teki paylaşımlı API anahtarı yedeği).
+     İkisi de yoksa (ör. mobil/repo bağlı değil) sessizce atlar. */
   const runAutoVerify = useCallback(async (edited: boolean) => {
     const cfg = useStore.getState().config;
     if (!edited || cfg.autoVerify === false) return;
-    if (!cfg.terminalWsUrl?.trim()) return;
+    const hasWs = !!cfg.terminalWsUrl?.trim();
+    if (!hasWs) {
+      /* WebContainer yolu: doğrulanacak gerçek bir repo bağlı olmalı (boş
+         sandbox'ta build/test komutunun bir anlamı yok) ve tarayıcı
+         SharedArrayBuffer/cross-origin-isolation'ı desteklemeli. */
+      if (!useStore.getState().repo || !isWebContainerSupported()) return;
+    }
     if (verifyRunsRef.current >= 5) return;
     verifyRunsRef.current += 1;
     const cmd = await detectVerifyCommand();
@@ -3213,6 +3250,7 @@ export function CoderView() {
                             ? (bIdx: number) => useStore.getState().switchMessageVersion(i, bIdx)
                             : undefined
                         }
+                        onChecklistToggle={isLastAssistant && !streaming ? () => handleChecklistAutoContinue(i) : undefined}
                       />
                       {isLastAssistant && !streaming && pendingCommit && pendingCommit.length > 0 && repo && (
                         <div className="ml-11 max-w-2xl">
