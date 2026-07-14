@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, ChevronDown, Loader2, Play, Trash2 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { MCP_CATALOG } from "@/lib/mcpCatalog";
+import { MCP_CATALOG, type McpCatalogEntry } from "@/lib/mcpCatalog";
 import type { McpServer } from "@/lib/types";
 
 /* Uygulama Bağlantıları galerisi — ExtensionsSettings.tsx (Ayarlar → Eklentiler)
@@ -38,15 +38,15 @@ export function McpGallery() {
   const servers = config.mcpServers ?? [];
   const models = config.models ?? [];
 
-  const toggleCatalogEntry = (entryId: string, entryName: string) => {
-    const existing = servers.find((s) => s.catalogId === entryId);
+  const toggleCatalogEntry = (entry: McpCatalogEntry) => {
+    const existing = servers.find((s) => s.catalogId === entry.id);
     if (existing) {
       updateMcpServer(existing.id, { enabled: !existing.enabled });
-      addToast(existing.enabled ? `${entryName} kapatıldı` : `${entryName} açıldı`, "info");
+      addToast(existing.enabled ? `${entry.name} kapatıldı` : `${entry.name} açıldı`, "info");
       return;
     }
-    addMcpServer({ name: entryName, url: "", enabled: true, catalogId: entryId });
-    addToast(`${entryName} açıldı — aşağıda sunucu adresini gir.`, "success");
+    addMcpServer({ name: entry.name, url: entry.builtinUrl ?? "", enabled: true, catalogId: entry.id });
+    addToast(entry.builtinUrl ? `${entry.name} açıldı — hazır, kuruluma gerek yok.` : `${entry.name} açıldı — aşağıda sunucu adresini gir.`, "success");
   };
 
   const submitMcpServer = () => {
@@ -103,7 +103,7 @@ export function McpGallery() {
                 role="switch"
                 aria-checked={on}
                 aria-label={`${e.name} ${on ? "açık" : "kapalı"}`}
-                onClick={() => toggleCatalogEntry(e.id, e.name)}
+                onClick={() => toggleCatalogEntry(e)}
                 className={`absolute top-2 right-2 w-8 h-[18px] rounded-full relative transition-colors ${on ? "bg-brand" : "bg-line"}`}
                 title={on ? "Kapat" : "Aç"}
               >
@@ -114,6 +114,9 @@ export function McpGallery() {
               <span className="text-lg leading-none">{e.icon}</span>
               <span className="text-[12.5px] font-semibold text-ink pr-8">{e.name}</span>
               <span className="text-[10.5px] text-muted/60 leading-snug">{e.description}</span>
+              {e.builtinUrl && (
+                <span className="self-start text-[9.5px] font-semibold text-brand bg-brand/10 border border-brand/20 px-1.5 py-0.5 rounded">Yerleşik</span>
+              )}
             </div>
           );
         })}

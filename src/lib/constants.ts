@@ -677,7 +677,16 @@ export const DEFAULT_CONFIG: Config = {
   terminalWsUrl: "",
   terminalSetupCommand: "",
   automations: [],
-  mcpServers: [],
+  /* Tem 2026 kullanıcı kararı — "açık kaynak olan ve doğrudan varsayılan
+     olarak yükleyebileceğin eklentiler varsa doğrudan ekle": bu ikisi
+     GERÇEKTEN yerleşik (src/lib/mcpBuiltins.ts, dış kurulum gerektirmez) ve
+     genel olarak faydalı olduğu için yeni kullanıcılarda varsayılan açık.
+     "Everything (Test)" yerleşik ama yalnızca bir MCP-plumbing demosu —
+     mağazada toggle'lanabilir kalır, varsayılan olarak açılmaz. */
+  mcpServers: [
+    { id: "builtin-time", name: "Zaman", url: "/api/mcp/builtin/time", enabled: true, catalogId: "time" },
+    { id: "builtin-sequential-thinking", name: "Adım Adım Düşünme", url: "/api/mcp/builtin/sequential-thinking", enabled: true, catalogId: "sequential-thinking" },
+  ],
 };
 
 export const DEFAULT_REPO = "gitlab.com/eneskahveci.bs/craft-ai-web";

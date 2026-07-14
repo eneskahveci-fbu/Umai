@@ -9,13 +9,24 @@
    gelen bir config.mcpServers girdisini (McpServer.catalogId ile eşlenir)
    oluşturur/aktif-pasif yapar (bkz. McpGallery.tsx) — GitHub/GitLab burada
    bilinçli olarak YOK, çünkü uygulamanın kendi gerçek OAuth tabanlı Git
-   entegrasyonuyla (Ayarlar → Git) karışmasın istendi. */
+   entegrasyonuyla (Ayarlar → Git) karışmasın istendi.
+
+   `builtinUrl` (Tem 2026 kullanıcı kararı — "açık kaynak olan ve doğrudan
+   varsayılan olarak yükleyebileceğin eklentiler varsa doğrudan ekle"): bir
+   avuç GERÇEK açık kaynak MCP referans sunucusunun (zaman, adım-adım-düşünme,
+   everything/test) işlevi dış bir URL uydurmadan, bu uygulamanın KENDİ
+   backend'inde (src/lib/mcpBuiltins.ts + /api/mcp/builtin/*) yeniden
+   uygulandı — bu yüzden bu birkaç girdi GERÇEKTEN kurulum gerektirmeden
+   çalışır (McpGallery.tsx kartı açınca doğrudan bu URL'i kullanır). */
 
 export interface McpCatalogEntry {
   id: string;
   name: string;
   icon: string; // emoji — PROJECT_TEMPLATES ile aynı ikon dili
   description: string;
+  /** Doluysa bu girdi yerleşiktir — kart açılınca kurulum gerektirmeden
+      doğrudan bu (aynı-köken, göreli) URL ile çalışır. */
+  builtinUrl?: string;
 }
 
 export const MCP_CATALOG: McpCatalogEntry[] = [
@@ -32,9 +43,9 @@ export const MCP_CATALOG: McpCatalogEntry[] = [
   { id: "memory", name: "Bellek", icon: "🧠", description: "Sohbetler arası kalıcı bilgi grafiği tutar." },
   { id: "fetch", name: "Web İçeriği", icon: "🌐", description: "Web sayfalarını getirip AI için temizler." },
   { id: "puppeteer", name: "Tarayıcı Otomasyonu", icon: "🖱️", description: "Gerçek bir tarayıcıda gezinip etkileşim kurar." },
-  { id: "sequential-thinking", name: "Adım Adım Düşünme", icon: "🧩", description: "Karmaşık problemleri denetlenebilir adımlara böler." },
+  { id: "sequential-thinking", name: "Adım Adım Düşünme", icon: "🧩", description: "Karmaşık problemleri denetlenebilir adımlara böler.", builtinUrl: "/api/mcp/builtin/sequential-thinking" },
   { id: "sqlite", name: "SQLite", icon: "🗃️", description: "Yerel bir SQLite veritabanında sorgu çalıştırır." },
-  { id: "time", name: "Zaman", icon: "🕐", description: "Saat dilimi dönüşümü ve zaman hesaplamaları yapar." },
+  { id: "time", name: "Zaman", icon: "🕐", description: "Saat dilimi dönüşümü ve zaman hesaplamaları yapar.", builtinUrl: "/api/mcp/builtin/time" },
   { id: "docker", name: "Docker", icon: "🐳", description: "Konteynerleri listele, başlat/durdur." },
   { id: "kubernetes", name: "Kubernetes", icon: "☸️", description: "Küme kaynaklarını görüntüle ve yönet." },
   { id: "sentry", name: "Sentry", icon: "🚨", description: "Hata takibi ve issue detaylarına eriş." },
@@ -48,6 +59,6 @@ export const MCP_CATALOG: McpCatalogEntry[] = [
   { id: "airtable", name: "Airtable", icon: "📊", description: "Tablo tabanlı veritabanı kayıtlarına eriş." },
   { id: "confluence", name: "Confluence", icon: "📘", description: "Takım wiki sayfalarını okur/düzenler." },
   { id: "stripe", name: "Stripe", icon: "💳", description: "Ödeme ve abonelik verilerini sorgular." },
-  { id: "everything", name: "Everything (Test)", icon: "🧪", description: "MCP özelliklerini denemek için referans sunucu." },
+  { id: "everything", name: "Everything (Test)", icon: "🧪", description: "MCP özelliklerini denemek için referans sunucu.", builtinUrl: "/api/mcp/builtin/everything" },
   { id: "custom", name: "Özel sunucu", icon: "🔌", description: "Kendi barındırdığın herhangi bir MCP sunucusu." },
 ];
