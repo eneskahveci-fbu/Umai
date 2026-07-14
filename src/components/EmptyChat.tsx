@@ -1,22 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowRight, Code2, GitBranch, History, MessageCircle, Sparkles, Wand2 } from "lucide-react";
+import { ArrowRight, History } from "lucide-react";
 import { useStore } from "@/lib/store";
-
-interface EmptyChatProps {
-  hasModel: boolean;
-  hasRepo: boolean;
-  onAddModel: () => void;
-  onPrompt: (text: string) => void;
-}
-
-const SAMPLE_PROMPTS = [
-  { icon: Code2, label: "Kodumu daha iyi yap", text: "Aşağıdaki kodu daha okunabilir ve test edilebilir hâle getir:\n\n" },
-  { icon: Sparkles, label: "Yeni bir özellik ekle", text: "Şu özelliği eklemek istiyorum, nasıl yaparım: " },
-  { icon: GitBranch, label: "Bir hatayı çöz", text: "Şu hatayı alıyorum, sebebi ne olabilir:\n\n" },
-  { icon: MessageCircle, label: "Bir şey açıkla / öğren", text: "Şunu basitçe açıklar mısın: " },
-];
 
 /* Saate göre kısa selamlama — boş duruma kişisel/profesyonel bir giriş verir. */
 function greeting(): string {
@@ -27,7 +12,10 @@ function greeting(): string {
   return "İyi akşamlar";
 }
 
-export function EmptyChat({ onPrompt }: EmptyChatProps) {
+/* Sade karşılama ekranı (Claude'un kendi boş-sohbet ekranına paralel,
+   Tem 2026 kullanıcı kararı): öneri çipleri ve diğer yüzeylere yönlendiren
+   bağlantılar (ör. "Stüdyo'ya geç") kaldırıldı — kullanıcı doğrudan yazar. */
+export function EmptyChat() {
   /* Son (gizli olmayan) sohbet — "kaldığın yerden devam" ince bağlantısı için. */
   const chats = useStore((s) => s.chats);
   const selectChat = useStore((s) => s.selectChat);
@@ -37,53 +25,20 @@ export function EmptyChat({ onPrompt }: EmptyChatProps) {
     <div className="flex flex-col items-center justify-center h-full px-6 py-10 select-none">
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand/70 mb-2">{greeting()}</div>
       <h2 className="text-[26px] sm:text-[28px] font-extrabold tracking-tight mb-2 text-center text-balance">Ne üzerinde çalışalım?</h2>
-      <p className="text-sm text-muted/70 max-w-sm text-center leading-relaxed mb-6">
-        Bir istek yaz veya aşağıdaki örneklerden birini seç.
+      <p className="text-sm text-muted/70 max-w-sm text-center leading-relaxed">
+        Bir istek yaz, gerisini hallederim.
       </p>
 
-      {/* Kompakt öneri çipleri — ilk aksiyon birincil (dolu), geri kalanı ikincil (outline). */}
-      <div className="flex flex-wrap items-center justify-center gap-2 max-w-md mb-6">
-        {SAMPLE_PROMPTS.map(({ icon: Icon, label, text }, i) =>
-          i === 0 ? (
-            <button
-              key={label}
-              onClick={() => onPrompt(text)}
-              className="inline-flex items-center gap-2 pl-3 pr-3.5 py-2 rounded-full bg-brand hover:bg-branddim text-[13px] font-semibold text-[#111110] transition-colors"
-            >
-              <Icon size={13} />
-              {label}
-            </button>
-          ) : (
-            <button
-              key={label}
-              onClick={() => onPrompt(text)}
-              className="inline-flex items-center gap-1.5 pl-2.5 pr-3.5 py-2 rounded-full border border-line text-[13px] font-medium text-muted hover:text-ink hover:border-brand/40 transition-colors"
-            >
-              <Icon size={13} className="text-muted/70" />
-              {label}
-            </button>
-          )
-        )}
-      </div>
-
-      {/* İnce bağlantılar: devam + Stüdyo köprüsü (kart değil). */}
-      <div className="flex flex-col items-center gap-2 text-xs">
-        {lastChat && (
-          <button
-            onClick={() => selectChat(lastChat.id)}
-            className="group inline-flex items-center gap-1.5 text-muted/70 hover:text-ink transition-colors"
-          >
-            <History size={13} className="text-brand/70" />
-            Kaldığın yerden devam: <span className="font-semibold text-ink/80 max-w-[220px] truncate">{lastChat.title}</span>
-            <ArrowRight size={12} className="text-muted/40 group-hover:translate-x-0.5 transition-transform" />
-          </button>
-        )}
-        <Link href="/studio" className="group inline-flex items-center gap-1.5 text-muted/60 hover:text-ink transition-colors">
-          <Wand2 size={13} className="text-brand/70" />
-          Kod değil, bir şey tasarlamak mı istiyorsun? <span className="text-ink/70 font-medium">Stüdyo&apos;ya geç</span>
-          <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
-        </Link>
-      </div>
+      {lastChat && (
+        <button
+          onClick={() => selectChat(lastChat.id)}
+          className="group mt-6 inline-flex items-center gap-1.5 text-xs text-muted/70 hover:text-ink transition-colors"
+        >
+          <History size={13} className="text-brand/70" />
+          Kaldığın yerden devam: <span className="font-semibold text-ink/80 max-w-[220px] truncate">{lastChat.title}</span>
+          <ArrowRight size={12} className="text-muted/40 group-hover:translate-x-0.5 transition-transform" />
+        </button>
+      )}
     </div>
   );
 }

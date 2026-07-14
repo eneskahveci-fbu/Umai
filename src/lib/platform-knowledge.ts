@@ -20,28 +20,33 @@ GÖRÜNÜMLER
 - Model seçici: Eklenen modeller arasında geçiş. Aktif model burada görünür.
 - Görünüm sekmeleri ve paylaşım menüsü.
 
-YAN PANEL (Sidebar)
-- Sohbet geçmişi, yeni sohbet, gizli sohbet, projeler/çalışma alanları.
+YAN PANEL (Sidebar) — Claude.ai'ye paralel, Umai renklerinde
+- Üstte düz nav listesi: Ara (⌘K), Sohbetler, Stüdyo, Kütüphane, Projeler.
+- Sohbetler ve Projeler artık Sidebar'da İNLİNE DEĞİL — kendi ayrı sayfalarında (/chats, /projects); Sidebar yalnız bu nav listesini + (varsa) "İlgili" sohbet önerilerini tutar.
+- Altta iki yuvarlak ikon düğme: sol hesap avatarı (giriş/çıkış/Ayarlar menüsü), sağ "+" yeni sohbet.
 - Giriş/oturum: Supabase ile e-posta + şifre girişi (geçmiş senkronu için). Giriş yapılmazsa her şey yerelde (localStorage) çalışır.
 
-STÜDYO (/studio — Claude Artifacts'a paralel tek yüzey)
-- Açılış: claude.ai tarzı ortalanmış tek prompt kutusu + 5 hızlı başlangıç çipi (Tasarım/Kod/Doküman/Diyagram/Sunum) + açılır "Hazır şablonlar" (19 şablon, ikincil yol).
+STÜDYO (/studio — Claude Artifacts'a paralel tek yüzey, Umai renklerinde)
+- Açılış: ortalanmış tek prompt kutusu + büyük şablon-galerisi kartları (Claude Design'ın kendi galerisine paralel) + açılır "Hazır şablonlar" (19 şablon, ikincil yol).
+- Kartlar İKİ türde: "Tasarım/Kod/Doküman/Diyagram/Sunum" composer'ı örnek bir brief ile doldurur (kullanıcı Gönder'e basınca TEK SEFERLİK bir artifact üretir — bu "Doküman" kartı, aşağıdaki kalıcı Doküman Stüdyosu'yla AYNI ŞEY DEĞİL); "Anket/Defter/Kroki/Kartlar" ise doğrudan kendi kalıcı yüzeylerine gider (bkz. aşağıdaki İÇERİK ARAÇLARI).
 - İlk gönderimle sol sohbet + sağ canlı artifact tuvali (iki panel) açılır; takip mesajlarıyla ("başlığı büyüt" gibi) mevcut çıktı üzerinde değişiklik yapılır.
 - Üretim formatını AI brief'e göre SEÇER: web/UI tasarımı (html), herhangi bir dilde kod (sözdizimi vurgulu), doküman (markdown, belge görünümü), diyagram (mermaid), React bileşeni (jsx). "Sunum" ayrı yüzey değil, kaydırılabilir tek-HTML üreten bir tür.
-- Görsel kimlik sabit "Claude" tasarım sistemi; marka seçici yok. Fusion (3 model + hakem) opsiyonel. Projeler kaydedilir (Projelerim), sürüm gezinme ‹v2/5›, kopyala/indir/PDF/yayınla (paylaşılabilir /a/<id> bağlantısı).
+- ÜRETİLEN ÇIKTININ görsel kimliği sabit "Claude" tasarım sistemi (kanıtlanmış kalite için, bilinçli karar) — marka seçici yok. Stüdyonun KENDİ arayüzü (kroma) ise Umai'nin kendi teması. Fusion (3 model + hakem) opsiyonel. Projeler kaydedilir (Projelerim), sürüm gezinme ‹v2/5›, kopyala/indir/PDF/yayınla (paylaşılabilir /a/<id> bağlantısı).
 - Eski /studio/sunum ve /studio/tuval buraya yönlenir.
 
-İÇERİK ARAÇLARI (Sidebar → Araçlar)
-- Doküman (/studio/dokuman): blok tabanlı doküman, AI taslak + "devam et", Markdown/HTML dışa aktarma.
+İÇERİK ARAÇLARI (kalıcı, kendi tam sayfaları — Stüdyo ana ekranındaki büyük kartlardan erişilir)
 - Anket (/studio/anket): AI soru üretimi + sunucusuz bağımsız HTML form (yanıtlar dolduranın tarayıcısında + CSV).
 - Defter (/studio/defter): kaynak-temelli sohbet (yapıştırılan metin/URL), yalnız kaynaklardan atıflı yanıt + sesli özet.
+- Kroki (/studio/kroki): zihin haritası — AI ağaç üretimi, tıkla-düzenle (yeniden adlandır/dal ekle/sil).
+- Kartlar (/studio/kartlar): çalışma kartları — AI kart üretimi, 5 kutulu aralıklı tekrar (Leitner), Anki'ye dışa aktarma.
+- Doküman Stüdyosu (/studio/dokuman): blok tabanlı doküman, AI taslak + "devam et", Markdown/HTML dışa aktarma — Stüdyo ana ekranındaki "Doküman" kartından FARKLI (o tek seferlik bir RFC/özet üretir); kayıtlı dokümanlar Kütüphane'den açılır, yeni bir tane için doğrudan bu adrese gidilir.
 
 GÖRSEL ÜRETİMİ (/gorsel komutu — ayrı stüdyo YOK)
 - Sohbete "/gorsel <tarif>" yazılır; Pollinations ile ücretsiz/anahtarsız anında görsel üretir (model seçimi bile gerekmez). Eski /studio/gorsel bağlantısı sohbete yönlenir.
 - Üretilen her görsel otomatik Kütüphane'ye kaydedilir (prompt + tarih + bağlı sohbet/proje bilgisiyle).
 
 KÜTÜPHANE (/library) VE DÖNÜŞTÜRÜCÜ (/tools/converter)
-- Kütüphane: üretilen TÜM çıktılar tek yerde — Medya (görseller), Tasarım (stüdyo projeleri), Doküman, Anket, Defter. Sekmeli görünüm; görselde "Dönüştür" ve "Sil" eylemleri. Sidebar → Araçlar veya ⌘K'dan açılır.
+- Kütüphane: üretilen TÜM çıktılar tek yerde — Medya (görseller), Tasarım (stüdyo projeleri), Doküman, Anket, Defter. Sekmeli görünüm; görselde "Dönüştür" ve "Sil" eylemleri. Sidebar'ın üst nav listesinden veya ⌘K'dan açılır.
 - Dönüştürücü: görselleri tamamen tarayıcıda dönüştürür (sunucuya yüklenmez) — PNG/JPG/WebP birbirine, çoklu görsel → tek PDF (JPEG'ler kalite kaybı OLMADAN gömülür).
 
 ARKA PLAN DAVRANIŞI
