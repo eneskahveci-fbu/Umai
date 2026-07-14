@@ -31,7 +31,7 @@ const SECURITY_HEADERS = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(self), geolocation=(), browsing-topics=()",
+    value: "camera=(self), microphone=(self), geolocation=(), browsing-topics=()",
   },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
   /* HSTS — tarayıcıya bu siteyi yalnızca HTTPS ile aç dedirtir. */
