@@ -181,9 +181,18 @@ export function RightPanel(props: RightPanelProps) {
         md:relative md:inset-auto md:z-auto md:w-[var(--rp-w)] md:shrink-0
         flex flex-col min-h-0 border-line/60
         border-t md:border-t-0 md:border-l
+        pb-[var(--rp-pb,0px)] md:pb-0
         animate-in slide-in-from-bottom-4 md:animate-none duration-200
       "
-      style={{ paddingBottom: "env(safe-area-inset-bottom)", ["--rp-w" as string]: `${width}px` }}
+      style={{
+        ["--rp-w" as string]: `${width}px`,
+        /* Mobil alt gezinme çubuğu (MobileTabBar.tsx) fixed+bottom-0+z-[70] —
+           bu panel de bottom-0 olduğundan çubuk ONUN üstüne biner, alt ~52px'lik
+           kısmı (önizleme/başlık/butonlar) örter. SurfacePage.tsx/app/page.tsx'in
+           zaten kullandığı AYNI 52px rezervasyonu; md:'de sıfırlanır (masaüstünde
+           bu panel fixed değil, çubuk da yok). */
+        ["--rp-pb" as string]: "calc(52px + env(safe-area-inset-bottom))",
+      }}
     >
       {/* Sürükleme tutamacı (masaüstü) — sol kenardan genişlik ayarla */}
       <div
