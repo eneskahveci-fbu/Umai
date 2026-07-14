@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MCP_CATALOG } from "../mcpCatalog";
+import { isBuiltinMcpServerId } from "../mcpBuiltins";
 
 describe("MCP_CATALOG", () => {
   it("her girdinin id/ad/ikon/açıklaması var", () => {
@@ -20,6 +21,15 @@ describe("MCP_CATALOG", () => {
     for (const e of MCP_CATALOG) {
       expect(e.name).not.toMatch(/https?:\/\//);
       expect(e.description).not.toMatch(/https?:\/\//);
+    }
+  });
+
+  it("builtinUrl doluysa yalnızca göreli, bilinen bir /api/mcp/builtin/ yoluna işaret eder (dış host'a asla değil)", () => {
+    for (const e of MCP_CATALOG) {
+      if (!e.builtinUrl) continue;
+      expect(e.builtinUrl).not.toMatch(/^https?:\/\//);
+      expect(e.builtinUrl.startsWith("/api/mcp/builtin/")).toBe(true);
+      expect(isBuiltinMcpServerId(e.builtinUrl.slice("/api/mcp/builtin/".length))).toBe(true);
     }
   });
 });

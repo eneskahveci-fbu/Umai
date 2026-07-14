@@ -6,10 +6,8 @@ import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import { buildFallbackChain } from "@/lib/fallback";
 import { filterMcpServersForModel } from "@/lib/mcpScope";
 import {
-  Activity,
   ArrowDown,
   ArrowUp,
-  BookOpen,
   Brain,
   ChevronDown,
   GitBranch,
@@ -25,7 +23,6 @@ import {
   CircleCheck,
   GitPullRequest,
   Globe,
-  Keyboard,
   MoreHorizontal,
   Image as ImageIcon,
   Loader2 as Loader2Icon,
@@ -720,8 +717,11 @@ export function CoderView() {
   const [researchMode, setResearchMode] = useState(false);
   /* Son gönderimin Otomatik Pilot kararı — ✦ Oto rozeti tooltip'i. */
   const [lastPilot, setLastPilot] = useState<PilotDecision | null>(null);
-  /* ⋯ menüsü sekme durumu: Çalışma Alanı · Modlar · Araçlar. */
-  const [moreTab, setMoreTab] = useState<"workspace" | "modes" | "tools">("workspace");
+  /* ⋯ menüsü sekme durumu: Çalışma Alanı · Modlar. "Araçlar" sekmesi
+     (Kütüphane/Etkinlik günlüğü/Kısayollar) Tem 2026 kullanıcı kararıyla
+     Sidebar → Eklentiler'in yanındaki yeni "Araçlar" düğmesine taşındı —
+     burada Efor + oturuma özgü kontroller kalıyor (bkz. Sidebar.tsx). */
+  const [moreTab, setMoreTab] = useState<"workspace" | "modes">("workspace");
   const swarmModeRef = useRef(false);
   useEffect(() => { swarmModeRef.current = swarmMode; }, [swarmMode]);
   const researchModeRef = useRef(false);
@@ -2701,10 +2701,20 @@ export function CoderView() {
             />
             <MoreItem icon={<Zap size={14} />} label="Skills" onClick={() => useStore.getState().setSkillsOpen(true)} />
             <MoreItem icon={<VenetianMask size={14} />} label="Gizli sohbet" onClick={() => useStore.getState().newChat(true)} />
+            {/* Composer'daki taslak metni işlediği için (bkz. improvePrompt)
+               burada, oturuma özgü hızlı eylemlerin yanında kalıyor — Sidebar'ın
+               yeni "Araçlar" popover'ına taşınamaz (o global store eylemleri
+               tutuyor, composer state'ine erişemez). */}
+            <MoreItem
+              icon={improvingPrompt ? <Loader2Icon size={14} className="animate-spin" /> : <Wand2 size={14} />}
+              label="Prompt geliştir"
+              desc="yazdığın istemi iyileştirir"
+              onClick={() => void improvePrompt()}
+            />
 
             {/* Sekme çubuğu — tıklanınca menü açık kalır */}
             <div className="flex gap-0.5 px-1 pt-1 pb-1" onClick={(e) => e.stopPropagation()}>
-              {([["workspace", "Çalışma"], ["modes", "Modlar"], ["tools", "Araçlar"]] as const).map(([key, lbl]) => (
+              {([["workspace", "Çalışma"], ["modes", "Modlar"]] as const).map(([key, lbl]) => (
                 <button
                   key={key}
                   onClick={() => setMoreTab(key)}
@@ -2771,19 +2781,6 @@ export function CoderView() {
                 <ModeChip icon={<Users size={12} />} label="Ekip" active={swarmMode} onClick={() => setSwarmMode((v) => !v)} />
                 <ModeChip icon={<Search size={12} />} label="Araştırma" active={researchMode} onClick={() => setResearchMode((v) => !v)} />
               </div>
-            )}
-            {moreTab === "tools" && (
-              <>
-                <MoreItem
-                  icon={improvingPrompt ? <Loader2Icon size={14} className="animate-spin" /> : <Wand2 size={14} />}
-                  label="Prompt geliştir"
-                  desc="yazdığın istemi iyileştirir"
-                  onClick={() => void improvePrompt()}
-                />
-                <MoreItem icon={<BookOpen size={14} />} label="Kütüphane" onClick={() => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); }} />
-                <MoreItem icon={<Activity size={14} />} label="Etkinlik günlüğü" onClick={() => useStore.getState().setActivityOpen(true)} />
-                <MoreItem icon={<Keyboard size={14} />} label="Kısayollar" onClick={() => useStore.getState().setShortcutsOpen(true)} />
-              </>
             )}
           </MoreMenu>
         </div>

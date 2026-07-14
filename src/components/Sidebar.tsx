@@ -1,17 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  Activity,
   Blocks,
+  BookOpen,
   FolderOpen,
   Images,
+  Keyboard,
   Link2,
   MessageSquare,
   Plus,
   Search,
   Settings,
   Sparkles,
+  Wrench,
   X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -26,6 +30,93 @@ function SidebarLogo({ size = 22 }: { size?: number }) {
       <path d="M14 4L23 9.5V18.5L14 24L5 18.5V9.5L14 4Z" stroke="#5c9478" strokeWidth="1.7" strokeLinejoin="round" fill="none" />
       <circle cx="14" cy="14" r="2.8" fill="#5c9478" fillOpacity="0.9" />
     </svg>
+  );
+}
+
+/* "Araçlar" — Tem 2026 kullanıcı kararı: sağ üst ⋯ menüsündeki Kütüphane/
+   Etkinlik günlüğü/Kısayollar buraya (Sidebar → Eklentiler'in yanına)
+   taşındı (Efor + oturuma özgü kontroller ⋯ menüsünde kaldı). AuthButton'daki
+   AYNI hafif açılır-panel deseni (ref + dışarı tıklama/Escape ile kapan). */
+function SidebarToolsButton({ variant, onNavigate }: { variant: "rail" | "nav"; onNavigate?: () => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (!rootRef.current?.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const items = [
+    { icon: <BookOpen size={14} />, label: "Kütüphane", onClick: () => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); } },
+    { icon: <Activity size={14} />, label: "Etkinlik Günlüğü", onClick: () => useStore.getState().setActivityOpen(true) },
+    { icon: <Keyboard size={14} />, label: "Kısayollar", onClick: () => useStore.getState().setShortcutsOpen(true) },
+  ];
+
+  const run = (fn: () => void) => { fn(); setOpen(false); onNavigate?.(); };
+
+  if (variant === "rail") {
+    return (
+      <div className="relative" ref={rootRef}>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          title="Araçlar"
+          aria-expanded={open}
+          className={`w-full h-9 rounded-xl border grid place-items-center transition-colors ${
+            open ? "border-brand/40 bg-brand/10 text-brand" : "border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink"
+          }`}
+        >
+          <Wrench size={14} />
+        </button>
+        {open && (
+          <div className="animate-fade-in absolute left-full bottom-0 ml-2 z-30 w-52 rounded-xl border border-line bg-surface elev-2 overflow-hidden text-sm">
+            {items.map((it) => (
+              <button
+                key={it.label}
+                onClick={() => run(it.onClick)}
+                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bgsoft/70 text-left text-ink/85"
+              >
+                {it.icon} {it.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative" ref={rootRef}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+          open ? "bg-brand/10 text-brand" : "text-ink/85 hover:bg-bgsoft/70 hover:text-ink"
+        }`}
+      >
+        <Wrench size={16} className="shrink-0" />
+        <span className="flex-1 text-left">Araçlar</span>
+      </button>
+      {open && (
+        <div className="animate-fade-in absolute top-full left-0 right-0 mt-1 z-30 rounded-xl border border-line bg-surface elev-2 overflow-hidden text-sm">
+          {items.map((it) => (
+            <button
+              key={it.label}
+              onClick={() => run(it.onClick)}
+              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bgsoft/70 text-left text-ink/85"
+            >
+              {it.icon} {it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -130,6 +221,7 @@ export function Sidebar() {
           >
             <Blocks size={14} />
           </button>
+          <SidebarToolsButton variant="rail" />
           <button
             onClick={() => router.push("/settings")}
             title="Ayarlar (Ctrl+,)"
@@ -237,6 +329,7 @@ export function Sidebar() {
           <Blocks size={16} className="shrink-0" />
           <span className="flex-1 text-left">Eklentiler</span>
         </button>
+        <SidebarToolsButton variant="nav" onNavigate={closeOnMobile} />
       </nav>
 
       {/* "Son Sohbetler" — her zaman görünen, en son 7 sohbet (Tem 2026

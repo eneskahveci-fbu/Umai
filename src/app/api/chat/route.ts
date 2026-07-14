@@ -14,6 +14,7 @@ import { CODER_TOOLS } from "@/lib/tools";
 import { EXTENSION_TOOLS } from "@/lib/extensions/registry";
 import { searchWeb, formatResults, fetchUrl } from "@/lib/webSearch";
 import { isSafeRemoteUrl } from "@/lib/urlSafety";
+import { isBuiltinMcpServerId } from "@/lib/mcpBuiltins";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendPushToUser } from "@/lib/push";
@@ -810,8 +811,20 @@ async function fetchSoulFile(ctx: RepoCtx): Promise<string | null> {
   return null;
 }
 
-async function fetchMcpTools(server: McpServerConfig): Promise<{ name: string; description: string; parameters: object }[]> {
-  if (!server.url || !isSafeRemoteUrl(server.url)) return [];
+/* Yerleşik (self-hosted) MCP sunucuları — AYNI dağıtımın kendi /api/mcp/builtin/*
+   route'una işaret eder, dış host'a asla erişemez (SSRF riski yok) — bu yüzden
+   isSafeRemoteUrl'in localhost/private-IP engelinden muaf tutulur. Muafiyet
+   yalnızca URL GERÇEKTEN bu isteğin kendi origin'iyle + bilinen bir builtin
+   id'siyle eşleşiyorsa uygulanır (yoksa dışarıdan taklit edilip güvenlik
+   kontrolü atlatılabilir). */
+function isSafeMcpServerUrl(url: string, ownOrigin: string): boolean {
+  const builtinPrefix = `${ownOrigin}/api/mcp/builtin/`;
+  if (url.startsWith(builtinPrefix) && isBuiltinMcpServerId(url.slice(builtinPrefix.length))) return true;
+  return isSafeRemoteUrl(url);
+}
+
+async function fetchMcpTools(server: McpServerConfig, ownOrigin: string): Promise<{ name: string; description: string; parameters: object }[]> {
+  if (!server.url || !isSafeMcpServerUrl(server.url, ownOrigin)) return [];
   try {
     const res = await fetch(`${server.url}/tools/list`, {
       method: "POST",
@@ -829,8 +842,8 @@ async function fetchMcpTools(server: McpServerConfig): Promise<{ name: string; d
   } catch { return []; }
 }
 
-async function callMcpTool(server: McpServerConfig, toolName: string, args: Record<string, unknown>): Promise<string> {
-  if (!server.url || !isSafeRemoteUrl(server.url)) return "Error: güvenli olmayan MCP sunucu adresi.";
+async function callMcpTool(server: McpServerConfig, toolName: string, args: Record<string, unknown>, ownOrigin: string): Promise<string> {
+  if (!server.url || !isSafeMcpServerUrl(server.url, ownOrigin)) return "Error: güvenli olmayan MCP sunucu adresi.";
   try {
     const res = await fetch(`${server.url}/tools/call`, {
       method: "POST",
@@ -851,6 +864,7 @@ async function executeTool(
   mcpServers?: McpServerConfig[],
   cache?: Map<string, string>,
   writeBuffer?: Map<string, WriteEntry>,
+  ownOrigin?: string,
 ): Promise<string> {
   try {
     if (!ctx && ["list_files","read_file","read_files","glob","grep","search_files","search_code","write_file","str_replace","list_branches","create_branch","create_pr","get_commit_history","git_diff","git_log","git_blame","discover_rules","trigger_ci"].includes(name))
@@ -948,7 +962,7 @@ async function executeTool(
     /* Try MCP servers for unknown tools */
     for (const srv of (mcpServers ?? [])) {
       if (!srv.enabled) continue;
-      const result = await callMcpTool(srv, name, args);
+      const result = await callMcpTool(srv, name, args, ownOrigin ?? "");
       if (!result.startsWith("MCP hata:")) return result;
     }
     return `Bilinmeyen araç: ${name}`;
@@ -1371,7 +1385,13 @@ export async function POST(req: Request) {
 
   /* Tool-use loop */
   const repoCtx = body.repoCtx;
-  const activeMcpServers = (body.mcpServers ?? []).filter((s) => s.enabled !== false);
+  const ownOrigin = new URL(req.url).origin;
+  /* Yerleşik (self-hosted) sunucular göreli bir yol (/api/mcp/builtin/*) taşır
+     — fetch() bunu tek başına çözemez, bu isteğin kendi origin'iyle mutlak
+     hale getirilir (bkz. isSafeMcpServerUrl). */
+  const activeMcpServers = (body.mcpServers ?? [])
+    .filter((s) => s.enabled !== false)
+    .map((s) => (s.url?.startsWith("/") ? { ...s, url: `${ownOrigin}${s.url}` } : s));
   const convo: ChatRequest["messages"] = [
     { role: "system", content: sysPrompt },
     ...body.messages,
@@ -1379,7 +1399,7 @@ export async function POST(req: Request) {
 
   /* Fetch MCP tools in parallel */
   const mcpToolDefs = (await Promise.all(
-    activeMcpServers.map((srv) => fetchMcpTools(srv)),
+    activeMcpServers.map((srv) => fetchMcpTools(srv, ownOrigin)),
   )).flat();
   const WEB_TOOLS = [
     {
@@ -1671,6 +1691,7 @@ export async function POST(req: Request) {
           const result = await executeTool(
             tc.name, args, repoCtx, activeMcpServers, readCache,
             MUTATING.has(tc.name) ? roundWrites : undefined,
+            ownOrigin,
           );
           if (prevContent !== undefined && result.startsWith("✅") && typeof args.path === "string") {
             safe.enqueue(
