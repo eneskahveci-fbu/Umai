@@ -57,6 +57,31 @@ describe("buildPreview", () => {
   });
 });
 
+describe("çok dosyalı yanıtlarda doğru bileşen seçimi", () => {
+  it("layout.tsx (kendi <html> etiketi) yerine SONRAKİ gerçek bileşeni seçer", () => {
+    const md =
+      "```tsx\nexport default function RootLayout({children}){return <html><body>{children}</body></html>;}\n```\n" +
+      "```tsx\nfunction App(){return <h1>Gerçek sayfa</h1>;}\n```";
+    const a = buildPreview(md);
+    expect(a?.content).toContain("React.createElement(App)");
+    expect(a?.content).not.toContain("RootLayout");
+  });
+
+  it("YALNIZ <html> içeren bir blok varsa net bir açıklama gösterir (sessiz boş render yerine)", () => {
+    const md = "```tsx\nexport default function RootLayout({children}){return <html><body>{children}</body></html>;}\n```";
+    const a = buildPreview(md);
+    expect(a?.type).toBe("html");
+    expect(a?.content).toContain("layout.tsx");
+    expect(a?.content).not.toContain("ReactDOM.createRoot");
+  });
+
+  it("tek (html içermeyen) bileşende davranış değişmez", () => {
+    const md = "```tsx\nfunction App(){return <h1>Tek dosya</h1>;}\n```";
+    const a = buildPreview(md);
+    expect(a?.content).toContain("React.createElement(App)");
+  });
+});
+
 describe("gömülü console paneli (sandbox)", () => {
   it("React önizlemesine console panelini gömer", () => {
     const a = buildPreview("```jsx\nfunction App(){return <div/>;}\n```");
