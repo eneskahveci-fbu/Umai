@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Command, Keyboard, Monitor, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useModalA11y } from "@/lib/useModalA11y";
+import { useExitAnimation } from "@/lib/useExitAnimation";
 
 interface Shortcut { keys: string[]; label: string; }
 
@@ -79,8 +80,9 @@ export function KeyboardShortcuts() {
 
   const modalRef = useRef<HTMLDivElement>(null);
   useModalA11y(modalRef, open, () => setOpen(false));
+  const { mounted, closing } = useExitAnimation(open);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   const resolveKey = (k: string) => {
     if (k === "mod") return macMode ? "⌘" : "Ctrl";
@@ -89,7 +91,7 @@ export function KeyboardShortcuts() {
 
   return (
     <div
-      className="fixed inset-0 z-[55] bg-black/50 backdrop-blur-sm grid place-items-center px-4 animate-modal-bg"
+      className={`fixed inset-0 z-[55] bg-black/50 backdrop-blur-sm grid place-items-center px-4 ${closing ? "animate-modal-bg-out" : "animate-modal-bg"}`}
       onClick={() => setOpen(false)}
     >
       <div

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { BookOpen, Code2, Copy, Search, Trash2, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useModalA11y } from "@/lib/useModalA11y";
+import { useExitAnimation } from "@/lib/useExitAnimation";
 import { PROMPT_TEMPLATES } from "@/lib/constants";
 
 const CATEGORIES = ["Tümü", "Kod Yazma", "Hata Ayıklama", "Açıklama", "Refaktöring", "Test"];
@@ -18,12 +19,13 @@ export function LibraryModal() {
 
   const modalRef = useRef<HTMLDivElement>(null);
   useModalA11y(modalRef, open, () => setOpen(false));
+  const { mounted, closing } = useExitAnimation(open);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[55] bg-black/50 backdrop-blur-sm grid place-items-center px-4 animate-modal-bg"
+      className={`fixed inset-0 z-[55] bg-black/50 backdrop-blur-sm grid place-items-center px-4 ${closing ? "animate-modal-bg-out" : "animate-modal-bg"}`}
       onClick={() => setOpen(false)}
     >
       <div

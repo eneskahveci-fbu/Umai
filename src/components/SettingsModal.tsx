@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useModalA11y } from "@/lib/useModalA11y";
+import { useExitAnimation } from "@/lib/useExitAnimation";
 import {
   Bell,
   Brain,
@@ -362,7 +363,8 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     return () => { cancelled = true; };
   }, [open, tab, config.activeGithubId, config.activeGitlabId, config.githubAccounts, config.gitlabAccounts, config.repos]);
 
-  if (!open) return null;
+  const { mounted, closing } = useExitAnimation(open);
+  if (!mounted) return null;
 
   const onProvider = (p: Provider) => {
     setProvider(p);
@@ -657,7 +659,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-0 sm:p-4" onClick={close}>
+    <div className={`fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 ${closing ? "animate-modal-bg-out" : "animate-modal-bg"}`} onClick={close}>
       <div
         ref={modalRef}
         role="dialog"
@@ -723,7 +725,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             </button>
             <span className="font-bold text-sm absolute left-1/2 -translate-x-1/2 pointer-events-none">{visibleTabs.find((t) => t.key === tab)?.label}</span>
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-5" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
+          <div key={tab} className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-5 animate-fade-in" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
 
         {/* MODEL */}
         {tab === "hesap" && <AccountSettings />}

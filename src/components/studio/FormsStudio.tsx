@@ -393,8 +393,9 @@ export function FormsStudio() {
       />
 
       {/* Merkezî yanıt özeti (form_responses — yalnız form sahibi görür).
-          Yalnız açıkken mount: her açılışta taze veri/state. */}
-      {form && responsesOpen && <FormResponsesModal form={form} open onClose={() => setResponsesOpen(false)} />}
+          Kapanış animasyonu oynayabilsin diye artık `form` var olduğu sürece
+          mounted kalır; iç state açılışta kendi sıfırlanır (bkz. FormResponses.tsx). */}
+      {form && <FormResponsesModal form={form} open={responsesOpen} onClose={() => setResponsesOpen(false)} />}
     </>
   );
 

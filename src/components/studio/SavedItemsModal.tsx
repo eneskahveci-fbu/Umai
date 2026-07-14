@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Download, Trash2, X } from "lucide-react";
 import { useModalA11y } from "@/lib/useModalA11y";
+import { useExitAnimation } from "@/lib/useExitAnimation";
 
 /* Kayıtlı-öğe modalı — Doküman/Sunum/Anket/Defter'in 4 kez elle kopyaladığı
    "Kayıtlı X" listesini tek bileşene indirir. Satır içeriği (başlık/alt
@@ -37,9 +38,10 @@ export function SavedItemsModal<T>({
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
   useModalA11y(ref, open, onClose);
-  if (!open) return null;
+  const { mounted, closing } = useExitAnimation(open);
+  if (!mounted) return null;
   return (
-    <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-modal-bg" onClick={onClose}>
+    <div className={`fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 ${closing ? "animate-modal-bg-out" : "animate-modal-bg"}`} onClick={onClose}>
       <div
         ref={ref}
         role="dialog"

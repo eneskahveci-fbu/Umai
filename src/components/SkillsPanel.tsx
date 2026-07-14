@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useModalA11y } from "@/lib/useModalA11y";
+import { useExitAnimation } from "@/lib/useExitAnimation";
 import {
   BookMarked, Check, Download, FileText, FileUp, GitBranch,
   Pencil, Plus, RotateCcw, Search, Sparkles, Trash2, Upload, X, Zap,
@@ -72,7 +73,8 @@ export function SkillsPanel() {
     reader.readAsText(file);
   };
 
-  if (!open) return null;
+  const { mounted, closing } = useExitAnimation(open);
+  if (!mounted) return null;
 
   const totalUsage = skills.reduce((sum, s) => sum + s.usageCount, 0);
   const enabledCount = skills.filter((s) => s.enabled).length;
@@ -85,7 +87,7 @@ export function SkillsPanel() {
 
   return (
     <div
-      className="fixed inset-0 z-[55] bg-black/50 backdrop-blur-sm grid place-items-center px-3 sm:px-4 animate-modal-bg"
+      className={`fixed inset-0 z-[55] bg-black/50 backdrop-blur-sm grid place-items-center px-3 sm:px-4 ${closing ? "animate-modal-bg-out" : "animate-modal-bg"}`}
       onClick={() => setOpen(false)}
       style={{
         paddingTop: "max(0.75rem, env(safe-area-inset-top))",

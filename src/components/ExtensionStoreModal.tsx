@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { Blocks, X } from "lucide-react";
 import { useModalA11y } from "@/lib/useModalA11y";
+import { useExitAnimation } from "@/lib/useExitAnimation";
 import { useStore } from "@/lib/store";
 import { McpGallery } from "@/components/McpGallery";
 
@@ -17,12 +18,13 @@ export function ExtensionStoreModal() {
   const setOpen = useStore((s) => s.setExtensionStoreOpen);
   const modalRef = useRef<HTMLDivElement>(null);
   useModalA11y(modalRef, open, () => setOpen(false));
+  const { mounted, closing } = useExitAnimation(open);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[55] bg-black/50 backdrop-blur-sm grid place-items-center px-3 sm:px-4 animate-modal-bg"
+      className={`fixed inset-0 z-[55] bg-black/50 backdrop-blur-sm grid place-items-center px-3 sm:px-4 ${closing ? "animate-modal-bg-out" : "animate-modal-bg"}`}
       onClick={() => setOpen(false)}
       style={{
         paddingTop: "max(0.75rem, env(safe-area-inset-top))",
