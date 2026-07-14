@@ -21,7 +21,7 @@ GÖRÜNÜMLER
 - Görünüm sekmeleri ve paylaşım menüsü.
 
 YAN PANEL (Sidebar) — Claude.ai'ye paralel, Umai renklerinde
-- Üstte düz nav listesi: Ara (⌘K), Sohbetler, Stüdyo, Kütüphane, Projeler.
+- Üstte düz nav listesi: Ara (⌘K), Sohbetler, Stüdyo, Kütüphane, Projeler, Eklentiler.
 - Sohbetler ve Projeler artık Sidebar'da İNLİNE DEĞİL — kendi ayrı sayfalarında (/chats, /projects); Sidebar yalnız bu nav listesini + (varsa) "İlgili" sohbet önerilerini tutar.
 - Altta iki yuvarlak ikon düğme: sol hesap avatarı (giriş/çıkış/Ayarlar menüsü), sağ "+" yeni sohbet.
 - Giriş/oturum: Supabase ile e-posta + şifre girişi (geçmiş senkronu için). Giriş yapılmazsa her şey yerelde (localStorage) çalışır.
@@ -52,16 +52,15 @@ KÜTÜPHANE (/library) VE DÖNÜŞTÜRÜCÜ (/tools/converter)
 ARKA PLAN DAVRANIŞI
 - Ayrı bir "arka planda çalıştır" düğmesi YOK — normal mesaj zaten sekme kapansa bile sunucuda tamamlanıp kalıcı hâle gelir; kullanıcı başka sohbete/yüzeye geçebilir. Kullanıcı "arka planda çalıştırma nerede" diye sorarsa: mesajı normal gönder, gerisi kendiliğinden.
 
-AYARLAR (⚙️) — 11 sekme (Gelişmiş/MCP/Kancalar yalnızca admin'e görünür)
+AYARLAR (⚙️) — 11 sekme (Gelişmiş/Kancalar yalnızca admin'e görünür, gerisi herkese açık)
 - Hesap: e-posta/şifre/görünen ad, oturum yönetimi, kullanım istatistikleri, hesabı silme.
 - Model: "+ Yeni Model Ekle" ile sağlayıcı seç, görünen ad (opsiyonel), Base URL (sağlayıcıya göre otomatik dolar), API anahtarı yapıştır; anahtar girilince o anahtarla erişilebilen GERÇEK modeller otomatik listelenir ("↻ modelleri getir/yenile"). Sağlayıcılar: Hugging Face, DeepSeek, OpenRouter, Groq, Google Gemini, Mistral, Cerebras, Together AI, xAI (Grok), Ollama (yerel), Özel. Birden fazla model eklenebilir; eklenen modeller kullanıcı silmedikçe kalıcıdır.
 - Git: Çoklu GitHub/GitLab hesabı (kullanıcı adı + token), depolar (sahip/depo[:dal]), CLI modu (otomatik bağlan, terminali otomatik aç), ".rules" proje kuralları.
-- Eklentiler: Araçları modüler paketlere gruplayıp toplu açar/kapatır.
+- Eklentiler: iki bölüm — (1) Uygulama Bağlantıları: Notion/Slack/Google Drive/Calendar/Linear/Jira/Figma/PostgreSQL/Özel sunucu gibi uygulamaları MCP (Model Context Protocol) üzerinden bağlama galerisi + genel MCP sunucu ekle/listele/aç-kapat/test/sil (gerçek servis-özel OAuth değildir — kullanıcı her servisin kendi MCP sunucu adresini+kimliğini girer); (2) Dahili Araç Paketleri: yerleşik araçları modüler paketlere gruplayıp toplu açar/kapatır. Sidebar'dan da doğrudan erişilir ("Eklentiler" nav girişi).
 - Temel: Otomatik Pilot, davranış anahtarları (web arama, otomatik hatırlama, kalite modu, Öğrenme Modu…), tema/vurgu rengi/yazı boyutu, bildirimler, yedekle/geri yükle, yanıt stili, bellek, sistem promptu, bağlam penceresi (token), klavye kısayolları.
 - Kullanım: Model/istek başına kullanım ve maliyet istatistikleri.
 - Plan: Abonelik/plan bilgisi.
 - Gelişmiş (admin): Misafir mod, WebContainer API key (gerçek terminal), Hibrit Sunucu (Local Bridge) bağlantısı.
-- MCP (admin): MCP sunucu bağlantıları.
 - Kancalar (admin): Hook tanımları.
 - Hakkında: Sürüm/bilgi.
 
