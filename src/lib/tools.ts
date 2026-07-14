@@ -291,7 +291,7 @@ export const CODER_TOOLS: ToolDefinition[] = [
     function: {
       name: "ask_user",
       description:
-        "Kullanıcıya tıklanabilir seçenekli yapılandırılmış soru(lar) sor. KOD YAZMADAN ÖNCE belirsizlikleri netleştirmek; yaklaşım, kütüphane, kapsam, tasarım veya YAYIN ortamı gibi sana bırakılan önemli kararları sormak için kullan. Kullanıcı bir veya birden çok seçeneği tıklar ya da 'Diğer' alanına serbest metin yazar. Cevabı aldıktan SONRA elde edilen bilgiyle görevi tamamla. Tahmin etmek yerine SOR — ama yalnızca gerçekten gerektiğinde (1-2 net karar).",
+        "Kullanıcıya tıklanabilir seçenekli yapılandırılmış soru(lar) sor. KOD YAZMADAN ÖNCE belirsizlikleri netleştirmek; yaklaşım, kütüphane, kapsam, tasarım veya YAYIN ortamı gibi sana bırakılan önemli kararları sormak için kullan. Kullanıcı bir veya birden çok seçeneği tıklar ya da 'Diğer' alanına serbest metin yazar. Cevabı aldıktan SONRA elde edilen bilgiyle görevi tamamla. Tahmin etmek yerine SOR — ama yalnızca gerçekten gerektiğinde (1-2 net karar). Kullanıcının cevabı hâlâ yeterli netliği sağlamadıysa (ör. seçtiği seçenek yeni bir alt-karar açtıysa) ask_user'ı TEKRAR çağırarak birkaç tur boyunca netleştirmeyi sürdürebilirsin — tek seferlik bir soru sınırı yok, Claude Code'un plan-onay döngüsü gibi düşün.",
       parameters: {
         type: "object",
         properties: {

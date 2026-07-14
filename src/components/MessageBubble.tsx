@@ -498,6 +498,7 @@ function MessageBubbleImpl({
   onEdit,
   onSwitchVersion,
   streamingNow,
+  onChecklistToggle,
 }: {
   message: ChatMessage;
   index: number;
@@ -508,6 +509,7 @@ function MessageBubbleImpl({
   onEdit?: (index: number, content: string) => void;
   onSwitchVersion?: (branchIndex: number) => void;
   streamingNow?: boolean;
+  onChecklistToggle?: () => void;
 }) {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
@@ -570,7 +572,11 @@ function MessageBubbleImpl({
   const toggleContentCheckbox = (line?: number) => {
     if (typeof line !== "number") return;
     const next = toggleChecklistLine(message.content, line);
-    if (next !== message.content) useStore.getState().updateMessageContentAt(index, next);
+    if (next === message.content) return;
+    useStore.getState().updateMessageContentAt(index, next);
+    /* Claude tarzı: kullanıcı elle mesaj yazıp göndermek zorunda kalmadan,
+       kısa bir sessizlik sonrası seçimiyle sohbeti otomatik sürdür. */
+    onChecklistToggle?.();
   };
 
   /* Seslendirme — Pollinations openai-audio (ücretsiz); hata olursa tarayıcı
@@ -1021,5 +1027,6 @@ export const MessageBubble = memo(MessageBubbleImpl, (prev, next) =>
   prev.streamingNow === next.streamingNow &&
   !!prev.onContinue === !!next.onContinue &&
   !!prev.onEdit === !!next.onEdit &&
-  !!prev.onSwitchVersion === !!next.onSwitchVersion,
+  !!prev.onSwitchVersion === !!next.onSwitchVersion &&
+  !!prev.onChecklistToggle === !!next.onChecklistToggle,
 );

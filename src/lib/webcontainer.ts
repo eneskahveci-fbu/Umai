@@ -29,10 +29,18 @@ export function getUnsupportedReason(): string | null {
   return null;
 }
 
+/* Site sahibinin Vercel'e eklediği PAYLAŞIMLI anahtar (varsa) — "hata düzeltene
+   kadar döngü" (otonom doğrulama) gibi arkaplan özellikleri, kullanıcı kendi
+   BYOK anahtarını hiç girmeden HERKESTE çalışsın diye. Kullanıcının Ayarlar'a
+   girdiği kendi anahtarı (varsa) her zaman önceliklidir — bu yalnız yedek. */
+const SHARED_API_KEY = (process.env.NEXT_PUBLIC_WEBCONTAINER_API_KEY ?? "").trim();
+
 /* WebContainer is free on localhost / *.stackblitz.io / *.webcontainer.io.
-   On other origins (e.g. Vercel) you need a free API key from webcontainer.dev. */
+   On other origins (e.g. Vercel) you need a free API key from webcontainer.dev
+   — bu yoksa PAYLAŞIMLI anahtar (üstte) devreye girer. */
 export function needsApiKey(): boolean {
   if (typeof window === "undefined") return false;
+  if (SHARED_API_KEY) return false;
   const h = window.location.hostname;
   if (h === "localhost" || h === "127.0.0.1") return false;
   if (h.endsWith(".stackblitz.io") || h.endsWith(".webcontainer.io")) return false;
@@ -47,7 +55,7 @@ export async function getWebContainer(apiKey?: string): Promise<WebContainer> {
 
   booting = (async () => {
     const mod = await import("@webcontainer/api");
-    const key = apiKey?.trim();
+    const key = apiKey?.trim() || SHARED_API_KEY;
     if (key) mod.configureAPIKey(key);
     instance = await mod.WebContainer.boot();
     booting = null;
