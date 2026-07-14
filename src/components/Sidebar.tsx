@@ -80,7 +80,7 @@ function SidebarToolsButton({ variant, onNavigate }: { variant: "rail" | "nav"; 
               <button
                 key={it.label}
                 onClick={() => run(it.onClick)}
-                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bgsoft/70 text-left text-ink/85"
+                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bgsoft/70 text-left text-ink/85 transition-colors"
               >
                 {it.icon} {it.label}
               </button>
@@ -109,7 +109,7 @@ function SidebarToolsButton({ variant, onNavigate }: { variant: "rail" | "nav"; 
             <button
               key={it.label}
               onClick={() => run(it.onClick)}
-              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bgsoft/70 text-left text-ink/85"
+              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bgsoft/70 text-left text-ink/85 transition-colors"
             >
               {it.icon} {it.label}
             </button>

@@ -133,9 +133,9 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
           <span className="text-sm font-semibold truncate min-w-0">{artifact.title || "Önizleme"}</span>
           {showVersionNav && (
             <div className="flex items-center gap-0.5 shrink-0 text-[10px] font-mono text-muted/70 bg-bgsoft border border-line/60 rounded-lg px-1 py-0.5">
-              <button onClick={onPrevVersion} disabled={versionIndex === 0} className="disabled:opacity-30 hover:text-ink" title="Önceki sürüm"><ChevronLeft size={13} /></button>
+              <button onClick={onPrevVersion} disabled={versionIndex === 0} className="disabled:opacity-30 hover:text-ink transition-colors" title="Önceki sürüm"><ChevronLeft size={13} /></button>
               <span>v{(versionIndex ?? 0) + 1}/{versionTotal}</span>
-              <button onClick={onNextVersion} disabled={versionIndex === (versionTotal ?? 1) - 1} className="disabled:opacity-30 hover:text-ink" title="Sonraki sürüm"><ChevronRight size={13} /></button>
+              <button onClick={onNextVersion} disabled={versionIndex === (versionTotal ?? 1) - 1} className="disabled:opacity-30 hover:text-ink transition-colors" title="Sonraki sürüm"><ChevronRight size={13} /></button>
             </div>
           )}
         </div>
@@ -185,7 +185,7 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
           <a href={publishedUrl} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline truncate min-w-0 flex-1">{publishedUrl}</a>
           <button
             onClick={async () => { try { await navigator.clipboard.writeText(publishedUrl); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); } catch { /* yok say */ } }}
-            className="shrink-0 flex items-center gap-1 text-muted hover:text-ink font-semibold"
+            className="shrink-0 flex items-center gap-1 text-muted hover:text-ink font-semibold transition-colors"
           >{linkCopied ? <><Check size={12} /> Kopyalandı</> : "Kopyala"}</button>
         </div>
       )}
@@ -194,7 +194,7 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
         <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-line bg-brand/5 text-[11px] text-brand">
           <MousePointerClick size={12} className="shrink-0" />
           <span className="min-w-0 flex-1 truncate">Değiştirmek istediğin öğeye önizlemede tıkla — seçim sohbete taşınır.</span>
-          <button onClick={() => setAnnotating(false)} className="shrink-0 text-muted hover:text-ink font-semibold">Vazgeç</button>
+          <button onClick={() => setAnnotating(false)} className="shrink-0 text-muted hover:text-ink font-semibold transition-colors">Vazgeç</button>
         </div>
       )}
 

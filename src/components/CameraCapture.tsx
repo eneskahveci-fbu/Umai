@@ -58,9 +58,9 @@ export function CameraCaptureModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[85] bg-black/80 backdrop-blur-sm grid place-items-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[85] bg-black/80 backdrop-blur-sm grid place-items-center p-4 animate-modal-bg" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-2xl border border-line bg-surface overflow-hidden shadow-2xl"
+        className="w-full max-w-lg rounded-2xl border border-line bg-surface overflow-hidden shadow-2xl animate-modal-content"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 px-4 py-3 border-b border-line">
