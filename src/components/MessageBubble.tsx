@@ -838,19 +838,34 @@ function MessageBubbleImpl({
                     );
                   },
                   /* GFM işaretleme kutuları varsayılan olarak disabled gelir —
-                     burada gerçek, tıklanabilir bir kutuya çeviriyoruz. */
+                     burada gerçek, tıklanabilir bir kutuya çeviriyoruz. Çıplak
+                     native checkbox (yalnız accent-brand) uygulamanın geri
+                     kalanındaki özel tasarımlı kontrollerin (McpGallery
+                     anahtarı, TaskPanel'in CircleCheck'i vb.) yanında "cansız
+                     ve garip" duruyordu — burada aynı dolgu+onay-ikonu
+                     dilini kullanan özel bir kutuya sarıyoruz. */
                   input: function ChecklistInput({ node, ...rest }) {
                     void node; // rest.type ile ayrım yapılır; DOM'a sızmasın diye ayrıştırıldı
                     const line = useContext(ChecklistLineContext);
                     if (rest.type !== "checkbox") return <input {...rest} />;
+                    const checked = !!rest.checked;
                     return (
-                      <input
-                        type="checkbox"
-                        checked={!!rest.checked}
-                        disabled={streamingNow}
-                        onChange={() => toggleContentCheckbox(line)}
-                        className="mr-1.5 align-middle accent-brand cursor-pointer disabled:cursor-default"
-                      />
+                      <label className="inline-flex align-middle -mb-0.5 mr-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={streamingNow}
+                          onChange={() => toggleContentCheckbox(line)}
+                          className="sr-only"
+                        />
+                        <span
+                          className={`w-[15px] h-[15px] shrink-0 rounded-[5px] border grid place-items-center transition-colors ${
+                            checked ? "bg-brand border-brand" : "border-line hover:border-brand/50"
+                          } ${streamingNow ? "opacity-50" : ""}`}
+                        >
+                          {checked && <Check size={10} className="text-[#111110]" strokeWidth={3.5} />}
+                        </span>
+                      </label>
                     );
                   },
                 }}
