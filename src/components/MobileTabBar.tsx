@@ -1,18 +1,20 @@
 "use client";
 
-/* Mobil alt gezinme çubuğu (yalnız sm altı) — üç öğe: Sohbet · Stüdyo ·
-   Ayarlar. Stüdyo artık tek mod (Tasarım) — Görüntü üretimi genel sohbette
-   "/gorsel" komutuna taşındı. İçerik araçları (Doküman/Anket/Defter/Kroki/
-   Kartlar) eskiden ayrı bir "Araçlar" sekmesi (alttan-sheet) idi; artık
+/* Mobil alt gezinme çubuğu (yalnız sm altı) — dört öğe: Sohbet · Stüdyo ·
+   Kütüphane · Ayarlar. Stüdyo artık tek mod (Tasarım) — Görüntü üretimi genel
+   sohbette "/gorsel" komutuna taşındı. İçerik araçları (Doküman/Anket/Defter/
+   Kroki/Kartlar) eskiden ayrı bir "Araçlar" sekmesi (alttan-sheet) idi; artık
    Stüdyo ana ekranındaki (StudioHomeScreen) büyük araç kartlarından
    erişiliyor — ayrı bir gezinme yolu tutmak yerine tek giriş noktası.
-   "Ayarlar" gerçek `/settings` rotasına gider (Sidebar'ın masaüstündeki
-   düğmesiyle aynı hizada), böylece diğer sekmelerle aynı aktif-vurgu
-   deseni otomatik çalışır. Aktif sekme marka renginde; safe-area alt
-   boşluğu korunur. */
+   "Kütüphane" Sidebar'ın masaüstündeki nav listesiyle aynı hedefe
+   (`/library`) gider — üretilen çıktılar mobilde de üst seviyede keşfedilebilir
+   olsun diye. "Ayarlar" gerçek `/settings` rotasına gider (Sidebar'ın
+   masaüstündeki düğmesiyle aynı hizada), böylece diğer sekmelerle aynı
+   aktif-vurgu deseni otomatik çalışır. Aktif sekme marka renginde; safe-area
+   alt boşluğu korunur. */
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { MessageSquare, Settings, Sparkles } from "lucide-react";
+import { Images, MessageSquare, Settings, Sparkles } from "lucide-react";
 
 /* Sanal klavye açık mı? (mobil) — visualViewport küçülmesiyle algılanır.
    Alt bar klavye açıkken gizlenir; sayfalar alt boşluğu buna göre sıfırlar. */
@@ -34,6 +36,7 @@ interface Tab { href: string; label: string; icon: typeof MessageSquare }
 const TABS: Tab[] = [
   { href: "/app", label: "Sohbet", icon: MessageSquare },
   { href: "/studio", label: "Stüdyo", icon: Sparkles },
+  { href: "/library", label: "Kütüphane", icon: Images },
   { href: "/settings", label: "Ayarlar", icon: Settings },
 ];
 
