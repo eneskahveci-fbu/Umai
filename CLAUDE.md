@@ -194,7 +194,17 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
 - **Öğrenme Modu** (`config.learningMode`): açıkken sistem prompt'una eğitsel
   yönerge eklenir (adım adım açıklama, kavram tanımı, "neden", "Sırada öğren").
   MoreMenu'den toggle; durum çubuğunda rozet. Üniversite öğrencileri için.
-- **Kalite Modu** (`config.qualityMode`): tek yanıtta taslak→öz-eleştiri→düzeltme.
+- **Kalite Modu / görünmez süpervizör** (`config.qualityMode`, Tem 2026
+  kullanıcı kararı): tek yanıtta taslak→öz-eleştiri→düzeltme; araçsız/tekil
+  sohbet turlarında ayrıca 3 iç taslak+hakem (Fusion) tetikler (bkz.
+  `CoderView.tsx`'teki `qualityForced`). **Varsayılan olarak açık**
+  (`DEFAULT_CONFIG.qualityMode: true`) — kullanıcı hiçbir şeye dokunmadan en
+  kaliteli/hatasız yanıtı ister; Ayarlar → Genel → Davranış'tan (herkese açık,
+  admin'e özel değil) hız/maliyet için kapatılabilir. Kapsam bilinçli olarak
+  yalnız ana sohbet — Stüdyolara henüz genişletilmedi. Otomatik Pilot'un
+  (`config.autoPilot`, admin dışı hesaplarda zaten her zaman açık) kendi
+  kalite sezgisiyle (`pilot?.quality`) örtüşür ama manuel anahtar her zaman
+  önceliklidir.
 - **Oto-ajan**: `autoSwarm(text)` eşik geçince Ajan Ekibi (planlayıcı→paralel
   işçiler→birleştirici, `/api/orchestrate`) butona basmadan devreye girer; repo
   bağlanınca araçlar otomatik açılır. Durum çubuğunda "Oto-ajan" göstergesi.
