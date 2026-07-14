@@ -647,7 +647,12 @@ export const DEFAULT_CONFIG: Config = {
   autoTheme: false,
   autoMemory: true,
   autoContinue: true,
-  qualityMode: false,
+  /* Görünmez süpervizör (Tem 2026 kullanıcı kararı): sohbette taslak→
+     öz-eleştiri→düzeltme akışı varsayılan olarak açık — kullanıcı hiçbir
+     şeye dokunmadan en kaliteli/hatasız yanıtı ister. Ayarlar → Genel →
+     Davranış'tan istenirse kapatılabilir (hız/maliyet için); kapsam bilinçli
+     olarak yalnız ana sohbet — Stüdyolara henüz genişletilmedi. */
+  qualityMode: true,
   learningMode: false,
   webSearch: true,
   agentsUseStrongestModel: true,
