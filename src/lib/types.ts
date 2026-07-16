@@ -368,7 +368,7 @@ export interface CraftDoc extends StudioProjectBase {
 }
 
 /** Anket Stüdyosu — Google Forms'tan ilhamla (craft yorumu). */
-export type FormQuestionType = "short" | "long" | "choice" | "multi" | "rating" | "dropdown" | "date";
+export type FormQuestionType = "short" | "long" | "choice" | "multi" | "rating" | "dropdown" | "date" | "file";
 
 export interface FormQuestion {
   id: string;
@@ -381,6 +381,12 @@ export interface FormQuestion {
       değeri aldığında göster (Google Forms'un "bölüme atla"sının craft
       yorumu — sunucusuz HTML'de de çalışır). */
   showIf?: { questionId: string; equals: string };
+  /** Bu sorudan SONRA yeni bir sayfa başlat (Google Forms'un "bölüm"
+      özelliğinin sunucusuz HTML'e taşınmış hali — ilerleme çubuğu + İleri/
+      Geri gezinmesiyle). Soruya bağlı tutulur ki sıralama/silme sırasında
+      ayrı bir indeks listesi bayatlamasın — sayfa sonu kendi sorusuyla
+      birlikte taşınır/silinir. */
+  pageBreakAfter?: boolean;
 }
 
 export interface CraftForm extends StudioProjectBase {

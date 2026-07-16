@@ -16,6 +16,7 @@ export const FORM_QUESTION_TYPES: { id: FormQuestionType; name: string }[] = [
   { id: "dropdown", name: "Açılır liste" },
   { id: "rating", name: "Derecelendirme (1-5)" },
   { id: "date", name: "Tarih" },
+  { id: "file", name: "Dosya yükleme" },
 ];
 
 /** Seçenek listesi taşıyan soru türleri (editör + normalize ortak kullanır). */
@@ -38,7 +39,7 @@ export function newQuestion(type: FormQuestionType = "short"): FormQuestion {
 
 /* ── LLM çıktısını güvenli ankete çevirme ───────────────────────────── */
 
-const VALID_QTYPES: FormQuestionType[] = ["short", "long", "choice", "multi", "rating", "dropdown", "date"];
+const VALID_QTYPES: FormQuestionType[] = ["short", "long", "choice", "multi", "rating", "dropdown", "date", "file"];
 
 function normalizeQuestion(raw: unknown): (FormQuestion & { _showIfIndex?: number; _showIfEquals?: string }) | null {
   if (!raw || typeof raw !== "object") return null;
@@ -54,6 +55,7 @@ function normalizeQuestion(raw: unknown): (FormQuestion & { _showIfIndex?: numbe
     q.options = opts.length >= 2 ? opts : ["Evet", "Hayır"];
   }
   if (r.required === true) q.required = true;
+  if (r.pageBreakAfter === true) q.pageBreakAfter = true;
   /* Koşul, LLM şemasında İNDEKS ile gelir (LLM bizim üreteceğimiz id'leri
      bilemez) — normalizeForm ikinci geçişte gerçek questionId'ye çevirir. */
   const si = r.showIf as Record<string, unknown> | undefined;
@@ -126,6 +128,11 @@ function questionHtml(q: FormQuestion, i: number): string {
         `<label><input type="radio" name="${name}" value="${n}"${req}><span>${n}</span></label>`).join("")}</div>`; break;
     case "date":
       body = `${label}<input type="date" name="${name}"${req}>`; break;
+    case "file":
+      /* Sunucusuz mimari: dosyanın kendisi HİÇBİR YERE yüklenmez, yalnız
+         seçilen dosyanın adı yanıt olarak (CSV'ye) kaydedilir — localStorage'a
+         ikili içerik gömmek kota riskini + karmaşıklığı haklı çıkarmıyor. */
+      body = `${label}<input type="file" name="${name}"${req}><p class="hint">Dosyanın adı kaydedilir; içeriği sunucuya/CSV'ye gönderilmez.</p>`; break;
     default:
       body = `${label}<input type="text" name="${name}"${req}>`;
   }
@@ -157,6 +164,20 @@ export function formToHtml(form: CraftForm, exportOpts?: FormExportOptions): str
       return { t: i, s, eq: q.showIf.equals };
     })
     .filter((r): r is { t: number; s: number; eq: string } => r !== null);
+  /* Sayfalar: pageBreakAfter işaretli sorudan sonra yeni sayfa başlar (Google
+     Forms "bölüm"ünün sunucusuz karşılığı) — soruya bağlı olduğundan sıralama/
+     silme sırasında ayrı bir indeks listesi bayatlamaz. İşaret hiç yoksa tek
+     sayfa (eski davranışla birebir aynı). */
+  const pages: number[][] = [];
+  {
+    let cur: number[] = [];
+    form.questions.forEach((q, i) => {
+      cur.push(i);
+      if (q.pageBreakAfter && i < form.questions.length - 1) { pages.push(cur); cur = []; }
+    });
+    pages.push(cur);
+  }
+  const paged = pages.length > 1;
   return `<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -180,11 +201,18 @@ export function formToHtml(form: CraftForm, exportOpts?: FormExportOptions): str
   .rate input { position: absolute; opacity: 0; } .rate span { display: grid; place-items: center; width: 2.4rem; height: 2.4rem;
     border: 1px solid var(--line); border-radius: .5rem; font-weight: 600; }
   .rate input:checked + span { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .hint { font-size: .78rem; color: var(--muted); margin: .4rem 0 0; }
   button { font: inherit; font-weight: 700; background: var(--accent); color: #fff; border: 0; border-radius: .7rem;
     padding: .7rem 1.6rem; cursor: pointer; margin-top: .6rem; }
+  button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
   .foot { margin-top: 2rem; font-size: .8rem; color: var(--muted); display: flex; gap: 1rem; align-items: center; }
   .foot a { color: var(--muted); } #ok { display: none; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46;
     padding: 1rem 1.2rem; border-radius: .8rem; margin-top: 1rem; }
+  .progress { height: .4rem; border-radius: 999px; background: var(--line); overflow: hidden; margin-bottom: .5rem; }
+  .progress .bar { height: 100%; background: var(--accent); transition: width .25s ease; }
+  .navrow { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .5rem; }
+  .navrow span { font-size: .8rem; color: var(--muted); font-weight: 600; }
+  .navbtns { display: flex; gap: .5rem; } .navbtns button { margin-top: 0; }
   @media (prefers-color-scheme: dark) {
     :root { --line: #33322e; --muted: #a8a396; }
     body { background: #111110; color: #f4f2ec; } .q { background: #1c1c1a; }
@@ -196,9 +224,15 @@ export function formToHtml(form: CraftForm, exportOpts?: FormExportOptions): str
 <body>
 <h1>${escapeHtml(form.title)}</h1>
 ${form.desc ? `<p class="desc">${escapeHtml(form.desc)}</p>` : ""}
+${paged ? `<div class="progress"><div class="bar" id="bar" style="width:${Math.round((100 / pages.length))}%"></div></div>
+<div class="navrow"><span id="pagelabel">Sayfa 1 / ${pages.length}</span></div>` : ""}
 <form id="f">
-${form.questions.map(questionHtml).join("\n")}
-<button type="submit">Gönder</button>
+${pages.map((idxs, pi) => `<div class="page" id="page${pi}">${idxs.map((i) => questionHtml(form.questions[i], i)).join("\n")}</div>`).join("\n")}
+${paged ? `<div class="navbtns">
+  <button type="button" class="ghost" id="prevBtn" style="display:none">Geri</button>
+  <button type="button" id="nextBtn">İleri</button>
+  <button type="submit" id="submitBtn" style="display:none">Gönder</button>
+</div>` : `<button type="submit">Gönder</button>`}
 </form>
 <div id="ok">Yanıtın kaydedildi — teşekkürler! Bu cihazdaki tüm yanıtlar aşağıdan CSV olarak indirilebilir.</div>
 <div class="foot">
@@ -213,8 +247,10 @@ ${form.questions.map(questionHtml).join("\n")}
   var KEY = ${JSON.stringify(storageKey)};
   var HEADERS = ${JSON.stringify(headers)};
   var LOGIC = ${JSON.stringify(logic)};
+  var PAGES = ${JSON.stringify(pages)};
   var COLLECT = ${JSON.stringify(collect)};
   var form = document.getElementById("f");
+  var page = 0;
   function all() { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) { return []; } }
   function refresh() { var n = all().length; document.getElementById("cnt").textContent = n + " yanıt"; }
   /* Koşullu görünürlük: kaynak sorunun değeri beklenene eşitse hedef görünür;
@@ -225,19 +261,58 @@ ${form.questions.map(questionHtml).join("\n")}
     var sel = form.querySelector('select[name="q' + i + '"]');
     return sel ? sel.value : "";
   }
-  function applyLogic() {
-    LOGIC.forEach(function (r) {
-      var wrap = document.getElementById("qw" + r.t);
-      if (!wrap) return;
-      var show = srcValue(r.s) === r.eq;
-      wrap.style.display = show ? "" : "none";
-      wrap.querySelectorAll("input, textarea, select").forEach(function (el) {
-        el.disabled = !show;
-        if (!show) { if (el.type === "radio" || el.type === "checkbox") el.checked = false; else el.value = ""; }
-      });
-    });
+  function pageOf(i) {
+    for (var p = 0; p < PAGES.length; p++) if (PAGES[p].indexOf(i) !== -1) return p;
+    return 0;
   }
-  if (LOGIC.length) { form.addEventListener("change", applyLogic); applyLogic(); }
+  function logicOk(i) {
+    var rule = LOGIC.filter(function (r) { return r.t === i; })[0];
+    return !rule || srcValue(rule.s) === rule.eq;
+  }
+  /* Görünürlüğün TEK kaynağı: sayfa gezinmesi (değer korunur, sadece
+     disabled/gizli) + koşullu mantık (mantık başarısızsa değer SIFIRLANIR —
+     eski davranışla aynı). İkisi ayrı sebeplerle disabled olsa da nihai
+     görünürlük her zaman bu fonksiyondan hesaplanır. */
+  function refreshVisibility() {
+    for (var i = 0; i < HEADERS.length; i++) {
+      var wrap = document.getElementById("qw" + i);
+      if (!wrap) continue;
+      var onPage = pageOf(i) === page;
+      var passes = logicOk(i);
+      wrap.style.display = onPage ? (passes ? "" : "none") : "none";
+      wrap.querySelectorAll("input, textarea, select").forEach(function (el) {
+        el.disabled = !(onPage && passes);
+        if (!passes) { if (el.type === "radio" || el.type === "checkbox") el.checked = false; else el.value = ""; }
+      });
+    }
+  }
+  function updatePageUi() {
+    var bar = document.getElementById("bar");
+    if (bar) bar.style.width = Math.round(((page + 1) / PAGES.length) * 100) + "%";
+    var label = document.getElementById("pagelabel");
+    if (label) label.textContent = "Sayfa " + (page + 1) + " / " + PAGES.length;
+    var prev = document.getElementById("prevBtn");
+    var next = document.getElementById("nextBtn");
+    var submitBtn = document.getElementById("submitBtn");
+    if (prev) prev.style.display = page === 0 ? "none" : "";
+    if (next) next.style.display = page === PAGES.length - 1 ? "none" : "";
+    if (submitBtn) submitBtn.style.display = page === PAGES.length - 1 ? "" : "none";
+  }
+  if (LOGIC.length || PAGES.length > 1) { form.addEventListener("change", refreshVisibility); refreshVisibility(); }
+  if (PAGES.length > 1) {
+    var prevBtn = document.getElementById("prevBtn");
+    var nextBtn = document.getElementById("nextBtn");
+    nextBtn.addEventListener("click", function () {
+      var cur = document.getElementById("page" + page);
+      var invalid = cur.querySelector(":invalid:not(:disabled)");
+      if (invalid) { invalid.reportValidity(); return; }
+      if (page < PAGES.length - 1) { page++; refreshVisibility(); updatePageUi(); window.scrollTo(0, 0); }
+    });
+    prevBtn.addEventListener("click", function () {
+      if (page > 0) { page--; refreshVisibility(); updatePageUi(); window.scrollTo(0, 0); }
+    });
+    updatePageUi();
+  }
   form.addEventListener("submit", function (e) {
     e.preventDefault();
     var row = [];
@@ -246,6 +321,7 @@ ${form.questions.map(questionHtml).join("\n")}
       var vals = [];
       els.forEach(function (el) {
         if (el.disabled) return;
+        if (el.type === "file") { if (el.files && el.files[0]) vals.push(el.files[0].name); return; }
         if ((el.type === "radio" || el.type === "checkbox") && !el.checked) return;
         if (el.value) vals.push(el.value);
       });
