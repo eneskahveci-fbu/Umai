@@ -99,7 +99,8 @@ import {
   isGitLabRepo,
   parseGitLabRepo,
 } from "@/lib/gitlab";
-import type { TreeFile, TreeNode } from "@/lib/types";
+import type { ChatMessage, TreeFile, TreeNode } from "@/lib/types";
+import { stashAsPendingBranches } from "@/lib/branching";
 import { ALL_AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agents";
 import { pollinationsImageUrl } from "@/lib/pollinations";
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
@@ -2704,8 +2705,18 @@ export function CoderView() {
     const store = useStore.getState();
     const chat = store.current();
     if (!chat || chat.messages.length < 2) return;
-    if (chat.messages[chat.messages.length - 1].role === "assistant") store.popLastMessage();
+    /* Eski yanıt artık kaybolmuyor: yeniden üretmeden önce (varsa kendi dal
+       geçmişiyle) bekleyen dal listesine alınır; yeni yanıt tamamlanınca bu
+       liste son mesaja işlenir — MessageBubble'daki "‹ n/m ›" sürüm okları
+       kullanıcı mesajı düzenlemesinde olduğu gibi asistan yanıtında da çalışır. */
+    let pendingBranches: ChatMessage[][] | null = null;
+    const last = chat.messages[chat.messages.length - 1];
+    if (last.role === "assistant") {
+      pendingBranches = stashAsPendingBranches(last);
+      store.popLastMessage();
+    }
     await callApi();
+    if (pendingBranches) useStore.getState().mergeRegenerateBranches(pendingBranches);
   };
 
   /* Keep the previous answer; ask the model to pick up where it left off.
