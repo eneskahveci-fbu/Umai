@@ -28,6 +28,23 @@ export function newCard(front = "", back = "", now = Date.now()): FlashCard {
   return { id: newCardId(), front, back, box: 0, due: now };
 }
 
+/* ── Cloze kartlar (Anki'nin {{c1::cevap}} sözdizimi) ──────────────────── */
+
+const CLOZE_RE = /\{\{c\d+::(.*?)\}\}/g;
+
+/** Cloze şablonundan ön/arka yüzü türetir: önde boşluklar [...] ile gizlenir,
+    arkada gerçek cevaplar açılır. Birden çok {{c1::}}/{{c2::}} aynı anda
+    gizlenir/açılır — v1 kasıtlı olarak Anki'nin numaraya göre kart çoğaltma
+    davranışını uygulamaz (tek kart, tüm boşluklar birlikte). */
+export function renderCloze(cloze: string): { front: string; back: string } {
+  return { front: cloze.replace(CLOZE_RE, "[...]"), back: cloze.replace(CLOZE_RE, "$1") };
+}
+
+export function newClozeCard(cloze = "Metnin bir kısmı {{c1::gizli}} olsun.", now = Date.now()): FlashCard {
+  const { front, back } = renderCloze(cloze);
+  return { id: newCardId(), front, back, box: 0, due: now, type: "cloze", cloze };
+}
+
 /* ── Aralıklı tekrar (saf) ─────────────────────────────────────────────── */
 
 /** Cevap değerlendirmesi: doğru → kutu yükselir; yanlış → kutu 0'a döner.
@@ -86,6 +103,19 @@ export function deckToTsv(deck: CraftDeck): string {
      düzleştirilir. */
   const flat = (s: string) => s.replace(/[\t\n\r]+/g, " ").trim();
   return deck.cards.map((c) => `${flat(c.front)}\t${flat(c.back)}`).join("\n") + "\n";
+}
+
+/** deckToTsv'nin tersi: Anki'den (veya bir tablodan) dışa aktarılmış
+    "ön yüz<TAB>arka yüz" satırlarından kart listesi üretir — her zaman
+    basic kart üretir (cloze içe aktarma kapsam dışı). Eksik/boş satırlar
+    ve fazladan sütunlar (yalnız ilk 2 alan kullanılır) yok sayılır. */
+export function parseCardsTsv(text: string): FlashCard[] {
+  const now = Date.now();
+  return text.split(/\r?\n/)
+    .map((line) => line.split("\t"))
+    .filter((cols) => cols.length >= 2 && cols[0].trim() && cols[1].trim())
+    .map(([front, back]) => newCard(front.trim().slice(0, MAX_FRONT_CHARS), back.trim().slice(0, MAX_BACK_CHARS), now))
+    .slice(0, MAX_DECK_CARDS);
 }
 
 /* ── Vurgular (saf yardımcılar — store bunları çağırır) ────────────────── */
