@@ -59,9 +59,14 @@ describe("yardımcılar", () => {
 });
 
 describe("autoStudioSkill", () => {
-  it("sunum brief'i artık deck'e yönlendirmiyor (gerçek Sunum stüdyosuna yönlendirme StudioView'da)", async () => {
+  it("sunum/slayt brief'i → slides (gerçek çok-slaytlı motor, slidesGen.ts)", async () => {
     const { autoStudioSkill } = await import("../autoPilot");
-    expect(autoStudioSkill("Yapay zekâ konulu 5 slaytlık bir sunum hazırla")).toBeNull();
+    expect(autoStudioSkill("Yapay zekâ konulu 5 slaytlık bir sunum hazırla")).toBe("slides");
+    expect(autoStudioSkill("yatırımcılar için pitch deck hazırla")).toBe("slides");
+    /* Türkçe çekim ekleri: "sunum" değil "sunumu"/"sunumuyla" gibi biçimler
+       gerçek kullanımda çok daha yaygın — \w* son eki tüketmeli. */
+    expect(autoStudioSkill("Bir kahve markası için ürün lansman sunumu")).toBe("slides");
+    expect(autoStudioSkill("10 slaytlık bir eğitim sunumu hazırla")).toBe("slides");
   });
   it("e-posta brief'i → email, dashboard → dashboard", async () => {
     const { autoStudioSkill } = await import("../autoPilot");
