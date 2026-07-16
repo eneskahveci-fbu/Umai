@@ -606,6 +606,9 @@ export interface Config {
   ttsVoice?: string;
   /** Defter podcast özetinde ikinci sunucunun sesi (varsayılan: onyx). */
   ttsVoiceB?: string;
+  /** Aylık kullanım bütçesi (USD) — belirtilmemişse/0 ise uyarı kapalıdır.
+      Yaklaşık maliyet aktif modelin fiyatına göre hesaplanır (bkz. lib/budget.ts). */
+  monthlyBudgetUsd?: number;
   mcpServers?: McpServer[];
   /** Yerel Mod: kullanıcının makinesindeki Local Bridge adresi (ör. http://localhost:4319).
       Doluysa ve localMode açıksa ajan GitHub/GitLab API yerine gerçek dosya
