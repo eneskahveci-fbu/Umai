@@ -34,6 +34,7 @@ import {
   PanelLeft,
   Paperclip,
   Check,
+  Columns,
   ListChecks,
   RefreshCw,
   RotateCcw,
@@ -109,6 +110,7 @@ import { detectSensitive } from "@/lib/pii";
 import { friendlyError } from "@/lib/friendlyError";
 import { autoEffort, autoSwarm, decidePilot, type PilotDecision } from "@/lib/autoPilot";
 import { pickDraftModels, buildBoostInstruction, generateDrafts, fillSelfConsistency, judgeDrafts } from "@/lib/boost";
+import { runCompare } from "@/lib/compare";
 import { fetchTextModels } from "@/lib/pollinations";
 import { importSkillFromUrl } from "@/lib/skillImport";
 import { trackEvent } from "@/lib/analytics";
@@ -810,6 +812,10 @@ export function CoderView() {
   const [swarmMode, setSwarmMode] = useState(false);
   /* Derin Araştırma modu: çok-kaynaklı web araması → atıflı rapor (/api/research). */
   const [researchMode, setResearchMode] = useState(false);
+  /* Karşılaştırma modu: sohbet + tool-loop yerine aynı mesajı 2-3 modelle
+     paralel çalıştırıp sonuçları yan yana gösterir (bkz. send() içindeki
+     erken intercept + MessageBubble'ın compareResults render dalı). */
+  const [compareMode, setCompareMode] = useState(false);
   /* Son gönderimin Otomatik Pilot kararı — ✦ Oto rozeti tooltip'i. */
   const [lastPilot, setLastPilot] = useState<PilotDecision | null>(null);
   /* ⋯ menüsü sekme durumu: Çalışma Alanı · Modlar. "Araçlar" sekmesi
@@ -2648,6 +2654,43 @@ export function CoderView() {
       void store.persistCurrent();
       return;
     }
+
+    /* Karşılaştırma modu: normal tool-loop/akış yerine aynı mesajı 2-3
+       modelle PARALEL çalıştırır (Fusion'ın pickDraftModels/fillSelfConsistency
+       sezgisiyle AYNI model seçimi), sonuçları MessageBubble'da yan yana
+       gösterir — kullanıcı hangisini tutacağını seçer (pickCompareResult).
+       v1 kapsamı: yalnız metin (ekler/araçlar bu modda desteklenmez). */
+    if (compareMode && text.trim()) {
+      setInput("");
+      store.pushMessage({ role: "user", content: text });
+      store.pushMessage({ role: "assistant", content: "" });
+      store.setStreaming(true);
+      try {
+        const active = store.activeModel()!;
+        const freeModelNames = await fetchTextModels();
+        const picks = pickDraftModels(store.config.models, active, 3, store.strongestModel(), freeModelNames);
+        const slots = fillSelfConsistency(picks, active, 3);
+        const candidates = await Promise.all(slots.map(async (s) => ({
+          label: s.profile.id.includes("#sc") ? `${s.profile.label} (T${s.temperature})` : s.profile.label,
+          baseUrl: s.profile.baseUrl, model: s.profile.model, provider: s.profile.provider,
+          apiKey: await usableApiKey(s.profile),
+        })));
+        const results = await runCompare({ userText: text, candidates });
+        useStore.getState().popLastMessage();
+        useStore.getState().pushMessage({ role: "assistant", content: "", compareResults: results });
+      } catch (e) {
+        useStore.getState().popLastMessage();
+        useStore.getState().pushMessage({
+          role: "assistant",
+          content: `Karşılaştırma başarısız: ${friendlyError((e as Error).message)}`,
+          isError: true,
+        });
+      } finally {
+        useStore.getState().setStreaming(false);
+        void useStore.getState().persistCurrent();
+      }
+      return;
+    }
     setPendingCommit(null);
     hookRunsRef.current = 0; // yeni kullanıcı mesajı → afterEdit döngü sayacını sıfırla
     verifyRunsRef.current = 0; // otonom doğrulama tur sayacını da sıfırla
@@ -2939,6 +2982,7 @@ export function CoderView() {
                 <ModeChip icon={<ShieldCheck size={12} />} label="Güvenli" active={!!config.safeMode} onClick={() => useStore.getState().saveConfig({ ...config, safeMode: !config.safeMode })} />
                 <ModeChip icon={<Users size={12} />} label="Ekip" active={swarmMode} onClick={() => setSwarmMode((v) => !v)} />
                 <ModeChip icon={<Search size={12} />} label="Araştırma" active={researchMode} onClick={() => setResearchMode((v) => !v)} />
+                <ModeChip icon={<Columns size={12} />} label="Karşılaştır" active={compareMode} onClick={() => setCompareMode((v) => !v)} />
               </div>
             )}
           </MoreMenu>
@@ -3273,6 +3317,7 @@ export function CoderView() {
                             : undefined
                         }
                         onChecklistToggle={isLastAssistant && !streaming ? () => handleChecklistAutoContinue(i) : undefined}
+                        onPickCompare={m.compareResults ? (rIdx: number) => useStore.getState().pickCompareResult(i, rIdx) : undefined}
                       />
                       {isLastAssistant && !streaming && pendingCommit && pendingCommit.length > 0 && repo && (
                         <div className="ml-11 max-w-2xl">

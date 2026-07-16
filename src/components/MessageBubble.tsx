@@ -9,12 +9,12 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import {
   AlertCircle, BookMarked, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-  Circle, CircleCheck, Compass, FlaskConical, ImageOff, ListChecks, Microscope, MoreHorizontal, Settings2,
+  Circle, CircleCheck, Columns, Compass, FlaskConical, ImageOff, ListChecks, Microscope, MoreHorizontal, Settings2,
   Code2, Copy, FileText, FolderOpen, GitBranch, GitCommit, Globe,
   Highlighter, Loader2, Pencil, RefreshCw, Search, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, Users, Volume2, VolumeX, Wrench, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { ChatMessage, SwarmState } from "@/lib/types";
+import type { ChatMessage, CompareResult, SwarmState } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { CodeBlock } from "./CodeBlock";
 import { ALL_AGENTS } from "@/lib/agents";
@@ -562,6 +562,38 @@ function GeneratedImage({ src, alt }: { src: string; alt?: string }) {
   );
 }
 
+/* Karşılaştırma modu — aynı mesaj birden fazla modelle paralel çalıştırılınca
+   normal metin yerine bu yatay-kaydırmalı sütunlar gösterilir. Her sütun kendi
+   modelini/hatasını taşır; "Bunu kullan" seçilen içeriği mesajın gerçek
+   content'i yapıp compareResults'ı temizler (bkz. store.ts pickCompareResult). */
+function CompareColumns({ results, onPick }: { results: CompareResult[]; onPick?: (resultIndex: number) => void }) {
+  return (
+    <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory">
+      {results.map((r, i) => (
+        <div key={i} className="shrink-0 w-[82vw] max-w-[320px] sm:w-[300px] snap-start rounded-xl border border-line bg-bgsoft/60 flex flex-col overflow-hidden">
+          <div className="px-3 py-2 border-b border-line/60 flex items-center gap-1.5 text-[11px] font-semibold text-muted">
+            <Columns size={11} className="text-brand shrink-0" />
+            <span className="truncate" title={r.label}>{r.label}</span>
+          </div>
+          <div className="px-3 py-2.5 text-[13px] leading-relaxed max-h-72 overflow-y-auto whitespace-pre-wrap flex-1">
+            {r.error
+              ? <span className="text-red text-xs">Başarısız: {r.error}</span>
+              : r.content || <span className="text-muted/50 text-xs">Boş yanıt</span>}
+          </div>
+          {onPick && !r.error && r.content && (
+            <button
+              onClick={() => onPick(i)}
+              className="flex items-center justify-center gap-1.5 mx-3 mb-2.5 py-1.5 rounded-lg bg-brand text-[#111110] text-xs font-semibold hover:bg-branddim transition-colors"
+            >
+              <Check size={12} /> Bunu kullan
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ── MessageBubble ─────────────────────────────────────────────────── */
 
 function MessageBubbleImpl({
@@ -575,6 +607,7 @@ function MessageBubbleImpl({
   onSwitchVersion,
   streamingNow,
   onChecklistToggle,
+  onPickCompare,
 }: {
   message: ChatMessage;
   index: number;
@@ -586,6 +619,7 @@ function MessageBubbleImpl({
   onSwitchVersion?: (branchIndex: number) => void;
   streamingNow?: boolean;
   onChecklistToggle?: () => void;
+  onPickCompare?: (resultIndex: number) => void;
 }) {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
@@ -880,8 +914,13 @@ function MessageBubbleImpl({
           <GeneratedImage key={`${i}-${img}`} src={img} />
         ))}
 
+        {/* Karşılaştırma sütunları — normal içerik yerine gösterilir. */}
+        {message.compareResults && message.compareResults.length > 0 && (
+          <CompareColumns results={message.compareResults} onPick={onPickCompare} />
+        )}
+
         {/* Content */}
-        {message.content ? (
+        {message.compareResults && message.compareResults.length > 0 ? null : message.content ? (
           <div className={message.isError ? "rounded-xl border border-red/20 bg-red/5 px-3 py-2.5" : undefined}>
             {message.isError && (
               <div className="flex items-center gap-1.5 text-[11px] font-semibold text-red mb-1.5">

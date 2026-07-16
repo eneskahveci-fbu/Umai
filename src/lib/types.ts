@@ -54,6 +54,18 @@ export interface ChatMessage {
       normal metinden görsel olarak ayırır (kırmızı vurgu + belirgin
       tekrar-dene eylemi). */
   isError?: boolean;
+  /** Karşılaştırma modu: aynı mesaj birden fazla modelle paralel çalıştırılınca
+      dolar. MessageBubble bunu tek metin yerine yan yana sütunlar olarak
+      çizer; kullanıcı birini seçince (pickCompareResult) mesaj normal bir
+      yanıta "çöker" (content = seçilen, compareResults silinir). */
+  compareResults?: CompareResult[];
+}
+
+/** Karşılaştırma modunun tek bir modelden gelen sonucu. */
+export interface CompareResult {
+  label: string;
+  content: string;
+  error?: string;
 }
 
 export interface SwarmAgentState {

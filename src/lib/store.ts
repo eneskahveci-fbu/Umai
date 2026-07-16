@@ -482,6 +482,10 @@ interface StoreState {
       alınan `stashAsPendingBranches` çıktısını, biten yeni son mesaja işler
       (bkz. CoderView.tsx `regenerate()`, branching.ts). */
   mergeRegenerateBranches: (pendingBranches: ChatMessage[][]) => void;
+  /** Karşılaştırma modu: kullanıcı `compareResults`'tan birini seçince o
+      mesajı normal bir yanıta "çökertir" — content seçilen olur, compareResults
+      silinir (bir daha karşılaştırma sütunları gösterilmez). */
+  pickCompareResult: (index: number, resultIndex: number) => void;
   maybeSetTitle: (text: string) => void;
   persistCurrent: () => Promise<void>;
   exportChat: (id: string) => void;
@@ -1420,6 +1424,22 @@ export const useStore = create<StoreState>()((set, get) => ({
       chats: s.chats.map((c) =>
         c.id === s.currentId ? { ...c, messages: mergeRegeneratedBranches(c.messages, pendingBranches) } : c,
       ),
+    }));
+    void get().persistCurrent();
+  },
+
+  pickCompareResult: (index, resultIndex) => {
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const target = c.messages[index];
+        const picked = target?.compareResults?.[resultIndex];
+        if (!picked) return c;
+        const messages = c.messages.map((m, i) =>
+          i === index ? { ...m, content: picked.content, compareResults: undefined } : m,
+        );
+        return { ...c, messages };
+      }),
     }));
     void get().persistCurrent();
   },
