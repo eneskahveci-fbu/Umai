@@ -343,6 +343,11 @@ export function FormsStudio() {
                     <label className="flex items-center gap-1 text-[11px] text-muted cursor-pointer">
                       <input type="checkbox" checked={!!q.required} onChange={(e) => patchQ(q.id, { required: e.target.checked || undefined })} /> Zorunlu
                     </label>
+                    {i < form.questions.length - 1 && (
+                      <label className="flex items-center gap-1 text-[11px] text-muted cursor-pointer" title="Bu sorudan sonra yeni sayfa başlat (ilerleme çubuklu, İleri/Geri gezinmeli)">
+                        <input type="checkbox" checked={!!q.pageBreakAfter} onChange={(e) => patchQ(q.id, { pageBreakAfter: e.target.checked || undefined })} /> Sayfa sonu
+                      </label>
+                    )}
                     <div className="ml-auto flex items-center gap-0.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/q:opacity-100 transition-opacity">
                       <button onClick={() => moveQ(q.id, -1)} className="w-6 h-6 grid place-items-center rounded text-muted/50 hover:text-ink hover:bg-bgsoft transition-colors" title="Yukarı"><ArrowUp size={12} /></button>
                       <button onClick={() => moveQ(q.id, 1)} className="w-6 h-6 grid place-items-center rounded text-muted/50 hover:text-ink hover:bg-bgsoft transition-colors" title="Aşağı"><ArrowDown size={12} /></button>
@@ -351,6 +356,12 @@ export function FormsStudio() {
                   </div>
                 </div>
               ))}
+              {form.questions.some((q) => q.pageBreakAfter) && (
+                <p className="text-[10.5px] text-muted/50 leading-relaxed">
+                  Bu ankette sayfa sonu(ları) var — dışa aktarılan formda ilerleme çubuğu ve İleri/Geri
+                  gezinmesiyle çok sayfalı olarak açılır.
+                </p>
+              )}
               <button onClick={addQ} className="flex items-center gap-1.5 text-xs text-muted/60 hover:text-brand transition-colors">
                 <Plus size={13} /> Soru ekle
               </button>
