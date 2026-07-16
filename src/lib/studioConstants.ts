@@ -106,8 +106,19 @@ export const STUDIO_SKILLS: StudioSkill[] = [
   // ── İçerik ───────────────────────────────────────────────────────────
   {
     id: "deck", name: "Tek sayfa sunum görseli", icon: "🖼️", category: "İçerik",
-    desc: "Kaydırılabilir tek HTML sayfası (gerçek slayt destesi için Sunum stüdyosunu kullan)",
+    desc: "Kaydırılabilir tek HTML sayfası (gerçek slayt destesi için 'Çok Slaytlı Sunum' skilini kullan)",
     instructions: "Kapak + içerik bölümleri + kapanıştan oluşan, aşağı KAYDIRILARAK gezilen TEK bir HTML sayfası üret (gerçek slayt-slayt geçişli bir deste değil). Büyük tipografi, nefes alan boşluk, marka renkleriyle tutarlı; projeksiyon için yüksek kontrast.",
+    defaultDevice: "web",
+  },
+  {
+    /* Bu skil generateArtifact/buildStudioSystem'i BAYPAS eder — DesignStudio.tsx'in
+       runGenerate'i skillId==="slides" iken slidesGen.generateDeck() + slides.ts'in
+       deckToHtml()'ini çağırır (yapılandırılmış JSON → deterministik render, gerçek
+       slayt-slayt gezinme, tema, slayt başına AI görsel, konuşmacı notları). Alandaki
+       `instructions` yalnız belgeleme amaçlı — bu yoldan hiç okunmaz. */
+    id: "slides", name: "Çok Slaytlı Sunum", icon: "📽️", category: "İçerik",
+    desc: "Gerçek slayt-slayt gezinme, temalar, slayt başına AI görsel, konuşmacı notları (Gamma kalitesinde)",
+    instructions: "Kapak, ajanda/bölüm geçişleri, içerik slaytları ve kapanıştan oluşan çok slaytlı bir sunum kurgula; düzenleri çeşitlendir, her slaytta tek net fikir olsun.",
     defaultDevice: "web",
   },
   {

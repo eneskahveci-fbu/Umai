@@ -121,6 +121,9 @@ export function autoStudioSkill(brief: string): string | null {
   if (!t.trim()) return null;
   const rules: [RegExp, string][] = [
     [/\b(e-?posta|mail|bülten|newsletter)\b/, "email"],
+    /* \w* son eki tüketir: Türkçe eklemeli yapı yüzünden "sunum" değil
+       "ürün lansman SUNUMU" gibi çekimli biçimler çok daha yaygın. */
+    [/\b(sunum\w*|slayt\w*|slide deck|prezentasyon\w*|pitch deck)\b/, "slides"],
     [/\b(sosyal|instagram|post|afiş|banner|story)\b/, "social"],
     [/\b(dashboard|panel|gösterge|analitik ekran)\b/, "dashboard"],
     [/\b(tablo|table|liste görünümü)\b/, "table"],
