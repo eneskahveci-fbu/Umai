@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  Download, FolderOpen, Highlighter, Layers, Loader2, Plus, RotateCcw, Save, Sparkles, Trash2,
+  Download, FolderOpen, Highlighter, Layers, Loader2, Plus, RotateCcw, Save, Sparkles, Trash2, Upload,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
@@ -12,7 +12,7 @@ import { GenSkeleton } from "./GenSkeleton";
 import type { CraftDeck, FlashCard } from "@/lib/types";
 import {
   cardsFromHighlights, deckToTsv, dueCards, generateDeck, gradeCard,
-  MAX_DECK_CARDS, newCard,
+  MAX_DECK_CARDS, newCard, newClozeCard, parseCardsTsv, renderCloze,
 } from "@/lib/cards";
 import { useStudioProject } from "@/lib/useStudioProject";
 
@@ -49,6 +49,7 @@ export function CardsStudio() {
   const [revealed, setRevealed] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [genFromHl, setGenFromHl] = useState(false);
+  const importRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const b = consumeSurfaceHandoff("cards");
@@ -112,6 +113,14 @@ export function CardsStudio() {
     setDeck({ ...deck, cards: [...deck.cards, newCard("Yeni soru", "Cevap")] });
   };
 
+  const addClozeCard = () => {
+    if (!deck) return;
+    if (deck.cards.length >= MAX_DECK_CARDS) { addToast(`En fazla ${MAX_DECK_CARDS} kart.`, "info"); return; }
+    setDeck({ ...deck, cards: [...deck.cards, newClozeCard()] });
+  };
+
+  const patchClozeText = (id: string, cloze: string) => patchCard(id, { cloze, ...renderCloze(cloze) });
+
   const deleteCard = (id: string) => {
     if (!deck || deck.cards.length <= 1) return;
     setDeck({ ...deck, cards: deck.cards.filter((c) => c.id !== id) });
@@ -124,6 +133,31 @@ export function CardsStudio() {
     a.download = `${safeFileName(deck.title, "kartlar")}.txt`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  };
+
+  /* İçe aktarma — deckToTsv'nin tersi: Anki'den (veya bir tablodan) dışa
+     aktarılmış "ön yüz<TAB>arka yüz" satırlarını içe alır. Açık deste varsa
+     ona ekler, yoksa yeni bir deste kurar. */
+  const importTsvFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const cards = parseCardsTsv(String(reader.result ?? ""));
+      if (!cards.length) { addToast("İçe aktarılabilir kart bulunamadı (ön yüz<TAB>arka yüz formatı bekleniyor).", "error"); return; }
+      if (deck) {
+        setDeck({ ...deck, cards: [...deck.cards, ...cards].slice(0, MAX_DECK_CARDS) });
+        addToast(`${cards.length} kart eklendi — Kaydet'i unutma.`, "success");
+        setTab("cards");
+      } else {
+        const now = Date.now();
+        openDeck({
+          id: `deck_${now.toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+          title: file.name.replace(/\.[^.]+$/, "") || "İçe aktarılan deste",
+          cards, createdAt: now, updatedAt: now,
+        });
+        addToast(`${cards.length} kart içe aktarıldı.`, "success");
+      }
+    };
+    reader.readAsText(file);
   };
 
   /* Seçili vurgulardan kart üret: açık deste varsa ona ekler, yoksa yeni
@@ -209,9 +243,20 @@ export function CardsStudio() {
       <div className="ml-auto flex items-center gap-1 shrink-0">
         <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
         <button onClick={() => deck && setDeck(save(deck, "Deste kaydedildi."))} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+        <button onClick={() => importRef.current?.click()} title="TSV içe aktar (ön yüz⇥arka yüz)" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Upload size={15} /></button>
         <button onClick={exportTsv} title="Anki TSV indir (.txt)" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Download size={15} /></button>
       </div>
     </div>
+  );
+
+  const importInput = (
+    <input
+      ref={importRef}
+      type="file"
+      accept=".txt,.tsv,.csv,text/tab-separated-values,text/csv,text/plain"
+      className="hidden"
+      onChange={(e) => { const f = e.target.files?.[0]; if (f) importTsvFile(f); e.target.value = ""; }}
+    />
   );
 
   const content = (
@@ -265,6 +310,9 @@ export function CardsStudio() {
                   <Highlighter size={13} className="text-yellow" /> Vurgular ({highlights.length})
                 </button>
               )}
+              <button onClick={() => importRef.current?.click()} className="inline-flex items-center gap-1.5 hover:text-ink transition-colors">
+                <Upload size={13} className="text-brand" /> TSV içe aktar
+              </button>
             </div>
           </div>
         </div>
@@ -318,26 +366,49 @@ export function CardsStudio() {
                     <div className="flex items-center gap-2 text-[10.5px] text-muted/50">
                       <span className="tabular-nums">#{i + 1}</span>
                       <span>kutu {c.box + 1}/5</span>
+                      {c.type === "cloze" && <span className="px-1.5 py-0.5 rounded bg-brand/15 text-brand font-semibold">cloze</span>}
                       <button onClick={() => deleteCard(c.id)} aria-label="Kartı sil" title="Kartı sil" className="ml-auto w-6 h-6 grid place-items-center rounded text-muted/40 hover:text-red [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/c:opacity-100 transition-opacity"><Trash2 size={12} /></button>
                     </div>
-                    <input
-                      value={c.front}
-                      onChange={(e) => patchCard(c.id, { front: e.target.value })}
-                      placeholder="Ön yüz (soru)"
-                      className="w-full bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-sm outline-none focus:border-brand/50 font-medium"
-                    />
-                    <textarea
-                      value={c.back}
-                      onChange={(e) => patchCard(c.id, { back: e.target.value })}
-                      placeholder="Arka yüz (cevap)"
-                      rows={2}
-                      className="w-full bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50 resize-none"
-                    />
+                    {c.type === "cloze" ? (
+                      <>
+                        <textarea
+                          value={c.cloze ?? ""}
+                          onChange={(e) => patchClozeText(c.id, e.target.value)}
+                          placeholder="Metin yaz, gizlenecek kısmı {{c1::cevap}} ile işaretle…"
+                          rows={2}
+                          className="w-full bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-sm outline-none focus:border-brand/50 resize-none font-medium"
+                        />
+                        <div className="text-[11px] text-muted/60 px-0.5">
+                          <span className="text-muted/40">Ön:</span> {c.front} <span className="text-muted/40 ml-2">Arka:</span> {c.back}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          value={c.front}
+                          onChange={(e) => patchCard(c.id, { front: e.target.value })}
+                          placeholder="Ön yüz (soru)"
+                          className="w-full bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-sm outline-none focus:border-brand/50 font-medium"
+                        />
+                        <textarea
+                          value={c.back}
+                          onChange={(e) => patchCard(c.id, { back: e.target.value })}
+                          placeholder="Arka yüz (cevap)"
+                          rows={2}
+                          className="w-full bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50 resize-none"
+                        />
+                      </>
+                    )}
                   </div>
                 ))}
-                <button onClick={addNewCard} className="flex items-center gap-1.5 text-xs text-muted/60 hover:text-brand transition-colors">
-                  <Plus size={13} /> Kart ekle
-                </button>
+                <div className="flex items-center gap-3">
+                  <button onClick={addNewCard} className="flex items-center gap-1.5 text-xs text-muted/60 hover:text-brand transition-colors">
+                    <Plus size={13} /> Kart ekle
+                  </button>
+                  <button onClick={addClozeCard} className="flex items-center gap-1.5 text-xs text-muted/60 hover:text-brand transition-colors">
+                    <Plus size={13} /> Cloze kart ekle
+                  </button>
+                </div>
               </div>
             )}
 
@@ -363,6 +434,7 @@ export function CardsStudio() {
         onDelete={(d) => remove(d.id)}
         emptyLabel="Henüz kayıtlı deste yok."
       />
+      {importInput}
     </>
   );
 

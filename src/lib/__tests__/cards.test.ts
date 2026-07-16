@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   deckToTsv, dueCards, gradeCard, LEITNER_INTERVALS_MS, MAX_DECK_CARDS,
-  MAX_HIGHLIGHTS, newCard, newHighlight, normalizeDeck, parseDeckJson, pushHighlight,
+  MAX_HIGHLIGHTS, newCard, newClozeCard, newHighlight, normalizeDeck, parseCardsTsv,
+  parseDeckJson, pushHighlight, renderCloze,
 } from "../cards";
 import type { Highlight } from "../types";
 
@@ -66,6 +67,65 @@ describe("deckToTsv", () => {
     const lines = tsv.trimEnd().split("\n");
     expect(lines.length).toBe(2);
     expect(lines[0]).toBe("soru içinde sekme\tcevap satır kırımı");
+  });
+});
+
+describe("renderCloze / newClozeCard", () => {
+  it("tek boşluğu ön yüzde gizler, arka yüzde açar", () => {
+    const { front, back } = renderCloze("Fransa'nın başkenti {{c1::Paris}}'tir.");
+    expect(front).toBe("Fransa'nın başkenti [...]'tir.");
+    expect(back).toBe("Fransa'nın başkenti Paris'tir.");
+  });
+
+  it("birden çok boşluğu aynı anda gizler/açar (v1: kart başına tek kart, Anki'nin numara-bazlı çoğaltması yok)", () => {
+    const { front, back } = renderCloze("{{c1::Ankara}} Türkiye'nin, {{c2::Paris}} Fransa'nın başkentidir.");
+    expect(front).toBe("[...] Türkiye'nin, [...] Fransa'nın başkentidir.");
+    expect(back).toBe("Ankara Türkiye'nin, Paris Fransa'nın başkentidir.");
+  });
+
+  it("boşluk yoksa metin değişmeden kalır", () => {
+    const { front, back } = renderCloze("Düz bir cümle.");
+    expect(front).toBe("Düz bir cümle.");
+    expect(back).toBe("Düz bir cümle.");
+  });
+
+  it("newClozeCard type/cloze alanlarını set eder, front/back'i türetir", () => {
+    const c = newClozeCard("{{c1::Su}} H2O'dur.", 1_000);
+    expect(c.type).toBe("cloze");
+    expect(c.cloze).toBe("{{c1::Su}} H2O'dur.");
+    expect(c.front).toBe("[...] H2O'dur.");
+    expect(c.back).toBe("Su H2O'dur.");
+    expect(c.box).toBe(0);
+    expect(c.due).toBe(1_000);
+  });
+});
+
+describe("parseCardsTsv (deckToTsv'nin tersi — içe aktarma)", () => {
+  it("ön yüz<TAB>arka yüz satırlarından kart üretir", () => {
+    const cards = parseCardsTsv("Soru 1\tCevap 1\nSoru 2\tCevap 2\n");
+    expect(cards).toHaveLength(2);
+    expect(cards[0].front).toBe("Soru 1");
+    expect(cards[0].back).toBe("Cevap 1");
+    expect(cards[0].box).toBe(0);
+    expect(cards[0].type).toBeUndefined();
+  });
+
+  it("boş/eksik satırları atlar, fazladan sütunları yok sayar", () => {
+    const cards = parseCardsTsv("Tam satır\tCevabı var\n\nSadece ön yüz\nA\tB\tC (fazladan)\n");
+    expect(cards).toHaveLength(2);
+    expect(cards[1].front).toBe("A");
+    expect(cards[1].back).toBe("B");
+  });
+
+  it("kart sayısını MAX_DECK_CARDS ile sınırlar", () => {
+    const tsv = Array.from({ length: MAX_DECK_CARDS + 10 }, (_, i) => `S${i}\tC${i}`).join("\n");
+    expect(parseCardsTsv(tsv)).toHaveLength(MAX_DECK_CARDS);
+  });
+
+  it("deckToTsv çıktısını gidiş-dönüş olarak geri okuyabilir", () => {
+    const d = normalizeDeck({ cards: [{ front: "A", back: "B" }, { front: "C", back: "D" }] })!;
+    const roundtrip = parseCardsTsv(deckToTsv(d));
+    expect(roundtrip.map((c) => [c.front, c.back])).toEqual([["A", "B"], ["C", "D"]]);
   });
 });
 
