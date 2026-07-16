@@ -72,14 +72,14 @@ export const STUDIO_TEMPLATES: StudioTemplate[] = [
 
   // ── Sunum (çok slayt) ────────────────────────────────────────────────
   { id: "pitch-deck", name: "Yatırımcı Sunumu", category: "Sunum", accent: "#635bff",
-    brief: "Bir startup için yatırımcı sunumu (çok slaytlı): kapak, problem, çözüm, pazar, ürün, iş modeli, ekip ve kapanış/CTA slaytları. Ok tuşlarıyla gezinilebilir.",
-    skillId: "deck", directionId: "corporate" },
+    brief: "Bir startup için yatırımcı sunumu: kapak, problem, çözüm, pazar, ürün, iş modeli, ekip ve kapanış/CTA slaytları.",
+    skillId: "slides", directionId: "corporate" },
   { id: "product-launch-deck", name: "Ürün Lansman Sunumu", category: "Sunum", accent: "#10a37f",
-    brief: "Bir ürün lansmanı sunumu (çok slaytlı): etkileyici kapak, vizyon, özellikler, demo, fiyatlandırma ve teşekkür slaytları. Büyük tipografi, animasyonlu geçiş hissi.",
-    skillId: "deck", directionId: "minimal" },
+    brief: "Bir ürün lansmanı sunumu: etkileyici kapak, vizyon, özellikler, demo, fiyatlandırma ve teşekkür slaytları.",
+    skillId: "slides", directionId: "minimal" },
   { id: "webinar-deck", name: "Eğitim/Webinar Sunumu", category: "Sunum", accent: "#a259ff",
-    brief: "Bir online eğitim/webinar sunumu (çok slaytlı): kapak, ajanda, 4 konu slaytı (başlık + maddeler), özet ve soru-cevap slaytı. Okunaklı, projeksiyon dostu.",
-    skillId: "deck", directionId: "editorial" },
+    brief: "Bir online eğitim/webinar sunumu: kapak, ajanda, 4 konu slaytı (başlık + maddeler), özet ve soru-cevap slaytı.",
+    skillId: "slides", directionId: "editorial" },
 
   // ── Uygulama ekranları ───────────────────────────────────────────────
   { id: "login-screen", name: "Giriş Ekranı", category: "Uygulama", accent: "#6c8eef",

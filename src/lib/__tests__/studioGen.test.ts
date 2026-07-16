@@ -8,6 +8,14 @@ describe("buildStudioSystem — kategori bazlı mükemmellik bilgisi", () => {
     expect(sys).toContain("Gamma");
   });
 
+  it("slides (İçerik, çok slaytlı motor) skill'i için de sunum mükemmelliği bilgisini ekler", () => {
+    /* generateArtifact/buildStudioSystem bu skil için DesignStudio.tsx'te
+       baypas edilir (slidesGen.generateDeck() kullanılır) — yine de skillById
+       ile çözümlenebilir olmalı ve aynı "İçerik" kategori bilgisini taşımalı. */
+    const sys = buildStudioSystem({ skillId: "slides" });
+    expect(sys).toContain("SUNUM/İÇERİK MÜKEMMELLİĞİ");
+  });
+
   it("dashboard (Uygulama) skill'i için araç/uygulama mükemmelliği bilgisini ekler", () => {
     const sys = buildStudioSystem({ skillId: "dashboard" });
     expect(sys).toContain("ARAÇ/UYGULAMA ARAYÜZÜ MÜKEMMELLİĞİ");

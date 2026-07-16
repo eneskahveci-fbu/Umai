@@ -308,6 +308,10 @@ export interface StudioProject {
   /** Bağlı olduğu proje (bkz. Project — Claude Projects tarzı klasörleme).
       Tanımsız = hiçbir projeye bağlı değil. */
   projectId?: string;
+  /** skillId "slides" iken dolu: yapılandırılmış slayt verisi (bkz. slidesGen.ts/
+      slides.ts) — `html` bunun deckToHtml() çıktısıdır. Tema değişimi bu veriyi
+      LLM'e gitmeden client-side günceller; başka bir skille geçilince temizlenir. */
+  deckData?: SlideDeck;
 }
 
 /** Sunum Stüdyosu — slayt düzenleri (Google Slides'tan ilhamla, craft yorumu). */

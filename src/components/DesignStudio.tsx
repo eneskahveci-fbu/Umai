@@ -21,9 +21,11 @@ import { useStore } from "@/lib/store";
 import { useSurfaceNav, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
 import { autoStudioSkill } from "@/lib/autoPilot";
-import type { Artifact, StudioProject } from "@/lib/types";
+import type { Artifact, SlideDeck, StudioProject } from "@/lib/types";
 import { designSystemById, designSystemPromptText } from "@/lib/designSystems";
 import { type StudioTemplate } from "@/lib/studioTemplates";
+import { generateDeck } from "@/lib/slidesGen";
+import { deckToHtml, SLIDE_THEMES } from "@/lib/slides";
 import { StudioHomeScreen, EmptyChatHint } from "./studio/StudioHomeScreen";
 import { ArtifactCanvas } from "./ArtifactCanvas";
 import { StudioTopBar } from "./studio/StudioTopBar";
@@ -44,6 +46,8 @@ const PHASE_LABEL: Record<StudioPhase, string> = {
 };
 
 const MAX_VERSIONS = 8;
+/* "slides" skili sabit slayt sayısıyla üretir (v1 basitlik — kullanıcı ayarı yok). */
+const DEFAULT_SLIDE_COUNT = 8;
 
 interface DesignMsg { role: "user" | "assistant"; text: string; }
 
@@ -246,48 +250,79 @@ export function DesignStudio() {
     const system = designSystemById(designSystemId);
 
     try {
-      let boostInstruction: string | undefined;
-      if (fusionEnabled) {
-        setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: "✦ Fusion: 3 model ile taslak üretiliyor…" }; return c; });
-        try {
-          const store = useStore.getState();
-          const active = store.strongestModel() ?? store.activeModel();
-          if (active) {
-            const freeModelNames = await fetchTextModels();
-            const manualFusionIds = store.config.fusionMode === "manual" ? store.config.fusionModelIds : undefined;
-            const draftProfiles = pickDraftModels(store.config.models, active, 3, store.strongestModel(), freeModelNames, manualFusionIds);
-            const slots = fillSelfConsistency(draftProfiles, active, 3);
-            const withKeys = await Promise.all(slots.map(async (s) => ({
-              baseUrl: s.profile.baseUrl, model: s.profile.model, provider: s.profile.provider,
-              apiKey: await resolveModelApiKey(s.profile, store.config.providerKeys), temperature: s.temperature,
-            })));
-            const fusionFallbacks = buildFallbackChain(store.config.models, active.id);
-            const drafts = await generateDrafts({ userText: brief, models: withKeys, fallbacks: fusionFallbacks, signal: ac.signal });
-            if (drafts.length) {
-              let judge: DraftJudge | null = null;
-              if (drafts.length >= 2) {
-                const activeKey = await resolveModelApiKey(active, store.config.providerKeys);
-                judge = await judgeDrafts({ userText: brief, drafts, model: { baseUrl: active.baseUrl, model: active.model, provider: active.provider, apiKey: activeKey }, signal: ac.signal });
-              }
-              boostInstruction = buildBoostInstruction(drafts, judge);
-              setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: `✦ Fusion: ${drafts.length} taslak${judge ? " + hakem kararı" : ""} birleştiriliyor…` }; return c; });
-            }
-          }
-        } catch { /* Fusion taslak/hakem başarısızsa sessizce normal üretime düş. */ }
-      }
+      let result: { artifact: Artifact; text: string };
+      let deckData: SlideDeck | undefined;
 
-      const result = await generateArtifact({
-        brief,
-        skillId,
-        directionId,
-        designSystemPrompt: system ? designSystemPromptText(system) : undefined,
-        /* Takip mesajlarında mevcut tasarımı TEMEL al — ilk üretimde yok. */
-        prevHtml: followup ? project.html : undefined,
-        boostInstruction,
-        onDelta: (txt) => setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: txt || "Tasarım üretiliyor…" }; return c; }),
-        onPhase: setPhase,
-        signal: ac.signal,
-      });
+      if (skillId === "slides") {
+        /* Çok Slaytlı Sunum: generateArtifact'ın serbest-HTML tahminini BAYPAS
+           eder — slidesGen.ts'in şemalı JSON motoru + slides.ts'in deterministik
+           deckToHtml() render'ı kullanılır (gerçek tema/slayt-başına-görsel/
+           konuşmacı notu/gezinme, Fusion'a gerek yok). Takip mesajı da AYNI
+           güvenilir motordan geçsin diye "tüm desteyi güncelle" olarak ele
+           alınır — LLM'in serbestçe HTML'i yeniden tahmin etmesine izin
+           verilmez (bu, ilk üretimdeki kaliteyi düzenlemelerde de korur). */
+        const deckBrief = followup ? `${project.brief}\n\nGüncelleme isteği: ${brief}` : brief;
+        setPhase("generating");
+        const deck = await generateDeck({
+          brief: deckBrief,
+          slideCount: DEFAULT_SLIDE_COUNT,
+          onDelta: (txt) => setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: `🎬 Sunum tasarlanıyor… (${txt.length} karakter)` }; return c; }),
+          signal: ac.signal,
+        });
+        /* Var olan tema tercihini koru — güncelleme temayı sıfırlamasın. */
+        if (followup && project.deckData?.themeId) deck.themeId = project.deckData.themeId;
+        deckData = deck;
+        setPhase("rendering");
+        result = {
+          artifact: { type: "html", content: deckToHtml(deck), title: deck.title },
+          text: followup
+            ? `Sunumu güncelledim (${deck.slides.length} slayt).`
+            : `"${deck.title}" sunumunu ${deck.slides.length} slaytla oluşturdum.`,
+        };
+      } else {
+        let boostInstruction: string | undefined;
+        if (fusionEnabled) {
+          setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: "✦ Fusion: 3 model ile taslak üretiliyor…" }; return c; });
+          try {
+            const store = useStore.getState();
+            const active = store.strongestModel() ?? store.activeModel();
+            if (active) {
+              const freeModelNames = await fetchTextModels();
+              const manualFusionIds = store.config.fusionMode === "manual" ? store.config.fusionModelIds : undefined;
+              const draftProfiles = pickDraftModels(store.config.models, active, 3, store.strongestModel(), freeModelNames, manualFusionIds);
+              const slots = fillSelfConsistency(draftProfiles, active, 3);
+              const withKeys = await Promise.all(slots.map(async (s) => ({
+                baseUrl: s.profile.baseUrl, model: s.profile.model, provider: s.profile.provider,
+                apiKey: await resolveModelApiKey(s.profile, store.config.providerKeys), temperature: s.temperature,
+              })));
+              const fusionFallbacks = buildFallbackChain(store.config.models, active.id);
+              const drafts = await generateDrafts({ userText: brief, models: withKeys, fallbacks: fusionFallbacks, signal: ac.signal });
+              if (drafts.length) {
+                let judge: DraftJudge | null = null;
+                if (drafts.length >= 2) {
+                  const activeKey = await resolveModelApiKey(active, store.config.providerKeys);
+                  judge = await judgeDrafts({ userText: brief, drafts, model: { baseUrl: active.baseUrl, model: active.model, provider: active.provider, apiKey: activeKey }, signal: ac.signal });
+                }
+                boostInstruction = buildBoostInstruction(drafts, judge);
+                setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: `✦ Fusion: ${drafts.length} taslak${judge ? " + hakem kararı" : ""} birleştiriliyor…` }; return c; });
+              }
+            }
+          } catch { /* Fusion taslak/hakem başarısızsa sessizce normal üretime düş. */ }
+        }
+
+        result = await generateArtifact({
+          brief,
+          skillId,
+          directionId,
+          designSystemPrompt: system ? designSystemPromptText(system) : undefined,
+          /* Takip mesajlarında mevcut tasarımı TEMEL al — ilk üretimde yok. */
+          prevHtml: followup ? project.html : undefined,
+          boostInstruction,
+          onDelta: (txt) => setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: txt || "Tasarım üretiliyor…" }; return c; }),
+          onPhase: setPhase,
+          signal: ac.signal,
+        });
+      }
 
       const wasEmpty = !project.html;
       /* versions[] tek bir `artifactType` alanını PAYLAŞIR (sürüm başına tip
@@ -304,6 +339,7 @@ export function DesignStudio() {
         artifactType: result.artifact.type,
         artifactLanguage: result.artifact.language,
         skillId, directionId, designSystemId,
+        deckData,
         versions: nextVersions,
         brief,
         name: followup ? p.name : (template?.name ?? brief.slice(0, 40)) || p.name,
@@ -378,6 +414,21 @@ export function DesignStudio() {
     addToast("Yeni proje oluşturuldu.", "info");
   }, [addToast]);
 
+  /* Sunum teması: LLM'e gitmeden client-side restyle (Gamma'nın "yeniden
+     üretmeden tema değiştir" hissi) — deckToHtml deterministik olduğundan
+     anında ve ücretsiz. Yeni bir sürüm EKLEMEZ, mevcut son sürümü günceller
+     (kozmetik restyle, ayrı bir "üretim" değil). */
+  const changeDeckTheme = useCallback((themeId: string) => {
+    setProject((p) => {
+      if (!p.deckData) return p;
+      const deck: SlideDeck = { ...p.deckData, themeId };
+      const html = deckToHtml(deck);
+      const versions = [...(p.versions ?? [])];
+      if (versions.length) versions[versions.length - 1] = html; else versions.push(html);
+      return { ...p, deckData: deck, html, versions, updatedAt: Date.now() };
+    });
+  }, []);
+
   /* ── Dışa Aktar (ArtifactCanvas'ın indir/yayınla'sına ek: PDF yazdır) ── */
 
   const printPdfOption = {
@@ -413,6 +464,17 @@ export function DesignStudio() {
 
   const actionButtons = (
     <>
+      {project.deckData && (
+        <select
+          value={project.deckData.themeId}
+          onChange={(e) => changeDeckTheme(e.target.value)}
+          title="Sunum teması"
+          aria-label="Sunum teması"
+          className="text-xs bg-bgsoft border border-line rounded-lg px-2 py-2 sm:py-1.5 outline-none focus:border-brand/50 cursor-pointer shrink-0"
+        >
+          {SLIDE_THEMES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+      )}
       <button onClick={saveProject} title="Kaydet" aria-label="Kaydet" className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
       <button onClick={() => setSavedOpen(true)} title="Projelerim" aria-label="Projelerim" className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
       <button
