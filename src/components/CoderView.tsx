@@ -105,6 +105,7 @@ import { stashAsPendingBranches } from "@/lib/branching";
 import { ALL_AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agents";
 import { pollinationsImageUrl } from "@/lib/pollinations";
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
+import { calcBudgetStatus, type BudgetStatus } from "@/lib/budget";
 import { buildContextSections } from "@/lib/prompt";
 import { detectSensitive } from "@/lib/pii";
 import { friendlyError } from "@/lib/friendlyError";
@@ -307,7 +308,7 @@ interface StatusBadgeInfo {
    değil) özetin DIŞINDA, her zaman görünür kalır. */
 function StatusBar({
   safeMode, web, autoPilot, pilotReasons, autoSwarm, swarmMode, researchMode,
-  toolsEnabled, learningMode, activeAgentLabel, sensitiveHits,
+  toolsEnabled, learningMode, activeAgentLabel, sensitiveHits, budget,
 }: {
   safeMode?: boolean;
   web?: boolean;
@@ -320,6 +321,7 @@ function StatusBar({
   learningMode?: boolean;
   activeAgentLabel?: string;
   sensitiveHits: string[];
+  budget?: BudgetStatus | null;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -369,6 +371,14 @@ function StatusBar({
       {sensitiveHits.length > 0 && (
         <span className="flex items-center gap-1 text-yellow font-medium" title={`Mesajında hassas veri olabilir (${sensitiveHits.join(", ")}). API anahtarlarını/kart bilgilerini sohbete yazma.`}>
           <ShieldCheck size={12} /> Hassas veri?
+        </span>
+      )}
+      {budget && budget.level !== "ok" && (
+        <span
+          className={`flex items-center gap-1 font-medium ${budget.level === "over" ? "text-red" : "text-yellow"}`}
+          title={`Bu ay ${formatCost(budget.spentUsd)} / ${formatCost(budget.budgetUsd)} (%${Math.round(budget.ratio * 100)}) — aktif modele göre kaba tahmin. Ayarlar → Kullanım'dan bütçeyi değiştirebilirsin.`}
+        >
+          <DollarSign size={12} /> {budget.level === "over" ? "Bütçe aşıldı" : "Bütçeye yaklaşıldı"}
         </span>
       )}
     </div>
@@ -2784,6 +2794,11 @@ export function CoderView() {
   const allFiles = useMemo(() => (tree ? getAllFiles(tree) : []), [tree]);
   /* Hassas veri uyarısı — yazılan istemde API anahtarı/kredi kartı/IBAN olursa. */
   const sensitiveHits = useMemo(() => detectSensitive(input), [input]);
+  /* Bütçe uyarısı — Ayarlar → Kullanım'da belirlenen aylık USD bütçesine göre. */
+  const budgetStatus = useMemo(
+    () => calcBudgetStatus(chats, config.models.find((m) => m.id === config.activeModelId)?.model, config.monthlyBudgetUsd),
+    [chats, config.models, config.activeModelId, config.monthlyBudgetUsd],
+  );
   const filteredFiles = useMemo(
     () => fuzzyFiles(allFiles, repoSearch),
     [allFiles, repoSearch],
@@ -3729,6 +3744,7 @@ export function CoderView() {
                   learningMode={config.learningMode}
                   activeAgentLabel={activeAgent?.command}
                   sensitiveHits={sensitiveHits}
+                  budget={budgetStatus}
                 />
               </div>
             </div>

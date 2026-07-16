@@ -1,15 +1,17 @@
 "use client";
 
 import { useMemo } from "react";
-import { BarChart3, Coins, Cpu, MessageSquare } from "lucide-react";
+import { AlertTriangle, BarChart3, Coins, Cpu, MessageSquare } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { calculateCost, formatCost, getModelPrice } from "@/lib/pricing";
+import { calcBudgetStatus } from "@/lib/budget";
 
 /* Kullanım panosu — sohbet/mesaj/token/maliyet özetleri + son 7 gün grafiği.
    Tüm veriler istemcide (chats) toplanır; ek sunucu/maliyet yok. */
 export function AnalyticsSettings() {
   const chats = useStore((s) => s.chats);
   const config = useStore((s) => s.config);
+  const saveConfig = useStore((s) => s.saveConfig);
 
   const stats = useMemo(() => {
     const real = chats.filter((c) => !c.incognito);
@@ -43,6 +45,7 @@ export function AnalyticsSettings() {
   const active = config.models.find((m) => m.id === config.activeModelId);
   const hasPrice = active ? getModelPrice(active.model) !== null : false;
   const cost = active ? calculateCost(active.model, stats.tin, stats.tout) : null;
+  const budget = calcBudgetStatus(chats, active?.model, config.monthlyBudgetUsd);
 
   const cards = [
     { icon: MessageSquare, label: "Sohbet", value: stats.count.toLocaleString("tr-TR") },
@@ -95,6 +98,46 @@ export function AnalyticsSettings() {
           </div>
         </div>
       )}
+
+      <div>
+        <div className="text-[10px] font-bold uppercase tracking-widest text-muted/45 mb-2">Aylık bütçe uyarısı</div>
+        <div className="flex items-center gap-2 mb-2">
+          <input
+            type="number"
+            min="0"
+            step="1"
+            inputMode="decimal"
+            value={config.monthlyBudgetUsd ?? ""}
+            onChange={(e) => saveConfig({ ...config, monthlyBudgetUsd: e.target.value ? Number(e.target.value) : undefined })}
+            placeholder="Belirtilmedi"
+            aria-label="Aylık bütçe (USD)"
+            className="w-28 bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50"
+          />
+          <span className="text-xs text-muted/60">USD/ay — aşılırsa uyarı gösterilir</span>
+        </div>
+        {budget && (
+          <div className="premium-card rounded-xl p-3 space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className={budget.level === "over" ? "text-red font-semibold" : budget.level === "warning" ? "text-yellow font-semibold" : "text-muted"}>
+                {formatCost(budget.spentUsd)} / {formatCost(budget.budgetUsd)} bu ay
+              </span>
+              <span className="tabular-nums text-muted/60">%{Math.round(budget.ratio * 100)}</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-bgsoft overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-[width] ${budget.level === "over" ? "bg-red" : budget.level === "warning" ? "bg-yellow" : "bg-brand"}`}
+                style={{ width: `${Math.min(100, budget.ratio * 100)}%` }}
+              />
+            </div>
+            {budget.level !== "ok" && (
+              <p className="flex items-center gap-1.5 text-[11px] text-muted/70">
+                <AlertTriangle size={11} className={budget.level === "over" ? "text-red" : "text-yellow"} />
+                {budget.level === "over" ? "Bu ay belirlediğin bütçeyi aştın." : "Bu ay bütçenin %80'ine yaklaştın."}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
 
       <p className="text-[11px] text-muted/45 leading-relaxed">Maliyet, aktif modelin fiyatına göre kaba tahmindir (ücretsiz modeller 0). Gerçek fatura sağlayıcına aittir.</p>
     </section>
