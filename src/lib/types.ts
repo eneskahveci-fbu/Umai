@@ -427,6 +427,11 @@ export interface FlashCard {
   box: number;
   /** Bir sonraki tekrar zamanı (epoch ms). */
   due: number;
+  /** Kart türü — belirtilmemişse "basic" sayılır (geriye dönük uyumlu). */
+  type?: "basic" | "cloze";
+  /** "cloze" türünde: ham şablon (Anki'nin {{c1::cevap}} sözdizimi). front/back
+      bundan türetilir (bkz. lib/cards.ts renderCloze) — düzenlemede birlikte güncellenir. */
+  cloze?: string;
 }
 
 export interface CraftDeck extends StudioProjectBase {
