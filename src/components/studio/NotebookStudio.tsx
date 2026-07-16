@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  BookOpen, FileText, FolderOpen, Globe, Link2, Loader2, Plus, Save, Send,
+  BookOpen, FileText, FolderOpen, Globe, GraduationCap, HelpCircle, Link2, Loader2, Plus, Save, Send,
   Sparkles, Trash2, Users, Volume2, VolumeX,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -80,6 +80,11 @@ export function NotebookStudio() {
      çalma durumunu izler ki tek-sesli özetten bağımsız disable/spinner davransın. */
   const [podcasting, setPodcasting] = useState(false);
   const [playingPodcast, setPlayingPodcast] = useState(false);
+  /* Hızlı üretim (NotebookLM'in "Notebook guide" fikrinden ilham) — çalışma
+     rehberi/SSS'in KENDİ üretim durumu, diğer eylemlerden bağımsız disable/
+     spinner davransın diye ayrı izlenir (podcast/sesli özetin aynı deseni). */
+  const [guideBusy, setGuideBusy] = useState(false);
+  const [faqBusy, setFaqBusy] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
   const [srcPanel, setSrcPanel] = useState(true);
   /* Tıklanabilir atıf → kaynağa atlama: kısa süreliğine vurgulanan kaynak id'si
@@ -178,7 +183,7 @@ export function NotebookStudio() {
 
   const ask = async (question?: string) => {
     const q = (question ?? input).trim();
-    if (!q || busy || narrating) return;
+    if (!q || busy || narrating || podcasting || playingPodcast || guideBusy || faqBusy) return;
     if (!enabledCount) { addToast("Önce en az bir kaynak ekle.", "info"); return; }
     setInput("");
     setBusy(true);
@@ -205,7 +210,7 @@ export function NotebookStudio() {
   const audioSummary = async () => {
     if (speaking) { stopTts(); setSpeaking(false); return; }
     if (!enabledCount) { addToast("Önce en az bir kaynak ekle.", "info"); return; }
-    if (busy || narrating) return;
+    if (busy || narrating || podcasting || playingPodcast || guideBusy || faqBusy) return;
     setNarrating(true);
     const history: NbMsg[] = [...msgs, { role: "user", content: "🔊 Sesli özet istendi" }];
     setMsgs([...history, { role: "assistant", content: "" }]);
@@ -230,7 +235,7 @@ export function NotebookStudio() {
   const podcastSummary = async () => {
     if (playingPodcast) { stopPodcast(); setPlayingPodcast(false); return; }
     if (!enabledCount) { addToast("Önce en az bir kaynak ekle.", "info"); return; }
-    if (busy || narrating || podcasting || speaking) return;
+    if (busy || narrating || podcasting || speaking || guideBusy || faqBusy) return;
     setPodcasting(true);
     const history: NbMsg[] = [...msgs, { role: "user", content: "🎙️ Podcast özeti istendi" }];
     setMsgs([...history, { role: "assistant", content: "" }]);
@@ -256,6 +261,42 @@ export function NotebookStudio() {
     } catch (e) {
       addToast(`Podcast üretilemedi: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
     } finally { setPodcasting(false); }
+  };
+
+  /* Hızlı üretim — NotebookLM'in "Notebook guide" fikrinden ilham: kaynaklardan
+     tek tıkla yapılandırılmış bir çıktı üretir. [n] atıflı olduğundan (bkz.
+     buildNotebookSystem) sonuç doğrudan tıklanabilir atıf pillerine dönüşür. */
+  const quickGenerate = async (kind: "guide" | "faq") => {
+    if (!enabledCount) { addToast("Önce en az bir kaynak ekle.", "info"); return; }
+    if (busy || narrating || podcasting || speaking || playingPodcast || guideBusy || faqBusy) return;
+    const setKindBusy = kind === "guide" ? setGuideBusy : setFaqBusy;
+    setKindBusy(true);
+    const label = kind === "guide" ? "📘 Çalışma rehberi istendi" : "❓ SSS istendi";
+    const instruction = kind === "guide"
+      ? "Kaynaklardan kapsamlı bir ÇALIŞMA REHBERİ hazırla. Şu bölümleri kullan: " +
+        "'## Ana Kavramlar' (madde madde, her maddenin sonunda [n] atıf), " +
+        "'## Önemli Terimler' (terim — kısa tanım, [n] atıflı), " +
+        "'## Anlama Soruları' (kaynağın kapsamına uygun sayıda — en az 3, en fazla 6 — " +
+        "kısa-yanıtlı soru), ardından '## Yanıt Anahtarı' başlığı altında her sorunun kısa " +
+        "yanıtı ([n] atıflı). Yalnız kaynaklardaki bilgiyi kullan; kaynaklar kısaysa daha az " +
+        "madde/soru üret, KONU DIŞI veya İCAT EDİLMİŞ soru/madde EKLEME."
+      : "Kaynaklardan bir SIKÇA SORULAN SORULAR (SSS) listesi hazırla: kaynağın kapsamına " +
+        "uygun sayıda — en az 3, en fazla 8 — soru-cevap çifti. Her soruyu '### ' ile başlat, " +
+        "cevabı 2-4 cümlede ver ve [n] ile atıfla. Yalnız kaynaklardaki bilgiyi kullan; " +
+        "kaynaklar kısaysa daha az soru üret, kaynak dışı/alakasız/icat edilmiş bir soru " +
+        "EKLEME (yalnızca kaynaklarda GERÇEKTEN yanıtı bulunan sorular sor).";
+    const history: NbMsg[] = [...msgs, { role: "user", content: label }];
+    setMsgs([...history, { role: "assistant", content: "" }]);
+    try {
+      await streamChat({
+        system: buildNotebookSystem(sources),
+        messages: [{ role: "user", content: instruction }],
+        temperature: 0.4,
+        onDelta: (full) => setMsgs([...history, { role: "assistant", content: full }]),
+      });
+    } catch (e) {
+      setMsgs([...history, { role: "assistant", content: `Hata: ${e instanceof Error ? e.message : "bilinmeyen"}` }]);
+    } finally { setKindBusy(false); }
   };
 
   const saveNb = () => {
@@ -362,7 +403,7 @@ export function NotebookStudio() {
 
             {/* Sesli özet (tekli ses) */}
             <div className="flex items-center gap-1.5">
-              <button onClick={() => void audioSummary()} disabled={(busy || narrating || podcasting || playingPodcast) && !speaking} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${speaking ? "border-brand/50 text-brand bg-brand/10" : "border-line text-muted hover:text-ink hover:border-brand/40"} disabled:opacity-40`}>
+              <button onClick={() => void audioSummary()} disabled={(busy || narrating || podcasting || playingPodcast || guideBusy || faqBusy) && !speaking} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${speaking ? "border-brand/50 text-brand bg-brand/10" : "border-line text-muted hover:text-ink hover:border-brand/40"} disabled:opacity-40`}>
                 {narrating ? <Loader2 size={14} className="animate-spin" /> : speaking ? <VolumeX size={14} /> : <Volume2 size={14} />} {speaking ? "Durdur" : "Sesli özet"}
               </button>
               <select
@@ -377,7 +418,7 @@ export function NotebookStudio() {
 
             {/* Podcast özeti (2 sunuculu, dönüşümlü seslendirme) */}
             <div className="flex items-center gap-1.5">
-              <button onClick={() => void podcastSummary()} disabled={(busy || narrating || podcasting || speaking) && !playingPodcast} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${playingPodcast ? "border-brand/50 text-brand bg-brand/10" : "border-line text-muted hover:text-ink hover:border-brand/40"} disabled:opacity-40`}>
+              <button onClick={() => void podcastSummary()} disabled={(busy || narrating || podcasting || speaking || guideBusy || faqBusy) && !playingPodcast} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${playingPodcast ? "border-brand/50 text-brand bg-brand/10" : "border-line text-muted hover:text-ink hover:border-brand/40"} disabled:opacity-40`}>
                 {podcasting ? <Loader2 size={14} className="animate-spin" /> : playingPodcast ? <VolumeX size={14} /> : <Users size={14} />} {playingPodcast ? "Durdur" : "Podcast özeti"}
               </button>
               <select
@@ -388,6 +429,18 @@ export function NotebookStudio() {
               >
                 {TTS_VOICES.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
               </select>
+            </div>
+
+            {/* Hızlı üretim (NotebookLM'in "Notebook guide" fikrinden ilham):
+                kaynaklardan tek tıkla çalışma rehberi / SSS üret — [n] atıflı,
+                tıklanabilir (bkz. parseCitations). */}
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => void quickGenerate("guide")} disabled={busy || narrating || podcasting || speaking || playingPodcast || guideBusy || faqBusy || !enabledCount} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-line text-muted text-xs font-semibold hover:text-ink hover:border-brand/40 disabled:opacity-40 transition-colors">
+                {guideBusy ? <Loader2 size={14} className="animate-spin" /> : <GraduationCap size={14} />} Çalışma Rehberi
+              </button>
+              <button onClick={() => void quickGenerate("faq")} disabled={busy || narrating || podcasting || speaking || playingPodcast || guideBusy || faqBusy || !enabledCount} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-line text-muted text-xs font-semibold hover:text-ink hover:border-brand/40 disabled:opacity-40 transition-colors">
+                {faqBusy ? <Loader2 size={14} className="animate-spin" /> : <HelpCircle size={14} />} SSS
+              </button>
             </div>
 
             {/* "İlgili" (Obsidian-lite) — yalnız kayıtlı bir defterde, çapraz-tip
@@ -459,7 +512,7 @@ export function NotebookStudio() {
                 placeholder={enabledCount ? "Kaynaklara soru sor… (Enter = gönder)" : "Önce kaynak ekle…"}
                 className="flex-1 bg-bgsoft border border-line rounded-2xl px-3.5 py-2.5 text-sm outline-none focus:border-brand/50 resize-none max-h-32"
               />
-              <button onClick={() => void ask()} disabled={busy || narrating || !input.trim() || !enabledCount} className="shrink-0 w-10 h-10 grid place-items-center rounded-xl bg-brand text-[#111110] disabled:opacity-40 transition-opacity" title="Gönder">
+              <button onClick={() => void ask()} disabled={busy || narrating || podcasting || playingPodcast || guideBusy || faqBusy || !input.trim() || !enabledCount} className="shrink-0 w-10 h-10 grid place-items-center rounded-xl bg-brand text-[#111110] disabled:opacity-40 transition-opacity" title="Gönder">
                 {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
               </button>
             </div>
