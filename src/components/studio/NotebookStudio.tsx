@@ -3,21 +3,24 @@
 import { useEffect, useRef, useState } from "react";
 import {
   BookOpen, FileText, FolderOpen, Globe, Link2, Loader2, Plus, Save, Send,
-  Sparkles, Trash2, Volume2, VolumeX,
+  Sparkles, Trash2, Users, Volume2, VolumeX,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { SavedItemsModal } from "./SavedItemsModal";
 import type { CraftNotebook, NotebookSource } from "@/lib/types";
 import { streamChat } from "@/lib/genChat";
-import { playTts, stopTts, TTS_MAX_CHARS, TTS_VOICES } from "@/lib/pollinations";
+import { playPodcast, playTts, stopPodcast, stopTts, TTS_MAX_CHARS, TTS_VOICES } from "@/lib/pollinations";
+import { parsePodcastScript } from "@/lib/podcast";
 import { useStudioProject } from "@/lib/useStudioProject";
 import { consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { CrossTypeRelated } from "./CrossTypeRelated";
 
 /* Defter — NotebookLM'den İLHAM alan craft yorumu (klonu değil): metin/URL
    kaynakları ekle → yalnız o kaynaklardan yanıtlayan sohbet ([1] [2] atıflı)
-   → Pollinations TTS ile "sesli özet". URL'ler mevcut /api/fetch-text
-   proxy'sinden çekilir (SSRF korumalı). Ücretsiz ve anahtarsız çalışır. */
+   → Pollinations TTS ile "sesli özet" (tekli ses) veya "podcast özeti" (iki
+   sunuculu, dönüşümlü sesli diyalog — NotebookLM'in "audio overview"ından
+   ilham). URL'ler mevcut /api/fetch-text proxy'sinden çekilir (SSRF
+   korumalı). Ücretsiz ve anahtarsız çalışır. */
 
 const MAX_SOURCES = 8;
 const PER_SOURCE_CHARS = 8000;
@@ -72,6 +75,10 @@ export function NotebookStudio() {
      "Sesli özet" butonu ilgisiz şekilde grileşmesin (yalnız kendi üretimi
      sırasında disabled olsun). */
   const [narrating, setNarrating] = useState(false);
+  /* Podcast özeti (2 sunuculu) — sesli özetin aynı ayrımıyla, KENDİ üretim/
+     çalma durumunu izler ki tek-sesli özetten bağımsız disable/spinner davransın. */
+  const [podcasting, setPodcasting] = useState(false);
+  const [playingPodcast, setPlayingPodcast] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
   const [srcPanel, setSrcPanel] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -81,7 +88,7 @@ export function NotebookStudio() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [msgs]);
 
-  useEffect(() => () => { stopTts(); abortRef.current?.abort(); }, []);
+  useEffect(() => () => { stopPodcast(); abortRef.current?.abort(); }, []);
 
   /* ⌘K birleşik arama: belirli bir defteri doğrudan açarak gelinmiş olabilir. */
   useEffect(() => {
@@ -187,6 +194,39 @@ export function NotebookStudio() {
     } finally { setNarrating(false); }
   };
 
+  /* Podcast özeti — NotebookLM'in "audio overview"ından ilham: iki sunucu
+     (A/B) kaynaklar üzerine sohbet ediyormuş gibi dönüşümlü seslerle okunur. */
+  const podcastSummary = async () => {
+    if (playingPodcast) { stopPodcast(); setPlayingPodcast(false); return; }
+    if (!enabledCount) { addToast("Önce en az bir kaynak ekle.", "info"); return; }
+    if (busy || narrating || podcasting || speaking) return;
+    setPodcasting(true);
+    const history: NbMsg[] = [...msgs, { role: "user", content: "🎙️ Podcast özeti istendi" }];
+    setMsgs([...history, { role: "assistant", content: "" }]);
+    try {
+      const raw = await streamChat({
+        system: buildNotebookSystem(sources),
+        messages: [{ role: "user", content:
+          "Kaynakların ana fikirlerini iki sunuculu (A ve B), sıcak ve doğal bir podcast " +
+          "diyaloğu olarak yaz — biri sorup diğeri yanıtlasın, karşılıklı yorum yapsınlar. " +
+          "SADECE 'A: ' veya 'B: ' ile başlayan satırlar üret (başka biçim/başlık kullanma), " +
+          "madde işareti ve atıf numarası koyma, en az 6 en fazla 10 tur, her tur 1-2 kısa cümle." },
+        ],
+        temperature: 0.7,
+        onDelta: (full) => setMsgs([...history, { role: "assistant", content: full }]),
+      });
+      let turns = parsePodcastScript(raw);
+      if (!turns.length && raw.trim()) turns = [{ speaker: "A", text: raw.trim() }];
+      if (!turns.length) { addToast("Podcast betiği üretilemedi.", "error"); return; }
+      setPlayingPodcast(true);
+      const voiceA = config.ttsVoice || "nova";
+      const voiceB = config.ttsVoiceB || "onyx";
+      playPodcast(turns, (speaker) => (speaker === "B" ? voiceB : voiceA), undefined, () => setPlayingPodcast(false));
+    } catch (e) {
+      addToast(`Podcast üretilemedi: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+    } finally { setPodcasting(false); }
+  };
+
   const saveNb = () => {
     const nb: CraftNotebook = {
       id: nbId, title: title.trim() || "Defter", sources,
@@ -196,12 +236,12 @@ export function NotebookStudio() {
   };
 
   const openNb = (n: CraftNotebook) => {
-    stopTts(); setSpeaking(false);
+    stopPodcast(); setSpeaking(false); setPlayingPodcast(false);
     setNbId(n.id); setTitle(n.title); setSources(n.sources); setMsgs([]); setSavedOpen(false);
   };
 
   const newNb = () => {
-    stopTts(); setSpeaking(false);
+    stopPodcast(); setSpeaking(false); setPlayingPodcast(false);
     setNbId(`nb_${Date.now().toString(36)}`); setTitle("Yeni defter"); setSources([]); setMsgs([]);
   };
 
@@ -279,9 +319,9 @@ export function NotebookStudio() {
               </button>
             </div>
 
-            {/* Sesli özet */}
+            {/* Sesli özet (tekli ses) */}
             <div className="flex items-center gap-1.5">
-              <button onClick={() => void audioSummary()} disabled={(busy || narrating) && !speaking} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${speaking ? "border-brand/50 text-brand bg-brand/10" : "border-line text-muted hover:text-ink hover:border-brand/40"} disabled:opacity-40`}>
+              <button onClick={() => void audioSummary()} disabled={(busy || narrating || podcasting || playingPodcast) && !speaking} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${speaking ? "border-brand/50 text-brand bg-brand/10" : "border-line text-muted hover:text-ink hover:border-brand/40"} disabled:opacity-40`}>
                 {narrating ? <Loader2 size={14} className="animate-spin" /> : speaking ? <VolumeX size={14} /> : <Volume2 size={14} />} {speaking ? "Durdur" : "Sesli özet"}
               </button>
               <select
@@ -289,6 +329,21 @@ export function NotebookStudio() {
                 onChange={(e) => saveConfig({ ...config, ttsVoice: e.target.value })}
                 className="bg-bgsoft border border-line rounded-lg px-2 py-2 text-xs outline-none focus:border-brand/50 cursor-pointer"
                 aria-label="Seslendirme sesi"
+              >
+                {TTS_VOICES.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+              </select>
+            </div>
+
+            {/* Podcast özeti (2 sunuculu, dönüşümlü seslendirme) */}
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => void podcastSummary()} disabled={(busy || narrating || podcasting || speaking) && !playingPodcast} className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${playingPodcast ? "border-brand/50 text-brand bg-brand/10" : "border-line text-muted hover:text-ink hover:border-brand/40"} disabled:opacity-40`}>
+                {podcasting ? <Loader2 size={14} className="animate-spin" /> : playingPodcast ? <VolumeX size={14} /> : <Users size={14} />} {playingPodcast ? "Durdur" : "Podcast özeti"}
+              </button>
+              <select
+                value={config.ttsVoiceB || "onyx"}
+                onChange={(e) => saveConfig({ ...config, ttsVoiceB: e.target.value })}
+                className="bg-bgsoft border border-line rounded-lg px-2 py-2 text-xs outline-none focus:border-brand/50 cursor-pointer"
+                aria-label="İkinci sunucu sesi"
               >
                 {TTS_VOICES.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
               </select>
