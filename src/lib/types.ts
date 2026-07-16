@@ -599,6 +599,8 @@ export interface Config {
   mediaAssets?: MediaAsset[];
   /** Seslendirme (TTS) için tercih edilen Pollinations sesi (varsayılan: nova). */
   ttsVoice?: string;
+  /** Defter podcast özetinde ikinci sunucunun sesi (varsayılan: onyx). */
+  ttsVoiceB?: string;
   mcpServers?: McpServer[];
   /** Yerel Mod: kullanıcının makinesindeki Local Bridge adresi (ör. http://localhost:4319).
       Doluysa ve localMode açıksa ajan GitHub/GitLab API yerine gerçek dosya
