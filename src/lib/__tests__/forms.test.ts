@@ -133,12 +133,69 @@ describe("Faz 6 — yeni soru türleri + koşullu mantık", () => {
     expect(html).toContain('"s":0');
     expect(html).toContain('"eq":"Hayır"');
     expect(html).toContain('id="qw1"');
-    expect(html).toContain("applyLogic");
+    expect(html).toContain("refreshVisibility");
   });
 
   it("koşulsuz ankette LOGIC boş kalır (mevcut davranış değişmez)", () => {
     const f = normalizeForm({ questions: [{ type: "short", label: "Ad?" }] })!;
     expect(formToHtml(f)).toContain("var LOGIC = []");
+  });
+});
+
+describe("Faz 11 — dosya yükleme soru tipi + çok sayfalı form", () => {
+  it("normalizeForm 'file' türünü kabul eder", () => {
+    const f = normalizeForm({ questions: [{ type: "file", label: "Belge yükle" }] })!;
+    expect(f.questions[0].type).toBe("file");
+  });
+
+  it("formToHtml file sorusu için input[type=file] + bilgi notu üretir", () => {
+    const f = normalizeForm({ questions: [{ type: "file", label: "Belge" }] })!;
+    const html = formToHtml(f);
+    expect(html).toContain('type="file"');
+    expect(html).toContain("içeriği sunucuya/CSV'ye gönderilmez");
+  });
+
+  it("pageBreakAfter yoksa tek sayfa üretir, nav butonları render edilmez (mevcut davranış korunur)", () => {
+    const f = normalizeForm({ questions: [{ type: "short", label: "A" }, { type: "short", label: "B" }] })!;
+    const html = formToHtml(f);
+    expect(html).toContain("var PAGES = [[0,1]]");
+    expect(html).not.toContain('id="nextBtn"');
+    expect(html).not.toContain('id="prevBtn"');
+  });
+
+  it("pageBreakAfter işaretlenen sorudan sonra yeni sayfa başlar, nav butonları render edilir", () => {
+    const f = normalizeForm({ questions: [
+      { type: "short", label: "A", pageBreakAfter: true },
+      { type: "short", label: "B" },
+    ] })!;
+    const html = formToHtml(f);
+    expect(html).toContain("var PAGES = [[0],[1]]");
+    expect(html).toContain('id="nextBtn"');
+    expect(html).toContain('id="prevBtn"');
+    expect(html).toContain('id="submitBtn"');
+    expect(html).toContain("Sayfa 1 / 2");
+  });
+
+  it("son sorudaki pageBreakAfter göz ardı edilir (boş sondan sayfa açılmaz)", () => {
+    const f = normalizeForm({ questions: [{ type: "short", label: "A", pageBreakAfter: true }] })!;
+    const html = formToHtml(f);
+    expect(html).toContain("var PAGES = [[0]]");
+  });
+
+  it("şablon gidiş-dönüşünde pageBreakAfter + file türü korunur", () => {
+    const form: CraftForm = {
+      id: "f2", title: "T",
+      questions: [
+        { id: "q1", type: "file", label: "Belge", pageBreakAfter: true },
+        { id: "q2", type: "short", label: "Ad" },
+      ],
+      createdAt: 0, updatedAt: 0,
+    };
+    const t = parseTemplate(templateToJson({ kind: "form", data: form }));
+    expect(t.kind).toBe("form");
+    if (t.kind !== "form") return;
+    expect(t.data.questions[0].type).toBe("file");
+    expect(t.data.questions[0].pageBreakAfter).toBe(true);
   });
 });
 
