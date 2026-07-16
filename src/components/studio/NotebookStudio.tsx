@@ -14,6 +14,7 @@ import { parsePodcastScript } from "@/lib/podcast";
 import { useStudioProject } from "@/lib/useStudioProject";
 import { consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { CrossTypeRelated } from "./CrossTypeRelated";
+import { parseCitations } from "@/lib/citations";
 
 /* Defter — NotebookLM'den İLHAM alan craft yorumu (klonu değil): metin/URL
    kaynakları ekle → yalnız o kaynaklardan yanıtlayan sohbet ([1] [2] atıflı)
@@ -81,6 +82,11 @@ export function NotebookStudio() {
   const [playingPodcast, setPlayingPodcast] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
   const [srcPanel, setSrcPanel] = useState(true);
+  /* Tıklanabilir atıf → kaynağa atlama: kısa süreliğine vurgulanan kaynak id'si
+     + (mobilde panel gizliyken) kaynak paneli açılana kadar bekleyen scroll hedefi. */
+  const [flashSourceId, setFlashSourceId] = useState<string | null>(null);
+  const sourceRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const pendingScrollRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -89,6 +95,17 @@ export function NotebookStudio() {
   }, [msgs]);
 
   useEffect(() => () => { stopPodcast(); abortRef.current?.abort(); }, []);
+
+  /* Kaynak paneli mobilde gizliyken bir atıfa tıklanırsa: önce paneli aç,
+     görünür olduğu bir sonraki frame'de kaynağa kaydır (gizliyken scrollIntoView
+     hiçbir şey yapmaz — display:none'ın layout kutusu yok). */
+  useEffect(() => {
+    if (srcPanel && pendingScrollRef.current) {
+      const id = pendingScrollRef.current;
+      pendingScrollRef.current = null;
+      requestAnimationFrame(() => sourceRefs.current.get(id)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+    }
+  }, [srcPanel]);
 
   /* ⌘K birleşik arama: belirli bir defteri doğrudan açarak gelinmiş olabilir. */
   useEffect(() => {
@@ -102,7 +119,21 @@ export function NotebookStudio() {
 
   if (!open) return null;
 
-  const enabledCount = sources.filter((s) => s.enabled && s.text.trim()).length;
+  /* buildNotebookSystem'in numaralandırdığı AYNI sırayla — atıf [n], bu
+     dizinin n'inci öğesine karşılık gelir (yalnız etkin+dolu kaynaklar). */
+  const enabledSources = sources.filter((s) => s.enabled && s.text.trim());
+  const enabledCount = enabledSources.length;
+
+  /** Sohbetteki [n] atıfına tıklanınca: kaynağı kısaca vurgula + görünür
+      panele kaydır (mobilde panel gizliyken önce paneli aç). */
+  const jumpToSource = (citationIndex: number) => {
+    const src = enabledSources[citationIndex - 1];
+    if (!src) return;
+    setFlashSourceId(src.id);
+    window.setTimeout(() => setFlashSourceId((cur) => (cur === src.id ? null : cur)), 1600);
+    if (!srcPanel) { pendingScrollRef.current = src.id; setSrcPanel(true); }
+    else sourceRefs.current.get(src.id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
 
   const addPaste = () => {
     const t = pasteText.trim();
@@ -268,20 +299,30 @@ export function NotebookStudio() {
         <div className={`shrink-0 lg:w-80 border-b lg:border-b-0 lg:border-r border-line/60 overflow-y-auto ${srcPanel ? "" : "hidden lg:block"}`}>
           <div className="p-3 space-y-3">
             <div className="text-[11px] font-bold text-muted/70 uppercase tracking-wide">Kaynaklar ({sources.length}/{MAX_SOURCES})</div>
-            {sources.map((s, i) => (
-              <div key={s.id} className={`flex items-start gap-2 px-2.5 py-2 rounded-xl border transition-colors ${s.enabled ? "border-line/60" : "border-line/30 opacity-50"}`}>
-                <input type="checkbox" checked={s.enabled} onChange={(e) => setSources((arr) => arr.map((x) => x.id === s.id ? { ...x, enabled: e.target.checked } : x))} className="mt-0.5 shrink-0" title="Sohbete dahil et" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold truncate flex items-center gap-1">
-                    <span className="text-brand">[{i + 1}]</span>
-                    {s.url && <Link2 size={10} className="text-muted/50 shrink-0" />}
-                    <span className="truncate">{s.name}</span>
+            {sources.map((s) => {
+              /* Panelde gösterilen numara, sohbetteki atıf numarasıyla (yalnız
+                 etkin+dolu kaynaklar sırayla) eşleşmeli — devre dışı bir kaynak
+                 numara ALMAZ, "—" gösterir (aksi halde atıf/panel numaraları kayar). */
+              const onIdx = enabledSources.indexOf(s);
+              return (
+                <div
+                  key={s.id}
+                  ref={(el) => { if (el) sourceRefs.current.set(s.id, el); else sourceRefs.current.delete(s.id); }}
+                  className={`flex items-start gap-2 px-2.5 py-2 rounded-xl border transition-colors ${flashSourceId === s.id ? "border-brand ring-2 ring-brand/40 bg-brand/5" : s.enabled ? "border-line/60" : "border-line/30 opacity-50"}`}
+                >
+                  <input type="checkbox" checked={s.enabled} onChange={(e) => setSources((arr) => arr.map((x) => x.id === s.id ? { ...x, enabled: e.target.checked } : x))} className="mt-0.5 shrink-0" title="Sohbete dahil et" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold truncate flex items-center gap-1">
+                      <span className="text-brand">{onIdx >= 0 ? `[${onIdx + 1}]` : "—"}</span>
+                      {s.url && <Link2 size={10} className="text-muted/50 shrink-0" />}
+                      <span className="truncate">{s.name}</span>
+                    </div>
+                    <div className="text-[10px] text-muted/50">{s.text.length.toLocaleString("tr-TR")} karakter</div>
                   </div>
-                  <div className="text-[10px] text-muted/50">{s.text.length.toLocaleString("tr-TR")} karakter</div>
+                  <button onClick={() => setSources((arr) => arr.filter((x) => x.id !== s.id))} className="w-6 h-6 grid place-items-center rounded text-muted/40 hover:text-red shrink-0" title="Kaldır"><Trash2 size={12} /></button>
                 </div>
-                <button onClick={() => setSources((arr) => arr.filter((x) => x.id !== s.id))} className="w-6 h-6 grid place-items-center rounded text-muted/40 hover:text-red shrink-0" title="Kaldır"><Trash2 size={12} /></button>
-              </div>
-            ))}
+              );
+            })}
 
             {/* Kaynak ekleme */}
             <div className="rounded-xl border border-dashed border-line/60 p-2.5 space-y-2">
@@ -384,7 +425,18 @@ export function NotebookStudio() {
                   <div key={i} className="flex items-start gap-2">
                     <Sparkles size={13} className="text-brand mt-1.5 shrink-0" />
                     <div className="flex-1 min-w-0 text-[13.5px] leading-relaxed whitespace-pre-wrap">
-                      {m.content || (
+                      {m.content ? parseCitations(m.content, enabledCount).map((p, pi) =>
+                        p.type === "text" ? <span key={pi}>{p.value}</span> : (
+                          <button
+                            key={pi}
+                            onClick={() => jumpToSource(p.index)}
+                            className="inline-flex items-center justify-center mx-0.5 min-w-[1.15rem] h-[1.15rem] px-1 rounded text-[10px] font-bold align-text-top bg-brand/15 text-brand hover:bg-brand/25 transition-colors"
+                            title={`Kaynağa git: ${enabledSources[p.index - 1]?.name ?? ""}`}
+                          >
+                            {p.index}
+                          </button>
+                        )
+                      ) : (
                         <span className="inline-flex items-center gap-1.5 py-1" aria-label="Yazıyor">
                           <span className="typing-dot" />
                           <span className="typing-dot delay-1" />
