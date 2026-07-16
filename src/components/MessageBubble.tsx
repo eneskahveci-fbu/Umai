@@ -997,6 +997,31 @@ function MessageBubbleImpl({
                 <RefreshCw size={12} />
               </button>
             )}
+            {onSwitchVersion && message.branches && message.branches.length > 1 && (
+              <div className="flex items-center gap-0.5 text-[11px] text-muted/50">
+                <button
+                  onClick={() => onSwitchVersion(Math.max(0, (message.branchIndex ?? 0) - 1))}
+                  disabled={(message.branchIndex ?? 0) === 0}
+                  aria-label="Önceki yanıt"
+                  title="Önceki yanıt"
+                  className="p-1.5 rounded hover:bg-bgsoft disabled:opacity-30 transition-colors"
+                >
+                  <ChevronLeft size={12} />
+                </button>
+                <span className="font-mono tabular-nums text-[10px]">
+                  {(message.branchIndex ?? 0) + 1}/{message.branches.length}
+                </span>
+                <button
+                  onClick={() => onSwitchVersion(Math.min(message.branches!.length - 1, (message.branchIndex ?? 0) + 1))}
+                  disabled={(message.branchIndex ?? 0) === message.branches.length - 1}
+                  aria-label="Sonraki yanıt"
+                  title="Sonraki yanıt"
+                  className="p-1.5 rounded hover:bg-bgsoft disabled:opacity-30 transition-colors"
+                >
+                  <ChevronRight size={12} />
+                </button>
+              </div>
+            )}
 
             {chatId && (
               <>
