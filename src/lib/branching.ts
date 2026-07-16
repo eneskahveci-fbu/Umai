@@ -43,3 +43,30 @@ export function applySwitchBranch(messages: ChatMessage[], index: number, bIdx: 
   const first: ChatMessage = { ...stripMeta(selected[0]), branches, branchIndex: bIdx };
   return [...head, first, ...selected.slice(1).map(stripMeta)];
 }
+
+/* Asistan "Yeniden oluştur" dallanması — kullanıcı mesajı düzenlemesinden
+   farklı olarak yeni içerik ANINDA bilinmiyor (normal akış/tool-loop akışıyla
+   sonra üretiliyor). Bu yüzden ikiye bölünür: regenerate BAŞLAMADAN önce
+   mevcut yanıtı bekleyen dal listesine aktar (stashAsPendingBranches), yeni
+   yanıt TAMAMLANINCA bu listeyi son mesaja işle (mergeRegeneratedBranches). */
+
+/** Son asistan mesajının (varsa önceki dal geçmişiyle) mevcut halini,
+    regenerate öncesi "bekleyen dal listesi"ne çevirir. */
+export function stashAsPendingBranches(message: ChatMessage): ChatMessage[][] {
+  const branches = message.branches ? [...message.branches] : [[stripMeta(message)]];
+  const curIdx = message.branchIndex ?? 0;
+  branches[curIdx] = [stripMeta(message)];
+  return branches;
+}
+
+/** Yeniden üretilen yanıt tamamlanınca çağrılır: bekleyen dalları + şimdi
+    biten yeni son mesajı birleştirip dal meta'sını ona işler. */
+export function mergeRegeneratedBranches(messages: ChatMessage[], pendingBranches: ChatMessage[][]): ChatMessage[] {
+  if (messages.length === 0 || pendingBranches.length === 0) return messages;
+  const lastIdx = messages.length - 1;
+  const target = messages[lastIdx];
+  const branches = [...pendingBranches, [stripMeta(target)]];
+  const newIndex = branches.length - 1;
+  const newTarget: ChatMessage = { ...stripMeta(target), branches, branchIndex: newIndex };
+  return [...messages.slice(0, lastIdx), newTarget];
+}
