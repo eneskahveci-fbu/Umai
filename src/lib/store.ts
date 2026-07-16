@@ -24,7 +24,7 @@ import type {
 import { deriveJobTitle, type BackgroundJob } from "./jobs";
 import { DEFAULT_CONFIG, DEFAULT_REPO, DEFAULT_SKILLS, POLLINATIONS_DEFAULT_MODEL } from "./constants";
 import { encryptConfigSecrets, decryptConfigSecrets, isCryptoAvailable, hasPlaintextSecret } from "./secureKeys";
-import { applyEditBranch, applySwitchBranch } from "./branching";
+import { applyEditBranch, applySwitchBranch, mergeRegeneratedBranches } from "./branching";
 import { createClient } from "./supabase/client";
 
 /* Config yazımları için monotonik sıra: async şifreli yazımların sırasını korur
@@ -478,6 +478,10 @@ interface StoreState {
       olarak yeni bir sürüm/dal açmaz, sonraki mesajları etkilemez. */
   updateMessageContentAt: (index: number, content: string) => void;
   switchMessageVersion: (index: number, branchIndex: number) => void;
+  /** "Yeniden oluştur" akışının ikinci yarısı — regenerate BAŞLAMADAN önce
+      alınan `stashAsPendingBranches` çıktısını, biten yeni son mesaja işler
+      (bkz. CoderView.tsx `regenerate()`, branching.ts). */
+  mergeRegenerateBranches: (pendingBranches: ChatMessage[][]) => void;
   maybeSetTitle: (text: string) => void;
   persistCurrent: () => Promise<void>;
   exportChat: (id: string) => void;
@@ -1406,6 +1410,15 @@ export const useStore = create<StoreState>()((set, get) => ({
     set((s) => ({
       chats: s.chats.map((c) =>
         c.id === s.currentId ? { ...c, messages: applySwitchBranch(c.messages, index, branchIndex) } : c,
+      ),
+    }));
+    void get().persistCurrent();
+  },
+
+  mergeRegenerateBranches: (pendingBranches) => {
+    set((s) => ({
+      chats: s.chats.map((c) =>
+        c.id === s.currentId ? { ...c, messages: mergeRegeneratedBranches(c.messages, pendingBranches) } : c,
       ),
     }));
     void get().persistCurrent();
