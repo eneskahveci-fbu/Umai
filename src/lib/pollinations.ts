@@ -218,3 +218,32 @@ export function playTts(text: string, voice = "nova", onEnd?: () => void): void 
   audio.onerror = () => { if (currentAudio === audio) currentAudio = null; speakWithBrowser(clean, onEnd); };
   void audio.play().catch(() => { if (currentAudio === audio) currentAudio = null; speakWithBrowser(clean, onEnd); });
 }
+
+/* ── Çok sesli sıralı okuma (podcast) ──────────────────────────────── */
+
+export interface VoiceTurn { speaker: string; text: string; }
+
+let podcastActive = false;
+
+/** Turları sırayla, konuşmacıya göre farklı seslerle okur — her tur bir
+ *  öncekinin bitmesini bekler (playTts'in kendi kuyruğunu kullanır).
+ *  `voiceOf` konuşmacı etiketinden Pollinations ses id'sine eşler. */
+export function playPodcast(turns: VoiceTurn[], voiceOf: (speaker: string) => string, onTurn?: (index: number) => void, onEnd?: () => void): void {
+  if (typeof window === "undefined") return;
+  podcastActive = true;
+  let i = 0;
+  const next = () => {
+    if (!podcastActive || i >= turns.length) { podcastActive = false; onEnd?.(); return; }
+    const turn = turns[i];
+    onTurn?.(i);
+    i++;
+    playTts(turn.text, voiceOf(turn.speaker), next);
+  };
+  next();
+}
+
+/** Devam eden podcast okumasını durdurur (sıradaki tura geçmeyi de engeller). */
+export function stopPodcast(): void {
+  podcastActive = false;
+  stopTts();
+}
