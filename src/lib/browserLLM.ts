@@ -42,6 +42,7 @@ interface ProgressEvent {
 
 let generatorPromise: Promise<MinimalGenerator | null> | null = null;
 let lastProgress = 0;
+let busy = false;
 
 /** Tarayıcı ortamı mı (SSR/Node'da her zaman false). */
 export function browserLLMSupported(): boolean {
@@ -62,6 +63,15 @@ export function getBrowserLLMLoadProgress(): number {
     olmadan hemen kullanılabilir mi? */
 export function isBrowserLLMLoaded(): boolean {
   return generatorPromise !== null;
+}
+
+/** İndirme/yükleme ya da üretim şu an sürüyor mu — sw-register.ts'in
+    otomatik güncelleme-sonrası sayfa yenilemesini ERTELEMESİ için (gerçek bir
+    kullanıcı raporundan bulundu: sekme arka plana alınıp öne gelince yeni bir
+    dağıtım yakalanırsa reload tetikleniyordu, ~1.2GB'lık indirme/üretim
+    yarıda kesiliyor VE henüz kaydedilmemiş sohbet durumu kayboluyordu). */
+export function isBrowserLLMBusy(): boolean {
+  return busy;
 }
 
 async function getGenerator(onProgress?: (pct: number) => void): Promise<MinimalGenerator | null> {
@@ -102,9 +112,10 @@ export async function runBrowserLLM(
   opts: { onProgress?: (pct: number) => void } = {},
 ): Promise<string | null> {
   if (!browserLLMSupported()) return null;
-  const generator = await getGenerator(opts.onProgress);
-  if (!generator) return null;
+  busy = true;
   try {
+    const generator = await getGenerator(opts.onProgress);
+    if (!generator) return null;
     const { TextStreamer } = await import("@huggingface/transformers");
     let full = "";
     const streamer = new TextStreamer(generator.tokenizer as never, {
@@ -123,5 +134,7 @@ export async function runBrowserLLM(
     return full;
   } catch {
     return null;
+  } finally {
+    busy = false;
   }
 }
