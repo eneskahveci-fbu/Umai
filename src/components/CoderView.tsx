@@ -700,6 +700,61 @@ function SurveyCard({
   );
 }
 
+/* Yerel/tarayıcı-içi model (Qwen2.5-1.5B, transformers.js + WebGPU/WASM) —
+   send()'in izole "browser" dalı VE callApi()'ın kendisi (regenerate()/
+   continueLast()/editAndResend() callApi()'ı DOĞRUDAN çağırır, send()'i hiç
+   görmez) tarafından paylaşılan tek çekirdek. `useStore.getState()` ile HER
+   ZAMAN taze state okur — bileşen render'ında yakalanmış (stale) `chats`/
+   `config` closure'larına asla güvenilmez (önceki hata: pushMessage()'lardan
+   HEMEN SONRA stale `chats`'ten geçmiş okunuyordu, en son kullanıcı mesajı
+   modele hiç ulaşmıyordu). Assistant placeholder'ın (varsa) zaten PUSH
+   EDİLMİŞ olması beklenir — bu fonksiyon yalnız üretip günceller. */
+async function runBrowserChatTurn(): Promise<void> {
+  const store = useStore.getState();
+  try {
+    const { runBrowserLLM, browserLLMSupported, isBrowserLLMLoaded, BROWSER_MODEL_SIZE_MB } = await import("@/lib/browserLLM");
+    if (!browserLLMSupported()) {
+      store.updateLastContent(
+        "**Bu tarayıcı yerel modeli desteklemiyor.** Ayarlar → Modeller'den başka bir model seç.",
+        { isError: true },
+      );
+      return;
+    }
+    if (!isBrowserLLMLoaded()) {
+      store.updateLastThinking(`Yerel model indiriliyor (~${(BROWSER_MODEL_SIZE_MB / 1000).toFixed(1)} GB, yalnız ilk kullanımda bir kez)…`);
+    }
+    const history = (store.current()?.messages ?? [])
+      .filter((m) => (m.role === "user" || m.role === "assistant") && m.content.trim())
+      .map((m) => ({ role: m.role, content: m.content }));
+    const sysPrompt = store.config.systemPrompt?.trim()
+      ? `Sen UMAI'nin tarayıcıda (yerelde) çalışan bir asistanısın. ${store.config.systemPrompt.trim()}`
+      : "Sen UMAI'nin tarayıcıda, tamamen kullanıcının kendi cihazında çalışan yardımcı bir asistanısın. Kısa ve net yanıt ver.";
+    let full = "";
+    const result = await runBrowserLLM(
+      [{ role: "system", content: sysPrompt }, ...history],
+      (delta) => { full += delta; useStore.getState().updateLastContent(full); },
+      {
+        onProgress: (pct) => {
+          if (pct < 1) useStore.getState().updateLastThinking(`Yerel model indiriliyor… %${Math.round(pct * 100)}`);
+        },
+      },
+    );
+    if (result === null) {
+      useStore.getState().updateLastContent(
+        "**Yerel model yüklenemedi.** Bu cihaz/tarayıcı desteklemiyor olabilir (WebGPU önerilir) ya da indirme sırasında bağlantı kesildi. Ayarlar → Modeller'den başka bir model seçebilirsin.",
+        { isError: true },
+      );
+    } else if (!result.trim()) {
+      useStore.getState().updateLastContent("_(Yerel model boş yanıt döndürdü.)_");
+    }
+  } catch (e) {
+    useStore.getState().updateLastContent(`**Hata:** ${friendlyError((e as Error).message)}`, { isError: true });
+  } finally {
+    useStore.getState().setStreaming(false);
+    void useStore.getState().persistCurrent();
+  }
+}
+
 export function CoderView() {
   const config = useStore((s) => s.config);
   const isAdmin = isAdminEmail(useStore((s) => s.userEmail));
@@ -1784,6 +1839,20 @@ export function CoderView() {
     const store = useStore.getState();
     let active = store.activeModel();
     if (!active) { store.setSettingsOpen(true); return; }
+
+    /* Yerel/tarayıcı-içi model: regenerate()/continueLast()/editAndResend()
+       callApi()'ı DOĞRUDAN çağırır — send()'in izole "browser" dalını hiç
+       görmez. Bu kontrol olmadan istek normal sunucu yoluna (boş baseUrl ile)
+       gidip anlamsız bir sunucu hatası/kota mesajı üretirdi (gerçek bir hata
+       raporundan bulundu). Araç kullanımı/Fusion/Ekip/Devam-modu bu
+       sağlayıcıda yok (v1 kapsamı) — bu yüzden aşağıdaki ağır pilot/swarm/
+       bağlam-sıkıştırma mantığına hiç girmeden doğrudan döner. */
+    if (active.provider === "browser") {
+      if (!opts?.continuation) store.pushMessage({ role: "assistant", content: "" });
+      store.setStreaming(true);
+      await runBrowserChatTurn();
+      return;
+    }
     /* Otomatik efor/Ajan-Ekibi için son kullanıcı mesajı. */
     const _lastUserText = String(store.current()?.messages.findLast?.((m) => m.role === "user")?.content ?? "");
     /* Ajan Ekibi: kullanıcı elle açtıysa VEYA otomatik eşik (açıkça çok-parçalı
@@ -2695,48 +2764,7 @@ export function CoderView() {
       store.pushMessage({ role: "assistant", content: "" });
       store.setStreaming(true);
       coderAbort = new AbortController();
-      try {
-        const { runBrowserLLM, browserLLMSupported, isBrowserLLMLoaded, BROWSER_MODEL_SIZE_MB } = await import("@/lib/browserLLM");
-        if (!browserLLMSupported()) {
-          useStore.getState().updateLastContent(
-            "**Bu tarayıcı yerel modeli desteklemiyor.** Ayarlar → Modeller'den başka bir model seç.",
-            { isError: true },
-          );
-          return;
-        }
-        if (!isBrowserLLMLoaded()) {
-          useStore.getState().updateLastThinking(`Yerel model indiriliyor (~${(BROWSER_MODEL_SIZE_MB / 1000).toFixed(1)} GB, yalnız ilk kullanımda bir kez)…`);
-        }
-        const history = (chats.find((c) => c.id === store.currentId)?.messages ?? [])
-          .filter((m) => (m.role === "user" || m.role === "assistant") && m.content.trim())
-          .map((m) => ({ role: m.role, content: m.content }));
-        const sysPrompt = config.systemPrompt?.trim()
-          ? `Sen UMAI'nin tarayıcıda (yerelde) çalışan bir asistanısın. ${config.systemPrompt.trim()}`
-          : "Sen UMAI'nin tarayıcıda, tamamen kullanıcının kendi cihazında çalışan yardımcı bir asistanısın. Kısa ve net yanıt ver.";
-        let full = "";
-        const result = await runBrowserLLM(
-          [{ role: "system", content: sysPrompt }, ...history],
-          (delta) => { full += delta; useStore.getState().updateLastContent(full); },
-          {
-            onProgress: (pct) => {
-              if (pct < 1) useStore.getState().updateLastThinking(`Yerel model indiriliyor… %${Math.round(pct * 100)}`);
-            },
-          },
-        );
-        if (result === null) {
-          useStore.getState().updateLastContent(
-            "**Yerel model yüklenemedi.** Bu cihaz/tarayıcı desteklemiyor olabilir (WebGPU önerilir) ya da indirme sırasında bağlantı kesildi. Ayarlar → Modeller'den başka bir model seçebilirsin.",
-            { isError: true },
-          );
-        } else if (!result.trim()) {
-          useStore.getState().updateLastContent("_(Yerel model boş yanıt döndürdü.)_");
-        }
-      } catch (e) {
-        useStore.getState().updateLastContent(`**Hata:** ${friendlyError((e as Error).message)}`, { isError: true });
-      } finally {
-        store.setStreaming(false);
-        void store.persistCurrent();
-      }
+      await runBrowserChatTurn();
       return;
     }
 
