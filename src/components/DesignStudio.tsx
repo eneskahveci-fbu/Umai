@@ -24,7 +24,7 @@ import { autoStudioSkill } from "@/lib/autoPilot";
 import type { Artifact, SlideDeck, StudioProject } from "@/lib/types";
 import { designSystemById, designSystemPromptText } from "@/lib/designSystems";
 import { type StudioTemplate } from "@/lib/studioTemplates";
-import { generateDeck } from "@/lib/slidesGen";
+import { generateDeck, generateDeckFusion } from "@/lib/slidesGen";
 import { deckToHtml, SLIDE_THEMES } from "@/lib/slides";
 import { StudioHomeScreen, EmptyChatHint } from "./studio/StudioHomeScreen";
 import { ArtifactCanvas } from "./ArtifactCanvas";
@@ -257,18 +257,49 @@ export function DesignStudio() {
         /* Çok Slaytlı Sunum: generateArtifact'ın serbest-HTML tahminini BAYPAS
            eder — slidesGen.ts'in şemalı JSON motoru + slides.ts'in deterministik
            deckToHtml() render'ı kullanılır (gerçek tema/slayt-başına-görsel/
-           konuşmacı notu/gezinme, Fusion'a gerek yok). Takip mesajı da AYNI
-           güvenilir motordan geçsin diye "tüm desteyi güncelle" olarak ele
-           alınır — LLM'in serbestçe HTML'i yeniden tahmin etmesine izin
-           verilmez (bu, ilk üretimdeki kaliteyi düzenlemelerde de korur). */
+           konuşmacı notu/gezinme). Takip mesajı da AYNI güvenilir motordan
+           geçsin diye "tüm desteyi güncelle" olarak ele alınır — LLM'in
+           serbestçe HTML'i yeniden tahmin etmesine izin verilmez (bu, ilk
+           üretimdeki kaliteyi düzenlemelerde de korur). Fusion açıksa
+           generateDeckFusion (best-of-3 + hakem, bkz. slidesGen.ts) kullanılır;
+           taslak/hakem başarısızsa sessizce düz generateDeck()'e düşülür —
+           HTML Fusion yolundaki AYNI zarif-düşüş deseni. */
         const deckBrief = followup ? `${project.brief}\n\nGüncelleme isteği: ${brief}` : brief;
         setPhase("generating");
-        const deck = await generateDeck({
-          brief: deckBrief,
-          slideCount: DEFAULT_SLIDE_COUNT,
-          onDelta: (txt) => setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: `🎬 Sunum tasarlanıyor… (${txt.length} karakter)` }; return c; }),
-          signal: ac.signal,
-        });
+        let deck: SlideDeck | undefined;
+        if (fusionEnabled) {
+          setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: "✦ Fusion: 3 model ile sunum taslaklanıyor…" }; return c; });
+          try {
+            const store = useStore.getState();
+            const active = store.strongestModel() ?? store.activeModel();
+            if (!active) throw new Error("model yok");
+            const freeModelNames = await fetchTextModels();
+            const manualFusionIds = store.config.fusionMode === "manual" ? store.config.fusionModelIds : undefined;
+            const draftProfiles = pickDraftModels(store.config.models, active, 3, store.strongestModel(), freeModelNames, manualFusionIds);
+            const slots = fillSelfConsistency(draftProfiles, active, 3);
+            const withKeys = await Promise.all(slots.map(async (s) => ({
+              baseUrl: s.profile.baseUrl, model: s.profile.model, provider: s.profile.provider,
+              apiKey: await resolveModelApiKey(s.profile, store.config.providerKeys), temperature: s.temperature,
+            })));
+            const fusionFallbacks = buildFallbackChain(store.config.models, active.id);
+            const activeKey = await resolveModelApiKey(active, store.config.providerKeys);
+            deck = await generateDeckFusion({
+              brief: deckBrief, slideCount: DEFAULT_SLIDE_COUNT,
+              drafts: withKeys, fallbacks: fusionFallbacks,
+              judgeModel: { baseUrl: active.baseUrl, model: active.model, provider: active.provider, apiKey: activeKey },
+              signal: ac.signal,
+            });
+            setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: "✦ Fusion: en iyi sunum seçildi, hazırlanıyor…" }; return c; });
+          } catch { /* Fusion taslak/hakem başarısızsa sessizce normal üretime düş. */ }
+        }
+        if (!deck) {
+          deck = await generateDeck({
+            brief: deckBrief,
+            slideCount: DEFAULT_SLIDE_COUNT,
+            onDelta: (txt) => setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: `🎬 Sunum tasarlanıyor… (${txt.length} karakter)` }; return c; }),
+            signal: ac.signal,
+          });
+        }
         /* Var olan tema tercihini koru — güncelleme temayı sıfırlamasın. */
         if (followup && project.deckData?.themeId) deck.themeId = project.deckData.themeId;
         deckData = deck;
