@@ -97,6 +97,16 @@ function convertTools(tools?: OAITool[]): Block[] | undefined {
   return out;
 }
 
+/* translateStream'in switch'inin okuduğu alanlarla sınırlı, gevşek Anthropic
+   SSE olay şekli — resmi SDK tipi yok, sunucu yanıtını ham JSON olarak okuyoruz. */
+interface AnthropicStreamEvent {
+  type: string;
+  message?: { usage?: { input_tokens?: number } };
+  content_block?: { type?: string; id?: string; name?: string };
+  delta?: { type?: string; text?: string; thinking?: string; partial_json?: string; stop_reason?: string };
+  usage?: { output_tokens?: number };
+}
+
 /* Native Anthropic SSE → OpenAI-stili SSE çevirici. streamRound/basit-pipe bunu
    normal bir OpenAI yanıtı gibi okur. */
 function translateStream(src: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
@@ -123,8 +133,8 @@ function translateStream(src: ReadableStream<Uint8Array>): ReadableStream<Uint8A
             if (!t.startsWith("data:")) continue;
             const data = t.slice(5).trim();
             if (!data) continue;
-            let ev: any;
-            try { ev = JSON.parse(data); } catch { continue; }
+            let ev: AnthropicStreamEvent;
+            try { ev = JSON.parse(data) as AnthropicStreamEvent; } catch { continue; }
             switch (ev.type) {
               case "message_start":
                 inputTokens = ev.message?.usage?.input_tokens ?? 0;

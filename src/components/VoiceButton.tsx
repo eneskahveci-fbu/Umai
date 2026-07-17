@@ -3,24 +3,39 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff } from "lucide-react";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-type SR = any;
+/* Web Speech API'nin SpeechRecognition'ı hâlâ standart TS DOM lib'inde yok
+   (tarayıcı desteği tutarsız, vendor-prefix'li) — kullanılan alanlarla sınırlı
+   yerel bir tip burada tanımlanıyor, `any` yerine. */
+interface SpeechRecognitionResultLike { 0: { transcript?: string }; isFinal: boolean }
+interface SpeechRecognitionEventLike { resultIndex: number; results: ArrayLike<SpeechRecognitionResultLike> }
+interface SpeechRecognitionErrorEventLike { error?: string }
+interface SpeechRecognitionLike {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((e: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((e: SpeechRecognitionErrorEventLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
 interface VoiceButtonProps {
   onTranscript: (text: string, isFinal: boolean) => void;
   lang?: string;
 }
 
-function getSpeechCtor(): SR | null {
+function getSpeechCtor(): SpeechRecognitionCtor | null {
   if (typeof window === "undefined") return null;
-  const w = window as any;
+  const w = window as unknown as { SpeechRecognition?: SpeechRecognitionCtor; webkitSpeechRecognition?: SpeechRecognitionCtor };
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
 export function VoiceButton({ onTranscript, lang = "tr-TR" }: VoiceButtonProps) {
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const ref = useRef<SR | null>(null);
+  const ref = useRef<SpeechRecognitionLike | null>(null);
   /* SpeechRecognition yalnızca tarayıcıda var; tespiti mount sonrasına ertele ki
      ilk istemci render'ı sunucuyla (buton yok) eşleşsin → hidrasyon uyumsuzluğu olmaz. */
   const [mounted, setMounted] = useState(false);
@@ -43,14 +58,14 @@ export function VoiceButton({ onTranscript, lang = "tr-TR" }: VoiceButtonProps) 
     r.continuous = true;
     r.interimResults = true;
     r.lang = lang;
-    r.onresult = (e: any) => {
+    r.onresult = (e) => {
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const res = e.results[i];
         const text = res[0]?.transcript ?? "";
         if (text) cbRef.current(text, res.isFinal);
       }
     };
-    r.onerror = (e: any) => {
+    r.onerror = (e) => {
       setError(String(e?.error || "speech error"));
       setListening(false);
     };
