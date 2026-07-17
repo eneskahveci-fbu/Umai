@@ -726,9 +726,21 @@ async function runBrowserChatTurn(): Promise<void> {
     const history = (store.current()?.messages ?? [])
       .filter((m) => (m.role === "user" || m.role === "assistant") && m.content.trim())
       .map((m) => ({ role: m.role, content: m.content }));
+    /* Kimlik çapası: 1.5B'lik modeller "hangi modelsin" gibi öz-farkındalık
+       sorularında güvenilir değildir — eğitim verisindeki "Ben Claude/GPT'yim"
+       kalıplarını rastgele birleştirip uydurabilir (gerçek bir kullanıcı
+       raporunda görüldü: "Claude 3.5 Sonic, OpenAI'nin Claude modeli..." gibi
+       tutarsız bir karışım üretti). Kimliği DOĞRUDAN, tartışmaya yer
+       bırakmadan veriyoruz — küçük modeller doğrudan talimatları kendi
+       kendine çıkarım yapmaktan çok daha güvenilir takip eder. */
+    const IDENTITY =
+      "Sen Qwen2.5-1.5B-Instruct adlı, açık kaynaklı küçük bir dil modelisin. UMAI uygulamasının " +
+      "\"Tarayıcıda Çalıştır\" seçeneğiyle kullanıcının KENDİ CİHAZINDA/tarayıcısında, internete hiçbir veri " +
+      "göndermeden çalışıyorsun. Kimliğin sorulursa YALNIZCA bunu söyle — Claude, GPT, Gemini gibi başka bir " +
+      "model olduğunu ASLA iddia etme; geliştiricini/eğitim verini UYDURMA.";
     const sysPrompt = store.config.systemPrompt?.trim()
-      ? `Sen UMAI'nin tarayıcıda (yerelde) çalışan bir asistanısın. ${store.config.systemPrompt.trim()}`
-      : "Sen UMAI'nin tarayıcıda, tamamen kullanıcının kendi cihazında çalışan yardımcı bir asistanısın. Kısa ve net yanıt ver.";
+      ? `${IDENTITY} ${store.config.systemPrompt.trim()}`
+      : `${IDENTITY} Küçük bir model olduğun için karmaşık isteklerde hata yapabilirsin; kısa ve net yanıt ver.`;
     let full = "";
     const result = await runBrowserLLM(
       [{ role: "system", content: sysPrompt }, ...history],
