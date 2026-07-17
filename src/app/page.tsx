@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ReferralCapture } from "@/components/ReferralCapture";
 import {
   ArrowRight,
   ChevronDown,
@@ -108,6 +109,7 @@ const JSON_LD_FAQ = {
 export default function Home() {
   return (
     <div className="min-h-screen flex flex-col">
+      <ReferralCapture />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_APP) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_FAQ) }} />
 

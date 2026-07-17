@@ -327,3 +327,34 @@ create policy "kendi abonelikleri - insert"
 drop policy if exists "kendi abonelikleri - delete" on public.push_subscriptions;
 create policy "kendi abonelikleri - delete"
   on public.push_subscriptions for delete using (auth.uid() = user_id);
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- DAVET/REFERRAL (bkz. Ayarlar → Hesap "Arkadaşını davet et")
+-- Referral kodu ayrı bir üretim/tablo gerektirmez: her kullanıcının kendi
+-- auth.uid()'i koddur (link: /?ref=<uuid>). Yeni kullanıcı bu parametreyle
+-- ilk kez giriş yaptığında istemci (src/lib/referral.ts) burada bir satır
+-- oluşturur. v1 kapsamı KASITLI olarak yalnız izleme/sayaç — otomatik
+-- ödül/kredi (ör. ücretsiz Pro günü) burada YOK; bu, denetlenebilir bir
+-- faturalama değişikliği gerektirir ve ayrı bir turun konusu.
+-- ─────────────────────────────────────────────────────────────────────────
+create table if not exists public.referrals (
+  id            bigint generated always as identity primary key,
+  referrer_id   uuid not null references auth.users(id) on delete cascade,
+  referred_id   uuid not null references auth.users(id) on delete cascade,
+  created_at    timestamptz not null default now(),
+  unique (referred_id)
+);
+
+create index if not exists referrals_referrer_idx on public.referrals (referrer_id);
+
+alter table public.referrals enable row level security;
+
+-- Davet eden yalnız KENDİ davet ettiklerini görebilir/sayabilir.
+drop policy if exists "kendi davetleri - select" on public.referrals;
+create policy "kendi davetleri - select"
+  on public.referrals for select using (auth.uid() = referrer_id);
+
+-- Yeni kullanıcı yalnız KENDİSİNİ referred_id olarak ekleyebilir (giriş anında).
+drop policy if exists "kendi kaydını ekle" on public.referrals;
+create policy "kendi kaydını ekle"
+  on public.referrals for insert with check (auth.uid() = referred_id);
