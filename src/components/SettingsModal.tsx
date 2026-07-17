@@ -58,6 +58,7 @@ import { fetchUserRepos } from "@/lib/github";
 import { fetchGitLabUserRepos } from "@/lib/gitlab";
 import { friendlyError } from "@/lib/friendlyError";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
+import { BROWSER_MODEL_ID, BROWSER_MODEL_SIZE_MB } from "@/lib/browserLLM";
 
 /* Kullanım anında şifre çözme: bellekteki config'den gelen anahtar `enc:1:`
    (şifreli) olabilir — açılıştaki rehydrate yarışı ya da bulut senkronunun
@@ -645,6 +646,30 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     }
   };
 
+  /* "browser" sağlayıcısı addAndTest()'in ağ-odaklı akışına (anahtar zorunluluğu,
+     baseUrl/model zorunluluğu, gerçek probeModel isteği) uymuyor — tamamen
+     tarayıcıda çalışır, sunucuya hiç istek atmaz. Kendi basit, ayrı ekleme
+     yolu: doğrudan kaydet ve aktif et, "test" adımı yok (indirme ilk mesajda
+     olur, bkz. CoderView.tsx'in "browser" dalı). */
+  const addBrowserModel = () => {
+    const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `m_${Date.now()}`;
+    saveConfig({
+      ...useStore.getState().config,
+      models: [...useStore.getState().config.models.filter((m) => m.provider !== "browser"), {
+        id,
+        label: "Tarayıcıda Çalıştır (Qwen2.5-1.5B)",
+        provider: "browser" as Provider,
+        baseUrl: "",
+        model: BROWSER_MODEL_ID.split("/")[1] ?? "Qwen2.5-1.5B-Instruct",
+        apiKey: "",
+      }],
+      activeModelId: id,
+    });
+    setQuickResult(null);
+    setQuickSwapNote(null);
+    addToast("Yerel model eklendi ve aktif — ilk mesajında bir kez indirilecek (~1,2 GB).", "success");
+  };
+
   const activeProj = config.projects.find((p) => p.id === config.activeProjectId);
 
   /* GNOME tarzı dikey sekmeler. `admin: true` olanlar (teknik ayarlar) admin
@@ -828,7 +853,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               {/* Önerilen ücretsiz sağlayıcılar — tek tıkla seç */}
               <div className="flex flex-wrap gap-1.5 mb-2.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted/45 w-full">Önerilen ücretsiz · açık kaynak</span>
-                {(["pollinations", "gemini", "groq", "nvidia", "cerebras", "openrouter"] as Provider[]).map((p) => (
+                {(["pollinations", "gemini", "groq", "nvidia", "cerebras", "openrouter", "browser"] as Provider[]).map((p) => (
                   <button
                     key={p}
                     onClick={() => onProvider(p)}
@@ -847,77 +872,103 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   <option key={p} value={p}>{PRESETS[p].label}</option>
                 ))}
               </select>
-              {QUICK_KEY_URL[provider] && (
-                <a
-                  href={QUICK_KEY_URL[provider]}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] text-brand hover:text-branddim underline mb-2"
-                >
-                  {cleanLabel(provider)} anahtarı al <ExternalLink size={11} />
-                </a>
-              )}
-              <div className="flex gap-1.5">
-                <input
-                  value={apiKey}
-                  onChange={(e) => { setApiKey(e.target.value); setQuickResult(null); setKeyCheck(null); setFetchedModels([]); }}
-                  placeholder={PRESETS[provider].keyHint}
-                  className="input-mono flex-1"
-                  onKeyDown={(e) => { if (e.key === "Enter" && !quickBusy) addAndTest(); }}
-                />
-                <button
-                  onClick={addAndTest}
-                  disabled={quickBusy || (!apiKey.trim() && !config.providerKeys?.[provider] && !KEYLESS_PROVIDERS.has(provider))}
-                  className="px-3 py-2 rounded-lg bg-brand hover:bg-branddim text-[#111110] text-xs font-semibold disabled:opacity-40 flex items-center gap-1.5 shrink-0"
-                >
-                  {quickBusy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Ekle ve test et
-                </button>
-              </div>
-              {/* Anahtar alanını boşaltmak TEK BAŞINA önbellekteki (providerKeys)
-                 kayıtlı anahtarı SİLMEZ (addAndTest boşsa oraya düşer) — anahtarsız
-                 sağlayıcıda (ör. OVH) yanlışlıkla kaydedilmiş bir anahtar, alan
-                 boşaltılsa bile kullanılmaya devam ederdi. Bu link tek self-servis
-                 çıkış yolu. */}
-              {config.providerKeys?.[provider] && (
-                <button
-                  onClick={() => {
-                    const next = { ...config.providerKeys };
-                    delete next[provider];
-                    saveConfig({ ...config, providerKeys: next });
-                    setApiKey(""); setKeyCheck(null); setQuickResult(null);
-                    addToast("Bu sağlayıcı için kayıtlı anahtar temizlendi.", "success");
-                  }}
-                  className="mt-1.5 text-[11px] text-muted/70 hover:text-red underline"
-                >
-                  Kayıtlı {cleanLabel(provider)} anahtarını temizle
-                </button>
-              )}
-              {/* Anahtarın CANLI doğrulama durumu — yazmayı bırakınca otomatik
-                 test edilir; başarı da hata da burada görünür (sessiz kalmaz). */}
-              {!quickResult && keyCheck && (
-                <div className={`mt-2 flex items-start gap-1.5 text-[11px] break-words leading-relaxed ${keyCheck.ok ? "text-green font-semibold" : "text-red"}`}>
-                  {keyCheck.ok ? <Check size={12} className="shrink-0 mt-0.5" /> : <X size={12} className="shrink-0 mt-0.5" />} {keyCheck.text}
+              {provider === "browser" ? (
+                /* Ağ-tabanlı akış (anahtar/BaseURL/probeModel) buraya uymuyor —
+                   tamamen tarayıcıda çalışır, "test" adımı anlamsız (indirme
+                   ilk mesajda gerçekleşir). Ayrı, basit bir kart + tek buton. */
+                <div className="rounded-lg border border-brand/25 bg-brand/6 p-3">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-ink mb-1">
+                    <Cpu size={13} /> Tamamen yerel — sunucuya hiç istek gitmez
+                  </div>
+                  <p className="text-[11px] text-muted leading-relaxed mb-2.5">
+                    {BROWSER_MODEL_ID.split("/")[1] ?? "Qwen2.5-1.5B"} modeli yalnızca bu tarayıcıda,
+                    WebGPU (yoksa WASM) ile çalışır — mesajların hiçbiri bir API&apos;ye/sunucuya gitmez,
+                    gerçek anlamda ücretsiz ve sınırsızdır. İlk mesajında ~{(BROWSER_MODEL_SIZE_MB / 1000).toFixed(1)} GB
+                    tek seferlik indirilir ve tarayıcı önbelleğinde kalır. Not: v1&apos;de yalnız düz sohbet
+                    destekler — araç kullanımı/Fusion/Ajan Ekibi bu modelde kapalıdır.
+                  </p>
+                  <button
+                    onClick={addBrowserModel}
+                    className="px-3 py-2 rounded-lg bg-brand hover:bg-branddim text-[#111110] text-xs font-semibold flex items-center gap-1.5"
+                  >
+                    <Download size={13} /> Yerel Modeli Ekle ve Etkinleştir
+                  </button>
                 </div>
-              )}
-              {!quickResult && !keyCheck && loadingModels && (
-                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted/70">
-                  <Loader2 size={12} className="animate-spin" /> Anahtar test ediliyor…
-                </div>
-              )}
-              {quickSwapNote && (
-                <div className={`mt-2 rounded-lg border px-2.5 py-2 text-[11px] break-words leading-relaxed ${quickSwapNote.tone === "warning" ? "border-red/30 bg-red/8 text-red" : "border-brand/30 bg-brand/8 text-muted"}`}>
-                  {quickSwapNote.text}
-                </div>
-              )}
-              {quickResult === "ok" && (
-                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-green font-semibold">
-                  <Check size={12} /> Çalışıyor — bu model artık aktif.
-                </div>
-              )}
-              {quickResult && quickResult !== "ok" && (
-                <div className="mt-2 rounded-lg border border-yellow/30 bg-yellow/8 px-2.5 py-2 text-[11px] text-muted break-words leading-relaxed">
-                  <span className="font-semibold text-yellow">Model kaydedildi</span>, ama test yanıtı alınamadı: {quickResult}
-                </div>
+              ) : (
+                <>
+                  {QUICK_KEY_URL[provider] && (
+                    <a
+                      href={QUICK_KEY_URL[provider]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] text-brand hover:text-branddim underline mb-2"
+                    >
+                      {cleanLabel(provider)} anahtarı al <ExternalLink size={11} />
+                    </a>
+                  )}
+                  <div className="flex gap-1.5">
+                    <input
+                      value={apiKey}
+                      onChange={(e) => { setApiKey(e.target.value); setQuickResult(null); setKeyCheck(null); setFetchedModels([]); }}
+                      placeholder={PRESETS[provider].keyHint}
+                      className="input-mono flex-1"
+                      onKeyDown={(e) => { if (e.key === "Enter" && !quickBusy) addAndTest(); }}
+                    />
+                    <button
+                      onClick={addAndTest}
+                      disabled={quickBusy || (!apiKey.trim() && !config.providerKeys?.[provider] && !KEYLESS_PROVIDERS.has(provider))}
+                      className="px-3 py-2 rounded-lg bg-brand hover:bg-branddim text-[#111110] text-xs font-semibold disabled:opacity-40 flex items-center gap-1.5 shrink-0"
+                    >
+                      {quickBusy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Ekle ve test et
+                    </button>
+                  </div>
+                  {/* Anahtar alanını boşaltmak TEK BAŞINA önbellekteki (providerKeys)
+                     kayıtlı anahtarı SİLMEZ (addAndTest boşsa oraya düşer) — anahtarsız
+                     sağlayıcıda (ör. OVH) yanlışlıkla kaydedilmiş bir anahtar, alan
+                     boşaltılsa bile kullanılmaya devam ederdi. Bu link tek self-servis
+                     çıkış yolu. */}
+                  {config.providerKeys?.[provider] && (
+                    <button
+                      onClick={() => {
+                        const next = { ...config.providerKeys };
+                        delete next[provider];
+                        saveConfig({ ...config, providerKeys: next });
+                        setApiKey(""); setKeyCheck(null); setQuickResult(null);
+                        addToast("Bu sağlayıcı için kayıtlı anahtar temizlendi.", "success");
+                      }}
+                      className="mt-1.5 text-[11px] text-muted/70 hover:text-red underline"
+                    >
+                      Kayıtlı {cleanLabel(provider)} anahtarını temizle
+                    </button>
+                  )}
+                  {/* Anahtarın CANLI doğrulama durumu — yazmayı bırakınca otomatik
+                     test edilir; başarı da hata da burada görünür (sessiz kalmaz). */}
+                  {!quickResult && keyCheck && (
+                    <div className={`mt-2 flex items-start gap-1.5 text-[11px] break-words leading-relaxed ${keyCheck.ok ? "text-green font-semibold" : "text-red"}`}>
+                      {keyCheck.ok ? <Check size={12} className="shrink-0 mt-0.5" /> : <X size={12} className="shrink-0 mt-0.5" />} {keyCheck.text}
+                    </div>
+                  )}
+                  {!quickResult && !keyCheck && loadingModels && (
+                    <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted/70">
+                      <Loader2 size={12} className="animate-spin" /> Anahtar test ediliyor…
+                    </div>
+                  )}
+                  {quickSwapNote && (
+                    <div className={`mt-2 rounded-lg border px-2.5 py-2 text-[11px] break-words leading-relaxed ${quickSwapNote.tone === "warning" ? "border-red/30 bg-red/8 text-red" : "border-brand/30 bg-brand/8 text-muted"}`}>
+                      {quickSwapNote.text}
+                    </div>
+                  )}
+                  {quickResult === "ok" && (
+                    <div className="mt-2 flex items-center gap-1.5 text-[11px] text-green font-semibold">
+                      <Check size={12} /> Çalışıyor — bu model artık aktif.
+                    </div>
+                  )}
+                  {quickResult && quickResult !== "ok" && (
+                    <div className="mt-2 rounded-lg border border-yellow/30 bg-yellow/8 px-2.5 py-2 text-[11px] text-muted break-words leading-relaxed">
+                      <span className="font-semibold text-yellow">Model kaydedildi</span>, ama test yanıtı alınamadı: {quickResult}
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Gelişmiş — ad · Base URL · model (custom veya pollinations

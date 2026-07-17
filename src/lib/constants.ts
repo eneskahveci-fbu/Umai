@@ -147,6 +147,12 @@ export const PRESETS: Record<Provider, Preset> = {
     model: "qwen2.5-coder:7b",
     keyHint: "ollama (boş bırakılabilir)",
   },
+  browser: {
+    label: "🧠 Tarayıcıda Çalıştır (Yerel, Ücretsiz, Sınırsız)",
+    baseUrl: "",
+    model: "Qwen2.5-1.5B-Instruct",
+    keyHint: "gerekmez — tamamen tarayıcında çalışır",
+  },
   custom: {
     label: "⚙️ Özel (manuel URL)",
     baseUrl: "",
@@ -269,6 +275,7 @@ export const PROVIDER_MODELS: Record<Provider, string[]> = {
     "deepseek-r1:7b",
     "gemma3:12b",
   ],
+  browser: ["Qwen2.5-1.5B-Instruct"],
   custom: [],
 };
 
