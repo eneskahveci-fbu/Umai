@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { useAuthGate, useThemeClasses } from "@/lib/authGate";
+import type { MediaAsset } from "@/lib/types";
 
 type Tab = "all" | "media" | "design" | "docs" | "forms" | "notebooks";
 
@@ -53,7 +54,7 @@ export default function LibraryPage() {
         </div>
 
         {show("media") && <section className="mb-10"><SectionHead title="Medya" count={media.length} empty="Henüz görsel yok. Sohbette /gorsel ile üret veya dosya dönüştür." />
-          {media.length > 0 && <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">{media.map((asset) => <article key={asset.id} className="border border-line bg-surface rounded-lg overflow-hidden group"><img src={asset.url} alt={asset.title} className="aspect-square w-full object-cover bg-bgsoft" /><div className="p-2"><p className="text-xs font-medium truncate" title={asset.title}>{asset.title}</p><p className="text-[10px] text-muted mt-0.5">{new Date(asset.createdAt).toLocaleDateString("tr-TR")}</p><div className="flex gap-1 mt-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"><button onClick={() => sendToConverter(asset.url)} className="flex-1 text-[10px] py-1 rounded border border-line hover:border-brand/50">Dönüştür</button><button onClick={() => saveConfig({ ...config, mediaAssets: media.filter((x) => x.id !== asset.id) })} className="text-[10px] px-1.5 text-red hover:bg-red/10 rounded" aria-label="Görseli sil">Sil</button></div></div></article>)}</div>}
+          {media.length > 0 && <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">{media.map((asset) => <MediaCard key={asset.id} asset={asset} onConvert={() => sendToConverter(asset.url)} onDelete={() => saveConfig({ ...config, mediaAssets: media.filter((x) => x.id !== asset.id) })} />)}</div>}
         </section>}
 
         {show("design") && <section className="mb-10"><SectionHead title="Tasarım ve artifact'ler" count={config.studioProjects?.length ?? 0} empty="Stüdyo'da oluşturduğun tasarımlar burada görünür." />
@@ -68,4 +69,24 @@ export default function LibraryPage() {
 }
 
 function SectionHead({ title, count, empty }: { title: string; count: number; empty: string }) { return <div className="mb-3"><div className="flex items-center gap-2"><h2 className="text-sm font-semibold">{title}</h2><span className="text-[11px] text-muted">{count}</span></div>{count === 0 && <p className="text-xs text-muted mt-2">{empty}</p>}</div>; }
+
+/* next/image, kullanıcı tarafından üretilen keyfi Pollinations/dönüştürücü
+   URL'leri için uygun değil (uzak host allowlist'i gerektirir) — DocsStudio/
+   MessageBubble'daki AYNI bilinçli istisna. */
+function MediaCard({ asset, onConvert, onDelete }: { asset: MediaAsset; onConvert: () => void; onDelete: () => void }) {
+  return (
+    <article className="border border-line bg-surface rounded-lg overflow-hidden group">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={asset.url} alt={asset.title} className="aspect-square w-full object-cover bg-bgsoft" />
+      <div className="p-2">
+        <p className="text-xs font-medium truncate" title={asset.title}>{asset.title}</p>
+        <p className="text-[10px] text-muted mt-0.5">{new Date(asset.createdAt).toLocaleDateString("tr-TR")}</p>
+        <div className="flex gap-1 mt-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          <button onClick={onConvert} className="flex-1 text-[10px] py-1 rounded border border-line hover:border-brand/50">Dönüştür</button>
+          <button onClick={onDelete} className="text-[10px] px-1.5 text-red hover:bg-red/10 rounded" aria-label="Görseli sil">Sil</button>
+        </div>
+      </div>
+    </article>
+  );
+}
 function LibraryCard({ title, meta, onOpen }: { title: string; meta: string; onOpen: () => void }) { return <button onClick={onOpen} className="text-left border border-line bg-surface rounded-lg p-3 hover:border-brand/50 hover:bg-bgsoft transition-colors"><p className="text-sm font-medium truncate">{title}</p><p className="text-xs text-muted mt-1">{meta}</p></button>; }
