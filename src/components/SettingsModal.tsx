@@ -192,7 +192,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     fusion:   ["fusion", "füzyon", "taslak", "draft", "hakem", "judge", "kalite", "quality", "birleştir", "model seç", "yedek", "fallback", "kota", "kredi", "credit"],
     kullanim: ["kullanım", "usage", "analitik", "analytics", "token", "maliyet", "cost", "istatistik", "grafik", "pano"],
     plan:     ["plan", "pro", "abonelik", "yükselt", "upgrade", "ödeme", "fatura", "stripe", "premium"],
-    hakkinda: ["hakkında", "about", "sürüm", "version", "gizlilik", "şartlar", "lisans", "iletişim", "destek"],
+    hakkinda: ["hakkında", "about", "sürüm", "version", "gizlilik", "şartlar", "lisans", "iletişim", "destek", "değişiklik", "changelog", "yenilik", "yardım", "help", "sss", "faq"],
     extensions: ["eklenti", "extension", "paket", "pack", "git", "ci", "cd", "kural", "web", "modül", "modular", "mcp", "model context", "protocol", "sunucu", "server", "bağlantı", "connector", "notion", "slack", "drive"],
     model:    ["model", "api", "anahtar", "key", "openai", "anthropic", "huggingface", "hf", "nvidia", "nim", "provider", "test"],
     github:   ["github", "gitlab", "token", "depo", "repo", "branch", "dal", "kullanıcı", "username"],
@@ -783,6 +783,8 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             </div>
             <div className="grid grid-cols-2 gap-2">
               {[
+                { href: "/changelog", label: "Değişiklikler" },
+                { href: "/help", label: "Yardım Merkezi" },
                 { href: "/privacy", label: "Gizlilik" },
                 { href: "/terms", label: "Kullanım Şartları" },
                 { href: "/cookies", label: "Çerezler" },
