@@ -53,6 +53,28 @@ Bağlantıyı uygulama tarafında **Ayarlar**'dan girersin; kod/dağıtım deği
   değerini düzenle → `sudo systemctl daemon-reload && sudo systemctl restart craft-bridge`.
 - Workspace: `/opt/craft-bridge/workspace` (repolar/projeler burada **kalıcı**).
 
+## (Opsiyonel) Yerel LLM — Pollinations'tan daha güçlü, tamamen kendi sunucunda
+
+Yukarıdaki kurulum tamamlandıktan sonra, AYNI sunucuya bir Ollama modeli
+ekleyip Pollinations'tan çok daha güçlü, tamamen ücretsiz (Oracle Always
+Free) ve üçüncü tarafa hiç veri gitmeyen bir model çalıştırabilirsin:
+
+```bash
+sudo bash deploy/oracle/setup-llm.sh
+```
+
+Ne yapar: Ollama'yı kurar (yalnız `127.0.0.1`'de dinler, dışarıya hiç
+açılmaz — ek güvenlik duvarı kuralı gerekmez), sunucunun RAM'ine göre
+otomatik model seçer (≥16GB → Qwen2.5 14B, yoksa Qwen2.5 7B), köprüyü
+(`bridge.mjs`'in `/llm/v1/*` proxy uçlarıyla) günceller ve sonunda
+craft.ai → **Ayarlar → Modeller**'e yapıştıracağın **Base URL** (`https://
+<alan>/llm/v1`), **Anahtar** (mevcut köprü token'ın) ve **Model** adını
+yazdırır — normal bir "Özel" sağlayıcı gibi eklenir, uygulama tarafında
+ekstra bir kod/kavram yok.
+
+Farklı bir model denemek istersen: `sudo CRAFT_MODEL=qwen2.5:7b bash
+deploy/oracle/setup-llm.sh` (herhangi bir Ollama kütüphane modeli olabilir).
+
 ## Güvenlik
 - Köprü yalnız `127.0.0.1`'de dinler; dışarıya yalnız Caddy (443, token korumalı) açıktır.
 - `craftbridge` kullanıcısı root değildir; terminal ve dosya işlemleri bu sınırlı

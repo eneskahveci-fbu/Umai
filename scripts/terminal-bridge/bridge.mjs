@@ -1,16 +1,26 @@
 #!/usr/bin/env node
-/* craft.coder — Hibrit Köprü (Terminal + Sunucu)  ⟶  TEK port, TEK token
+/* craft.coder — Hibrit Köprü (Terminal + Sunucu + Yerel LLM)  ⟶  TEK port, TEK token
  * ════════════════════════════════════════════════════════════════════════
  * Bu köprü, craft.coder'ı tıpkı Claude Code gibi GERÇEK bir ortamda çalıştırır.
- * Tek bir adres (wss:// + token) üzerinden İKİ şey birden sunar:
+ * Tek bir adres (wss:// + token) üzerinden ÜÇ şey birden sunar:
  *
- *   1) TERMİNAL  (WebSocket /)         — gerçek shell (node-pty), canlı.
- *   2) SUNUCU    (HTTP /fs/*, /exec…)  — gerçek dosya sistemi + komut + MCP.
+ *   1) TERMİNAL  (WebSocket /)              — gerçek shell (node-pty), canlı.
+ *   2) SUNUCU    (HTTP /fs/*, /exec…)       — gerçek dosya sistemi + komut + MCP.
+ *   3) YEREL LLM (HTTP /llm/v1/*)           — bu sunucudaki Ollama'ya OpenAI-uyumlu
+ *      proxy (bkz. deploy/oracle/setup-llm.sh). Ollama YALNIZ 127.0.0.1'de dinler,
+ *      dışarıya hiç açılmaz — köprünün KENDİ token doğrulamasından geçmeden
+ *      erişilemez. craft.ai tarafında normal bir "Özel" sağlayıcı gibi eklenir:
+ *      Base URL = https://<alan>/llm/v1, Anahtar = köprü token'ı, Model = ör.
+ *      qwen2.5:14b-instruct-q4_K_M. Sunucudan (Vercel /api/chat) normal bir
+ *      OpenAI-uyumlu uca gitmekten farksız — köprüye özel bir istemci kodu YOK.
  *
  * Böylece:
  *   • Vercel'deki site             → bu köprüye bağlanır (Faz 4 hibrit).
  *   • Mobil Safari/Firefox dahil   → WebContainer GEREKMEZ; her şey sunucuda.
  *   • Repo bağlamak ZORUNLU değil   → kalıcı workspace dizini her zaman hazır.
+ *   • Pollinations'tan çok daha güçlü bir model, tamamen KENDİ sunucunda,
+ *     üçüncü tarafa hiç veri gitmeden, gerçek anlamda ücretsiz (Oracle Always
+ *     Free) çalışır.
  *
  * Aynı uç noktayı uygulamada İKİ alana da girersin (ikisi de aynı adres+token):
  *   • Ayarlar → Terminal WS URL    : wss://<alan>/?token=<token>
@@ -27,6 +37,7 @@
  *   CRAFT_SHELL   Terminal kabuğu            (varsayılan: bash / powershell)
  *   ALLOWED_ORIGIN  CORS origin              (varsayılan *)
  *   MAX_FILE_BYTES  Okuma/yazma üst sınırı   (varsayılan 2_000_000)
+ *   OLLAMA_URL    Yerel Ollama adresi        (varsayılan http://127.0.0.1:11434)
  *
  * Güvenlik: HTTP token (Bearer/X-Bridge-Token) + WS token (?token=). Tek kullanıcı
  * (root değil) ile çalıştır. Yol her zaman WORK_DIR içinde kalır (path traversal yok).
@@ -39,12 +50,14 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import os from "node:os";
+import { Readable } from "node:stream";
 
 const PORT = Number(process.env.PORT || 7777);
 const HOST = process.env.HOST || "127.0.0.1";
 const ROOT = path.resolve(process.env.WORK_DIR || process.cwd());
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
 const MAX_FILE_BYTES = parseInt(process.env.MAX_FILE_BYTES || "2000000", 10);
+const OLLAMA_URL = (process.env.OLLAMA_URL || "http://127.0.0.1:11434").replace(/\/$/, "");
 const SHELL =
   process.env.CRAFT_SHELL ||
   (os.platform() === "win32" ? "powershell.exe" : process.env.SHELL || "bash");
@@ -270,6 +283,40 @@ const server = http.createServer(async (req, res) => {
         const cwd = body.cwd ? safeResolve(body.cwd) : ROOT;
         if (body.background) return send(res, 200, { taskId: runBackground(command, cwd) });
         return send(res, 200, await runForeground(command, cwd));
+      }
+      /* Yerel LLM (Ollama) proxy — craft.ai bunu düz bir OpenAI-uyumlu "Özel"
+         sağlayıcı gibi görür (bkz. dosya başındaki blok). Ollama'nın kendisi
+         asla dışarıya açılmaz; buraya ulaşan istek zaten authedHttp()'ten
+         geçmiş olur. Akışlı (SSE) yanıtlar olduğu gibi pipe'lanır. */
+      case "/llm/v1/chat/completions": {
+        let upstream;
+        try {
+          upstream = await fetch(`${OLLAMA_URL}/v1/chat/completions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+        } catch (e) {
+          return send(res, 200, { error: "Yerel model sunucusuna (Ollama) ulaşılamadı: " + e.message });
+        }
+        res.writeHead(upstream.status, {
+          "Content-Type": upstream.headers.get("content-type") || "application/json",
+          "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+          "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Bridge-Token",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        });
+        if (!upstream.body) { res.end(); return; }
+        Readable.fromWeb(upstream.body).pipe(res);
+        return;
+      }
+      case "/llm/v1/models": {
+        try {
+          const upstream = await fetch(`${OLLAMA_URL}/v1/models`);
+          const data = await upstream.json().catch(() => ({ data: [] }));
+          return send(res, upstream.status, data);
+        } catch (e) {
+          return send(res, 200, { error: "Yerel model sunucusuna (Ollama) ulaşılamadı: " + e.message });
+        }
       }
       case "/mcp/list": {
         const reqs = [
