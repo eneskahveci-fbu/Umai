@@ -4,6 +4,7 @@ import {
   browserLLMHasWebGPU,
   browserLLMSupported,
   getBrowserLLMLoadProgress,
+  isBrowserLLMBusy,
   isBrowserLLMLoaded,
   runBrowserLLM,
 } from "../browserLLM";
@@ -41,6 +42,17 @@ describe("runBrowserLLM", () => {
   it("desteklenmeyen (Node) ortamda null döner, patlamaz", async () => {
     const onDelta = () => {};
     await expect(runBrowserLLM([{ role: "user", content: "selam" }], onDelta)).resolves.toBeNull();
+  });
+});
+
+describe("isBrowserLLMBusy", () => {
+  it("hiç çağrılmadıysa false döner", () => {
+    expect(isBrowserLLMBusy()).toBe(false);
+  });
+
+  it("desteklenmeyen (Node) ortamda erken dönüş busy'yi hiç true yapmaz — çağrı sonrası false kalır", async () => {
+    await runBrowserLLM([{ role: "user", content: "selam" }], () => {});
+    expect(isBrowserLLMBusy()).toBe(false);
   });
 });
 
