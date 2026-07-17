@@ -20,13 +20,29 @@ export function registerServiceWorker() {
   if (navigator.serviceWorker.controller) {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (refreshing) return;
-      try {
-        const last = Number(sessionStorage.getItem(RELOAD_GUARD_KEY) || 0);
-        if (Date.now() - last < RELOAD_COOLDOWN_MS) return;
-        sessionStorage.setItem(RELOAD_GUARD_KEY, String(Date.now()));
-      } catch { /* sessionStorage erişilemezse eski davranışa düş */ }
-      refreshing = true;
-      window.location.reload();
+      void (async () => {
+        /* Yerel/tarayıcı-içi model (Ayarlar → "Tarayıcıda Çalıştır") indirme
+           veya üretim sürerken OTOMATİK reload ATLA — sayfa yenilenirse
+           ~1.2GB'lık indirme yarıda kesilir VE henüz persistCurrent() ile
+           kaydedilmemiş sohbet durumu kaybolur (gerçek kullanıcı raporu:
+           "indirme dolduğu an sohbet yeni sohbete geçiyor ve çalışmıyor" —
+           sekme arka plana alınıp öne gelince visibilitychange yeni bir
+           dağıtımı yakalıyor, controllerchange ateşleniyor, reload devreye
+           giriyordu). SW zaten devraldı (clients.claim() oldu); reload'u
+           atlamak yalnız bu sekmenin BİR SONRAKİ doğal yenilemesine kadar
+           eski bundle'la çalışmasına yol açar — güvenli bir erteleme. */
+        try {
+          const { isBrowserLLMBusy } = await import("@/lib/browserLLM");
+          if (isBrowserLLMBusy()) return;
+        } catch { /* modül yüklenemedi — normal akışa devam */ }
+        try {
+          const last = Number(sessionStorage.getItem(RELOAD_GUARD_KEY) || 0);
+          if (Date.now() - last < RELOAD_COOLDOWN_MS) return;
+          sessionStorage.setItem(RELOAD_GUARD_KEY, String(Date.now()));
+        } catch { /* sessionStorage erişilemezse eski davranışa düş */ }
+        refreshing = true;
+        window.location.reload();
+      })();
     });
   }
 
