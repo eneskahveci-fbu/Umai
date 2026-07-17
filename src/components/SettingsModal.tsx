@@ -23,6 +23,7 @@ import {
   Pencil,
   Play,
   Plus,
+  RotateCcw,
   Search,
   Server,
   Sparkles,
@@ -107,6 +108,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   const setActiveRepo = useStore((s) => s.setActiveRepo);
   const removeRepo = useStore((s) => s.removeRepo);
   const saveConfig = useStore((s) => s.saveConfig);
+  const setOnboardingDone = useStore((s) => s.setOnboardingDone);
   const toggleTheme = useStore((s) => s.toggleTheme);
   const addToast = useStore((s) => s.addToast);
   const chats = useStore((s) => s.chats);
@@ -192,7 +194,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     fusion:   ["fusion", "füzyon", "taslak", "draft", "hakem", "judge", "kalite", "quality", "birleştir", "model seç", "yedek", "fallback", "kota", "kredi", "credit"],
     kullanim: ["kullanım", "usage", "analitik", "analytics", "token", "maliyet", "cost", "istatistik", "grafik", "pano"],
     plan:     ["plan", "pro", "abonelik", "yükselt", "upgrade", "ödeme", "fatura", "stripe", "premium"],
-    hakkinda: ["hakkında", "about", "sürüm", "version", "gizlilik", "şartlar", "lisans", "iletişim", "destek", "değişiklik", "changelog", "yenilik", "yardım", "help", "sss", "faq"],
+    hakkinda: ["hakkında", "about", "sürüm", "version", "gizlilik", "şartlar", "lisans", "iletişim", "destek", "değişiklik", "changelog", "yenilik", "yardım", "help", "sss", "faq", "tanıtım", "tur", "onboarding"],
     extensions: ["eklenti", "extension", "paket", "pack", "git", "ci", "cd", "kural", "web", "modül", "modular", "mcp", "model context", "protocol", "sunucu", "server", "bağlantı", "connector", "notion", "slack", "drive"],
     model:    ["model", "api", "anahtar", "key", "openai", "anthropic", "huggingface", "hf", "nvidia", "nim", "provider", "test"],
     github:   ["github", "gitlab", "token", "depo", "repo", "branch", "dal", "kullanıcı", "username"],
@@ -781,6 +783,12 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               <div className="flex justify-between"><span className="text-muted/60">Model tabanı</span><span>Çok sağlayıcılı (BYOK)</span></div>
               <div className="flex justify-between"><span className="text-muted/60">Gizlilik</span><span>Anahtarlar tarayıcında</span></div>
             </div>
+            <button
+              onClick={() => { setOnboardingDone(false); close(); }}
+              className="w-full flex items-center justify-between premium-card rounded-lg px-3 py-2.5 text-xs font-semibold hover:border-brand/40 transition-colors"
+            >
+              <span className="flex items-center gap-2"><RotateCcw size={13} className="text-brand" /> Tanıtım turunu tekrar izle</span>
+            </button>
             <div className="grid grid-cols-2 gap-2">
               {[
                 { href: "/changelog", label: "Değişiklikler" },
