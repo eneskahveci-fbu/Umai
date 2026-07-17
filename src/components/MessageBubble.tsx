@@ -9,7 +9,7 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import {
   AlertCircle, BookMarked, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-  Circle, CircleCheck, Columns, Compass, FlaskConical, ImageOff, ListChecks, Microscope, MoreHorizontal, Settings2,
+  Circle, CircleCheck, Columns, Compass, FlaskConical, GitPullRequest, ImageOff, ListChecks, Microscope, MoreHorizontal, Settings2,
   Code2, Copy, FileText, FolderOpen, GitBranch, GitCommit, Globe,
   Highlighter, Loader2, Pencil, RefreshCw, Search, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, Users, Volume2, VolumeX, Wrench, X,
 } from "lucide-react";
@@ -608,6 +608,7 @@ function MessageBubbleImpl({
   streamingNow,
   onChecklistToggle,
   onPickCompare,
+  onPostToPr,
 }: {
   message: ChatMessage;
   index: number;
@@ -620,6 +621,9 @@ function MessageBubbleImpl({
   streamingNow?: boolean;
   onChecklistToggle?: () => void;
   onPickCompare?: (resultIndex: number) => void;
+  /** Bu yanıtı GitHub/GitLab'da bağlı bir PR/MR'a yorum olarak gönder — yalnız
+      asistan mesajlarında ve bir repo bağlıyken sunulur (bkz. CoderView.tsx). */
+  onPostToPr?: () => void;
 }) {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
@@ -1036,6 +1040,11 @@ function MessageBubbleImpl({
                 <RefreshCw size={12} />
               </button>
             )}
+            {onPostToPr && (
+              <button onClick={onPostToPr} aria-label="PR/MR'a yorum olarak gönder" title="PR/MR'a yorum olarak gönder" className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-2.5 rounded-lg hover:bg-bgsoft transition-colors">
+                <GitPullRequest size={12} />
+              </button>
+            )}
             {onSwitchVersion && message.branches && message.branches.length > 1 && (
               <div className="flex items-center gap-0.5 text-[11px] text-muted/50">
                 <button
@@ -1162,5 +1171,6 @@ export const MessageBubble = memo(MessageBubbleImpl, (prev, next) =>
   !!prev.onContinue === !!next.onContinue &&
   !!prev.onEdit === !!next.onEdit &&
   !!prev.onSwitchVersion === !!next.onSwitchVersion &&
-  !!prev.onChecklistToggle === !!next.onChecklistToggle,
+  !!prev.onChecklistToggle === !!next.onChecklistToggle &&
+  !!prev.onPostToPr === !!next.onPostToPr,
 );
