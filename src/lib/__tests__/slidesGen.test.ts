@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { generateDeck, rewriteSlide } from "../slidesGen";
+import { beforeEach, describe, it, expect, vi } from "vitest";
+import { generateDeck, generateDeckFusion, rewriteSlide } from "../slidesGen";
 import type { SlideDeck } from "../types";
 
 vi.mock("../genChat", async (importOriginal) => {
@@ -8,6 +8,14 @@ vi.mock("../genChat", async (importOriginal) => {
 });
 import { streamChat } from "../genChat";
 const mockedStreamChat = vi.mocked(streamChat);
+
+vi.mock("../boost", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../boost")>();
+  return { ...actual, generateDrafts: vi.fn(), judgeDrafts: vi.fn() };
+});
+import { generateDrafts, judgeDrafts } from "../boost";
+const mockedGenerateDrafts = vi.mocked(generateDrafts);
+const mockedJudgeDrafts = vi.mocked(judgeDrafts);
 
 describe("generateDeck", () => {
   it("streamChat yanıtını SlideDeck'e çevirir ve brief'i ekler", async () => {
@@ -29,6 +37,73 @@ describe("generateDeck", () => {
     await generateDeck({ brief: "x", slideCount: 6 });
     const call = mockedStreamChat.mock.calls.at(-1)![0];
     expect(call.system).toContain("6 slaytlık");
+  });
+});
+
+describe("generateDeckFusion", () => {
+  const fakeModel = { baseUrl: "https://x", model: "m", provider: "gemini", apiKey: "k" };
+  const deckJson = (title: string) => JSON.stringify({ title, slides: [{ layout: "cover", title: "Kapak" }] });
+
+  beforeEach(() => {
+    mockedGenerateDrafts.mockReset();
+    mockedJudgeDrafts.mockReset();
+  });
+
+  it("hakem en iyisini seçer (best-of-N, birleştirme YOK)", async () => {
+    mockedGenerateDrafts.mockResolvedValueOnce([deckJson("A"), deckJson("B"), deckJson("C")]);
+    mockedJudgeDrafts.mockResolvedValueOnce({ best: 2, guidance: "ikinci daha iyi" });
+    const deck = await generateDeckFusion({
+      brief: "bir brief", slideCount: 4,
+      drafts: [fakeModel, fakeModel, fakeModel],
+      judgeModel: fakeModel,
+    });
+    expect(deck.title).toBe("B");
+    expect(deck.brief).toBe("bir brief");
+  });
+
+  it("geçersiz JSON üreten taslakları eler; hakem yalnız GEÇERLİ olanlara bakar", async () => {
+    mockedGenerateDrafts.mockResolvedValueOnce(["bozuk json değil bu", deckJson("Geçerli1"), deckJson("Geçerli2")]);
+    mockedJudgeDrafts.mockResolvedValueOnce({ best: 2, guidance: "x" });
+    const deck = await generateDeckFusion({
+      brief: "b", slideCount: 4, drafts: [fakeModel, fakeModel, fakeModel], judgeModel: fakeModel,
+    });
+    expect(deck.title).toBe("Geçerli2");
+    const judgeArg = mockedJudgeDrafts.mock.calls.at(-1)![0];
+    expect(judgeArg.drafts).toHaveLength(2);
+  });
+
+  it("hiçbir taslak geçerli JSON üretmezse hata fırlatır", async () => {
+    mockedGenerateDrafts.mockResolvedValueOnce(["bozuk 1", "bozuk 2"]);
+    await expect(
+      generateDeckFusion({ brief: "b", slideCount: 4, drafts: [fakeModel, fakeModel], judgeModel: fakeModel }),
+    ).rejects.toThrow();
+  });
+
+  it("yalnız 1 geçerli taslak varsa hakem HİÇ çağrılmaz, o taslak doğrudan döner", async () => {
+    mockedGenerateDrafts.mockResolvedValueOnce([deckJson("TekGeçerli")]);
+    const deck = await generateDeckFusion({
+      brief: "b", slideCount: 4, drafts: [fakeModel], judgeModel: fakeModel,
+    });
+    expect(deck.title).toBe("TekGeçerli");
+    expect(mockedJudgeDrafts).not.toHaveBeenCalled();
+  });
+
+  it("hakem başarısız olursa (null döner) ilk geçerli taslağa düşer", async () => {
+    mockedGenerateDrafts.mockResolvedValueOnce([deckJson("İlk"), deckJson("İkinci")]);
+    mockedJudgeDrafts.mockResolvedValueOnce(null);
+    const deck = await generateDeckFusion({
+      brief: "b", slideCount: 4, drafts: [fakeModel, fakeModel], judgeModel: fakeModel,
+    });
+    expect(deck.title).toBe("İlk");
+  });
+
+  it("draft üretimi için deste şema+kurallarını (deckSystem) ve brief'i userText'e gömer", async () => {
+    mockedGenerateDrafts.mockResolvedValueOnce([deckJson("A"), deckJson("B")]);
+    mockedJudgeDrafts.mockResolvedValueOnce({ best: 1, guidance: "x" });
+    await generateDeckFusion({ brief: "ÖZEL-BRIEF-123", slideCount: 5, drafts: [fakeModel, fakeModel], judgeModel: fakeModel });
+    const call = mockedGenerateDrafts.mock.calls.at(-1)![0];
+    expect(call.userText).toContain("5 slaytlık");
+    expect(call.userText).toContain("ÖZEL-BRIEF-123");
   });
 });
 
