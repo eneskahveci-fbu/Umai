@@ -2679,6 +2679,67 @@ export function CoderView() {
       return;
     }
 
+    /* Yerel/tarayıcı-içi model (Qwen2.5-1.5B, transformers.js + WebGPU/WASM) —
+       sunucuya (model indirmesi hariç) hiç istek gitmez, gerçek anlamda
+       ücretsiz+sınırsız+gizli. v1 kapsamı: yalnız düz metin sohbet — araç
+       kullanımı/Fusion/Swarm YOK (1.5B parametreli bir model güvenilir
+       tool-calling yapamaz) — bu yüzden CoderView'ın geri kalan ağır tur/araç
+       mantığından tamamen ayrı, kendi başına izole bir dal (image-gen/
+       compareMode dallarıyla aynı desende). */
+    const localActiveModel = store.activeModel();
+    if (localActiveModel?.provider === "browser" && text.trim()) {
+      setInput("");
+      setPendingImages([]);
+      setAttachedFiles([]);
+      store.pushMessage({ role: "user", content: text });
+      store.pushMessage({ role: "assistant", content: "" });
+      store.setStreaming(true);
+      coderAbort = new AbortController();
+      try {
+        const { runBrowserLLM, browserLLMSupported, isBrowserLLMLoaded, BROWSER_MODEL_SIZE_MB } = await import("@/lib/browserLLM");
+        if (!browserLLMSupported()) {
+          useStore.getState().updateLastContent(
+            "**Bu tarayıcı yerel modeli desteklemiyor.** Ayarlar → Modeller'den başka bir model seç.",
+            { isError: true },
+          );
+          return;
+        }
+        if (!isBrowserLLMLoaded()) {
+          useStore.getState().updateLastThinking(`Yerel model indiriliyor (~${(BROWSER_MODEL_SIZE_MB / 1000).toFixed(1)} GB, yalnız ilk kullanımda bir kez)…`);
+        }
+        const history = (chats.find((c) => c.id === store.currentId)?.messages ?? [])
+          .filter((m) => (m.role === "user" || m.role === "assistant") && m.content.trim())
+          .map((m) => ({ role: m.role, content: m.content }));
+        const sysPrompt = config.systemPrompt?.trim()
+          ? `Sen UMAI'nin tarayıcıda (yerelde) çalışan bir asistanısın. ${config.systemPrompt.trim()}`
+          : "Sen UMAI'nin tarayıcıda, tamamen kullanıcının kendi cihazında çalışan yardımcı bir asistanısın. Kısa ve net yanıt ver.";
+        let full = "";
+        const result = await runBrowserLLM(
+          [{ role: "system", content: sysPrompt }, ...history],
+          (delta) => { full += delta; useStore.getState().updateLastContent(full); },
+          {
+            onProgress: (pct) => {
+              if (pct < 1) useStore.getState().updateLastThinking(`Yerel model indiriliyor… %${Math.round(pct * 100)}`);
+            },
+          },
+        );
+        if (result === null) {
+          useStore.getState().updateLastContent(
+            "**Yerel model yüklenemedi.** Bu cihaz/tarayıcı desteklemiyor olabilir (WebGPU önerilir) ya da indirme sırasında bağlantı kesildi. Ayarlar → Modeller'den başka bir model seçebilirsin.",
+            { isError: true },
+          );
+        } else if (!result.trim()) {
+          useStore.getState().updateLastContent("_(Yerel model boş yanıt döndürdü.)_");
+        }
+      } catch (e) {
+        useStore.getState().updateLastContent(`**Hata:** ${friendlyError((e as Error).message)}`, { isError: true });
+      } finally {
+        store.setStreaming(false);
+        void store.persistCurrent();
+      }
+      return;
+    }
+
     /* Karşılaştırma modu: normal tool-loop/akış yerine aynı mesajı 2-3
        modelle PARALEL çalıştırır (Fusion'ın pickDraftModels/fillSelfConsistency
        sezgisiyle AYNI model seçimi), sonuçları MessageBubble'da yan yana
