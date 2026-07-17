@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Database, KeyRound, Loader2, LogOut, Mail, MessageSquare, Image as ImageIcon, Palette, ShieldAlert, UserCircle } from "lucide-react";
+import { Check, Copy, Database, Gift, KeyRound, Loader2, LogOut, Mail, MessageSquare, Image as ImageIcon, Palette, ShieldAlert, UserCircle } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 import { isAdminEmail } from "@/lib/admin";
+import { referralLink } from "@/lib/referral";
 
 /* Hesap ayarları — modüler panel. Şifre/e-posta/görünen ad değiştirme, oturum
    yönetimi (tüm cihazlardan çık), kullanım istatistikleri ve hesabı kalıcı silme.
@@ -36,6 +37,9 @@ export function AccountSettings() {
   const [delText, setDelText] = useState("");
   const [deleting, setDeleting] = useState(false);
 
+  const [referralCount, setReferralCount] = useState<number | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
   useEffect(() => {
     const sb = createClient();
     if (!sb) return;
@@ -44,6 +48,25 @@ export function AccountSettings() {
       setDisplayName(n); setLoadedName(n);
     });
   }, []);
+
+  useEffect(() => {
+    if (!storeUserId) return;
+    const sb = createClient();
+    if (!sb) return;
+    sb.from("referrals").select("id", { count: "exact", head: true }).eq("referrer_id", storeUserId)
+      .then(({ count }) => setReferralCount(count ?? 0), () => setReferralCount(null));
+  }, [storeUserId]);
+
+  const copyReferralLink = async () => {
+    if (!storeUserId) return;
+    try {
+      await navigator.clipboard.writeText(referralLink(storeUserId));
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      addToast("Bağlantı kopyalanamadı.", "error");
+    }
+  };
 
   const msgCount = chats.reduce((a, c) => a + c.messages.length, 0);
   const designCount = config.studioProjects?.length ?? 0;
@@ -172,6 +195,36 @@ export function AccountSettings() {
         </div>
         <p className="text-[10px] text-muted/45 mt-1.5">Toplam {msgCount} mesaj.</p>
       </div>
+
+      {/* Arkadaşını davet et — referral linki paylaş, kaç kişi katıldığını gör. */}
+      {storeUserId && (
+        <div>
+          <div className="text-[10px] font-bold uppercase tracking-widest text-muted/45 mb-1.5 flex items-center gap-1"><Gift size={11} /> Arkadaşını davet et</div>
+          <div className="premium-card rounded-xl p-3.5 space-y-2.5">
+            <p className="text-xs text-muted/70 leading-relaxed">
+              Bu bağlantıyı paylaş — arkadaşın tıklayıp UMAI&apos;ye katılınca burada görünür.
+            </p>
+            <div className="flex gap-2">
+              <input
+                readOnly
+                value={referralLink(storeUserId)}
+                onFocus={(e) => e.currentTarget.select()}
+                className="flex-1 min-w-0 bg-bgsoft border border-line rounded-lg px-3 py-2 text-xs font-mono outline-none focus:border-brand/50 truncate"
+              />
+              <button
+                onClick={copyReferralLink}
+                className="px-3 py-2 rounded-lg border border-line hover:border-brand/50 text-xs font-semibold transition-colors flex items-center gap-1.5 shrink-0"
+              >
+                {linkCopied ? <Check size={13} className="text-brand" /> : <Copy size={13} />}
+                {linkCopied ? "Kopyalandı" : "Kopyala"}
+              </button>
+            </div>
+            <p className="text-[11px] text-muted/50">
+              {referralCount === null ? "Davet sayısı yükleniyor…" : `Şu ana kadar ${referralCount} kişi bu bağlantıyla katıldı.`}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Verilerim — neyin nerede saklandığı tek bakışta (şeffaflık). */}
       <div>

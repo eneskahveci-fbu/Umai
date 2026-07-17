@@ -20,6 +20,7 @@ import { BackgroundJobs } from "@/components/BackgroundJobs";
 import { useStore } from "@/lib/store";
 import { createClient, supabaseConfigured } from "@/lib/supabase/client";
 import { registerServiceWorker, watchConnection } from "@/lib/sw-register";
+import { captureReferralCode, recordReferralIfPending } from "@/lib/referral";
 
 /* Ağır modaller/stüdyolar ana bundle'a girmez (kod bölme) ve İLK açılışa kadar
    mount edilmez → /app açılışı hafifler. Bir kez açıldıktan sonra mount kalır,
@@ -60,6 +61,8 @@ export default function AppPage() {
     /* Depodaki şifreli API anahtarlarını çöz + eski düz metni migrate et
        (mümkün olan en erken; kullanıcı bir istek başlatmadan önce tamamlanır). */
     void useStore.getState().rehydrateSecrets();
+    /* Referral linki doğrudan /app?ref=...'e düşerse de yakala (bkz. lib/referral.ts). */
+    captureReferralCode();
     return watchConnection();
   }, [setSidebarOpen]);
 
@@ -109,7 +112,7 @@ export default function AppPage() {
       setUser(u?.id ?? null, u?.email ?? null);
       loadChats(u?.id ?? null);
       void useStore.getState().loadPlan(u?.id ?? null);
-      if (u?.id) void syncConfig(u.id);
+      if (u?.id) { void syncConfig(u.id); recordReferralIfPending(u.id); }
       setAuthState(u ? "in" : "out");
     });
     const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
@@ -117,7 +120,7 @@ export default function AppPage() {
       setUser(u?.id ?? null, u?.email ?? null);
       loadChats(u?.id ?? null);
       void useStore.getState().loadPlan(u?.id ?? null);
-      if (u?.id) void syncConfig(u.id);
+      if (u?.id) { void syncConfig(u.id); recordReferralIfPending(u.id); }
       setAuthState(u ? "in" : "out");
     });
     return () => sub.subscription.unsubscribe();
