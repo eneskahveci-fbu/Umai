@@ -45,6 +45,19 @@ export const prReviewSchema = z
   })
   .passthrough();
 
+/* PR/MR'a yorum yazma gövdesi — okumadan farklı olarak token ZORUNLU (gerçek
+   bir yazma eylemi, anonim/public erişimle yapılamaz). */
+export const prCommentSchema = z
+  .object({
+    provider: z.enum(["github", "gitlab"]),
+    owner: z.string().min(1).max(200),
+    repo: z.string().min(1).max(200),
+    prNumber: z.union([z.number().int().positive(), z.string().regex(/^\d+$/).transform(Number)]),
+    token: z.string().min(1).max(8192),
+    body: z.string().min(1).max(65536),
+  })
+  .passthrough();
+
 /* Gövdeyi güvenle ayrıştırıp doğrular. Hata → hazır 400 Response döner. */
 export async function parseBody<T>(
   req: Request,

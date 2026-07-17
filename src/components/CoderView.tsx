@@ -918,6 +918,13 @@ export function CoderView() {
   const [prModalOpen, setPrModalOpen] = useState(false);
   const [prNumber, setPrNumber] = useState("");
   const [prLoading, setPrLoading] = useState(false);
+  /* Bir asistan yanıtını GERÇEK bir PR/MR yorumu olarak GitHub/GitLab'a geri
+     gönderme — "PR incele"den (yalnız sohbete yazar) farklı, sonucu dışarı
+     yazan tek eylem. postPrMessageIndex: hangi mesajın gönderileceği. */
+  const [postPrModalOpen, setPostPrModalOpen] = useState(false);
+  const [postPrNumber, setPostPrNumber] = useState("");
+  const [postPrLoading, setPostPrLoading] = useState(false);
+  const [postPrMessageIndex, setPostPrMessageIndex] = useState<number | null>(null);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   /* Composer auto-grow: içerik değiştikçe yükseklik içeriğe uyar (≤240px);
@@ -3333,6 +3340,11 @@ export function CoderView() {
                         }
                         onChecklistToggle={isLastAssistant && !streaming ? () => handleChecklistAutoContinue(i) : undefined}
                         onPickCompare={m.compareResults ? (rIdx: number) => useStore.getState().pickCompareResult(i, rIdx) : undefined}
+                        onPostToPr={m.role === "assistant" && m.content && repo ? () => {
+                          setPostPrMessageIndex(i);
+                          setPostPrNumber("");
+                          setPostPrModalOpen(true);
+                        } : undefined}
                       />
                       {isLastAssistant && !streaming && pendingCommit && pendingCommit.length > 0 && repo && (
                         <div className="ml-11 max-w-2xl">
@@ -3850,6 +3862,38 @@ export function CoderView() {
           </div>
         </div>
       )}
+
+      {postPrModalOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setPostPrModalOpen(false)}>
+          <div className="w-full max-w-sm bg-surface border border-line rounded-2xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <GitPullRequest size={16} className="text-brand" />
+                <h3 className="font-bold text-sm">Yorumu {repoIsGitLab ? "MR'a" : "PR'a"} gönder</h3>
+              </div>
+              <button onClick={() => setPostPrModalOpen(false)} className="text-muted hover:text-ink"><X size={16} /></button>
+            </div>
+            <p className="text-xs text-muted mb-3">
+              Bu yanıt, gerçek bir yorum olarak {repoIsGitLab ? "GitLab MR" : "GitHub PR"}&apos;a yazılacak — geri alınamaz.
+            </p>
+            <input
+              value={postPrNumber}
+              onChange={(e) => setPostPrNumber(e.target.value.replace(/\D/g, ""))}
+              placeholder="#123"
+              className="input-mono w-full mb-3"
+              autoFocus
+              onKeyDown={(e) => { if (e.key === "Enter") void handlePostToPr(); }}
+            />
+            <button
+              onClick={() => void handlePostToPr()}
+              disabled={!postPrNumber || postPrLoading}
+              className="w-full flex items-center justify-center gap-2 bg-brand text-[#111110] text-sm font-semibold py-2.5 rounded-xl hover:bg-branddim disabled:opacity-50 transition-colors"
+            >
+              {postPrLoading ? <Loader2Icon size={14} className="animate-spin" /> : <><GitPullRequest size={14} /> Yorumu gönder</>}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -3883,6 +3927,46 @@ export function CoderView() {
       useStore.getState().addToast((e as Error).message, "error");
     } finally {
       setPrLoading(false);
+    }
+  }
+
+  /* "PR incele"nin (yalnız sohbete yazar) aksine, seçilen bir asistan yanıtını
+     GERÇEK bir yorum olarak GitHub/GitLab'a geri yazar — tek yönlü inceleme
+     akışını tamamlar. */
+  async function handlePostToPr() {
+    if (!postPrNumber || !repo || postPrMessageIndex === null) return;
+    const msg = messages[postPrMessageIndex];
+    if (!msg?.content) return;
+    setPostPrLoading(true);
+    try {
+      const store = useStore.getState();
+      const token = repoIsGitLab ? store.activeGitlab()?.token : store.activeGithub()?.token;
+      if (!token) { store.addToast("Önce bir GitHub/GitLab hesabı bağla.", "error"); return; }
+      const res = await fetch("/api/pr-review/comment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: repoIsGitLab ? "gitlab" : "github",
+          owner: repo.owner,
+          repo: repo.repo,
+          prNumber: parseInt(postPrNumber, 10),
+          token,
+          body: msg.content,
+        }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        store.addToast(data.error ?? "Yorum gönderilemedi", "error");
+        return;
+      }
+      store.addToast("Yorum PR'a gönderildi.", "success");
+      setPostPrModalOpen(false);
+      setPostPrNumber("");
+      setPostPrMessageIndex(null);
+    } catch (e) {
+      useStore.getState().addToast((e as Error).message, "error");
+    } finally {
+      setPostPrLoading(false);
     }
   }
 }
