@@ -335,3 +335,12 @@ describe("useStore — toast/görev kuyruğu", () => {
     expect(useStore.getState().backgroundJobs.find((j) => j.id === id)).toBeUndefined();
   });
 });
+
+describe("useStore — onboarding turu", () => {
+  it("setOnboardingDone: tanıtım turunu tekrar izle akışında false'a döner", () => {
+    useStore.getState().setOnboardingDone(true);
+    expect(useStore.getState().onboardingDone).toBe(true);
+    useStore.getState().setOnboardingDone(false);
+    expect(useStore.getState().onboardingDone).toBe(false);
+  });
+});
