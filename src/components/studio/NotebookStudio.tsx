@@ -183,7 +183,7 @@ export function NotebookStudio() {
 
   const ask = async (question?: string) => {
     const q = (question ?? input).trim();
-    if (!q || busy || narrating || podcasting || playingPodcast || guideBusy || faqBusy) return;
+    if (!q || busy || narrating || podcasting || speaking || playingPodcast || guideBusy || faqBusy) return;
     if (!enabledCount) { addToast("Önce en az bir kaynak ekle.", "info"); return; }
     setInput("");
     setBusy(true);
@@ -226,7 +226,9 @@ export function NotebookStudio() {
         playTts(text, config.ttsVoice || "nova", () => setSpeaking(false));
       }
     } catch (e) {
-      addToast(`Özet üretilemedi: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+      const msg = e instanceof Error ? e.message : "bilinmeyen";
+      addToast(`Özet üretilemedi: ${msg}`, "error");
+      setMsgs([...history, { role: "assistant", content: `Hata: ${msg}` }]);
     } finally { setNarrating(false); }
   };
 
@@ -253,13 +255,19 @@ export function NotebookStudio() {
       });
       let turns = parsePodcastScript(raw);
       if (!turns.length && raw.trim()) turns = [{ speaker: "A", text: raw.trim() }];
-      if (!turns.length) { addToast("Podcast betiği üretilemedi.", "error"); return; }
+      if (!turns.length) {
+        addToast("Podcast betiği üretilemedi.", "error");
+        setMsgs([...history, { role: "assistant", content: "Hata: podcast betiği üretilemedi." }]);
+        return;
+      }
       setPlayingPodcast(true);
       const voiceA = config.ttsVoice || "nova";
       const voiceB = config.ttsVoiceB || "onyx";
       playPodcast(turns, (speaker) => (speaker === "B" ? voiceB : voiceA), undefined, () => setPlayingPodcast(false));
     } catch (e) {
-      addToast(`Podcast üretilemedi: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+      const msg = e instanceof Error ? e.message : "bilinmeyen";
+      addToast(`Podcast üretilemedi: ${msg}`, "error");
+      setMsgs([...history, { role: "assistant", content: `Hata: ${msg}` }]);
     } finally { setPodcasting(false); }
   };
 
@@ -295,7 +303,9 @@ export function NotebookStudio() {
         onDelta: (full) => setMsgs([...history, { role: "assistant", content: full }]),
       });
     } catch (e) {
-      setMsgs([...history, { role: "assistant", content: `Hata: ${e instanceof Error ? e.message : "bilinmeyen"}` }]);
+      const msg = e instanceof Error ? e.message : "bilinmeyen";
+      addToast(kind === "guide" ? `Çalışma rehberi üretilemedi: ${msg}` : `SSS üretilemedi: ${msg}`, "error");
+      setMsgs([...history, { role: "assistant", content: `Hata: ${msg}` }]);
     } finally { setKindBusy(false); }
   };
 
@@ -512,7 +522,7 @@ export function NotebookStudio() {
                 placeholder={enabledCount ? "Kaynaklara soru sor… (Enter = gönder)" : "Önce kaynak ekle…"}
                 className="flex-1 bg-bgsoft border border-line rounded-2xl px-3.5 py-2.5 text-sm outline-none focus:border-brand/50 resize-none max-h-32"
               />
-              <button onClick={() => void ask()} disabled={busy || narrating || podcasting || playingPodcast || guideBusy || faqBusy || !input.trim() || !enabledCount} className="shrink-0 w-10 h-10 grid place-items-center rounded-xl bg-brand text-[#111110] disabled:opacity-40 transition-opacity" title="Gönder">
+              <button onClick={() => void ask()} disabled={busy || narrating || podcasting || speaking || playingPodcast || guideBusy || faqBusy || !input.trim() || !enabledCount} className="shrink-0 w-10 h-10 grid place-items-center rounded-xl bg-brand text-[#111110] disabled:opacity-40 transition-opacity" title="Gönder">
                 {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
               </button>
             </div>
