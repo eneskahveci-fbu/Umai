@@ -78,7 +78,7 @@ export const PRESETS: Record<Provider, Preset> = {
   openrouter: {
     label: "🔀 OpenRouter",
     baseUrl: "https://openrouter.ai/api/v1",
-    model: "deepseek/deepseek-chat-v3-0324:free",
+    model: "poolside/laguna-m.1:free",
     keyHint: "OpenRouter anahtarı (sk-or-...)",
   },
   groq: {
@@ -196,15 +196,22 @@ export const PROVIDER_MODELS: Record<Provider, string[]> = {
     "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
   ],
   deepseek: ["deepseek-chat", "deepseek-reasoner"],
+  /* Tem 2026 itibarıyla OpenRouter'ın GERÇEK ücretsiz kataloğu ("pricing.prompt"
+     ve "pricing.completion" ikisi de 0) canlı /api/v1/models'ten doğrulandı —
+     eski DeepSeek/Qwen/Kimi/Llama/Gemini ":free" uçları artık ücretli (bu liste
+     bilinçli olarak güncellendi; eski uçları burada bırakmak kullanıcıyı
+     "ücretsiz" sanıp yanlışlıkla ücretli çağrı yapmaya iter). İlk 6 girdi
+     gerçekten anahtarsız/ücretsiz; son 2 ücretlidir (kredi gerekir).
+     "poolside/laguna-m.1:free" kod/yapılandırılmış-çıktı için en güçlü ücretsiz
+     seçenek olarak varsayılan (PRESETS.openrouter.model ile aynı). */
   openrouter: [
-    "deepseek/deepseek-chat-v3-0324:free",
-    "deepseek/deepseek-r1-0528:free",
-    "deepseek/deepseek-r1:free",
-    "qwen/qwen3-coder:free",
-    "moonshotai/kimi-k2:free",
+    "poolside/laguna-m.1:free",
+    "poolside/laguna-xs-2.1:free",
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "tencent/hy3:free",
+    "cohere/north-mini-code:free",
     "qwen/qwen-2.5-coder-32b-instruct",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "google/gemini-2.0-flash-exp:free",
     "openai/gpt-4o-mini",
   ],
   groq: [
@@ -212,6 +219,10 @@ export const PROVIDER_MODELS: Record<Provider, string[]> = {
     "llama-3.1-8b-instant",
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
+    /* Groq'un resmi model dokümantasyonunda (Tem 2026) doğrulanan, doğal
+       çok-modlu MoE Llama 4 — mevcut listedekilerden daha güçlü, hâlâ ücretsiz
+       geliştirici katmanında (yalnız hız sınırlı). */
+    "meta-llama/llama-4-scout-17b-16e-instruct",
     "qwen/qwen3-32b",
     "moonshotai/kimi-k2-instruct",
   ],
