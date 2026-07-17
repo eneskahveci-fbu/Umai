@@ -1136,6 +1136,13 @@ export async function POST(req: Request) {
     hasServerKey,
     isPro: !apiKey && hasServerKey && providerNeedsKey ? await isProRequest() : false,
   });
+  /* Şeffaflık: "free-fallback" öncesi asıl istenen sağlayıcı/modeli sakla —
+     kullanıcı seçtiği modelin ANLIK olarak kullanılamadığını (anahtar eksik/
+     çözülemedi) fark edemiyordu çünkü aşağıdaki geçiş tamamen sessizdi. Akış
+     başlarken bir fallback_event ile istemciye bildirilir (bkz. aşağıda). */
+  const requestedProvider = provider;
+  const requestedModel = model;
+  let noKeyFallback = false;
   if (access === "server") {
     baseUrl = (body.baseUrl || process.env.LLM_BASE_URL || "https://router.huggingface.co/v1").replace(/\/$/, "");
     model = body.model || process.env.LLM_MODEL || model;
@@ -1144,6 +1151,7 @@ export async function POST(req: Request) {
     /* Anahtarsız istek → ücretsiz Pollinations (yine yanıt alır, kırılma yok).
        Seçili model BAŞKA sağlayıcıya ait (ör. deepseek/...:free) — Pollinations'ta
        o ID yok, korunursa 404 olur. Geçerli bir Pollinations modeline eşle. */
+    noKeyFallback = true;
     baseUrl = "https://text.pollinations.ai/openai";
     provider = "pollinations";
     model = "openai";
@@ -1370,8 +1378,17 @@ export async function POST(req: Request) {
       `Bilgi gerektiren sorularda önce web_search ile ara, sonra ilgili sayfaları read_url ile oku.`;
   }
 
+  /* Aşağıdaki iki yoldan (araçsız passthrough + araçlı tur döngüsü) HER
+     İKİSİ de fallback_event kodlamak için kullanır — tek bir encoder yeter. */
+  const encoder = new TextEncoder();
+
   /* Tool-use disabled: simple passthrough — adayları sırayla dene, ilk başarılı
-     olanın gövdesini stream et. Hiçbiri başarmazsa son hatayı dön. */
+     olanın gövdesini stream et. Hiçbiri başarmazsa son hatayı dön.
+     ÖNEMLİ: seçili model için anahtar yoktu (noKeyFallback) YA DA birincil
+     aday başarısız olup bir sonrakine geçildiyse (c !== primary), akışın
+     BAŞINA bir fallback_event eklenir — aksi halde bu (en yaygın, araçsız
+     sohbet) yolda kullanıcı hangi modelin gerçekten yanıt verdiğini asla
+     göremez (bkz. streamRound tabanlı tool-use döngüsündeki eşdeğer mantık). */
   if (!body.tools && !body.webSearch) {
     const messages = [{ role: "system", content: sysPrompt }, ...body.messages];
     let lastStatus = 502, lastDetail = "", lastCand: Candidate = primary;
@@ -1384,9 +1401,31 @@ export async function POST(req: Request) {
         continue; // bağlantı hatası → sıradaki aday
       }
       if (upstream.ok && upstream.body) {
-        return new Response(upstream.body, {
-          headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" },
+        const headers = { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" };
+        if (!noKeyFallback && c === primary) {
+          return new Response(upstream.body, { headers });
+        }
+        /* Şeffaflık olayını akışın başına ekle, sonra upstream'i olduğu gibi ilet. */
+        const reader = upstream.body.getReader();
+        const prefix = encoder.encode(`data: ${JSON.stringify({
+          fallback_event: noKeyFallback
+            ? { provider: c.provider, model: c.model, reason: "no_key", requestedProvider, requestedModel }
+            : { provider: c.provider, model: c.model },
+        })}\n\n`);
+        const combined = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(prefix);
+          },
+          async pull(controller) {
+            const { done, value } = await reader.read();
+            if (done) { controller.close(); return; }
+            controller.enqueue(value);
+          },
+          cancel(reason) {
+            void reader.cancel(reason).catch(() => {});
+          },
         });
+        return new Response(combined, { headers });
       }
       lastStatus = upstream.status || 500;
       lastDetail = await upstream.text().catch(() => "");
@@ -1478,7 +1517,6 @@ export async function POST(req: Request) {
   const durableUser = durableSupabase ? (await durableSupabase.auth.getUser()).data.user : null;
   const durableChatId = durableUser && body.chatId ? body.chatId : null;
 
-  const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       /* İstemci bağlantıyı kapatınca (sekme kapanır/ağ gider) bunu güvenilir
@@ -1491,6 +1529,14 @@ export async function POST(req: Request) {
           try { controller.enqueue(chunk); } catch { clientGone = true; }
         },
       };
+      /* Seçili model için kullanılabilir anahtar yoktu → sessizce ücretsiz
+         Pollinations'a geçildi (bkz. yukarıda "free-fallback"). Kullanıcı
+         bunu hiç fark edemiyordu; akış başlarken açıkça bildir. */
+      if (noKeyFallback) {
+        safe.enqueue(encoder.encode(`data: ${JSON.stringify({
+          fallback_event: { provider, model, reason: "no_key", requestedProvider, requestedModel },
+        })}\n\n`));
+      }
       /* Turlar boyunca biriken tam yanıt metni — dayanıklılık kaydı bunu yazar. */
       let fullContent = "";
       let lastFinishReason: string | null = null;

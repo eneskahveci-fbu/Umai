@@ -2341,12 +2341,19 @@ export function CoderView() {
               useStore.getState().setPlanOnLast(String(parsed.plan_event.plan ?? ""));
               continue;
             }
-            /* Otomatik fallback: birincil model hata verdi, sunucu ücretsiz bir
-               alternatife geçti → kullanıcıyı şeffaflık için bilgilendir. */
+            /* Otomatik fallback: ya birincil model hata verdi ve sunucu ücretsiz
+               bir alternatife geçti, ya da seçili model için kullanılabilir
+               anahtar hiç yoktu ("no_key") — her iki durumda da kullanıcıyı
+               şeffaflık için bilgilendir. */
             if (parsed.fallback_event) {
               const fp = String(parsed.fallback_event.provider ?? "");
               const fm = String(parsed.fallback_event.model ?? "");
-              addToast(`Aktif model yanıt vermedi; ücretsiz alternatife geçildi: ${fp} / ${fm}`, "info");
+              if (parsed.fallback_event.reason === "no_key") {
+                const rp = String(parsed.fallback_event.requestedProvider ?? "");
+                addToast(`Seçili model (${rp}) için kullanılabilir bir API anahtarı bulunamadı — ücretsiz ${fp}/${fm} kullanıldı. Ayarlar → Modeller'den anahtarını kontrol et.`, "error");
+              } else {
+                addToast(`Aktif model yanıt vermedi; ücretsiz alternatife geçildi: ${fp} / ${fm}`, "info");
+              }
               continue;
             }
             /* Ajan Ekibi (Swarm) ilerleme olayı → todo paneli canlı güncelle */
