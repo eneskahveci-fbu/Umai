@@ -360,7 +360,19 @@ Playwright ile.
   **veya** token ile manuel ekleme.
 - **Hibrit köprü:** `scripts/terminal-bridge/bridge.mjs` (node-pty + ws) →
   terminal (WS) + `/fs/*` + `/exec` + tokensız `/health`; istemci tarafı
-  `src/lib/bridgeFs.ts`.
+  `src/lib/bridgeFs.ts`. **Yerel LLM** (`/llm/v1/chat/completions` +
+  `/llm/v1/models`, Tem 2026): aynı köprünün, aynı sunucudaki bir Ollama'ya
+  OpenAI-uyumlu proxy'si — Ollama yalnız `127.0.0.1:11434`'te dinler, dışarıya
+  hiç açılmaz, tek erişim yolu köprünün mevcut token doğrulaması. Uygulama
+  tarafında özel bir kod/kavram YOK — kullanıcı bunu normal bir "Özel"
+  sağlayıcı gibi ekler (`baseUrl: https://<alan>/llm/v1`, anahtar: köprü
+  token'ı) ve `/api/chat` üzerinden AYNI genel OpenAI-uyumlu yoldan geçer.
+  Tek-komut kurulum: `deploy/oracle/setup-llm.sh` (Ollama kurar, sunucu
+  RAM'ine göre Qwen2.5 14B/7B seçer, köprüyü günceller) — `deploy/oracle/
+  setup.sh` (asıl köprü kurulumu) TAMAMLANDIKTAN SONRA, ona ek olarak
+  çalışır. Amaç: Pollinations'tan çok daha güçlü bir model, tamamen
+  kullanıcının kendi (Oracle Always Free) sunucusunda, üçüncü tarafa veri
+  gitmeden.
 - **Native sarmalayıcı:** Capacitor (`capacitor.config.ts` canlı siteyi
   `server.url` ile yükler); `src/lib/native.ts` web'de no-op.
 

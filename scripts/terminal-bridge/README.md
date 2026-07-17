@@ -1,9 +1,12 @@
-# craft.coder — Hibrit Köprü (Terminal + Sunucu)
+# craft.coder — Hibrit Köprü (Terminal + Sunucu + Yerel LLM)
 
-Bu köprü craft.coder'a **tek bir adres** üzerinden iki şey birden açar:
+Bu köprü craft.coder'a **tek bir adres** üzerinden üç şey birden açar:
 
 1. **Terminal** (WebSocket) — gerçek shell (bash/zsh/PowerShell), canlı.
 2. **Sunucu** (HTTP) — gerçek dosya sistemi + komut çalıştırma + MCP.
+3. **Yerel LLM** (HTTP `/llm/v1/*`) — aynı sunucudaki Ollama'ya OpenAI-uyumlu
+   proxy (bkz. `deploy/oracle/setup-llm.sh`) — Pollinations'tan çok daha
+   güçlü bir model, tamamen kendi sunucunda, üçüncü tarafa veri gitmeden.
 
 Böylece craft.coder, tarayıcı içi sanal makine (WebContainer) yerine **gerçek
 bir ortamda** çalışır — tıpkı Claude Code gibi. Repo bağlamak zorunlu değildir;
@@ -42,6 +45,9 @@ Tek adresi yapıştırman yeterli — gerisi otomatik dolar:
 > Public sunucu için tek-komut kurulum: **`deploy/oracle/setup.sh`** (Caddy ile
 > otomatik HTTPS + systemd + güvenlik duvarı). Oracle Always Free veya herhangi
 > bir Ubuntu VPS'te çalışır.
+>
+> Kurulumdan SONRA, aynı sunucuya Pollinations'tan çok daha güçlü bir yerel
+> model (Ollama, Qwen2.5 7B/14B) eklemek için: **`deploy/oracle/setup-llm.sh`**.
 
 ## Ayarlar (ortam değişkenleri)
 
@@ -54,6 +60,20 @@ Tek adresi yapıştırman yeterli — gerisi otomatik dolar:
 | `CRAFT_SHELL` | sistem shell'i | Terminal shell'i (ör. `zsh`, `powershell.exe`) |
 | `ALLOWED_ORIGIN` | `*` | Tarayıcıdan doğrudan HTTP çağrısı için CORS origin |
 | `MAX_FILE_BYTES` | `2000000` | Okuma/yazma üst sınırı |
+| `OLLAMA_URL` | `http://127.0.0.1:11434` | `/llm/v1/*` proxy'sinin yönlendiği yerel Ollama adresi |
+
+## Yerel LLM (Ollama) — `/llm/v1/*`
+
+Aynı sunucuda çalışan bir Ollama'ya OpenAI-uyumlu proxy. Ollama dışarıya HİÇ
+açılmaz (yalnız `127.0.0.1:11434`); tek erişim yolu bu köprünün kendi
+token'ıdır. craft.ai'de normal bir **"Özel"** sağlayıcı gibi eklenir:
+
+- **Base URL**: `https://<alan>/llm/v1`
+- **Anahtar**: köprü token'ın (`Authorization: Bearer <token>`)
+- **Model**: Ollama'da çektiğin model adı (ör. `qwen2.5:14b`)
+
+Tek komutla kurulum (Ollama + model seçimi + köprü güncellemesi):
+`sudo bash deploy/oracle/setup-llm.sh` (bkz. `deploy/oracle/README.md`).
 
 ## Sağlık kontrolü
 
