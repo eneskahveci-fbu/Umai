@@ -358,3 +358,19 @@ create policy "kendi davetleri - select"
 drop policy if exists "kendi kaydını ekle" on public.referrals;
 create policy "kendi kaydını ekle"
   on public.referrals for insert with check (auth.uid() = referred_id);
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- KART HATIRLATMA DURUMU (Kartlar/Anki — günlük push bildirimi dedup)
+-- Vercel Cron (bkz. vercel.json + /api/cron/cards-reminder) günde bir kez
+-- vadesi gelmiş kartı olan, push'a abone kullanıcılara bildirim gönderir.
+-- Bu tablo AYNI GÜN içinde ikinci kez göndermemek için son gönderim
+-- tarihini tutar. RLS AÇIK ama HİÇBİR politika YOK — istemciden (sahibi
+-- dahil) hiç kimse erişemez, yalnızca service-role (cron) okur/yazar.
+-- ─────────────────────────────────────────────────────────────────────────
+create table if not exists public.card_reminder_state (
+  user_id        uuid primary key references auth.users(id) on delete cascade,
+  last_sent_date date not null,
+  updated_at     timestamptz not null default now()
+);
+
+alter table public.card_reminder_state enable row level security;
