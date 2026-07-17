@@ -1489,7 +1489,8 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     <div>
                       <div className="text-sm font-semibold">{pushSubscribed ? "Push bildirimi açık" : "Push bildirimi aç"}</div>
                       <div className="text-xs text-muted mt-0.5">
-                        “Arka planda çalıştır” ile başlattığın görev bitince, tarayıcı TAMAMEN kapalı olsa bile bildirim gelir.
+                        “Arka planda çalıştır” ile başlattığın görev bitince ya da Kartlar&apos;da tekrar zamanı gelen kartların
+                        olduğunda, tarayıcı TAMAMEN kapalı olsa bile bildirim gelir.
                       </div>
                     </div>
                   </button>
