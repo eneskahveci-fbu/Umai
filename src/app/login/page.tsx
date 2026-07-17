@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Eye, EyeOff, KeyRound, Loader2, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { captureReferralCode } from "@/lib/referral";
 
 type Mode = "login" | "signup";
 
@@ -33,6 +34,10 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+
+  /* Referral linki (/?ref=<uuid>) tıklanıp "Ücretsiz başla" ile buraya
+     düşülürse de kodu yakala — kayıt sonrası app/page.tsx bunu işler. */
+  useEffect(() => { captureReferralCode(); }, []);
 
   const validate = () => {
     const errs: typeof fieldErrors = {};
