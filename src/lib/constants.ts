@@ -90,7 +90,12 @@ export const PRESETS: Record<Provider, Preset> = {
   gemini: {
     label: "✨ Google Gemini (Ücretsiz · Önerilen)",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    model: "gemini-2.5-flash",
+    /* "gemini-flash-latest" Google'ın kendi resmî takma adı (ai.google.dev/
+       gemini-api/docs/models, Tem 2026 canlı doğrulandı) — Google'ın o an
+       önerdiği güncel flash modeline otomatik işaret eder, bu yüzden versiyon
+       numarası ilerledikçe (ör. 2.5→3.5) BAYATLAMAZ. Sabit bir sürüm numarası
+       yerine bilinçli olarak bu seçildi. */
+    model: "gemini-flash-latest",
     keyHint: "AIza... (aistudio.google.com/apikey — ücretsiz)",
   },
   mistral: {
@@ -226,11 +231,19 @@ export const PROVIDER_MODELS: Record<Provider, string[]> = {
     "qwen/qwen3-32b",
     "moonshotai/kimi-k2-instruct",
   ],
+  /* Tem 2026'da ai.google.dev/gemini-api/docs/models'ten canlı doğrulandı:
+     "gemini-2.0-flash" Google tarafından KAPATILDI ("Shut down" — dokümanda
+     "Previous models"/deprecated bölümünde) — seçen kullanıcının her çağrısı
+     başarısız olup sessizce (yalnızca bir toast ile) ücretsiz bir alternatife
+     düşüyordu; listeden kaldırıldı. "gemini-flash-latest" (auto-updating takma
+     ad) ve doğrulanmış güncel "gemini-3.5-flash" eklendi; 2.5 serisi hâlâ
+     canlı/güncel olduğundan korundu. */
   gemini: [
+    "gemini-flash-latest",
+    "gemini-3.5-flash",
     "gemini-2.5-flash",
     "gemini-2.5-pro",
     "gemini-2.5-flash-lite",
-    "gemini-2.0-flash",
   ],
   mistral: [
     "mistral-large-latest",
