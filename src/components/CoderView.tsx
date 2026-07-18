@@ -2031,13 +2031,17 @@ export function CoderView() {
     let boostDrafts: string[] = [];
     let boostJudge: import("@/lib/boost").DraftJudge | null = null;
     const toolsWanted = store.toolsEnabled && (!!store.repo || !!(store.config.localMode && store.config.localBridgeUrl?.trim()));
-    const qualityForced = !!store.config.qualityMode;
-    /* FÜZYON yalnız üretim işlerinde (pilot.fusion) ya da kullanıcı Kalite/Füzyon
-       çipini elle açtıysa. Normal sohbet turlarında ekstra taslak çağrısı YOK.
-       Kullanıcı Ayarlar → Fusion'da "Kapalı" seçtiyse bu hat hiç çalışmaz —
-       qualityMode/pilot.quality yine de aşağıdaki tek-geçişli (ekstra API
-       çağrısı olmayan) hafif kalite talimatına düşer, bkz. finalSystemPrompt. */
-    if (store.config.fusionMode !== "off" && (pilot?.fusion || qualityForced) && !useSwarm && !useResearch && !toolsWanted && !isContinuation) {
+    /* FÜZYON yalnız üretim işlerinde (pilot.fusion — autoFusion, mesajda hem bir
+       üretim nesnesi (site/uygulama/kod…) hem üretim fiili birlikte geçtiğinde)
+       tetiklenir. ÖNCEDEN varsayılan-açık config.qualityMode de bu ağır 3-taslak+
+       hakem hattını tetikliyordu — "Otomatik Fusion her mesajda çalışıyor"
+       şikayetinin kök sebebi buydu (qualityMode her kullanıcıda varsayılan açık
+       olduğundan neredeyse her uygun mesaj bu pahalı hattı ateşliyordu). qualityMode
+       artık YALNIZCA aşağıdaki hafif, ekstra API çağrısı gerektirmeyen tek-geçişli
+       talimata etki eder (bkz. finalSystemPrompt) — Ayarlar → Fusion sekmesinin
+       "Kapalı" açıklamasında zaten belgelenen davranışla eşleşir. Kullanıcı
+       Ayarlar → Fusion'da "Kapalı" seçtiyse bu hat hiç çalışmaz. */
+    if (store.config.fusionMode !== "off" && pilot?.fusion && !useSwarm && !useResearch && !toolsWanted && !isContinuation) {
       try {
         useStore.getState().updateLastThinking("✦ Füzyon: 3 iç taslak hazırlanıyor…");
         const freeModelNames = await fetchTextModels();
