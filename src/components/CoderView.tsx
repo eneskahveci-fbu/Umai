@@ -22,8 +22,6 @@ import {
   FolderOpen,
   Folder,
   GraduationCap,
-  Circle,
-  CircleCheck,
   GitPullRequest,
   Globe,
   MoreHorizontal,
@@ -2164,7 +2162,18 @@ export function CoderView() {
     let full = isContinuation ? (lastMsg?.content ?? "") : ""; // try/catch ortak erişimi
     let cutAtLength = false; // finish_event: "length" ⇒ otomatik devam tetiklenebilir
     let realUsage: { prompt: number; completion: number } | null = null; // sağlayıcı gerçek token
-    let thinkingFull = ""; // reasoning delta'ları birikir
+    /* reasoning delta'ları birikir. Boştan BAŞLAMAZ: Füzyon/Hakem bloğu bu
+       turda zaten "•••" panosuna bir durum notu ("✦ Füzyon: N taslak
+       birleştiriliyor…" vb.) yazmış olabilir — buradan "" ile başlamak,
+       gerçek reasoning delta'sı gelir gelmez o notu SESSİZCE SİLİYORDU
+       (updateLastThinking her zaman TAM DEĞİŞTİRME yapar, birleştirmez).
+       Var olan notu üstüne ekleyerek koru; yoksa (Füzyon çalışmadıysa)
+       zaten boş başlar, davranış değişmez. */
+    let thinkingFull = (() => {
+      const s = useStore.getState();
+      const prior = s.chats.find((c) => c.id === s.currentId)?.messages.slice(-1)[0]?.thinking ?? "";
+      return prior ? `${prior}\n\n` : "";
+    })();
     try {
       /* Projeye özel Skills: aktif projede skillIds tanımlıysa global "enabled"
          yerine yalnızca o set kullanılır; aksi halde global aktif skills. */
@@ -3467,10 +3476,6 @@ export function CoderView() {
                           />
                         </div>
                       )}
-                      {/* Canlı görev paneli — her modda, akış sırasında da görünür. */}
-                      {isLastAssistant && m.plan && (
-                        <TaskPanel plan={m.plan} streaming={streaming} />
-                      )}
                       {isLastAssistant && !streaming && config.planApprovalMode && m.plan && (
                         <div className="ml-11 max-w-2xl mt-2 flex items-center gap-2 px-3 py-2 rounded-xl border border-brand/30 bg-brand/5 text-xs">
                           <ListChecks size={13} className="text-brand shrink-0" />
@@ -3539,7 +3544,7 @@ export function CoderView() {
                         />
                       )}
                       {isLastAssistant && !streaming && checkpoints.length > 0 && repo && (
-                        <div className="ml-11 max-w-2xl mt-2 rounded-xl border border-line bg-bgsoft/50 text-xs overflow-hidden">
+                        <div className="ml-11 max-w-2xl mt-2 rounded-xl border border-line/50 bg-bgsoft/30 text-xs overflow-hidden">
                           <div className="flex items-center gap-2 px-3 py-2">
                             <RotateCcw size={13} className="text-yellow shrink-0" />
                             {checkpoints.length === 1 ? (
@@ -3577,7 +3582,7 @@ export function CoderView() {
                             </button>
                           </div>
                           {checkpoints.length > 1 && checkpointsExpanded && (
-                            <ul className="px-3 pb-2.5 pt-0.5 space-y-1 border-t border-line/40">
+                            <ul className="px-3 pb-2.5 pt-0.5 space-y-1 border-t border-line/30">
                               {checkpoints.map((c) => (
                                 <li key={c.path} className="text-muted/70 font-mono text-[11px] truncate">{c.path}</li>
                               ))}
@@ -4091,62 +4096,10 @@ function getTreeItems(node: import("@/lib/types").TreeNode): { path: string; typ
 }
 
 /* ── Token + cost rozeti ── */
-/* Canlı görev paneli — update_plan'in yazdığı [ ]/[~]/[x] listesini ikonlu
-   checklist olarak gösterir; akış sırasında gerçek zamanlı güncellenir. */
-type TaskStatus = "todo" | "doing" | "done";
-function parsePlan(plan: string): { status: TaskStatus; text: string }[] {
-  return plan
-    .split("\n")
-    .map((line) => {
-      const m = line.match(/^\s*(?:[-*]\s*)?\[([ ~xX])\]\s*(.*)$/);
-      if (!m) return null;
-      const mark = m[1].toLowerCase();
-      const status: TaskStatus = mark === "x" ? "done" : mark === "~" ? "doing" : "todo";
-      return { status, text: m[2].trim() };
-    })
-    .filter((s): s is { status: TaskStatus; text: string } => s !== null && s.text.length > 0);
-}
-
-function TaskPanel({ plan, streaming }: { plan: string; streaming: boolean }) {
-  const [collapsed, setCollapsed] = useState(false);
-  const steps = parsePlan(plan);
-  if (steps.length === 0) return null;
-  const done = steps.filter((s) => s.status === "done").length;
-  const allDone = done === steps.length;
-
-  return (
-    <div className="ml-11 max-w-2xl mt-2 rounded-xl border border-line/60 bg-bgsoft/40 overflow-hidden">
-      <button
-        onClick={() => setCollapsed((c) => !c)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-bgsoft/60 transition-colors"
-      >
-        <ListChecks size={13} className={allDone ? "text-green shrink-0" : "text-brand shrink-0"} />
-        <span className="font-semibold flex-1 text-left">Görevler</span>
-        <span className="font-mono text-muted/70">{done}/{steps.length}</span>
-        {streaming && !allDone && <Loader2Icon size={11} className="animate-spin text-brand/70" />}
-        <ChevronDown size={13} className={`text-muted/50 transition-transform ${collapsed ? "-rotate-90" : ""}`} />
-      </button>
-      {!collapsed && (
-        <ul className="px-3 pb-2.5 pt-0.5 space-y-1.5">
-          {steps.map((s, i) => (
-            <li key={i} className="flex items-start gap-2 text-xs">
-              {s.status === "done" ? (
-                <CircleCheck size={14} className="text-green shrink-0 mt-px" />
-              ) : s.status === "doing" ? (
-                <Loader2Icon size={14} className="text-brand shrink-0 mt-px animate-spin" />
-              ) : (
-                <Circle size={14} className="text-muted/40 shrink-0 mt-px" />
-              )}
-              <span className={s.status === "done" ? "text-muted/60 line-through" : s.status === "doing" ? "text-ink font-medium" : "text-muted"}>
-                {s.text}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
+/* Görev paneli (update_plan) artık yalnız MessageBubble.tsx'te render edilir
+   (bkz. oradaki PlanPanel) — burada AYRICA bir TaskPanel daha vardı, aynı
+   `m.plan` verisini FARKLI bir ayrıştırıcıyla ikinci kez çiziyordu (aktif
+   turda ikisi aynı anda görünüyordu). Tek doğruluk kaynağı için silindi. */
 
 /* Sağlayıcıların ücretsiz katman limitleri (canlı uç yoksa gösterilen bilgi). */
 const FREE_TIER_INFO: Partial<Record<string, string>> = {
