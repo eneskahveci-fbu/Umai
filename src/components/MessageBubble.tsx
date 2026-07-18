@@ -14,12 +14,13 @@ import {
   Highlighter, Loader2, Pencil, RefreshCw, Search, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, Users, Volume2, VolumeX, Wrench, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { ChatMessage, CompareResult, SwarmState } from "@/lib/types";
+import type { ChatMessage, CompareResult, FileCheckpoint, SwarmState } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { CodeBlock } from "./CodeBlock";
 import { ALL_AGENTS } from "@/lib/agents";
 import { playTts, speakableText, stopTts } from "@/lib/pollinations";
 import { toggleChecklistLine } from "@/lib/checklist";
+import { detectLanguage } from "@/lib/editor";
 
 /* `<li>` (task-list-item) render'ında bulunan güvenilir satır numarasını,
    içindeki checkbox `<input>`'a taşımak için — bkz. MessageBubbleImpl'deki
@@ -146,14 +147,29 @@ function getKeyArg(name: string, args: Record<string, unknown>): string {
   }
 }
 
+/* str_replace'in TAM yeni dosya içeriği yok — yalnız old_string/new_string.
+   Ama old_string sunucuda BENZERSİZ+birebir eşleşme şartıyla doğrulanmış
+   (aksi halde araç hata döner) — bu yüzden checkpoint'teki eski tam içerik
+   üzerinde AYNI değişimi istemci tarafında güvenle tekrarlayıp diff için tam
+   "sonra" içeriğini yeniden kurabiliriz. old_string bulunamazsa (ör. checkpoint
+   farklı bir çağrıya aitse) null döner — YANLIŞ bir diff göstermek yerine
+   Diff butonu gizlenir. */
+function applyStrReplace(original: string, oldStr: string, newStr: string, all: boolean): string | null {
+  if (!oldStr || !original.includes(oldStr)) return null;
+  return all ? original.split(oldStr).join(newStr) : original.replace(oldStr, newStr);
+}
+
 function ToolCallCard({
   call,
   isLast,
+  checkpoints,
 }: {
   call: NonNullable<ChatMessage["toolCalls"]>[number];
   isLast: boolean;
+  checkpoints?: FileCheckpoint[];
 }) {
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const isRunning = call.status === "pending";
   const isError = call.status === "error";
   const args = (() => { try { return JSON.parse(call.arguments || "{}"); } catch { return {}; } })();
@@ -165,6 +181,35 @@ function ToolCallCard({
         ? ((call.endedAt - call.startedAt) / 1000).toFixed(1) + "s"
         : (call.endedAt - call.startedAt) + "ms"
       : null;
+
+  /* Dosya düzenlemelerinde (write_file/str_replace) gerçek bir diff — Claude
+     Code'daki gibi. write_file'ın yeni içeriği zaten `content` argümanında tam
+     olarak var; str_replace'inki checkpoint'in eski içeriğine uygulanarak
+     yeniden kurulur (yukarıdaki not). */
+  const diffInfo = (() => {
+    if (isRunning || isError) return null;
+    if (call.name !== "write_file" && call.name !== "str_replace") return null;
+    const path = String(args.path ?? "");
+    if (!path) return null;
+    const cp = checkpoints?.find((c) => c.path === path);
+    if (!cp) return null;
+    if (call.name === "write_file") {
+      return { path, original: cp.previous ?? "", newCode: String(args.content ?? "") };
+    }
+    if (cp.previous == null) return null;
+    const newCode = applyStrReplace(cp.previous, String(args.old_string ?? ""), String(args.new_string ?? ""), !!args.replace_all);
+    if (newCode == null) return null;
+    return { path, original: cp.previous, newCode };
+  })();
+
+  const copyResult = async () => {
+    if (!call.result) return;
+    try {
+      await navigator.clipboard.writeText(call.result);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* yoksay */ }
+  };
 
   return (
     <div className="relative">
@@ -200,16 +245,36 @@ function ToolCallCard({
           )}
           <div className="ml-auto flex items-center gap-1 shrink-0">
             {elapsed && (
-              <span className="text-[10px] text-muted/30 font-mono tabular-nums">{elapsed}</span>
+              <span className="text-[10px] text-muted/30 font-mono tabular-nums mr-0.5">{elapsed}</span>
             )}
-            {call.result && (
-              <button
-                onClick={() => setOpen((o) => !o)}
-                className="[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/tool:opacity-100 transition-opacity flex items-center gap-0.5 text-[10px] text-muted/40 hover:text-muted/70 px-1 py-0.5 rounded"
-              >
-                {open ? <ChevronUp size={9} /> : <ChevronDown size={9} />}
-              </button>
-            )}
+            <div className="flex items-center gap-1 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/tool:opacity-100 transition-opacity">
+              {diffInfo && (
+                <button
+                  onClick={() => useStore.getState().setDiffModal({ path: diffInfo.path, original: diffInfo.original, newCode: diffInfo.newCode, language: detectLanguage(diffInfo.path) })}
+                  title="Değişikliği diff olarak gör"
+                  className="flex items-center gap-0.5 text-[10px] text-muted/40 hover:text-brand px-1 py-0.5 rounded"
+                >
+                  <FileText size={9} /> Diff
+                </button>
+              )}
+              {call.result && (
+                <button
+                  onClick={copyResult}
+                  title="Çıktıyı kopyala"
+                  className="flex items-center gap-0.5 text-[10px] text-muted/40 hover:text-muted/70 px-1 py-0.5 rounded"
+                >
+                  {copied ? <Check size={9} /> : <Copy size={9} />}
+                </button>
+              )}
+              {call.result && (
+                <button
+                  onClick={() => setOpen((o) => !o)}
+                  className="flex items-center gap-0.5 text-[10px] text-muted/40 hover:text-muted/70 px-1 py-0.5 rounded"
+                >
+                  {open ? <ChevronUp size={9} /> : <ChevronDown size={9} />}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -224,49 +289,68 @@ function ToolCallCard({
   );
 }
 
-/* ── Plan paneli (update_plan) ─────────────────────────────────────── */
-
-function PlanPanel({ plan }: { plan: string }) {
-  const steps = plan
+/* ── Görevler paneli (update_plan) ─────────────────────────────────────
+   Öncesinde bu veri (`message.plan`) İKİ farklı bileşende, İKİ farklı
+   ayrıştırıcıyla render ediliyordu (burada + CoderView.tsx'in ayrı
+   TaskPanel'i) — aynı satır ikisinde farklı yorumlanabiliyordu (ör.
+   "- [x] adım" burada ham metin olarak sızarken orada doğru "tamamlandı"
+   sayılıyordu). Tek doğruluk kaynağı için birleştirildi; ayrıştırıcı
+   update_plan'ın tools.ts'teki gerçek sözleşmesiyle ('[ ]'/'[~]'/'[x]',
+   opsiyonel '-'/'*' madde imi) eşleşir. */
+type PlanStepStatus = "pending" | "active" | "done";
+function parsePlanSteps(plan: string): { status: PlanStepStatus; text: string }[] {
+  return plan
     .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map((l) => {
-      const m = /^\[([ x~\-])\]\s*(.*)$/.exec(l);
-      if (!m) return { status: "pending" as const, text: l.replace(/^[-*]\s*/, "") };
-      const c = m[1];
-      const status = c === "x" ? ("done" as const) : c === "~" || c === "-" ? ("active" as const) : ("pending" as const);
-      return { status, text: m[2] };
-    });
+    .map((line) => {
+      const m = line.match(/^\s*(?:[-*]\s*)?\[([ ~xX])\]\s*(.*)$/);
+      if (!m) return null;
+      const mark = m[1].toLowerCase();
+      const status: PlanStepStatus = mark === "x" ? "done" : mark === "~" ? "active" : "pending";
+      return { status, text: m[2].trim() };
+    })
+    .filter((s): s is { status: PlanStepStatus; text: string } => s !== null && s.text.length > 0);
+}
+
+function PlanPanel({ plan, streaming }: { plan: string; streaming?: boolean }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const steps = parsePlanSteps(plan);
   if (!steps.length) return null;
   const done = steps.filter((s) => s.status === "done").length;
+  const allDone = done === steps.length;
   return (
     <div className="mb-3 border border-line/50 rounded-xl overflow-hidden bg-bgsoft/30">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-line/30 text-xs">
-        <ListChecks size={12} className="text-brand" />
-        <span className="font-semibold">Plan</span>
+      <button
+        onClick={() => setCollapsed((c) => !c)}
+        className="w-full flex items-center gap-2 px-3 py-2 border-b border-line/30 text-xs hover:bg-bgsoft/40 transition-colors"
+      >
+        <ListChecks size={12} className={allDone ? "text-green" : "text-brand"} />
+        <span className="font-semibold">Görevler</span>
         <span className="text-muted/50 font-mono ml-auto tabular-nums">{done}/{steps.length}</span>
-      </div>
-      <div className="px-3 py-2.5 space-y-1.5">
-        {steps.map((s, i) => (
-          <div key={i} className="flex items-start gap-2 text-xs">
-            {s.status === "done" ? (
-              <CircleCheck size={12} className="text-green shrink-0 mt-0.5" />
-            ) : s.status === "active" ? (
-              <Loader2 size={12} className="text-brand shrink-0 mt-0.5 animate-spin" />
-            ) : (
-              <Circle size={12} className="text-muted/30 shrink-0 mt-0.5" />
-            )}
-            <span className={
-              s.status === "done" ? "text-muted/50 line-through" :
-              s.status === "active" ? "text-ink font-medium" :
-              "text-muted/70"
-            }>
-              {s.text}
-            </span>
-          </div>
-        ))}
-      </div>
+        {streaming && !allDone && <Loader2 size={11} className="animate-spin text-brand/70" />}
+        <ChevronDown size={12} className={`text-muted/40 transition-transform ${collapsed ? "-rotate-90" : ""}`} />
+      </button>
+      {!collapsed && (
+        <div className="px-3 py-2.5 space-y-1.5">
+          {steps.map((s, i) => (
+            <div key={i} className="flex items-start gap-2 text-xs">
+              {s.status === "done" ? (
+                <CircleCheck size={12} className="text-green shrink-0 mt-0.5" />
+              ) : s.status === "active" ? (
+                <Loader2 size={12} className="text-brand shrink-0 mt-0.5 animate-spin" />
+              ) : (
+                <Circle size={12} className="text-muted/30 shrink-0 mt-0.5" />
+              )}
+              <span className={
+                s.status === "done" ? "text-muted/50 line-through" :
+                s.status === "active" ? "text-ink font-medium" :
+                "text-muted/70"
+              }>
+                {s.text}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -420,7 +504,7 @@ function CommandPanel({ commands }: { commands: NonNullable<ChatMessage["command
 
 /* ── Tool call group ───────────────────────────────────────────────── */
 
-function ToolCallGroup({ calls }: { calls: NonNullable<ChatMessage["toolCalls"]> }) {
+function ToolCallGroup({ calls, checkpoints }: { calls: NonNullable<ChatMessage["toolCalls"]>; checkpoints?: FileCheckpoint[] }) {
   const running = calls.filter((c) => c.status === "pending");
   const done    = calls.filter((c) => c.status !== "pending");
   const [collapsed, setCollapsed] = useState(false);
@@ -468,7 +552,7 @@ function ToolCallGroup({ calls }: { calls: NonNullable<ChatMessage["toolCalls"]>
       {!collapsed && (
         <div className="px-3 pt-0.5 pb-1">
           {calls.map((tc, i) => (
-            <ToolCallCard key={tc.id} call={tc} isLast={i === calls.length - 1} />
+            <ToolCallCard key={tc.id} call={tc} isLast={i === calls.length - 1} checkpoints={checkpoints} />
           ))}
         </div>
       )}
@@ -864,8 +948,8 @@ function MessageBubbleImpl({
         {/* Terminal komutları (todo kutusu) */}
         {message.commands && message.commands.length > 0 && <CommandPanel commands={message.commands} />}
 
-        {/* Plan */}
-        {message.plan && <PlanPanel plan={message.plan} />}
+        {/* Görevler */}
+        {message.plan && <PlanPanel plan={message.plan} streaming={streamingNow} />}
 
         {/* Web arama kaynakları */}
         {message.sources && message.sources.length > 0 && (
@@ -908,10 +992,13 @@ function MessageBubbleImpl({
           </div>
         )}
 
-        {/* Tool calls */}
-        {message.toolCalls?.length ? (
-          <ToolCallGroup calls={message.toolCalls} />
-        ) : null}
+        {/* Tool calls — update_plan hariç: o zaten yukarıdaki Görevler panelinde
+           tam olarak gösteriliyor, burada ikinci kez "Plan güncellendi" satırı
+           olarak tekrar etmesin. */}
+        {(() => {
+          const visibleCalls = message.toolCalls?.filter((c) => c.name !== "update_plan");
+          return visibleCalls?.length ? <ToolCallGroup calls={visibleCalls} checkpoints={message.checkpoints} /> : null;
+        })()}
 
         {/* Images */}
         {message.images?.map((img, i) => (
@@ -1002,12 +1089,23 @@ function MessageBubbleImpl({
               </button>
             )}
           </div>
-        ) : streamingNow && !message.thinking && !message.toolCalls?.length ? (
-          <span className="inline-flex items-center gap-1.5 py-1 text-muted/50" aria-label="Yazıyor">
-            <span className="typing-dot" />
-            <span className="typing-dot delay-1" />
-            <span className="typing-dot delay-2" />
-          </span>
+        ) : streamingNow && !message.toolCalls?.length ? (
+          message.thinking ? (
+            /* İçerik henüz gelmedi ama "•••" panosunda bir şeyler birikiyor
+               (Füzyon durumu / gerçek reasoning) — sessiz bir imleç yerine
+               bunun GERÇEKTEN çalıştığını gösteren bir etiket (aksi halde
+               Füzyon/hakem aşaması boyunca akış "takılmış" gibi görünüyordu). */
+            <span className="inline-flex items-center gap-1.5 py-1 text-brand/70 text-[12.5px]">
+              <Brain size={13} className="animate-pulse" />
+              <span>Düşünüyor…</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 py-1 text-muted/50" aria-label="Yazıyor">
+              <span className="typing-dot" />
+              <span className="typing-dot delay-1" />
+              <span className="typing-dot delay-2" />
+            </span>
+          )
         ) : (
           <span className="caret" />
         )}
