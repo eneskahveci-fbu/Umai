@@ -39,6 +39,11 @@ const PRICES: Record<string, ModelPrice> = {
   "mistral-large": { inputPerMTok: 2.00, outputPerMTok: 6.00 },
   "codestral": { inputPerMTok: 0.30, outputPerMTok: 0.90 },
   // Google Gemini
+  /* "gemini-flash-latest" Google'ın otomatik-güncellenen takma adı — Tem 2026
+     itibarıyla en güncel flash modeline (3.5-flash) işaret ediyor, aynı
+     fiyatla tahmin edilir (bkz. ai.google.dev/gemini-api/docs/pricing). */
+  "gemini-flash-latest": { inputPerMTok: 1.50, outputPerMTok: 9.00 },
+  "gemini-3.5-flash": { inputPerMTok: 1.50, outputPerMTok: 9.00 },
   "gemini-2.5-flash-lite": { inputPerMTok: 0.10, outputPerMTok: 0.40 },
   "gemini-2.5-flash": { inputPerMTok: 0.30, outputPerMTok: 2.50 },
   "gemini-2.5-pro": { inputPerMTok: 1.25, outputPerMTok: 10.00 },
