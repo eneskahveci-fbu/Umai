@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   asBranch,
   asString,
-  asToken,
+  asGitlabToken,
   isValidationError,
   readJson,
 } from "@/lib/validate";
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     }
     namespace = asString(body.namespace, "namespace", { min: 1, max: 200 });
     repo = asString(body.repo, "repo", { min: 1, max: 200 });
-    token = asToken(body.token);
+    token = asGitlabToken(body.token);
   } catch (e) {
     if (isValidationError(e)) {
       return NextResponse.json({ error: e.message }, { status: e.status });

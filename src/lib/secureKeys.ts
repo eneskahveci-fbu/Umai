@@ -100,7 +100,13 @@ export async function encryptField(plain: string): Promise<string> {
 export async function decryptField(token: string): Promise<string> {
   if (!isEncrypted(token) || !isCryptoAvailable()) return token;
   try {
-    const [, ivb64, ctb64] = token.split(":");
+    /* token biçimi "enc:1:<ivB64>:<ctB64>" — split(":") 4 parça verir
+       (["enc","1",iv,ct]); ilk İKİ parçayı (önek + sürüm) atla. Yalnız 1
+       parça atlamak iv/ct'yi bir kaydırıp şifreyi kalıcı olarak çözülemez
+       yapıyordu (atob geçersiz veri hatası verip catch'e düşüyor, token
+       değişmeden dönüyordu — kullanıcı anahtar girmiş gibi görünse de
+       sağlayıcıya hep boş anahtar gidiyordu). */
+    const [, , ivb64, ctb64] = token.split(":");
     const key = await getKey();
     const pt = await crypto.subtle.decrypt(
       { name: "AES-GCM", iv: b64.dec(ivb64) },
