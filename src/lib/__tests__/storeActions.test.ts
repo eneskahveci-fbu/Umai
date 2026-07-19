@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { useStore } from "../store";
 import { DEFAULT_CONFIG, POLLINATIONS_DEFAULT_MODEL } from "../constants";
+import { installFakeBrowserCrypto, removeFakeBrowserCrypto } from "./fakeBrowserCrypto";
 
 /* store.ts'in saf yardımcıları (mergeConfigs/mergeChats/migrateRepos) zaten
    config.test.ts/mergeChats.test.ts'te test ediliyor. Bu dosya, o dosyaların
@@ -333,6 +334,57 @@ describe("useStore — toast/görev kuyruğu", () => {
     const id = useStore.getState().enqueueJob("hedef");
     useStore.getState().removeJob(id);
     expect(useStore.getState().backgroundJobs.find((j) => j.id === id)).toBeUndefined();
+  });
+});
+
+describe("useStore — setUser izolasyon süpürgesi (Kritik-7)", () => {
+  it("hesap değişiminde (prev≠id) snippets ve backgroundJobs de temizlenir", () => {
+    useStore.setState({ userId: "userA" });
+    useStore.getState().addSnippet({ title: "gizli", language: "text", code: "A'nın promptu" });
+    useStore.getState().enqueueJob("A'nın hedef metni");
+    expect(useStore.getState().snippets).toHaveLength(1);
+    expect(useStore.getState().backgroundJobs).toHaveLength(1);
+
+    useStore.getState().setUser("userB", "b@example.com");
+
+    /* Önceki kullanıcının snippet kütüphanesi/görev hedef metni yeni hesaba
+       sızmamalı — yalnız config/chats değil, bunlar da CONFIG_OWNER_KEY'e
+       bağlı olmadığından ayrıca süpürülmesi gerekiyordu. */
+    expect(useStore.getState().snippets).toHaveLength(0);
+    expect(useStore.getState().backgroundJobs).toHaveLength(0);
+    expect(useStore.getState().chats).toHaveLength(0);
+  });
+
+  it("ilk giriş (prev yok, foreignLocal yok) snippets/backgroundJobs'a dokunmaz", () => {
+    useStore.setState({ userId: null });
+    useStore.getState().addSnippet({ title: "kalıcı", language: "text", code: "içerik" });
+    useStore.getState().setUser("userA", "a@example.com");
+    expect(useStore.getState().snippets).toHaveLength(1);
+  });
+});
+
+describe("useStore — rehydrateSecrets yarış koruması (Kritik-7)", () => {
+  beforeAll(() => installFakeBrowserCrypto());
+  afterAll(() => removeFakeBrowserCrypto());
+
+  it("decrypt sürerken config başka bir yerden değişirse (hesap değişimi) bayat sonucu UYGULAMAZ", async () => {
+    const staleConfig = { ...DEFAULT_CONFIG, providerKeys: { groq: "gsk_STALE_USER_A_KEY" } };
+    useStore.setState({ config: staleConfig });
+    const pending = useStore.getState().rehydrateSecrets(); // `cur` bu anlık görüntüyü yakalar, decrypt async başlar
+    /* Decrypt tamamlanmadan ÖNCE (gerçek yarış penceresi) — setUser/syncConfig'in
+       yaptığı gibi config'i BAŞKA bir referansla değiştir. */
+    const freshConfig = { ...DEFAULT_CONFIG, providerKeys: { groq: "gsk_USER_B_REAL_KEY" } };
+    useStore.setState({ config: freshConfig });
+    await pending;
+    /* rehydrateSecrets bayat kullanıcı A anlık görüntüsünü uygulamamalı —
+       B'nin gerçek config'i korunmalı. */
+    expect(useStore.getState().config.providerKeys?.groq).toBe("gsk_USER_B_REAL_KEY");
+  });
+
+  it("yarış YOKSA normal şekilde çözüp uygular", async () => {
+    useStore.setState({ config: { ...DEFAULT_CONFIG, providerKeys: { groq: "gsk_normal" } } });
+    await useStore.getState().rehydrateSecrets();
+    expect(useStore.getState().config.providerKeys?.groq).toBe("gsk_normal");
   });
 });
 

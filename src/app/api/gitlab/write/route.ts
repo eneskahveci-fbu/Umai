@@ -6,7 +6,7 @@ import {
   asOptString,
   asRepoPath,
   asString,
-  asToken,
+  asGitlabToken,
   isValidationError,
   readJson,
 } from "@/lib/validate";
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     path = asRepoPath(body.path);
     content = asContent(body.content);
     message = asOptString(body.message, "message", { max: 500 });
-    token = asToken(body.token);
+    token = asGitlabToken(body.token);
   } catch (e) {
     if (isValidationError(e)) {
       return NextResponse.json({ error: e.message }, { status: e.status });

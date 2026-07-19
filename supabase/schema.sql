@@ -324,6 +324,13 @@ create policy "kendi abonelikleri - select"
 drop policy if exists "kendi abonelikleri - insert" on public.push_subscriptions;
 create policy "kendi abonelikleri - insert"
   on public.push_subscriptions for insert with check (auth.uid() = user_id);
+/* UPDATE politikası: /api/push/subscribe `endpoint` üzerinde onConflict ile
+   upsert yapıyor (yeniden abonelik/mevcut pushManager aboneliğinin tekrar
+   gönderilmesi) — bu, çakışma çözümü için UPDATE izni gerektirir; politika
+   yoksa RLS ihlaliyle sessizce başarısız oluyordu (bkz. Kritik-7 denetimi). */
+drop policy if exists "kendi abonelikleri - update" on public.push_subscriptions;
+create policy "kendi abonelikleri - update"
+  on public.push_subscriptions for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 drop policy if exists "kendi abonelikleri - delete" on public.push_subscriptions;
 create policy "kendi abonelikleri - delete"
   on public.push_subscriptions for delete using (auth.uid() = user_id);

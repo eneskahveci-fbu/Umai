@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { checkLimit } from "@/lib/rate-limit";
 import { readJson, asContent, isValidationError } from "@/lib/validate";
@@ -31,7 +32,10 @@ export async function POST(req: NextRequest) {
     /* Sahip bilgisi → kullanıcı kendi yayınını sonradan silebilir (RLS delete policy). */
     const { data: { user } } = await sb.auth.getUser();
 
-    const id = `a_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+    /* Kriptografik olarak güçlü, tahmin edilemez id (128 bit) — /a/<id> ve
+       /api/publish?id= kimlik doğrulamasız herkese açık uçlar; eski
+       Date.now()+Math.random() şeması düşük entropiliydi (bkz. Kritik-7). */
+    const id = `a_${randomBytes(16).toString("base64url")}`;
     const row = {
       id,
       user_id: user?.id ?? null,
@@ -56,6 +60,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  /* Enumerasyon/brute-force'a karşı: kimlik doğrulamasız uç, id artık yeterince
+     güçlü (bkz. yukarı) ama savunma derinliği için istemci başına da sınırla. */
+  const limited = checkLimit(req, "publish-get", 30, 60_000);
+  if (limited) return NextResponse.json(limited.body, { status: limited.status, headers: { "Retry-After": String(limited.retryAfter) } });
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id gerekli" }, { status: 400 });
 
