@@ -5,7 +5,7 @@ import {
   asOptString,
   asRepoPath,
   asString,
-  asToken,
+  asGitlabToken,
   isValidationError,
   readJson,
 } from "@/lib/validate";
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     branch = asBranch(body.branch);
     path = asRepoPath(body.path);
     message = asOptString(body.message, "message", { max: 500 });
-    token = asToken(body.token);
+    token = asGitlabToken(body.token);
   } catch (e) {
     if (isValidationError(e)) return NextResponse.json({ error: e.message }, { status: e.status });
     return NextResponse.json({ error: "Geçersiz istek" }, { status: 400 });

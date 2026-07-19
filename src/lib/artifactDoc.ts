@@ -99,6 +99,33 @@ const CODE_EXT: Record<string, string> = {
   yaml: "yml", yml: "yml", json: "json", jsx: "jsx", tsx: "tsx",
 };
 
+/* HTML ÖZNİTELİĞİ (attribute) içine gömerken güvenli hâle getirir — htmlEscape
+   yalnız & < > kaçırır, ama çift tırnaklı bir öznitelik değerinde (`srcdoc="…"`)
+   kaçmamış bir `"` içeriği dışına taşırıp keyfi HTML/script enjeksiyonuna
+   (kabuk belgesinde) yol açar. */
+function attrEscape(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+}
+
+/* "Yeni sekmede aç": blob: URL'ler OLUŞTURAN sayfanın origin'ini miras alır
+   (canlı önizlemedeki sandbox'lı <iframe srcDoc> ile AYNI korumaya sahip
+   DEĞİLDİR) — untrusted artifact içeriği doğrudan blob'a konursa, içindeki
+   herhangi bir script yeni sekmede gerçek uygulama origin'iyle (çerezler,
+   localStorage/IndexedDB, service worker) çalışır; sandbox tamamen atlanmış
+   olur. Düzeltme: blob'un DIŞ kabuğu hiçbir kullanıcı script'i çalıştırmaz —
+   yalnız asıl içeriği, canlı önizlemenin kullandığı AYNI
+   sandbox="allow-scripts allow-modals" (allow-same-origin YOK → opak origin)
+   iframe'e srcdoc olarak gömer. */
+export function buildStandaloneSandboxDoc(srcdoc: string, autoPrint = false): string {
+  /* autoPrint: yazdırma tetikleyicisi DIŞ (güvenilir, bizim yazdığımız) kabukta
+     çalışır — window.print() üst pencereyi (sandbox'lı iframe'i içeren sayfayı)
+     yazdırır; içerideki opak-origin iframe'e hiç erişmez/güvenmez. */
+  const printScript = autoPrint
+    ? `<script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script>`
+    : "";
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%;background:#111110;}iframe{border:0;width:100%;height:100%;display:block;}</style></head><body><iframe sandbox="allow-scripts allow-modals" referrerpolicy="no-referrer" srcdoc="${attrEscape(srcdoc)}"></iframe>${printScript}</body></html>`;
+}
+
 /* İndirme için uzantı + gövde (html'de tam belge, diğerlerinde ham içerik). */
 export function artifactDownload(type: Artifact["type"], content: string, language?: string): { ext: string; body: string } {
   const ext =

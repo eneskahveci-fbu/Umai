@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { checkLimit } from "@/lib/rate-limit";
 import { readJson, isValidationError } from "@/lib/validate";
@@ -24,7 +25,12 @@ export async function POST(req: NextRequest) {
     /* Sahip bilgisini ekle → kullanıcı kendi paylaşımını sonradan silebilir (RLS delete policy). */
     const { data: { user } } = await sb.auth.getUser();
 
-    const shareId = `sh_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+    /* Kriptografik olarak güçlü, tahmin edilemez id (128 bit) — /api/share?id=
+       kimlik doğrulamasız herkese açık bir uç, önceki Date.now()+Math.random()
+       şeması hem öngörülebilir (zaman damgası) hem düşük entropiliydi (~26 bit),
+       enumerasyon/brute-force ile başka kullanıcıların paylaşılan sohbetlerine
+       erişilebilirdi (bkz. Kritik-7 denetimi). */
+    const shareId = `sh_${randomBytes(16).toString("base64url")}`;
     const { error } = await sb.from("shared_chats").insert({
       id: shareId,
       user_id: user?.id ?? null,
@@ -47,6 +53,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  /* Enumerasyon/brute-force'a karşı: kimlik doğrulamasız uç, id artık yeterince
+     güçlü (bkz. yukarı) ama savunma derinliği için istemci başına da sınırla. */
+  const limited = checkLimit(req, "share-get", 30, 60_000);
+  if (limited) return NextResponse.json(limited.body, { status: limited.status, headers: { "Retry-After": String(limited.retryAfter) } });
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id gerekli" }, { status: 400 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildArtifactSrcDoc, withAnnotationScript, artifactDownload } from "../artifactDoc";
+import { buildArtifactSrcDoc, withAnnotationScript, artifactDownload, buildStandaloneSandboxDoc } from "../artifactDoc";
 
 /* Claude Artifacts paritesi (code/markdown türleri) regresyon testleri —
    önizleme belgesi kurulumu, HTML-escape güvenliği ve indirme uzantıları. */
@@ -70,6 +70,30 @@ describe("withAnnotationScript — İşaretle & Değiştir", () => {
     const out = withAnnotationScript(doc);
     const scriptIdx = out.indexOf("__umaiAnnotate");
     expect(scriptIdx).toBeGreaterThan(out.indexOf('id="son"'));
+  });
+});
+
+describe("buildStandaloneSandboxDoc — 'yeni sekmede aç'/yazdır sandbox koruması (Kritik-7)", () => {
+  it("içeriği allow-same-origin OLMADAN sandbox'lı bir iframe'e gömer", () => {
+    const doc = buildStandaloneSandboxDoc("<script>alert(1)</script>");
+    expect(doc).toContain('sandbox="allow-scripts allow-modals"');
+    expect(doc).not.toContain("allow-same-origin");
+  });
+  it("srcdoc özniteliğindeki çift tırnağı kaçırır (öznitelik dışına taşamaz)", () => {
+    const malicious = `"><script>parent.opener.document.title='pwned'</script>`;
+    const doc = buildStandaloneSandboxDoc(malicious);
+    expect(doc).not.toContain(`srcdoc="${malicious}`); // kaçmamış hâliyle görünmemeli — attribute dışına taşardı
+    expect(doc).toContain('srcdoc="&quot;><script>'); // " kaçırıldı; artık öznitelik değerinin İÇİNDE, zararsız
+  });
+  it("autoPrint=false iken yazdırma script'i eklemez", () => {
+    expect(buildStandaloneSandboxDoc("<p>hi</p>")).not.toContain("window.print()");
+  });
+  it("autoPrint=true iken DIŞ kabuğa (iframe DIŞINA) yazdırma tetikleyicisi ekler", () => {
+    const doc = buildStandaloneSandboxDoc("<p>hi</p>", true);
+    expect(doc).toContain("window.print()");
+    // print script'i srcdoc özniteliğinin İÇİNDE değil, gövdenin kendisinde olmalı
+    const iframeEnd = doc.indexOf("</iframe>");
+    expect(doc.indexOf("window.print()")).toBeGreaterThan(iframeEnd);
   });
 });
 

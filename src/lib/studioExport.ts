@@ -2,6 +2,8 @@
    Klasik DesignStudio'nun katman/canvas PNG export'undan ayrı; burada tam HTML
    belgesi indirilir / yazdırılır / yeni sekmede açılır. */
 
+import { buildStandaloneSandboxDoc } from "./artifactDoc";
+
 function slug(title: string): string {
   return (title || "tasarim").trim().replace(/\s+/g, "-").toLowerCase().slice(0, 60) || "tasarim";
 }
@@ -17,9 +19,14 @@ export function downloadHtml(html: string, title: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
-/** HTML'i yeni sekmede aç (önizleme/paylaşım için geçici blob). */
+/** HTML'i yeni sekmede aç (önizleme/paylaşım için geçici blob).
+    NOT: blob: URL'ler OLUŞTURAN sayfanın origin'ini miras alır — untrusted
+    (LLM üretimi) html'i çıplak blob'a koymak, içindeki script'e gerçek
+    uygulama origin'ini (çerezler/localStorage/service worker) verirdi.
+    buildStandaloneSandboxDoc dış kabuğu script'siz tutup asıl içeriği
+    allow-same-origin'siz sandbox'lı bir iframe'e gömer (bkz. artifactDoc.ts). */
 export function openInTab(html: string): boolean {
-  const blob = new Blob([html], { type: "text/html" });
+  const blob = new Blob([buildStandaloneSandboxDoc(html)], { type: "text/html" });
   const url = URL.createObjectURL(blob);
   const w = window.open(url, "_blank", "noopener");
   setTimeout(() => URL.revokeObjectURL(url), 10000);
@@ -46,16 +53,20 @@ export async function publishArtifact(title: string, content: string, type: "htm
   }
 }
 
-/** Yazdır panelini açarak PDF'e aktar (tarayıcı "PDF olarak kaydet"). */
+/** Yazdır panelini açarak PDF'e aktar (tarayıcı "PDF olarak kaydet").
+    NOT: `w` bilerek `noopener` OLMADAN açılıyor (document.write ile yazmak için
+    referansa ihtiyaç var) — ama bu, untrusted (LLM üretimi) html'i doğrudan
+    aynı-origin pencereye yazmak GÜVENLİ demek değil: w, about:blank olduğundan
+    açan sayfanın origin'ini miras alır ve `w.opener` üzerinden gerçek uygulama
+    penceresine erişebilir. Bu yüzden ham html DEĞİL, buildStandaloneSandboxDoc'un
+    ürettiği sarmalayıcı yazılıyor — untrusted içerik yalnız allow-same-origin'siz
+    (opak origin) bir iframe'in içinde çalışıyor, `w.opener`'a hiç erişemiyor.
+    Yazdırma tetikleyicisi de sarmalayıcının KENDİ (güvenilir) script'i. */
 export function printPdf(html: string): boolean {
   const w = window.open("", "_blank");
   if (!w) return false;
-  /* Yüklendikten sonra otomatik yazdır → kullanıcı "PDF olarak kaydet" seçer. */
-  const withPrint = html.includes("</body>")
-    ? html.replace("</body>", "<script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script></body>")
-    : html + "<script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script>";
   w.document.open();
-  w.document.write(withPrint);
+  w.document.write(buildStandaloneSandboxDoc(html, true));
   w.document.close();
   return true;
 }

@@ -593,9 +593,20 @@ export const useStore = create<StoreState>()((set, get) => ({
       const clean: Config = { ...DEFAULT_CONFIG, models: [POLLINATIONS_DEFAULT_MODEL], activeModelId: POLLINATIONS_DEFAULT_MODEL.id };
       applyTheme(clean.theme ?? "dark");
       const store = getStore();
-      if (store) { try { store.setItem(CONFIG_KEY, JSON.stringify(clean)); } catch { /* yok */ } }
+      if (store) {
+        try { store.setItem(CONFIG_KEY, JSON.stringify(clean)); } catch { /* yok */ }
+        /* Snippet kütüphanesi/arka plan görev kuyruğu/kaldırılmış-varsayılan-
+           skill izleri CONFIG_OWNER_KEY'e bağlı DEĞİL — süpürge bunları
+           atlarsa önceki kullanıcının prompt snippet'leri ve görev hedef
+           metni (hassas olabilir) aynı tarayıcıda yeni hesaba aynen
+           görünür kalırdı; kaldırılmış-varsayılan izleri de kalıcı olarak
+           yeni kullanıcıdan bir varsayılan skill'i gizlerdi. */
+        try { store.removeItem(SNIPPETS_KEY); } catch { /* yok */ }
+        try { store.removeItem(JOBS_KEY); } catch { /* yok */ }
+        try { store.removeItem(REMOVED_DEFAULTS_KEY); } catch { /* yok */ }
+      }
       setConfigOwner(null);
-      set({ config: clean, chats: [], currentId: null, chatsLoadedFor: undefined, configHydratedFor: null });
+      set({ config: clean, chats: [], currentId: null, chatsLoadedFor: undefined, configHydratedFor: null, snippets: [], backgroundJobs: [] });
     }
   },
   loadPlan: async (userId) => {
@@ -659,8 +670,20 @@ export const useStore = create<StoreState>()((set, get) => ({
     const cur = get().config;
     /* Depodan gelen şifreli gizli alanları çöz (düz metinse passthrough). */
     const dec = await decryptConfigSecrets(cur);
+    /* YARIŞ KORUMASI: decrypt async — bu sürede setUser (hesap değişimi
+       izolasyon süpürgesi) veya syncConfig (gerçek hidrasyon) config'i
+       TAMAMEN değiştirmiş olabilir. `cur` artık BAYAT bir anlık görüntüdür;
+       onu uygulamak doğru izole edilmiş YENİ kullanıcının config'ini önceki
+       kullanıcının çözülmüş anahtarlarıyla sessizce ezer. `set()` config'e
+       dokunan her çağrıda YENİ bir nesne ürettiğinden (setUser/syncConfig'in
+       kendi `set({config:...})` çağrıları), referans hâlâ `cur` ise hiçbir
+       şey araya girmemiştir; değiştiyse sessizce vazgeç (doğru config zaten
+       yerinde). */
+    if (get().config !== cur) return;
+    let appliedConfig = cur;
     if (JSON.stringify(dec) !== JSON.stringify(cur)) {
       set({ config: dec });
+      appliedConfig = dec;
     }
     /* Migrasyon: hâlâ düz metin anahtar varsa (eski veri), şifreli forma yaz.
        saveConfig zaten şifreli kalıcılaştırır; burada yalnızca depoyu günceller. */
@@ -669,7 +692,10 @@ export const useStore = create<StoreState>()((set, get) => ({
       if (store) {
         const seq = ++saveSeq;
         const enc = await encryptConfigSecrets(dec);
-        if (seq === saveSeq) {
+        /* İkinci await'ten sonra da AYNI yarış kontrolü: bu süre zarfında da
+           kullanıcı değişmiş olabilir — o zaman bayat şifreli veriyi depoya
+           yazma. */
+        if (seq === saveSeq && get().config === appliedConfig) {
           try { store.setItem(CONFIG_KEY, JSON.stringify(enc)); } catch { /* yok say */ }
           if (!isGuestMode()) {
             try { window.sessionStorage.setItem(CONFIG_KEY + "_backup", JSON.stringify(enc)); } catch { /* yok say */ }
