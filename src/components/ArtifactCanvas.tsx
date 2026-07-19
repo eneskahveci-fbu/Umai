@@ -4,7 +4,7 @@ import { Check, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useStore } from "@/lib/store";
 import type { Artifact } from "@/lib/types";
-import { buildArtifactSrcDoc, withAnnotationScript, artifactDownload } from "@/lib/artifactDoc";
+import { buildArtifactSrcDoc, withAnnotationScript, artifactDownload, buildStandaloneSandboxDoc } from "@/lib/artifactDoc";
 import { ExportMenu } from "./studio/ExportMenu";
 
 /* Paylaşılan Artifact görüntüleyici — sohbetin ArtifactPanel'i ile Tasarım
@@ -165,7 +165,11 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
               ...(view === "preview" ? [
                 { key: "reload", label: "Yenile", icon: <RotateCw size={14} />, onSelect: () => setReloadKey((k) => k + 1), separatorBefore: true },
                 { key: "open-tab", label: "Yeni sekmede aç", icon: <ExternalLink size={14} />, onSelect: () => {
-                  const blob = new Blob([baseSrcdoc], { type: "text/html" });
+                  /* blob: URL oluşturan sayfanın origin'ini miras alır — untrusted
+                     içeriği ÇIPLAK koymak sandbox'ı atlatırdı (bkz. artifactDoc.ts
+                     buildStandaloneSandboxDoc yorumu). Dış kabuk script çalıştırmaz,
+                     asıl içerik yine allow-same-origin'siz sandbox'lı iframe'e gömülür. */
+                  const blob = new Blob([buildStandaloneSandboxDoc(baseSrcdoc)], { type: "text/html" });
                   const url = URL.createObjectURL(blob);
                   window.open(url, "_blank", "noopener");
                   setTimeout(() => URL.revokeObjectURL(url), 10000);

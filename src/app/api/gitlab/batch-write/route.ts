@@ -6,7 +6,7 @@ import {
   asOptString,
   asRepoPath,
   asString,
-  asToken,
+  asGitlabToken,
   isValidationError,
   readJson,
 } from "@/lib/validate";
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     repo = asString(body.repo, "repo", { min: 1, max: 200 });
     branch = asBranch(body.branch);
     message = asOptString(body.message, "message", { max: 500 });
-    token = asToken(body.token);
+    token = asGitlabToken(body.token);
     if (!Array.isArray(body.files) || body.files.length === 0) {
       return NextResponse.json({ error: "files boş" }, { status: 400 });
     }
