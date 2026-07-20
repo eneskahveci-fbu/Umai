@@ -538,8 +538,6 @@ export interface Config {
   autoMemory?: boolean;
   /** Yanıt token sınırında kesilirse otomatik sürdür (en çok 2 kez). */
   autoContinue?: boolean;
-  /** Çok-geçişli kalite modu: taslak → öz-eleştiri → düzeltme (tek yanıtta). */
-  qualityMode?: boolean;
   /** Öğrenme Modu: yanıtlar eğitsel olur — adım adım açıklama, kavram/jargon
       tanımı, "neden" gerekçesi, sırada öğrenilecekler. Yazılım öğrencileri için. */
   learningMode?: boolean;
@@ -637,14 +635,16 @@ export interface Config {
       katastrofik kalıplara (rm -rf /, fork bomb, mkfs, curl|sh…) karşı engellenir
       ve sonuç ajana geri bildirilir. false ⇒ kapalı. */
   commandGuard?: boolean;
-  /** Fusion taslak modeli seçimi: "auto" (varsayılan) craft en uygun 1-3 modeli
-      kendisi seçer; "manual" kullanıcının `fusionModelIds`'te seçtiği modelleri
-      kullanır (herhangi bir kullanıcı seçebilir — admin şartı yok); "off"
-      Fusion'ı tamamen devre dışı bırakır (Otomatik Pilot/Kalite Modu tetiklese
-      bile çoklu-model taslak+hakem hattı hiç çalışmaz — bkz. CoderView.tsx). */
-  fusionMode?: "auto" | "manual" | "off";
-  /** Manuel Fusion modunda taslak üretecek `models` id'leri (en fazla 3). */
-  fusionModelIds?: string[];
+  /** Kalite seviyesi — önceki ayrı qualityMode+fusionMode alanlarının birleşimi
+      (Tem 2026 kullanıcı kararı: iki örtüşen "yanıtı iyileştir" anahtarı tek
+      anlaşılır kademeye indirildi). "off": hiçbiri çalışmaz. "standard": eski
+      qualityMode'un tek-geçişli taslak→öz-eleştiri→düzeltme talimatı (ekstra
+      API çağrısı yok). "high": eski Fusion'ın çoklu-model taslak+hakem hattı
+      (bkz. CoderView.tsx). Tanımsızsa "standard" varsayılır. */
+  qualityTier?: "off" | "standard" | "high";
+  /** "high" kademesinde taslak üretecek `models` id'leri (en fazla 3) — boşsa
+      craft en uygun modelleri kendisi seçer (eski fusionMode "auto"). */
+  qualityModelIds?: string[];
 }
 
 export interface RepoState {

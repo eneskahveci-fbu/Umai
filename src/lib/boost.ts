@@ -28,8 +28,8 @@ export function pickDraftModels(
   count: 1 | 2 | 3,
   strongest?: ModelProfile | null,
   freeModelNames?: string[],
-  /** Manuel Fusion modu: kullanıcının Ayarlar → Fusion'da seçtiği model id'leri
-      (bkz. `Config.fusionModelIds`). Verilip en az biri `models`'te bulunursa
+  /** Kalite "Yüksek" kademesinde kullanıcının Ayarlar → Kalite'de seçtiği model
+      id'leri (bkz. `Config.qualityModelIds`). Verilip en az biri `models`'te bulunursa
       çeşitlilik sezgisi devre dışı kalır — taslaklar DOĞRUDAN bu modellerden
       üretilir (sırayla, `count`'a kırpılır). Eşleşme yoksa (ör. seçili modeller
       silinmiş) otomatik sezgiye zarifçe düşülür. */
