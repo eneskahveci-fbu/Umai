@@ -31,13 +31,27 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [glLoading, setGlLoading] = useState(false);
-  const [error, setError] = useState("");
+  /* OAuth dönüşü başarısız olup /auth/callback bizi ?error=... ile buraya
+     geri yolladıysa, bunu ilk render'da yakala (efekt içinde setState YAPMA
+     — lazy initializer'la doğrudan başlangıç durumuna koy). */
+  const [error, setError] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("error") ?? "";
+  });
   const [success, setSuccess] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
   /* Referral linki (/?ref=<uuid>) tıklanıp "Ücretsiz başla" ile buraya
      düşülürse de kodu yakala — kayıt sonrası app/page.tsx bunu işler. */
   useEffect(() => { captureReferralCode(); }, []);
+
+  /* Yukarıdaki lazy initializer hatayı state'e koydu; burada yalnız URL'i
+     temizliyoruz (setState YOK, yalnız history — lint kuralına uygun). */
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("error")) {
+      window.history.replaceState({}, "", "/login");
+    }
+  }, []);
 
   const validate = () => {
     const errs: typeof fieldErrors = {};
