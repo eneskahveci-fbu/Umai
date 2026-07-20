@@ -35,10 +35,17 @@ export function SurfacePage({ flag, children }: {
       mapStudioOpen: s.setMapStudioOpen,
       cardsStudioOpen: s.setCardsStudioOpen,
     };
-    const set = setters[flag];
-    set(true);
+    setters[flag](true);
     trackEvent("surface_open", flag);
-    return () => set(false);
+    return () => {
+      /* Yalnız mount'taki bayrağı değil, HEPSİNİ kapat. /studio/araclar
+         (İçerik Araçları) artık sekmeler arası geçişi yeniden mount olmadan
+         (surfaceNav.go()'nun aynı-sayfa dalıyla) yapıyor — kullanıcı BAŞKA
+         bir sekmedeyken (ör. Kroki) bu sayfadan ayrılırsa, yalnız ilk
+         mount'taki bayrağı (ör. formsStudioOpen) kapatmak son aktif olanı
+         (mapStudioOpen) kalıcı "açık" bırakırdı. */
+      Object.values(setters).forEach((set) => set(false));
+    };
   }, [flag]);
 
   if (auth !== "in") {

@@ -137,7 +137,7 @@ export function CommandPalette() {
       label: "Anket Stüdyosu'nu aç (AI anket + HTML form)",
       icon: <ListChecks size={16} />,
       action: () => {
-        router.push("/studio/anket");
+        router.push("/studio/araclar?tab=anket");
         setOpen(false);
       },
       keywords: ["anket", "form", "survey", "soru", "geri bildirim", "feedback"],
@@ -147,7 +147,7 @@ export function CommandPalette() {
       label: "Defter'i aç (kaynaklı sohbet + sesli özet)",
       icon: <BookOpen size={16} />,
       action: () => {
-        router.push("/studio/defter");
+        router.push("/studio/araclar?tab=defter");
         setOpen(false);
       },
       keywords: ["defter", "notebook", "kaynak", "arastirma", "araştırma", "notebooklm", "ozet", "özet"],
@@ -157,7 +157,7 @@ export function CommandPalette() {
       label: "Kroki'yi aç (AI zihin haritası)",
       icon: <Network size={16} />,
       action: () => {
-        router.push("/studio/kroki");
+        router.push("/studio/araclar?tab=kroki");
         setOpen(false);
       },
       keywords: ["kroki", "harita", "zihin", "mindmap", "mind map", "beyin", "firtinasi", "fırtınası", "dal"],
@@ -167,7 +167,7 @@ export function CommandPalette() {
       label: "Kartlar'ı aç (AI kartlarla aralıklı tekrar)",
       icon: <Layers size={16} />,
       action: () => {
-        router.push("/studio/kartlar");
+        router.push("/studio/araclar?tab=kartlar");
         setOpen(false);
       },
       keywords: ["kart", "kartlar", "anki", "flashcard", "ezber", "tekrar", "vurgu", "vurgular", "calis", "çalış"],
@@ -344,7 +344,7 @@ export function CommandPalette() {
           label: f.title,
           sub: "Anket",
           icon: <ListChecks size={16} />,
-          run: () => { setSurfaceOpenItem("forms", f.id); router.push("/studio/anket"); setOpen(false); },
+          run: () => { setSurfaceOpenItem("forms", f.id); router.push("/studio/araclar?tab=anket"); setOpen(false); },
         }))
     : [];
 
@@ -357,7 +357,7 @@ export function CommandPalette() {
           label: n.title,
           sub: "Defter",
           icon: <BookOpen size={16} />,
-          run: () => { setSurfaceOpenItem("notebook", n.id); router.push("/studio/defter"); setOpen(false); },
+          run: () => { setSurfaceOpenItem("notebook", n.id); router.push("/studio/araclar?tab=defter"); setOpen(false); },
         }))
     : [];
 
@@ -370,7 +370,7 @@ export function CommandPalette() {
           label: m.title,
           sub: "Kroki",
           icon: <Network size={16} />,
-          run: () => { setSurfaceOpenItem("map", m.id); router.push("/studio/kroki"); setOpen(false); },
+          run: () => { setSurfaceOpenItem("map", m.id); router.push("/studio/araclar?tab=kroki"); setOpen(false); },
         }))
     : [];
 
@@ -383,7 +383,7 @@ export function CommandPalette() {
           label: d.title,
           sub: "Kartlar",
           icon: <Layers size={16} />,
-          run: () => { setSurfaceOpenItem("cards", d.id); router.push("/studio/kartlar"); setOpen(false); },
+          run: () => { setSurfaceOpenItem("cards", d.id); router.push("/studio/araclar?tab=kartlar"); setOpen(false); },
         }))
     : [];
 

@@ -25,7 +25,7 @@ const KIND_ICON: Record<RelatedKind, LucideIcon> = {
   chat: MessageSquare, doc: FileText, form: ListChecks, notebook: BookOpen,
 };
 const KIND_ROUTE: Record<RelatedKind, string> = {
-  chat: "", doc: "/studio/dokuman", form: "/studio/anket", notebook: "/studio/defter",
+  chat: "", doc: "/studio/dokuman", form: "/studio/araclar?tab=anket", notebook: "/studio/araclar?tab=defter",
 };
 /* RelatedKind ("doc"/"form") ile surfaceNav'ın Surface birliği ("docs"/"forms")
    isimleri farklı — küçük bir çeviri tablosu. */

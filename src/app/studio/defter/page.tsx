@@ -1,13 +1,19 @@
 "use client";
 
-import { StudioHub } from "@/components/studio/StudioHub";
-import { SurfacePage } from "@/components/studio/SurfacePage";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-/* /studio/defter — tek stüdyo kabuğu — Defter modu açık başlar. */
-export default function NotebookPage() {
+/* /studio/defter → /studio/araclar?tab=defter (Tem 2026: Anket/Defter/Kroki/
+   Kartlar tek sayfada birleşti). Eski yer imleri/derin bağlantılar için
+   sessizce yönlendirir. */
+export default function NotebookRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/studio/araclar?tab=defter");
+  }, [router]);
   return (
-    <SurfacePage flag="notebookStudioOpen">
-      <StudioHub />
-    </SurfacePage>
+    <div className="h-screen grid place-items-center bg-bg text-muted/60 text-sm">
+      Yönlendiriliyor…
+    </div>
   );
 }
