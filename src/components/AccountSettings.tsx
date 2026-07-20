@@ -24,6 +24,11 @@ export function AccountSettings() {
   const [displayName, setDisplayName] = useState("");
   const [loadedName, setLoadedName] = useState("");
   const [savingName, setSavingName] = useState(false);
+  /* GitHub/GitLab OAuth ile girişte Supabase, sağlayıcının kullanıcı adını
+     user_metadata'ya otomatik yazar (user_name / GitHub'da preferred_username,
+     GitLab'da nickname) — görünen ad elle ayarlanmadıysa e-posta yerine bunu
+     birincil kimlik olarak göster. */
+  const [providerUsername, setProviderUsername] = useState("");
 
   const [newEmail, setNewEmail] = useState("");
   const [savingEmail, setSavingEmail] = useState(false);
@@ -46,6 +51,9 @@ export function AccountSettings() {
     sb.auth.getUser().then(({ data }) => {
       const n = (data.user?.user_metadata?.display_name as string | undefined) ?? "";
       setDisplayName(n); setLoadedName(n);
+      const meta = data.user?.user_metadata as Record<string, unknown> | undefined;
+      const uname = (meta?.user_name ?? meta?.preferred_username ?? meta?.nickname) as string | undefined;
+      setProviderUsername(uname ?? "");
     });
   }, []);
 
@@ -155,6 +163,9 @@ export function AccountSettings() {
     );
   }
 
+  const primaryLabel = loadedName || providerUsername || userEmail;
+  const showEmailSubline = primaryLabel !== userEmail;
+
   return (
     <div className="space-y-5">
       <h4 className="text-sm font-bold">Hesap</h4>
@@ -162,12 +173,12 @@ export function AccountSettings() {
       {/* Profil kartı */}
       <div className="premium-card rounded-xl p-4 flex items-center gap-3">
         <div className="w-11 h-11 rounded-full bg-brand/15 border border-brand/20 grid place-items-center text-brand font-bold text-lg shrink-0">
-          {(loadedName || userEmail)[0]?.toUpperCase()}
+          {primaryLabel[0]?.toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold truncate">{loadedName || userEmail}</div>
+          <div className="text-sm font-semibold truncate">{primaryLabel}</div>
           <div className="text-[11px] text-muted/60 flex items-center gap-1.5">
-            {loadedName && <span className="truncate">{userEmail} · </span>}
+            {showEmailSubline && <span className="truncate">{userEmail} · </span>}
             <span>Plan: {plan === "pro" ? "Pro" : "Ücretsiz"}</span>
             {isAdmin && <span className="text-brand/80 font-bold">· Admin</span>}
           </div>
