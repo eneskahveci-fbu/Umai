@@ -9,7 +9,7 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import {
   AlertCircle, BookMarked, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-  Circle, CircleCheck, Columns, Compass, FlaskConical, GitPullRequest, ImageOff, ListChecks, Microscope, MoreHorizontal, Settings2,
+  Circle, CircleCheck, Columns, Compass, FlaskConical, GitPullRequest, Image as ImageIcon, ImageOff, ListChecks, Microscope, MoreHorizontal, Settings2,
   Code2, Copy, FileText, FolderOpen, GitBranch, GitCommit, Globe,
   Highlighter, Loader2, Pencil, RefreshCw, Search, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, Users, Volume2, VolumeX, Wrench, X,
 } from "lucide-react";
@@ -79,6 +79,7 @@ const TOOL_LABEL: Record<string, string> = {
   dispatch_agents:    "Alt ajanlar çalışıyor",
   update_plan:        "Plan güncelleniyor",
   create_pr:          "PR oluşturuluyor",
+  generate_image:     "Görsel üretiliyor",
 };
 
 const TOOL_DONE_LABEL: Record<string, string> = {
@@ -101,6 +102,7 @@ const TOOL_DONE_LABEL: Record<string, string> = {
   dispatch_agents:    "Tamamlandı",
   update_plan:        "Plan güncellendi",
   create_pr:          "PR oluşturuldu",
+  generate_image:     "Görsel üretildi",
 };
 
 function ToolIcon({ name, size = 11 }: { name: string; size?: number }) {
@@ -121,6 +123,7 @@ function ToolIcon({ name, size = 11 }: { name: string; size?: number }) {
     case "read_url":          return <Globe size={size} />;
     case "dispatch_agents":   return <Loader2 size={size} className="text-purple" />;
     case "update_plan":       return <ListChecks size={size} className="text-brand" />;
+    case "generate_image":    return <ImageIcon size={size} className="text-brand" />;
     default:                  return <Wrench size={size} />;
   }
 }
@@ -143,6 +146,7 @@ function getKeyArg(name: string, args: Record<string, unknown>): string {
       try { return new URL(u).hostname; } catch { return u.slice(0, 50); }
     }
     case "list_files":    return args.filter ? `*${args.filter}*` : "";
+    case "generate_image": return `"${String(args.prompt ?? "").slice(0, 60)}"`;
     default: return "";
   }
 }
