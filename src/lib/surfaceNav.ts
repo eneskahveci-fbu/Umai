@@ -19,16 +19,23 @@ import { useStore } from "./store";
 
 export type Surface = "studio" | "slides" | "docs" | "forms" | "canvas" | "notebook" | "map" | "cards";
 
-/* Yeni rota yapısı — slides ve canvas artık /studio'ya yönlendirilir */
+/* Yeni rota yapısı — slides ve canvas artık /studio'ya yönlendirilir.
+   forms/notebook/map/cards AYNI fiziksel rotayı (/studio/araclar) paylaşır
+   (Tem 2026 kullanıcı kararı: "özellik kaybetmeden birleştir" — Anket/Defter/
+   Kroki/Kartlar tek sayfada sekmeli). ?tab= yalnız İLK açılışta hangi aracın
+   aktif olacağını belirler; StudioHub içindeki sekmeler arası geçiş go()'nun
+   "aynı sayfadaysa yönlendirme yapma" dalıyla URL'e dokunmadan çalışır (bkz.
+   aşağıdaki go()). Eski /studio/anket, /studio/defter, /studio/kroki,
+   /studio/kartlar rotaları geriye dönük uyumluluk için buraya yönlendirir. */
 export const SURFACE_ROUTES: Record<Surface, string> = {
   studio: "/studio",
   slides: "/studio",       // ← Redirect: birleşik stüdyo
   docs: "/studio/dokuman",
-  forms: "/studio/anket",
+  forms: "/studio/araclar?tab=anket",
   canvas: "/studio",       // ← Redirect: birleşik stüdyo
-  notebook: "/studio/defter",
-  map: "/studio/kroki",
-  cards: "/studio/kartlar",
+  notebook: "/studio/araclar?tab=defter",
+  map: "/studio/araclar?tab=kroki",
+  cards: "/studio/araclar?tab=kartlar",
 };
 
 /* Yüzeyler arası brief taşıma (hub'dan araca): sessionStorage, 60 sn tazelik. */
@@ -79,11 +86,15 @@ export function useSurfaceNav() {
   const routed = pathname.startsWith("/studio");
 
   const go = (which: Surface) => {
-    if (routed) {
-      router.push(SURFACE_ROUTES[which]);
+    const target = SURFACE_ROUTES[which];
+    if (routed && target.split("?")[0] !== pathname) {
+      router.push(target);
       return;
     }
-    // Overlay modunda store bayraklarını güncelle
+    /* Zaten hedef sayfadayız (İçerik Araçları'nın kendi sekmeleri arası geçiş
+       — forms/notebook/map/cards hepsi /studio/araclar'ı paylaşıyor) ya da
+       overlay modundayız: yeniden mount'a yol açan bir router.push YAPMA,
+       doğrudan bayrakları güncelle. */
     const s = useStore.getState();
     s.setStudioOpen(which === "studio" || which === "slides" || which === "canvas");
     s.setDocsStudioOpen(which === "docs");
