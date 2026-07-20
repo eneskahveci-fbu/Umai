@@ -41,7 +41,7 @@ export async function publishArtifact(title: string, content: string, type: "htm
     const res = await fetch("/api/publish", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: title || "craft", type, content }),
+      body: JSON.stringify({ title: title || "umai", type, content }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.id) return null;

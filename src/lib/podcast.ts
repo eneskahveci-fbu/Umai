@@ -1,5 +1,5 @@
 /* Defter "podcast özeti" — NotebookLM'in çok sesli "audio overview" fikrinin
- * craft yorumu. Saf metin ayrıştırma burada; TTS çalma sırası pollinations.ts'te
+ * Umai yorumu. Saf metin ayrıştırma burada; TTS çalma sırası pollinations.ts'te
  * (playPodcast/stopPodcast), UI akışı NotebookStudio.tsx'te. */
 
 export interface PodcastTurn {
