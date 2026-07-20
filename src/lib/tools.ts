@@ -202,6 +202,21 @@ export const CODER_TOOLS: ToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "generate_image",
+      description: "Kullanıcı bir görsel/resim/illüstrasyon istediğinde ÇAĞIR — 'bir X görseli yap', 'bana Y resmi çiz' gibi doğal dil isteklerinde, herhangi bir komut/buton gerekmeden. Sonuç bir görsel URL'i döner; yanıtına '![açıklama](url)' markdown biçiminde ekle, URL'i düz metin olarak yazma.",
+      parameters: {
+        type: "object",
+        properties: {
+          prompt: { type: "string", description: "Görselin İngilizce, betimleyici üretim istemi (ör. 'a red fox in a snowy forest, digital art')" },
+          aspect_ratio: { type: "string", description: "Görsel oranı", enum: ["square", "landscape", "portrait"] },
+        },
+        required: ["prompt"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "update_plan",
       description: "Çok adımlı bir görev için canlı yapılacaklar listesini (plan) günceller; kullanıcı ilerlemeyi görür. Göreve başlarken tüm adımları yaz, her adım bitince listeyi yeniden gönder. Her satır bir adım: '[ ]' bekliyor, '[~]' devam ediyor, '[x]' tamamlandı. Örn: '[x] Dosyaları incele\\n[~] Bug'ı düzelt\\n[ ] Testi çalıştır'.",
       parameters: {
