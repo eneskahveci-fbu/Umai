@@ -4,11 +4,17 @@ import { createClient } from "@/lib/supabase/server";
 /* Web Push abonelik uçları — kullanıcı yalnız KENDİ aboneliğini ekler/siler
    (RLS zaten bunu zorunlu kılar, burada ayrıca user_id doğrulanır). */
 
+/* Origin/Host uyuşmazlığında reddeder. ÖNEMLİ: eksik Origin/Host artık
+   "izin ver" değil "reddet" — gerçek tarayıcılar bu uca yaptığı POST/DELETE
+   isteklerinde (fetch, aynı-origin dahil) Origin'i HER ZAMAN gönderir; bu
+   başlığı atlamak yalnız betikli/sahte bir istemciye (curl vb.) has bir
+   davranıştır. Eskiden "başlık yoksa serbest bırak" kontrolü tam da bu
+   saldırgan sınıfı için etkisizdi (Origin'i eklemeyerek denetimi tamamen
+   atlatabiliyordu). */
 function checkOrigin(req: Request): boolean {
   const origin = req.headers.get("origin");
-  if (!origin) return true;
   const host = req.headers.get("host");
-  if (!host) return true;
+  if (!origin || !host) return false;
   try { return new URL(origin).host === host; } catch { return false; }
 }
 

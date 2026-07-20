@@ -30,6 +30,14 @@ import { createClient } from "./supabase/client";
 /* Config yazımları için monotonik sıra: async şifreli yazımların sırasını korur
    (eski yazım yeniyi ezmesin). */
 let saveSeq = 0;
+/* persistCurrent için monotonik sıra: streaming sırasında sık art arda
+   tetiklenen çağrılar ağ üzerinde SIRASIZ tamamlanabilir (eski/az-mesajlı bir
+   istek, yeni/çok-mesajlı bir isteği geride bırakıp DB'de son yazım olarak
+   kalabilir). Tam çözüm sunucu taraflı koşullu yazım gerektirir; burada
+   kendi-kendini-onaran bir yaklaşım kullanılıyor: bir çağrı tamamlandığında
+   arada başka çağrı başladıysa (sıra ilerlediyse), o an bilinen EN GÜNCEL
+   sohbet durumu bir kez daha yazılır. */
+let persistSeq = 0;
 const CONFIG_KEY = "craftai_config";
 const CHATS_KEY = "craftai_chats";
 const SNIPPETS_KEY = "craftai_snippets";
@@ -260,28 +268,50 @@ function mergeById<T extends { id: string }>(
   local: T[],
   remote: T[],
   pick?: (l: T, r: T) => T,
+  deleted?: Set<string>,
 ): T[] {
   const map = new Map<string, T>();
-  for (const item of local ?? []) map.set(item.id, item);
+  for (const item of local ?? []) { if (!deleted?.has(item.id)) map.set(item.id, item); }
   for (const item of remote ?? []) {
+    if (deleted?.has(item.id)) continue;
     const existing = map.get(item.id);
     map.set(item.id, existing && pick ? pick(existing, item) : item);
   }
   return [...map.values()];
 }
 
+/* Silme "mezar taşı": bir öğe (model/hesap/proje/skill/mcp/hook) SİLİNDİĞİNDE
+   id'si `config.deletedIds`'e eklenir — böylece cihazlar arası merge onu henüz
+   senkronlanmamış bir cihazın bayat kopyasından GERİ GETİRMEZ (mergeById salt
+   birleşim yaptığından, tombstone olmadan silinen öğe diğer cihazdan "dirilir").
+   Sınırsız büyümesin diye son 500 id ile sınırlı (uid() rastgele olduğundan
+   gerçek bir objeyle çakışma pratikte imkânsız). */
+function markDeleted(config: Config, id: string): string[] {
+  return [...new Set([...(config.deletedIds ?? []), id])].slice(-500);
+}
+
 export function mergeConfigs(local: Config, remote: Partial<Config>): Config {
   /* Skalar tercihler için uzak (en son senkronlanan cihaz) kazanır. */
   const base: Config = { ...DEFAULT_CONFIG, ...local, ...remote };
-  /* Diziler: id'ye göre birleştir; çakışmada anahtarı/token'ı dolu olanı koru. */
-  base.models = mergeById(local.models, remote.models ?? [], (l, r) => (r.apiKey ? r : l));
-  base.githubAccounts = mergeById(local.githubAccounts, remote.githubAccounts ?? [], (l, r) => (r.token ? r : l));
-  base.gitlabAccounts = mergeById(local.gitlabAccounts, remote.gitlabAccounts ?? [], (l, r) => (r.token ? r : l));
-  base.skills = mergeById(local.skills, remote.skills ?? []);
-  base.projects = mergeById(local.projects, remote.projects ?? []);
-  base.mcpServers = mergeById(local.mcpServers ?? [], remote.mcpServers ?? []);
-  base.hooks = mergeById(local.hooks ?? [], remote.hooks ?? []);
+  /* İki taraftan silme mezar taşlarını birleştir (bkz. markDeleted). */
+  const deletedIds = new Set([...(local.deletedIds ?? []), ...(remote.deletedIds ?? [])]);
+  /* Diziler: id'ye göre birleştir; çakışmada anahtarı/token'ı dolu olanı koru.
+     models için: ikisinde de updatedAt varsa en YENİ kazanır — böylece bir
+     cihazda BİLEREK temizlenen (apiKey: "") bir anahtar, henüz senkronlanmamış
+     eski bir cihazın hâlâ dolu kopyasıyla "geri gelmez". Zaman damgası
+     yoksa (eski veri) geriye dönük uyum için eski sezgisel kural korunur. */
+  base.models = mergeById(local.models, remote.models ?? [], (l, r) => {
+    if (l.updatedAt !== undefined && r.updatedAt !== undefined) return r.updatedAt >= l.updatedAt ? r : l;
+    return r.apiKey ? r : l;
+  }, deletedIds);
+  base.githubAccounts = mergeById(local.githubAccounts, remote.githubAccounts ?? [], (l, r) => (r.token ? r : l), deletedIds);
+  base.gitlabAccounts = mergeById(local.gitlabAccounts, remote.gitlabAccounts ?? [], (l, r) => (r.token ? r : l), deletedIds);
+  base.skills = mergeById(local.skills, remote.skills ?? [], undefined, deletedIds);
+  base.projects = mergeById(local.projects, remote.projects ?? [], undefined, deletedIds);
+  base.mcpServers = mergeById(local.mcpServers ?? [], remote.mcpServers ?? [], undefined, deletedIds);
+  base.hooks = mergeById(local.hooks ?? [], remote.hooks ?? [], undefined, deletedIds);
   base.repos = [...new Set([...(remote.repos ?? []), ...(local.repos ?? [])])];
+  base.deletedIds = [...deletedIds].slice(-500);
   /* Aktif id'ler hâlâ listede mevcutsa korunur, değilse ilk öğeye düşülür. */
   const has = <T extends { id: string }>(arr: T[], id: string | null) => !!id && arr.some((x) => x.id === id);
   base.activeModelId = has(base.models, base.activeModelId) ? base.activeModelId : (base.models[0]?.id ?? null);
@@ -756,9 +786,13 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
   updateModel: (id, patch) => {
     const config = get().config;
+    /* apiKey değişince (temizleme dahil) zaman damgası da güncellenir — merge
+       sırasında "boş anahtar" ile "henüz senkronlanmamış eski anahtar"
+       ayrımı yapılabilsin diye (bkz. mergeConfigs). */
+    const stamp = "apiKey" in patch ? { updatedAt: Date.now() } : {};
     get().saveConfig({
       ...config,
-      models: config.models.map((m) => (m.id === id ? { ...m, ...patch } : m)),
+      models: config.models.map((m) => (m.id === id ? { ...m, ...patch, ...stamp } : m)),
     });
   },
   removeModel: (id) => {
@@ -769,6 +803,7 @@ export const useStore = create<StoreState>()((set, get) => ({
       models,
       activeModelId:
         config.activeModelId === id ? (models[0]?.id ?? null) : config.activeModelId,
+      deletedIds: markDeleted(config, id),
     });
   },
   setActiveModel: (id) => get().saveConfig({ ...get().config, activeModelId: id }),
@@ -810,6 +845,7 @@ export const useStore = create<StoreState>()((set, get) => ({
       githubAccounts,
       activeGithubId:
         config.activeGithubId === id ? (githubAccounts[0]?.id ?? null) : config.activeGithubId,
+      deletedIds: markDeleted(config, id),
     });
   },
   setActiveGithub: (id) => get().saveConfig({ ...get().config, activeGithubId: id }),
@@ -834,6 +870,7 @@ export const useStore = create<StoreState>()((set, get) => ({
       gitlabAccounts,
       activeGitlabId:
         config.activeGitlabId === id ? (gitlabAccounts[0]?.id ?? null) : config.activeGitlabId,
+      deletedIds: markDeleted(config, id),
     });
   },
   setActiveGitlab: (id) => get().saveConfig({ ...get().config, activeGitlabId: id }),
@@ -912,6 +949,7 @@ export const useStore = create<StoreState>()((set, get) => ({
       ...config,
       projects: config.projects.filter((p) => p.id !== id),
       activeProjectId: config.activeProjectId === id ? null : config.activeProjectId,
+      deletedIds: markDeleted(config, id),
     });
     set((s) => ({
       chats: s.chats.map((c) => (c.projectId === id ? { ...c, projectId: undefined } : c)),
@@ -1032,6 +1070,7 @@ export const useStore = create<StoreState>()((set, get) => ({
     get().saveConfig({
       ...config,
       skills: (config.skills ?? []).filter((s) => s.id !== id),
+      deletedIds: markDeleted(config, id),
     });
   },
   toggleSkill: (id) => {
@@ -1110,6 +1149,8 @@ export const useStore = create<StoreState>()((set, get) => ({
             messages: r.messages,
             created_at: new Date(r.created_at).getTime(),
             projectId: r.project_id ?? undefined,
+            tags: r.tags ?? undefined,
+            pinned: r.pinned ?? false,
           }));
           /* MUTLAK KURAL: yerel sohbetleri EZME — buluttakilerle BİRLEŞTİR. */
           const { merged, toUpload } = mergeChats(loadLocalChats(), cloud);
@@ -1124,6 +1165,8 @@ export const useStore = create<StoreState>()((set, get) => ({
                 title: c.title,
                 messages: c.messages,
                 project_id: c.projectId ?? null,
+                tags: c.tags ?? null,
+                pinned: c.pinned ?? false,
                 created_at: new Date(c.created_at).toISOString(),
                 updated_at: new Date().toISOString(),
               })),
@@ -1191,6 +1234,8 @@ export const useStore = create<StoreState>()((set, get) => ({
               if (sb) void sb.from("chats").upsert({
                 id: deleted.id, user_id: userId, title: deleted.title, messages: deleted.messages,
                 project_id: deleted.projectId ?? null,
+                tags: deleted.tags ?? null,
+                pinned: deleted.pinned ?? false,
                 created_at: new Date(deleted.created_at).toISOString(),
                 updated_at: new Date().toISOString(),
               });
@@ -1216,17 +1261,35 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   tagChat: (id, tags) => {
     set((s) => ({ chats: s.chats.map((c) => (c.id === id ? { ...c, tags } : c)) }));
-    saveLocalChats(get().chats);
+    const { userId } = get();
+    if (userId) {
+      const sb = createClient();
+      if (sb) sb.from("chats").update({ tags }).eq("id", id);
+    } else {
+      saveLocalChats(get().chats);
+    }
   },
 
   pinChat: (id, pinned) => {
     set((s) => ({ chats: s.chats.map((c) => (c.id === id ? { ...c, pinned } : c)) }));
-    saveLocalChats(get().chats);
+    const { userId } = get();
+    if (userId) {
+      const sb = createClient();
+      if (sb) sb.from("chats").update({ pinned }).eq("id", id);
+    } else {
+      saveLocalChats(get().chats);
+    }
   },
 
   moveChat: (id, projectId) => {
     set((s) => ({ chats: s.chats.map((c) => (c.id === id ? { ...c, projectId: projectId ?? undefined } : c)) }));
-    saveLocalChats(get().chats);
+    const { userId } = get();
+    if (userId) {
+      const sb = createClient();
+      if (sb) sb.from("chats").update({ project_id: projectId ?? null }).eq("id", id);
+    } else {
+      saveLocalChats(get().chats);
+    }
   },
 
   updateChatEmbeddings: (updates) => {
@@ -1418,12 +1481,14 @@ export const useStore = create<StoreState>()((set, get) => ({
       ),
     })),
 
-  editMessageBranch: (index, content) =>
+  editMessageBranch: (index, content) => {
     set((s) => ({
       chats: s.chats.map((c) =>
         c.id === s.currentId ? { ...c, messages: applyEditBranch(c.messages, index, content) } : c,
       ),
-    })),
+    }));
+    void get().persistCurrent();
+  },
 
   updateMessageContentAt: (index, content) => {
     set((s) => ({
@@ -1486,6 +1551,7 @@ export const useStore = create<StoreState>()((set, get) => ({
     if (userId) {
       const sb = createClient();
       if (sb) {
+        const seq = ++persistSeq;
         await sb.from("chats").upsert({
           id: chat.id,
           user_id: userId,
@@ -1495,6 +1561,24 @@ export const useStore = create<StoreState>()((set, get) => ({
           created_at: new Date(chat.created_at).toISOString(),
           updated_at: new Date().toISOString(),
         });
+        /* Bu istek tamamlanana kadar arada başka bir persistCurrent daha
+           başladıysa (sıra ilerlediyse), ağ gecikmesiyle bu eski çağrı DB'de
+           son yazım olarak kalmış olabilir — o an bilinen en güncel durumu
+           bir kez daha yazarak düzelt. */
+        if (seq !== persistSeq) {
+          const latest = get().current();
+          if (latest && latest.id === chat.id) {
+            await sb.from("chats").upsert({
+              id: latest.id,
+              user_id: userId,
+              title: latest.title,
+              messages: latest.messages,
+              project_id: latest.projectId ?? null,
+              created_at: new Date(latest.created_at).toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+          }
+        }
       }
     } else {
       saveLocalChats(get().chats);
@@ -1710,7 +1794,11 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
   removeMcpServer: (id) => {
     const config = get().config;
-    get().saveConfig({ ...config, mcpServers: (config.mcpServers ?? []).filter((s) => s.id !== id) });
+    get().saveConfig({
+      ...config,
+      mcpServers: (config.mcpServers ?? []).filter((s) => s.id !== id),
+      deletedIds: markDeleted(config, id),
+    });
   },
   updateMcpServer: (id, patch) => {
     const config = get().config;
@@ -1726,7 +1814,11 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
   removeHook: (id) => {
     const config = get().config;
-    get().saveConfig({ ...config, hooks: (config.hooks ?? []).filter((h) => h.id !== id) });
+    get().saveConfig({
+      ...config,
+      hooks: (config.hooks ?? []).filter((h) => h.id !== id),
+      deletedIds: markDeleted(config, id),
+    });
   },
   updateHook: (id, patch) => {
     const config = get().config;

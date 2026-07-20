@@ -184,6 +184,16 @@ function candidateKey(m: { provider: string; baseUrl: string; model: string }): 
   return `${m.provider}|${m.baseUrl}|${m.model}`;
 }
 
+/** Bir başarılı taslağın metni + hangi modelin ÜRETTİĞİ (yedeğe düşüldüyse
+    ORİJİNAL değil GERÇEKTE üreten model) — çağıranın taslak-model eşlemesini
+    (ör. Fusion rozeti) DOĞRU kurabilmesi için gerekli. Salt `string[]`
+    dönseydi, bir slot elenince (hata/kısa taslak) kalan taslakların hangi
+    modelden geldiği ARTIK dizideki orijinal pozisyonla uyuşmazdı. */
+export interface DraftResult {
+  text: string;
+  model: string;
+}
+
 /** Taslakları PARALEL üretir; her biri 45 sn ile sınırlı. Bir taslak modeli
     hata verirse (kota/erişim/5xx) VE `fallbacks` sağlanmışsa, o slot için
     (bir kez) sıradaki uygun aday (bkz. `fallback.ts`'teki `buildFallbackChain`)
@@ -195,7 +205,7 @@ export async function generateDrafts(opts: {
   /** Bir taslak modeli başarısız olursa denenecek yedek aday havuzu. */
   fallbacks?: FallbackCandidate[];
   signal?: AbortSignal;
-}): Promise<string[]> {
+}): Promise<DraftResult[]> {
   const attempt = async (m: (typeof opts.models)[number]) => {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 45_000);
@@ -207,21 +217,24 @@ export async function generateDrafts(opts: {
     }
   };
 
-  const withFallback = async (m: (typeof opts.models)[number]): Promise<string> => {
+  const withFallback = async (m: (typeof opts.models)[number]): Promise<DraftResult> => {
     try {
-      return await attempt(m);
+      const text = await attempt(m);
+      return { text, model: m.model };
     } catch (e) {
       const alt = (opts.fallbacks ?? []).find((c) => candidateKey(c) !== candidateKey(m));
       if (!alt) throw e;
-      return await attempt({ ...alt, temperature: m.temperature });
+      const altModel = { ...alt, temperature: m.temperature };
+      const text = await attempt(altModel);
+      return { text, model: altModel.model };
     }
   };
 
   const results = await Promise.allSettled(opts.models.map(withFallback));
   return results
-    .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
+    .filter((r): r is PromiseFulfilledResult<DraftResult> => r.status === "fulfilled")
     .map((r) => r.value)
-    .filter((d) => d.length > 40);
+    .filter((d) => d.text.length > 40);
 }
 
 /** HAKEM aşaması (Claude tarzı füzyonun kalbi): taslakları karşılaştırır,

@@ -1,6 +1,19 @@
-import { describe, expect, it } from "vitest";
-import { pickDraftModels, buildBoostInstruction, fillSelfConsistency, parseJudge, DRAFT_TEMPS } from "../boost";
+import { describe, expect, it, vi, afterEach } from "vitest";
+import { pickDraftModels, buildBoostInstruction, fillSelfConsistency, parseJudge, generateDrafts, DRAFT_TEMPS } from "../boost";
+import type { FallbackCandidate } from "../fallback";
 import type { ModelProfile } from "../types";
+
+function sseResponse(text: string, status = 200): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`));
+      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+      controller.close();
+    },
+  });
+  return new Response(stream, { status });
+}
 
 const m = (id: string, provider: string): ModelProfile =>
   ({ id, label: id, provider, baseUrl: "", model: id, apiKey: "" } as unknown as ModelProfile);
@@ -137,5 +150,46 @@ describe("buildBoostInstruction — hakem kararıyla", () => {
   });
   it("hakem yoksa eski davranış (geriye dönük uyumlu)", () => {
     expect(buildBoostInstruction(["x".repeat(50)])).not.toContain("HAKEM");
+  });
+});
+
+describe("generateDrafts — DraftResult model eşlemesi (Fusion rozeti mislabeling düzeltmesi)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("bir slot elense bile kalan taslaklar KENDİ ürettikleri modelle etiketlenir", async () => {
+    const models = [
+      { baseUrl: "https://x", model: "model-A", provider: "custom", apiKey: "k" },
+      { baseUrl: "https://x", model: "model-B", provider: "custom", apiKey: "k" },
+      { baseUrl: "https://x", model: "model-C", provider: "custom", apiKey: "k" },
+    ];
+    /* model-A başarısız (ör. kota/erişim hatası) — ÖNCEKİ hatalı davranışta
+       kalan 2 taslak "slots'un İLK 2'si" (A, B) olarak etiketlenirdi; doğrusu
+       GERÇEKTEN üreten B ve C olmalı. */
+    const fetchMock = vi.fn(async (_url: unknown, init: { body: string }) => {
+      const body = JSON.parse(init.body) as { model: string };
+      if (body.model === "model-A") return new Response(null, { status: 500 });
+      return sseResponse(`${body.model} taslağının metni buraya yazılır tam olarak.`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const results = await generateDrafts({ userText: "brief", models });
+    expect(results.map((r) => r.model)).toEqual(["model-B", "model-C"]);
+    expect(results[0].text).toContain("model-B");
+    expect(results[1].text).toContain("model-C");
+  });
+
+  it("hata alan slot fallback'ten üretirse GERÇEK (yedek) modelle etiketlenir", async () => {
+    const models = [{ baseUrl: "https://x", model: "model-A", provider: "custom", apiKey: "k" }];
+    const fallback: FallbackCandidate = { baseUrl: "https://y", model: "model-YEDEK", provider: "custom", apiKey: "k2" };
+    const fetchMock = vi.fn(async (_url: unknown, init: { body: string }) => {
+      const body = JSON.parse(init.body) as { model: string };
+      if (body.model === "model-A") return new Response(null, { status: 500 });
+      return sseResponse(`${body.model} yedek taslağının metni buraya yazılır tam olarak.`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const results = await generateDrafts({ userText: "brief", models, fallbacks: [fallback] });
+    expect(results).toHaveLength(1);
+    expect(results[0].model).toBe("model-YEDEK");
   });
 });

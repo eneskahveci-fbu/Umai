@@ -41,27 +41,40 @@ export function notebookEmbeddingText(n: { title: string; sources: { name: strin
   return clip(`${n.title}\n${text}`);
 }
 
-/** Eksik/bayat gömmeleri toplu (tek embed() çağrısı) hesaplar. `versionOf` içerik
-    değiştiğinde artan bir sayı (ör. mesaj/blok sayısı) döndürmeli — güncel
-    öğelere DOKUNULMAZ (aynı referans korunur), yalnız bayat/eksik olanlar
-    yeni referansla değiştirilir. Gömme modeli yüklenemezse dizi olduğu gibi
-    döner (zarif düşüş — rag.ts'in kendi deseniyle tutarlı). */
+/* Basit, hızlı 32-bit string hash (Java'nın String.hashCode'una benzer) —
+   embeddingVersion'ı içeriğin kendisinden türetmek için kullanılır. Kriptografik
+   değil, yalnızca "bu metin öncekiyle aynı mı" testi — çarpışma riski bu
+   kullanım için önemsiz. */
+function hashText(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  return h;
+}
+
+/** Eksik/bayat gömmeleri toplu (tek embed() çağrısı) hesaplar. Bayatlık,
+    `textOf(item)`'in KENDİSİNDEN türetilen bir hash ile belirlenir — ÖNCEDEN
+    çağıranın verdiği bir "sayaç" (ör. mesaj/blok SAYISI) kullanılıyordu; bu,
+    sayıyı değiştirmeyen bir düzenlemede (ör. mevcut bir mesajı/bloğu YERİNDE
+    düzenleme, başlık değişimi) embedding'i SONSUZA DEK bayat bırakıyordu —
+    "İlgili" özelliği güncel içerikle değil eski bir anlık görüntüyle
+    eşleştirme yapıyordu. Hash, gerçek metindeki HERHANGİ bir değişikliği
+    yakalar. Güncel öğelere DOKUNULMAZ (aynı referans korunur), yalnız bayat/
+    eksik olanlar yeni referansla değiştirilir. Gömme modeli yüklenemezse dizi
+    olduğu gibi döner (zarif düşüş — rag.ts'in kendi deseniyle tutarlı). */
 export async function withFreshEmbeddings<T extends { embedding?: number[]; embeddingVersion?: number }>(
   items: T[],
-  versionOf: (item: T) => number,
   textOf: (item: T) => string,
 ): Promise<T[]> {
-  const stale = items
-    .map((item, i) => ({ item, i }))
-    .filter(({ item }) => !item.embedding?.length || item.embeddingVersion !== versionOf(item));
+  const withText = items.map((item, i) => ({ item, i, text: textOf(item) || " " }));
+  const stale = withText.filter(({ item, text }) => !item.embedding?.length || item.embeddingVersion !== hashText(text));
   if (!stale.length) return items;
 
-  const vectors = await embed(stale.map(({ item }) => textOf(item) || " "));
+  const vectors = await embed(stale.map(({ text }) => text));
   if (vectors.length !== stale.length) return items;
 
   const next = [...items];
-  stale.forEach(({ item, i }, k) => {
-    next[i] = { ...item, embedding: vectors[k], embeddingVersion: versionOf(item) };
+  stale.forEach(({ item, i, text }, k) => {
+    next[i] = { ...item, embedding: vectors[k], embeddingVersion: hashText(text) };
   });
   return next;
 }

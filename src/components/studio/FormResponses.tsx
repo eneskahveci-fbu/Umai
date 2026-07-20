@@ -37,12 +37,26 @@ export function FormResponsesModal({ form, open, onClose }: {
       if (!sb) { if (alive) setErr("Supabase yapılandırılmamış."); return; }
       const { data: { user } } = await sb.auth.getUser();
       if (!user) { if (alive) setErr("Merkezî yanıtları görmek için giriş yapmalısın."); return; }
-      const { data, error } = await sb
+      let { data, error } = await sb
         .from("form_responses")
-        .select("answers, created_at")
+        .select("answers, question_ids, created_at")
         .eq("form_id", form.id)
         .order("created_at", { ascending: false })
         .limit(1000);
+      /* Geriye uyumluluk: question_ids kolonu henüz migrate edilmemiş bir
+         Supabase kurulumunda sorgu TÜMÜYLE kırılmasın — kolon-yok hatasında
+         onsuz yeniden dene (yalnız eski pozisyonel eşleme kullanılır, veri
+         akışı durmaz). */
+      if (error && /question_ids/i.test(error.message)) {
+        const fallback = await sb
+          .from("form_responses")
+          .select("answers, created_at")
+          .eq("form_id", form.id)
+          .order("created_at", { ascending: false })
+          .limit(1000);
+        data = fallback.data?.map((r) => ({ ...r, question_ids: null })) ?? null;
+        error = fallback.error;
+      }
       if (!alive) return;
       if (error) {
         setErr(/does not exist|relation/i.test(error.message)

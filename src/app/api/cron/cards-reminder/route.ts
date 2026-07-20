@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_URL } from "@/lib/supabase/config";
 import { sendPushToUser } from "@/lib/push";
 import { usersNeedingCardReminder, cardReminderMessage, type UserConfigRow } from "@/lib/cardReminders";
+import { timingSafeEqualStr } from "@/lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export async function GET(req: Request) {
     return Response.json({ error: "CRON_SECRET yapılandırılmamış." }, { status: 501 });
   }
   const auth = req.headers.get("authorization") || "";
-  if (auth !== `Bearer ${secret}`) {
+  if (!timingSafeEqualStr(auth, `Bearer ${secret}`)) {
     return Response.json({ error: "Yetkisiz." }, { status: 401 });
   }
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

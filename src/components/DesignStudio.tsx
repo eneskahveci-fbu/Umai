@@ -327,7 +327,8 @@ export function DesignStudio() {
                 apiKey: await resolveModelApiKey(s.profile, store.config.providerKeys), temperature: s.temperature,
               })));
               const fusionFallbacks = buildFallbackChain(store.config.models, active.id);
-              const drafts = await generateDrafts({ userText: brief, models: withKeys, fallbacks: fusionFallbacks, signal: ac.signal });
+              const draftResults = await generateDrafts({ userText: brief, models: withKeys, fallbacks: fusionFallbacks, signal: ac.signal });
+              const drafts = draftResults.map((d) => d.text);
               if (drafts.length) {
                 let judge: DraftJudge | null = null;
                 if (drafts.length >= 2) {
@@ -448,16 +449,23 @@ export function DesignStudio() {
   /* Sunum teması: LLM'e gitmeden client-side restyle (Gamma'nın "yeniden
      üretmeden tema değiştir" hissi) — deckToHtml deterministik olduğundan
      anında ve ücretsiz. Yeni bir sürüm EKLEMEZ, mevcut son sürümü günceller
-     (kozmetik restyle, ayrı bir "üretim" değil). */
+     (kozmetik restyle, ayrı bir "üretim" değil). deckData sürümsüz (tekil)
+     olduğundan restyle HER ZAMAN EN SON sürümü hedefler — kullanıcı önceki
+     bir sürümü görüntülerken tema değiştirirse (ÖNCEDEN: versions[son] sessizce
+     ezilirken ekranda hâlâ eski/görüntülenen sürüm kalıyordu, ikisi ayrışıyordu)
+     görünüm de son sürüme kaydırılır ki ekran ile depo hep tutarlı kalsın. */
   const changeDeckTheme = useCallback((themeId: string) => {
+    let newLen = 0;
     setProject((p) => {
       if (!p.deckData) return p;
       const deck: SlideDeck = { ...p.deckData, themeId };
       const html = deckToHtml(deck);
       const versions = [...(p.versions ?? [])];
       if (versions.length) versions[versions.length - 1] = html; else versions.push(html);
+      newLen = versions.length;
       return { ...p, deckData: deck, html, versions, updatedAt: Date.now() };
     });
+    if (newLen > 0) setVersionIndex(newLen - 1);
   }, []);
 
   /* ── Dışa Aktar (ArtifactCanvas'ın indir/yayınla'sına ek: PDF yazdır) ── */

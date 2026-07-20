@@ -82,6 +82,14 @@ create policy "shared_chats - delete"
 alter table public.chats
   add column if not exists project_id text;
 
+-- ── chats: etiket/sabitleme (tagChat/pinChat, /chats sayfası) ──
+-- ÖNCEDEN yalnız yerel (localStorage) tutuluyordu — cihazlar arası merge
+-- (mergeChats, yalnız mesaj sayısına bakar) sessizce düşürebiliyordu.
+alter table public.chats
+  add column if not exists tags text[];
+alter table public.chats
+  add column if not exists pinned boolean not null default false;
+
 -- ── updated_at otomatik güncelleme (uygulama unutsa bile DB tutarlı kalır) ──
 create or replace function public.set_updated_at()
 returns trigger language plpgsql as $$
@@ -111,6 +119,13 @@ create table if not exists public.subscriptions (
   current_period_end     timestamptz,
   updated_at             timestamptz not null default now()
 );
+
+-- ── olay-sıra koruması (webhook, Stripe teslim sırası GARANTİLİ DEĞİL) ──
+-- `updated_at` bir trigger'la HER yazımda "now()"a sıfırlandığından sıra
+-- karşılaştırması için kullanılamaz; Stripe'ın kendi event.created zaman
+-- damgasını ayrıca saklıyoruz (bkz. billing/webhook/route.ts).
+alter table public.subscriptions
+  add column if not exists stripe_event_created_at timestamptz;
 
 alter table public.subscriptions enable row level security;
 
@@ -276,6 +291,14 @@ create table if not exists public.form_responses (
   answers    jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now()
 );
+
+-- ── yanıt anındaki soru id sırası (analitik veri bütünlüğü) ──
+-- Form sahibi YAYINDAN SONRA soru ekler/siler/sıralarsa, answers'ın ham
+-- pozisyonu artık GÜNCEL form.questions ile uyuşmaz — bu sütun doğru
+-- soru-cevap eşlemesini korur (bkz. formAnalytics.ts answerAt). Eski
+-- kurulumlarda idempotent olarak eklenir; NULL = eski satır (pozisyonel).
+alter table public.form_responses
+  add column if not exists question_ids jsonb;
 
 create index if not exists form_responses_form_idx on public.form_responses (form_id, created_at desc);
 

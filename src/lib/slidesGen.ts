@@ -82,9 +82,9 @@ export interface DeckFusionOptions {
     düz generateDeck()'e düşmelidir. */
 export async function generateDeckFusion(opts: DeckFusionOptions): Promise<SlideDeck> {
   const userText = `${deckSystem(opts.slideCount)}\n\nBRIEF:\n${opts.brief}`;
-  const rawDrafts = await generateDrafts({
+  const rawDrafts = (await generateDrafts({
     userText, models: opts.drafts, fallbacks: opts.fallbacks, signal: opts.signal,
-  });
+  })).map((d) => d.text);
 
   const validRaw: string[] = [];
   const validDecks: SlideDeck[] = [];

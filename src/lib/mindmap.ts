@@ -109,11 +109,25 @@ export function parseMapJson(text: string, fallbackTitle = "Kroki"): CraftMap {
 export interface LaidNode {
   id: string;
   text: string;
+  /** Kutu içinde gösterilecek KISALTILMIŞ metin (bkz. TEXT_TRUNCATE_AT) —
+      düğüm genişliği (nodeWidth) 240px'te tavan yaptığından uzun metin
+      kutuyu taşırdı. Tek yerde hesaplanır: React tuvali VE dışa aktarılan
+      SVG (mapToSvg) AYNI değeri kullanır — ÖNCEDEN yalnız React tarafı
+      kendi 30-karakter kısaltmasını uyguluyordu, dışa aktarılan SVG tam
+      metni bastığından uzun düğümlerde (>30 karakter, MAX_NODE_TEXT=80'e
+      kadar geçerli) yayınlanan/indirilen SVG'de metin kutudan TAŞIYORDU —
+      uygulama içi görünümle uyuşmayan, bozuk bir çıktı. */
+  displayText: string;
   depth: number;
   x: number;
   y: number;
   w: number;
   h: number;
+}
+
+const TEXT_TRUNCATE_AT = 30;
+function truncateNodeText(text: string): string {
+  return text.length > TEXT_TRUNCATE_AT ? text.slice(0, TEXT_TRUNCATE_AT - 1) + "…" : text;
 }
 
 export interface MapLayout {
@@ -160,7 +174,7 @@ export function layoutMap(root: MindNode): MapLayout {
     }
     const w = nodeWidth(n.text);
     const nx = colX[depth];
-    nodes.push({ id: n.id, text: n.text, depth, x: nx, y: cy - NODE_H / 2, w, h: NODE_H });
+    nodes.push({ id: n.id, text: n.text, displayText: truncateNodeText(n.text), depth, x: nx, y: cy - NODE_H / 2, w, h: NODE_H });
     for (const c of n.children) {
       const child = nodes.find((ln) => ln.id === c.id)!;
       const x1 = nx + w, y1 = cy, x2 = child.x, y2 = child.y + NODE_H / 2;
@@ -194,7 +208,7 @@ export function mapToSvg(map: CraftMap): string {
     const stroke = isRoot ? "#5c9478" : "#d9d3c4";
     return `<g>
 <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="8" fill="${fill}" stroke="${stroke}"/>
-<text x="${n.x + n.w / 2}" y="${n.y + n.h / 2 + 4}" text-anchor="middle" font-size="12.5" font-weight="${isRoot ? 700 : 500}" fill="${textFill}">${escapeHtml(n.text)}</text>
+<text x="${n.x + n.w / 2}" y="${n.y + n.h / 2 + 4}" text-anchor="middle" font-size="12.5" font-weight="${isRoot ? 700 : 500}" fill="${textFill}">${escapeHtml(n.displayText)}</text>
 </g>`;
   }).join("\n");
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${l.width} ${l.height}" width="${l.width}" height="${l.height}" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
