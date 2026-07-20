@@ -1,6 +1,6 @@
 /* Şablon paylaşımı — Canva'nın "şablonu bağlantıyla paylaş" fikrinin sıfır
-   maliyetli craft yorumu: sunum/doküman/anket JSON dosyası olarak dışa
-   aktarılır, başka bir craft kullanıcısı içe aktarıp üzerine çalışır.
+   maliyetli Umai yorumu: sunum/doküman/anket JSON dosyası olarak dışa
+   aktarılır, başka bir Umai kullanıcısı içe aktarıp üzerine çalışır.
    Sunucu yok; doğrulama içe aktarma anında normalize* ile yapılır. */
 import type { CraftDoc, CraftForm, SlideDeck } from "./types";
 import { normalizeDeck } from "./slides";

@@ -163,7 +163,7 @@ export function FormsStudio() {
     if (!form) return;
     const html = await buildExportHtml(form);
     const collecting = html.includes("/api/forms/respond");
-    const url = await publishArtifact(form.title || "craft anketi", html);
+    const url = await publishArtifact(form.title || "Umai anketi", html);
     if (url) addToast(collecting ? "Yayınlandı — bağlantı kopyalandı. Yanıtlar 'Yanıtlar' panelinde birikecek." : "Yayınlandı — bağlantı kopyalandı.", "success");
     else addToast("Yayınlama başarısız.", "error");
   };
@@ -201,7 +201,7 @@ export function FormsStudio() {
           <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-20 flex flex-col gap-5">
             <div className="text-center">
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-balance">Neyi ölçelim?</h1>
-              <p className="text-muted text-sm mt-1.5 text-balance">Amacı anlat — craft tarafsız soruları kursun; bağımsız HTML olarak paylaş, yanıtları CSV al.</p>
+              <p className="text-muted text-sm mt-1.5 text-balance">Amacı anlat — Umai tarafsız soruları kursun; bağımsız HTML olarak paylaş, yanıtları CSV al.</p>
             </div>
             <div className="rounded-2xl border border-line bg-surface elev-2 focus-within:border-brand/50 transition-colors">
               <textarea
