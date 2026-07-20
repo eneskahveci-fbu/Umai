@@ -80,6 +80,7 @@ const TOOL_LABEL: Record<string, string> = {
   update_plan:        "Plan güncelleniyor",
   create_pr:          "PR oluşturuluyor",
   generate_image:     "Görsel üretiliyor",
+  deep_research:      "Derinlemesine araştırılıyor",
 };
 
 const TOOL_DONE_LABEL: Record<string, string> = {
@@ -103,6 +104,7 @@ const TOOL_DONE_LABEL: Record<string, string> = {
   update_plan:        "Plan güncellendi",
   create_pr:          "PR oluşturuldu",
   generate_image:     "Görsel üretildi",
+  deep_research:      "Araştırma tamamlandı",
 };
 
 function ToolIcon({ name, size = 11 }: { name: string; size?: number }) {
@@ -124,6 +126,7 @@ function ToolIcon({ name, size = 11 }: { name: string; size?: number }) {
     case "dispatch_agents":   return <Loader2 size={size} className="text-purple" />;
     case "update_plan":       return <ListChecks size={size} className="text-brand" />;
     case "generate_image":    return <ImageIcon size={size} className="text-brand" />;
+    case "deep_research":     return <Microscope size={size} className="text-purple" />;
     default:                  return <Wrench size={size} />;
   }
 }
@@ -147,6 +150,7 @@ function getKeyArg(name: string, args: Record<string, unknown>): string {
     }
     case "list_files":    return args.filter ? `*${args.filter}*` : "";
     case "generate_image": return `"${String(args.prompt ?? "").slice(0, 60)}"`;
+    case "deep_research":  return `"${String(args.topic ?? "").slice(0, 60)}"`;
     default: return "";
   }
 }

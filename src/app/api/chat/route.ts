@@ -14,6 +14,7 @@ import { CODER_TOOLS } from "@/lib/tools";
 import { EXTENSION_TOOLS } from "@/lib/extensions/registry";
 import { searchWeb, formatResults, fetchUrl } from "@/lib/webSearch";
 import { pollinationsImageUrl, stableSeed } from "@/lib/pollinations";
+import { runDeepResearch } from "@/lib/researchPipeline";
 import { isSafeRemoteUrl } from "@/lib/urlSafety";
 import { isBuiltinMcpServerId } from "@/lib/mcpBuiltins";
 import { after } from "next/server";
@@ -1338,6 +1339,7 @@ export async function POST(req: Request) {
       `• trigger_ci(workflow, ref?, inputs?) — GitHub Actions workflow'unu tetikle\n` +
       `• dispatch_agents(tasks[]) — karmaşık görevi PARALEL salt-okunur alt-ajanlara böl (Claude'daki gibi)\n` +
       `• generate_image(prompt, aspect_ratio?) — kullanıcı görsel/resim isteyince ÇAĞIR (doğal dilde, komut gerekmez); sonucu '![açıklama](url)' olarak yanıtına göm\n` +
+      `• deep_research(topic) — kullanıcı derinlemesine/kaynaklı bir araştırma/rapor isteyince ÇAĞIR; dönen atıflı raporu ÖZETLEMEDEN aynen ilet\n` +
       `• update_plan(plan) — çok adımlı görevde canlı yapılacaklar listesi\n` +
       (body.webSearch ? `• web_search(query) — internette ara\n• read_url(url) — web sayfası oku\n` : "") +
       `\nÇalışma pratiği:\n` +
@@ -1345,6 +1347,7 @@ export async function POST(req: Request) {
       `— Çok adımlı (2+) görevlerde MUTLAKA önce update_plan ile yapılacaklar listesini yaz (kullanıcı ilerlemeyi canlı "todo" kutusunda görür), her adım bitince planı güncelleyip [x] işaretle — bunu atlama.\n` +
       `— Görev BAĞIMSIZ paralel parçalara bölünebiliyorsa (ör. birden çok modülü ayrı ayrı incelemek) dispatch_agents ile alt-ajanlara dağıt; basitse kendin yap.\n` +
       `— Kullanıcı bir görsel/resim/illüstrasyon istediğinde (komut/buton beklemeden, doğal dilden anla) generate_image'i çağır; dönen URL'i düz metin YAZMA, '![açıklama](url)' markdown biçiminde göm.\n` +
+      `— Kullanıcı derinlemesine/kaynaklı/kapsamlı bir araştırma istediğinde deep_research'ü çağır; dönen atıflı raporu ÖZETLEMEDEN/KISALTMADAN, atıfları ve Kaynaklar bölümünü koruyarak ilet.\n` +
       `— Cevaplamadan önce ilgili dosyaları oku. Bağımsız okumaları TEK turda birlikte iste (paralel çalışır).\n` +
       `— list_files veya search_code ile önce yapıyı anla, sonra spesifik dosyalara gir.\n` +
       `— Var olan dosyada KÜÇÜK değişiklik için str_replace kullan (tüm dosyayı yeniden yazma); old_string ham metin olmalı (satır numarası DEĞİL), birebir ve benzersiz.\n` +
@@ -1561,8 +1564,14 @@ export async function POST(req: Request) {
       });
       /* ask_user çağrıldığında tool-loop kırılır → kullanıcı yanıtı beklenir. */
       let askUserCalled = false;
+      /* deep_research'ün döndürdüğü atıflı raporun bir SONRAKİ turda modelce
+         özetlenip/kısaltılıp atıfların kaybolmaması için: rapor geldikten
+         hemen sonraki tur zorla tool_choice:"none" olur (model yalnızca
+         raporu ilet/çerçevele, yeni araç çağırmasın). */
+      let forceNoToolsNextRound = false;
       for (let round = 0; round < MAX_ROUNDS; round++) {
-        const lastRound = round === MAX_ROUNDS - 1;
+        const lastRound = round === MAX_ROUNDS - 1 || forceNoToolsNextRound;
+        forceNoToolsNextRound = false;
         let upstream: Response | null = null;
 
         if (chosen) {
@@ -1705,6 +1714,33 @@ export async function POST(req: Request) {
             const markdown = `![${prompt.slice(0, 120)}](${url})`;
             safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: "Görsel üretildi" } })}\n\n`));
             resultById.set(tc.id, markdown);
+            return;
+          }
+          /* deep_research: doğal dilden ("şu konuyu derinlemesine araştır")
+             tetiklenen çok-kaynaklı araştırma — Faz 1'de çıkarılan SAF
+             pipeline'ı (researchPipeline.ts) burada da kullanır; ilerleme
+             AYNI swarm_event(kind:"research") şemasıyla yollanır, istemcinin
+             ZATEN sahip olduğu "Ajan Ekibi" paneli hiç değişmeden render eder. */
+          if (tc.name === "deep_research") {
+            const topic = String(args.topic ?? "").trim();
+            const fail = (m: string) => {
+              safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: m } })}\n\n`));
+              resultById.set(tc.id, m);
+            };
+            if (!repoCtx) { fail("Hata: repo bağlı değil"); return; }
+            if (!topic) { fail("Hata: topic gerekli"); return; }
+            const sc = chosen ?? primary;
+            const subCfg = { baseUrl: sc.baseUrl, model: sc.model, provider: sc.provider as Provider, headers: buildCandidateHeaders(sc, req) };
+            try {
+              const report = await runDeepResearch(subCfg, topic, body.systemPrompt || DEFAULT_SYSTEM_PROMPT, {
+                onPhase: (phase, agents) => safe.enqueue(encoder.encode(`data: ${JSON.stringify({ swarm_event: { kind: "research", phase, agents } })}\n\n`)),
+              });
+              safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: "Araştırma tamamlandı" } })}\n\n`));
+              resultById.set(tc.id, report);
+              forceNoToolsNextRound = true;
+            } catch (e) {
+              fail(`Hata: ${(e as Error).message}`);
+            }
             return;
           }
           /* Yıkıcı işlemler (silme/yeniden adlandırma): ASLA doğrudan yapılmaz.
