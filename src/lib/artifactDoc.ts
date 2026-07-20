@@ -54,7 +54,13 @@ document.getElementById('doc').innerHTML=marked.parse(raw);
 <\/script></body></html>`;
   }
   /* html */
-  return content.includes("<html")
+  /* preview.ts'in AYNI kontrolü (ör. htmlDoc'taki isFull) harf duyarsız
+     `/<html[\s>]/i` kullanıyor; burası önceden yalnız küçük-harf
+     `content.includes("<html")` arıyordu — bir artifact "<HTML>" (büyük
+     harf) ile başlarsa canlı sohbet önizlemesi onu ZATEN tam belge sayıp
+     olduğu gibi gösterirken, burası (yayınlanan /a/[id] ve panel) onu
+     eksik sanıp içine BİR DAHA <html><body> sarardı — iç içe/bozuk belge. */
+  return /<html[\s>]/i.test(content)
     ? content
     : `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;margin:1rem;}</style></head><body>${content}</body></html>`;
 }

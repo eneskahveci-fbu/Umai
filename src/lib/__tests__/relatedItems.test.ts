@@ -88,29 +88,34 @@ interface TestItem {
 }
 
 describe("withFreshEmbeddings", () => {
-  it("eksik gömmeleri hesaplar ve version damgası ekler", async () => {
+  it("eksik gömmeleri hesaplar ve içerikten türetilmiş version damgası ekler", async () => {
     const items: TestItem[] = [{ id: "a", text: "hello" }];
-    const next = await withFreshEmbeddings(items, () => 1, (i) => i.text);
+    const next = await withFreshEmbeddings(items, (i) => i.text);
     expect(next[0].embedding).toBeDefined();
-    expect(next[0].embeddingVersion).toBe(1);
+    expect(next[0].embeddingVersion).toBeDefined();
   });
 
-  it("güncel öğelere dokunmaz (aynı referans)", async () => {
-    const items: TestItem[] = [{ id: "a", text: "hello", embedding: [1, 0], embeddingVersion: 3 }];
-    const next = await withFreshEmbeddings(items, () => 3, (i) => i.text);
-    expect(next[0]).toBe(items[0]);
+  it("güncel öğelere dokunmaz (aynı referans) — metin aynıysa version de aynı", async () => {
+    const first = await withFreshEmbeddings([{ id: "a", text: "hello" } as TestItem], (i) => i.text);
+    const next = await withFreshEmbeddings(first, (i) => i.text);
+    expect(next[0]).toBe(first[0]);
   });
 
-  it("version değiştiyse yeniden hesaplar", async () => {
-    const items: TestItem[] = [{ id: "a", text: "hello world", embedding: [1, 0], embeddingVersion: 1 }];
-    const next = await withFreshEmbeddings(items, () => 2, (i) => i.text);
+  it("METİN değiştiyse (SAYI aynı kalsa bile) yeniden hesaplar — bayatlık düzeltmesi", async () => {
+    /* ÖNCEKİ hatalı davranış: version harici bir "sayaç" (ör. mesaj sayısı)
+       ile belirleniyordu — bir mesajı YERİNDE düzenlemek (sayıyı değiştirmeden)
+       embedding'i sonsuza dek bayat bırakıyordu. Artık version doğrudan
+       metnin kendisinden türediği için HERHANGİ bir metin değişikliği
+       yakalanır. */
+    const items: TestItem[] = [{ id: "a", text: "eski metin", embedding: [1, 0], embeddingVersion: 999 }];
+    const next = await withFreshEmbeddings(items, () => "YENİ metin — aynı 'sayı' ama farklı içerik");
     expect(next[0]).not.toBe(items[0]);
-    expect(next[0].embeddingVersion).toBe(2);
+    expect(next[0].embeddingVersion).not.toBe(999);
   });
 
   it("hiçbir şey bayat değilse aynı diziyi döndürür", async () => {
-    const items: TestItem[] = [{ id: "a", text: "x", embedding: [1, 0], embeddingVersion: 1 }];
-    const next = await withFreshEmbeddings(items, () => 1, (i) => i.text);
-    expect(next).toBe(items);
+    const first = await withFreshEmbeddings([{ id: "a", text: "x" } as TestItem], (i) => i.text);
+    const next = await withFreshEmbeddings(first, (i) => i.text);
+    expect(next).toBe(first);
   });
 });

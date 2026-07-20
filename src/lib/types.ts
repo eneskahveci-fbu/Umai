@@ -173,6 +173,10 @@ export interface ModelProfile {
   baseUrl: string;
   model: string;
   apiKey: string;
+  /** apiKey en son ne zaman değiştirildi (temizleme dahil) — cihazlar arası
+      config merge'inde "boş = henüz senkronlanmamış" ile "kasıtlı temizleme"
+      ayrımı için kullanılır (bkz. store.ts mergeConfigs). */
+  updatedAt?: number;
 }
 
 export interface GitHubAccount {
@@ -508,6 +512,10 @@ export interface Config {
   activeGitlabId: string | null;
   repos: string[];
   activeRepo: string | null;
+  /** Silinmiş model/hesap/proje/skill/mcp/hook id'lerinin "mezar taşı" listesi
+      — cihazlar arası config merge'inde silinen bir öğenin başka bir cihazın
+      bayat kopyasından geri gelmesini önler (bkz. store.ts mergeConfigs). */
+  deletedIds?: string[];
   systemPrompt: string;
   theme: "dark" | "light";
   style: ResponseStyle;

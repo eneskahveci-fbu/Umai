@@ -255,7 +255,7 @@ export function MapStudio() {
                       x={n.x + n.w / 2} y={n.y + n.h / 2 + 4}
                       textAnchor="middle" fontSize={12.5} fontWeight={isRoot ? 700 : 500}
                       className={isRoot ? "fill-[#111110]" : "fill-ink"}
-                    >{n.text.length > 30 ? n.text.slice(0, 29) + "…" : n.text}</text>
+                    >{n.displayText}</text>
                   </g>
                 );
               })}

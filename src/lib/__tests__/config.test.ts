@@ -73,4 +73,50 @@ describe("mergeConfigs", () => {
     expect(out.repos).not.toContain(DEAD);
     expect(out.repos).toContain(DEFAULT_REPO);
   });
+
+  it("silme mezar taşı: yerelde silinmiş bir model uzaktaki bayat kopyadan geri gelmez", () => {
+    const out = mergeConfigs(
+      cfg({ models: [], deletedIds: ["m1"] }),
+      { models: [model("m1", "OLD_STILL_HERE")] },
+    );
+    expect(out.models.find((m) => m.id === "m1")).toBeUndefined();
+  });
+
+  it("silme mezar taşı: uzakta silinmiş bir skill yereldeki bayat kopyadan geri gelmez", () => {
+    const skill = { id: "s1", title: "t", content: "c", tags: [], enabled: true, source: "manual" as const, usageCount: 0, createdAt: 0 };
+    const out = mergeConfigs(
+      cfg({ skills: [skill] }),
+      { skills: [], deletedIds: ["s1"] },
+    );
+    expect(out.skills?.find((s) => s.id === "s1")).toBeUndefined();
+  });
+
+  it("silme mezar taşı iki taraftan birleşir (base.deletedIds)", () => {
+    const out = mergeConfigs(cfg({ deletedIds: ["a"] }), { deletedIds: ["b"] });
+    expect(out.deletedIds).toEqual(expect.arrayContaining(["a", "b"]));
+  });
+
+  it("apiKey zaman damgası: BİLEREK temizlenen (updatedAt daha yeni) anahtar uzaktaki bayat kopyadan geri gelmez", () => {
+    const out = mergeConfigs(
+      cfg({ models: [{ ...model("m1", ""), updatedAt: 2000 }], activeModelId: "m1" }),
+      { models: [{ ...model("m1", "STALE_KEY"), updatedAt: 1000 }] },
+    );
+    expect(out.models.find((m) => m.id === "m1")?.apiKey).toBe("");
+  });
+
+  it("apiKey zaman damgası: uzaktaki DAHA YENİ anahtar yereldeki eskiyi ezer", () => {
+    const out = mergeConfigs(
+      cfg({ models: [{ ...model("m1", "OLD"), updatedAt: 1000 }], activeModelId: "m1" }),
+      { models: [{ ...model("m1", "NEW"), updatedAt: 2000 }] },
+    );
+    expect(out.models.find((m) => m.id === "m1")?.apiKey).toBe("NEW");
+  });
+
+  it("apiKey zaman damgası yoksa (eski veri) geriye dönük uyum: dolu anahtar kazanır", () => {
+    const out = mergeConfigs(
+      cfg({ models: [model("m1", "")], activeModelId: "m1" }),
+      { models: [model("m1", "NO_TIMESTAMP")] },
+    );
+    expect(out.models.find((m) => m.id === "m1")?.apiKey).toBe("NO_TIMESTAMP");
+  });
 });

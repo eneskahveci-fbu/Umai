@@ -96,6 +96,25 @@ describe("layoutMap / dışa aktarma", () => {
     expect(l.height).toBeGreaterThan(0);
   });
 
+  it("layoutMap uzun metni kısaltır (displayText) — mapToSvg ile React tuvali AYNI kısaltmayı paylaşır", () => {
+    /* ÖNCEDEN: yalnız MapStudio.tsx'in kendi JSX'i 30 karakterden uzun metni
+       kısaltıyordu; mapToSvg TAM metni basıyordu — düğüm genişliği 240px'te
+       tavan yaptığından (nodeWidth) dışa aktarılan/yayınlanan SVG'de uzun
+       (MAX_NODE_TEXT=80'e kadar geçerli) metin kutudan taşıyordu. Artık
+       kısaltma layoutMap'te TEK yerde hesaplanıyor. */
+    const longText = "Bu çok ama çok uzun bir düğüm metni örneğidir kesinlikle";
+    const longMap = normalizeMap({ title: "T", root: { text: "kök", children: [{ text: longText, children: [] }] } })!;
+    const l = layoutMap(longMap.root);
+    const child = l.nodes.find((n) => n.text === longText)!;
+    expect(child.displayText.length).toBeLessThan(longText.length);
+    expect(child.displayText.endsWith("…")).toBe(true);
+    expect(longText.startsWith(child.displayText.slice(0, -1))).toBe(true);
+
+    const svg = mapToSvg(longMap);
+    expect(svg).toContain(child.displayText);
+    expect(svg).not.toContain(longText); // tam metin SVG'ye asla girmemeli
+  });
+
   it("mapToSvg bağımsız SVG üretir (başlık + tüm düğüm metinleri, XSS kaçışlı)", () => {
     const evil = normalizeMap({ title: "T", root: { text: "<script>kök", children: [{ text: "dal & alt", children: [] }] } })!;
     const svg = mapToSvg(evil);

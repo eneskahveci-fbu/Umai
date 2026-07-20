@@ -64,7 +64,14 @@ function isUsable(m: { provider: Provider; baseUrl?: string; model?: string; api
 }
 
 function dedupeKey(c: FallbackCandidate): string {
-  return `${c.provider}|${c.baseUrl}|${c.model}`;
+  /* baseUrl büyük/küçük harfe duyarlı KARŞILAŞTIRILMIYOR — URL şeması/host'u
+     RFC'ye göre zaten harf duyarsız (bkz. urlSafety.ts'teki aynı desen),
+     yani kullanıcı aynı uç noktayı iki farklı harf biçimiyle girdiğinde
+     (ör. elle eklenen özel sağlayıcı) bu iki profil TEKİLLEŞTİRİLMEDEN
+     zincire ikisi de girer — sınırlı `maxFallbacks` yuvasından birini
+     GERÇEKTEN FARKLI bir sağlayıcı yerine aynı uç noktaya tekrar denemeye
+     harcar. */
+  return `${c.provider}|${c.baseUrl.toLowerCase()}|${c.model}`;
 }
 
 export interface BuildChainOptions {

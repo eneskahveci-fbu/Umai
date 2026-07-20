@@ -89,4 +89,14 @@ describe("buildFallbackChain", () => {
     const chain = buildFallbackChain(models, "active", { pollinationsBackstop: false });
     expect(chain.filter((c) => c.provider === "groq").length).toBe(1);
   });
+
+  it("yalnız harf büyüklüğü farklı aynı baseUrl'i de teklerleştirir (harf duyarsız dedup)", () => {
+    const models = [
+      m({ id: "active", provider: "gemini" }),
+      m({ id: "g1", provider: "custom", baseUrl: "https://API.Example.test/v1", model: "m", apiKey: "k" }),
+      m({ id: "g2", provider: "custom", baseUrl: "https://api.example.test/v1", model: "m", apiKey: "k" }),
+    ];
+    const chain = buildFallbackChain(models, "active", { pollinationsBackstop: false });
+    expect(chain.filter((c) => c.provider === "custom").length).toBe(1);
+  });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { asOwner, asRepo, asBranch, asRepoPath, ValidationError } from "../validate";
+import { asOwner, asRepo, asBranch, asRepoPath, timingSafeEqualStr, ValidationError } from "../validate";
 
 describe("validate helpers", () => {
   it("asOwner accepts normal GitHub usernames", () => {
@@ -26,5 +26,18 @@ describe("validate helpers", () => {
     expect(() => asRepoPath("../etc/passwd")).toThrow(ValidationError);
     expect(() => asRepoPath("/abs/path")).toThrow(ValidationError);
     expect(asRepoPath("src/lib/foo.ts")).toBe("src/lib/foo.ts");
+  });
+
+  describe("timingSafeEqualStr", () => {
+    it("eşit stringlerde true döner", () => {
+      expect(timingSafeEqualStr("Bearer abc123", "Bearer abc123")).toBe(true);
+    });
+    it("farklı stringlerde (aynı uzunluk) false döner", () => {
+      expect(timingSafeEqualStr("Bearer abc123", "Bearer xyz789")).toBe(false);
+    });
+    it("farklı uzunlukta false döner (timingSafeEqual atmadan)", () => {
+      expect(timingSafeEqualStr("kısa", "çok-daha-uzun-bir-string")).toBe(false);
+      expect(timingSafeEqualStr("", "x")).toBe(false);
+    });
   });
 });

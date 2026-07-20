@@ -45,18 +45,25 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  /* Gezinme → network-first (çevrimiçiyken asla cache'den HTML). */
+  /* Gezinme → network-first (çevrimiçiyken asla cache'den HTML).
+     ÖNEMLİ: her rota KENDİ istek URL'iyle (req) önbelleklenir — tek bir sabit
+     OFFLINE_FALLBACK anahtarı kullanmak, en son fetch edilen HANGİ rota olursa
+     olsun onu ezip herkese (ör. /pricing'i son gezen biri /studio'ya çevrimdışı
+     gidince /pricing içeriği) YANLIŞ sayfayı gösteriyordu. Çevrimdışıyken önce
+     TAM OLARAK istenen rotanın önbelleği denenir; hiç ziyaret edilmemişse
+     (önbellekte yoksa) en azından bir kabuk göstermek için genel OFFLINE_FALLBACK'e
+     düşülür. */
   if (req.mode === "navigate") {
     event.respondWith(
       (async () => {
         try {
           const fresh = await fetch(req);
           const cache = await caches.open(SHELL_CACHE);
-          cache.put(OFFLINE_FALLBACK, fresh.clone());
+          cache.put(req, fresh.clone());
           return fresh;
         } catch {
           const cache = await caches.open(SHELL_CACHE);
-          const cached = await cache.match(OFFLINE_FALLBACK);
+          const cached = (await cache.match(req)) || (await cache.match(OFFLINE_FALLBACK));
           return cached || Response.error();
         }
       })(),

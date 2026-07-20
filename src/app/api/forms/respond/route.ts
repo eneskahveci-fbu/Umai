@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     });
   }
   try {
-    const { formId, answers } = await readJson(req) as { formId?: unknown; answers?: unknown };
+    const { formId, answers, questionIds } = await readJson(req) as { formId?: unknown; answers?: unknown; questionIds?: unknown };
     if (typeof formId !== "string" || !FORM_ID_RE.test(formId)) {
       return NextResponse.json({ error: "Geçersiz form kimliği" }, { status: 400, headers: CORS });
     }
@@ -45,11 +45,28 @@ export async function POST(req: NextRequest) {
     if (!clean.some((a) => a.trim() !== "")) {
       return NextResponse.json({ error: "Boş yanıt" }, { status: 400, headers: CORS });
     }
+    /* Yayınlanma anındaki soru id sırası — form sonradan düzenlenirse (soru
+       eklenir/silinir/sıralanır) doğru soru-cevap eşlemesi için gerekir (bkz.
+       formAnalytics.ts answerAt). Opsiyonel: eski/uyumsuz istemciler göndermez. */
+    const cleanQuestionIds = Array.isArray(questionIds) && questionIds.length === answers.length
+      ? questionIds.map((q) => (typeof q === "string" ? q.slice(0, 64) : ""))
+      : null;
 
     const sb = await createClient();
     if (!sb) return NextResponse.json({ error: "Veritabanı bağlantısı yok" }, { status: 503, headers: CORS });
 
-    const { error } = await sb.from("form_responses").insert({ form_id: formId, answers: clean });
+    let { error } = await sb.from("form_responses").insert({
+      form_id: formId,
+      answers: clean,
+      ...(cleanQuestionIds ? { question_ids: cleanQuestionIds } : {}),
+    });
+    /* Geriye uyumluluk: question_ids kolonu henüz migrate edilmemiş bir
+       Supabase kurulumunda TÜM yanıt gönderimi kırılmasın — kolon-yok
+       hatasında onsuz yeniden dene (yalnız analitik eski pozisyonel eşlemeye
+       düşer, formun kendisi/toplama çalışmaya devam eder). */
+    if (error && cleanQuestionIds && /question_ids/i.test(error.message)) {
+      ({ error } = await sb.from("form_responses").insert({ form_id: formId, answers: clean }));
+    }
     if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: CORS });
     return NextResponse.json({ ok: true }, { headers: CORS });
   } catch (e) {

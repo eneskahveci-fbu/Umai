@@ -36,6 +36,24 @@ export async function POST(req: Request) {
     status: string;
     current_period_end: number;
   }) => {
+    /* OLAY-SIRA KORUMASI: Stripe webhook teslimi SIRA GARANTİLİ DEĞİL (Stripe'ın
+       kendi dokümantasyonu). Bu event'ten DAHA YENİ bir event bu satırı zaten
+       güncellemişse (ör. ağ gecikmesiyle geç gelen eski bir "canceled" event,
+       az önce işlenmiş yeni bir "active" event'in üzerine yazabilir), bu
+       yazımı sessizce atla — bayat veri asla daha yeniyi ezmesin. Geriye
+       uyumluluk: stripe_event_created_at kolonu henüz migrate edilmemişse
+       (eski kurulum) korumasız ama ÇALIŞAN eski davranışa düş — billing asla
+       tamamen kırılmasın. */
+    const { data: existing, error: selErr } = await admin
+      .from("subscriptions")
+      .select("stripe_event_created_at")
+      .eq("user_id", row.user_id)
+      .maybeSingle();
+    const hasEventColumn = !selErr || !/stripe_event_created_at/i.test(selErr.message);
+    const existingTs = existing?.stripe_event_created_at ? new Date(existing.stripe_event_created_at).getTime() : 0;
+    const incomingTs = event.created * 1000;
+    if (hasEventColumn && incomingTs < existingTs) return;
+
     await admin.from("subscriptions").upsert({
       user_id: row.user_id,
       stripe_customer_id: row.stripe_customer_id,
@@ -43,6 +61,7 @@ export async function POST(req: Request) {
       status: row.status,
       plan: isActive(row.status) ? "pro" : "free",
       current_period_end: new Date(row.current_period_end * 1000).toISOString(),
+      ...(hasEventColumn ? { stripe_event_created_at: new Date(incomingTs).toISOString() } : {}),
       updated_at: new Date().toISOString(),
     });
   };
