@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import {
-  ArrowUp, BarChart3, BookOpen, ChevronDown, Code2, FileText, LayoutTemplate,
+  ArrowUp, BarChart3, BookOpen, Code2, FileText,
   Layers, ListChecks, Network, Palette, Presentation, Sparkles,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { TemplateGallery } from "./TemplateGallery";
 import { useSurfaceNav, type Surface } from "@/lib/surfaceNav";
-import type { StudioTemplate } from "@/lib/studioTemplates";
+import { templatesByCategory, type StudioTemplate } from "@/lib/studioTemplates";
 
 /* Stüdyo anasayfası — claude.ai'yi açınca gelen ilk ekrana birebir paralel:
    ortalanmış karşılama + TEK büyük prompt kutusu + biçim/araç kartları ızgarası
@@ -22,8 +22,11 @@ import type { StudioTemplate } from "@/lib/studioTemplates";
        gibi tek-seferlik üretimle ASLA karşılanamayacak özellikler taşıdığından
        tek tuval üzerinden değil kendi tam sayfalarında açılırlar (eskiden
        Sidebar → "Araçlar" açılır listesindeydi, artık buradan erişiliyor).
-   19 şablonluk ızgara (TemplateGallery) burada ayrı, İKİNCİL bir yol olarak
-   kalır — varsayılan kapalı, "Hazır şablonlar" ile açılır. */
+   Şablon ızgarası (TemplateGallery) artık kategori sekmeli, HER ZAMAN GÖRÜNÜR
+   bir vitrin olarak burada duruyor (Tem 2026 kullanıcı kararı: eskiden
+   varsayılan kapalı bir "Hazır şablonlardan başla" açılır menüsüydü —
+   Claude Design'ın kendi ana ekranındaki gibi kategori sekmesi + doğrudan
+   ızgaraya geçildi, gizli bir adım kalmadı). */
 
 interface QuickCard {
   label: string;
@@ -80,8 +83,10 @@ export function StudioHomeScreen({
   onPickTemplate: (t: StudioTemplate) => void;
   busy: boolean;
 }) {
-  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const templateGroups = templatesByCategory();
+  const [activeCategory, setActiveCategory] = useState(() => templateGroups[0]?.category ?? "");
   const nav = useSurfaceNav();
+  const activeTemplates = templateGroups.find((g) => g.category === activeCategory)?.items ?? [];
 
   const submit = () => {
     const t = brief.trim();
@@ -133,21 +138,25 @@ export function StudioHomeScreen({
             {TOOL_CARDS.map((c) => <Card key={c.label} card={c} onClick={() => nav.go(c.surface)} />)}
           </div>
 
-          {/* Hazır şablonlar — ikincil yol, varsayılan kapalı */}
-          <div className="w-full">
-            <button
-              onClick={() => setTemplatesOpen((v) => !v)}
-              className="mx-auto flex items-center gap-1.5 text-xs text-muted/70 hover:text-ink transition-colors"
-            >
-              <LayoutTemplate size={13} />
-              Hazır şablonlardan başla
-              <ChevronDown size={13} className={`transition-transform ${templatesOpen ? "rotate-180" : ""}`} />
-            </button>
-            {templatesOpen && (
-              <div className="mt-4 animate-fade-in">
-                <TemplateGallery onPick={onPickTemplate} />
-              </div>
-            )}
+          {/* Şablon vitrini — her zaman görünür, kategori sekmeli (Claude
+              Design'ın kendi ana ekranındaki gibi). */}
+          <div className="w-full flex flex-col gap-3">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              {templateGroups.map((g) => (
+                <button
+                  key={g.category}
+                  onClick={() => setActiveCategory(g.category)}
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    activeCategory === g.category
+                      ? "bg-ink text-bg"
+                      : "text-muted hover:text-ink hover:bg-bgsoft/60"
+                  }`}
+                >
+                  {g.category}
+                </button>
+              ))}
+            </div>
+            <TemplateGallery templates={activeTemplates} onPick={onPickTemplate} />
           </div>
         </div>
       </div>
