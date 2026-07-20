@@ -217,6 +217,20 @@ export const CODER_TOOLS: ToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "deep_research",
+      description: "Kullanıcı 'derinlemesine araştır', 'kapsamlı bir rapor/analiz hazırla', 'kaynaklarıyla anlat' gibi çok-kaynaklı, atıflı bir araştırma istediğinde ÇAĞIR — komut gerekmez. Birden çok web kaynağını tarayıp ATIFLI (kaynak numaralı) bir rapor döner; bu raporu ÖZETLEME/KISALTMA, olduğu gibi kullanıcıya sun (atıfları ve Kaynaklar bölümünü koru).",
+      parameters: {
+        type: "object",
+        properties: {
+          topic: { type: "string", description: "Araştırılacak konu/soru" },
+        },
+        required: ["topic"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "update_plan",
       description: "Çok adımlı bir görev için canlı yapılacaklar listesini (plan) günceller; kullanıcı ilerlemeyi görür. Göreve başlarken tüm adımları yaz, her adım bitince listeyi yeniden gönder. Her satır bir adım: '[ ]' bekliyor, '[~]' devam ediyor, '[x]' tamamlandı. Örn: '[x] Dosyaları incele\\n[~] Bug'ı düzelt\\n[ ] Testi çalıştır'.",
       parameters: {
