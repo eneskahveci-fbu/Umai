@@ -3,6 +3,20 @@
  * API rotalarında path traversal, boyut taşması ve format ihlallerini engeller.
  */
 
+import { timingSafeEqual } from "node:crypto";
+
+/* Sabit-zamanlı string karşılaştırma — paylaşılan sır (ör. CRON_SECRET)
+   doğrulamasında düz `===`/`!==` kullanmak zamanlama yan kanalına açık
+   (JS motoru ilk uyuşmayan karakterde erken çıkar, eşleşen önek uzunluğuna
+   göre süre değişir). Uzunluk farklıysa (kendi başına hassas olmayan bir
+   bilgi) doğrudan false döner — timingSafeEqual eşit uzunluk gerektirir. */
+export function timingSafeEqualStr(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
 export class ValidationError extends Error {
   status: number;
   constructor(message: string, status = 400) {

@@ -409,7 +409,7 @@ function RelatedChats({
     let cancelled = false;
     (async () => {
       setState("loading");
-      const fresh = await withFreshEmbeddings(chats, (c) => c.messages.length, chatEmbeddingText);
+      const fresh = await withFreshEmbeddings(chats, chatEmbeddingText);
       const changed = fresh
         .map((c, i) => ({ c, i }))
         .filter(({ c, i }) => c !== chats[i]);

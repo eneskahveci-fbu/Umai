@@ -47,6 +47,10 @@ describe("buildArtifactSrcDoc — mevcut türler değişmedi", () => {
     expect(buildArtifactSrcDoc("svg", "<svg/>")).toContain("place-items:center");
     expect(buildArtifactSrcDoc("mermaid", "graph TD; A-->B")).toContain("mermaid.initialize");
   });
+  it("html: büyük harfli <HTML> de tam belge sayılır (preview.ts ile tutarlı — bkz. faz-4 düzeltmesi)", () => {
+    const full = "<HTML><body>selam</body></HTML>";
+    expect(buildArtifactSrcDoc("html", full)).toBe(full);
+  });
 });
 
 describe("withAnnotationScript — İşaretle & Değiştir", () => {

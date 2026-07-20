@@ -20,7 +20,13 @@ interface PrCommentRequest {
 /* GitHub'da PR'lar da birer "issue" — issue-yorum uç noktası PR'a da yazar
    (satıra-bağlı review-comment değil, genel bir PR yorumu; basit ve yeterli). */
 async function postGithubComment(owner: string, repo: string, prNumber: number, token: string, body: string): Promise<void> {
-  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments`, {
+  /* owner/repo kaçırılmadan URL'ye gömülüyordu — bkz. ../route.ts'teki aynı
+     düzeltme: schema karakter kümesini kısıtlamadığından "/.." içeren bir
+     owner, URL normalizasyonuyla isteği api.github.com'un başka bir uç
+     noktasına yönlendirebilirdi. */
+  const o = encodeURIComponent(owner);
+  const r = encodeURIComponent(repo);
+  const res = await fetch(`https://api.github.com/repos/${o}/${r}/issues/${prNumber}/comments`, {
     method: "POST",
     headers: {
       Accept: "application/vnd.github.v3+json",

@@ -233,10 +233,17 @@ const server = http.createServer(async (req, res) => {
       }
       case "/fs/write": {
         const p = safeResolve(body.path);
+        const content = String(body.content ?? "");
+        /* MAX_FILE_BYTES yorumu "okuma/YAZMA üst sınırı" diyor ama yazma
+           yolu hiç kontrol etmiyordu — /fs/read'in AYNI sınırı (231. satır)
+           burada da uygulanmalı, yoksa bu uç sınırsız boyutta içeriği
+           doğrudan diske yazar (disk taşması/DoS). */
+        const bytes = Buffer.byteLength(content, "utf-8");
+        if (bytes > MAX_FILE_BYTES) return send(res, 200, { error: `İçerik çok büyük (${bytes} bayt)` });
         let created = false;
         try { await fsp.access(p); } catch { created = true; }
         await fsp.mkdir(path.dirname(p), { recursive: true });
-        await fsp.writeFile(p, String(body.content ?? ""), "utf-8");
+        await fsp.writeFile(p, content, "utf-8");
         return send(res, 200, { ok: true, created });
       }
       case "/fs/delete": {

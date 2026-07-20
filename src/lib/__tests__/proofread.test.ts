@@ -24,6 +24,16 @@ describe("validateIssues", () => {
     expect(out.length).toBe(1);
   });
 
+  it("segmentte BİRDEN FAZLA geçen belirsiz find reddedilir (yanlış geçişi düzeltme riski)", () => {
+    const ambiguous = ["kedi köpek ile kedi oynadı."];
+    const out = validateIssues({ issues: [
+      { b: 0, find: "kedi", replace: "kuş", kind: "yazim" }, // "kedi" 2 kez geçiyor — belirsiz
+      { b: 0, find: "köpek ile", replace: "köpekle", kind: "yazim" }, // tek geçiş — kabul
+    ] }, ambiguous);
+    expect(out).toHaveLength(1);
+    expect(out[0].find).toBe("köpek ile");
+  });
+
   it("bozuk kök / issues dizisi olmayan girdi boş döner; üst sınır uygulanır", () => {
     expect(validateIssues("çöp", segs)).toEqual([]);
     expect(validateIssues({ issues: "dizi değil" }, segs)).toEqual([]);
