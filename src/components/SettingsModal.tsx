@@ -49,6 +49,7 @@ import { ExtensionsSettings } from "@/components/ExtensionsSettings";
 import { ProUpgrade } from "@/components/ProUpgrade";
 import { AnalyticsSettings } from "@/components/AnalyticsSettings";
 import { AdminAnalytics } from "@/components/AdminAnalytics";
+import { AdminUsers } from "@/components/AdminUsers";
 import { createClient } from "@/lib/supabase/client";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, ALL_TOOL_CATALOG } from "@/lib/constants";
 import { buildFallbackChain, KEYLESS_PROVIDERS } from "@/lib/fallback";
@@ -772,6 +773,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
           <>
             <AnalyticsSettings />
             {isAdmin && <AdminAnalytics />}
+            {isAdmin && <AdminUsers />}
           </>
         )}
 
