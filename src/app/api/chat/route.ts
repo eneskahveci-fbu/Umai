@@ -13,6 +13,7 @@ import { detectFrameworks, extractDeps, parseGitignore } from "@/lib/projectCont
 import { CODER_TOOLS } from "@/lib/tools";
 import { EXTENSION_TOOLS } from "@/lib/extensions/registry";
 import { searchWeb, formatResults, fetchUrl } from "@/lib/webSearch";
+import { pollinationsImageUrl, stableSeed } from "@/lib/pollinations";
 import { isSafeRemoteUrl } from "@/lib/urlSafety";
 import { isBuiltinMcpServerId } from "@/lib/mcpBuiltins";
 import { after } from "next/server";
@@ -1336,12 +1337,14 @@ export async function POST(req: Request) {
       `• discover_rules() — CLAUDE.md/AGENTS.md/.rules gibi davranış dosyalarını otomatik tara\n` +
       `• trigger_ci(workflow, ref?, inputs?) — GitHub Actions workflow'unu tetikle\n` +
       `• dispatch_agents(tasks[]) — karmaşık görevi PARALEL salt-okunur alt-ajanlara böl (Claude'daki gibi)\n` +
+      `• generate_image(prompt, aspect_ratio?) — kullanıcı görsel/resim isteyince ÇAĞIR (doğal dilde, komut gerekmez); sonucu '![açıklama](url)' olarak yanıtına göm\n` +
       `• update_plan(plan) — çok adımlı görevde canlı yapılacaklar listesi\n` +
       (body.webSearch ? `• web_search(query) — internette ara\n• read_url(url) — web sayfası oku\n` : "") +
       `\nÇalışma pratiği:\n` +
       `— ARAÇLARI GERÇEKTEN ÇAĞIR — anlatma/simüle etme. Komutu veya kodu kullanıcıya "şunu çalıştır / şunu yapıştır" diye METİN olarak VERME; uygun araç varsa (run_command, str_replace, write_file) KENDİN çağır ve sonucu göster. Kullanıcı senin yapmanı bekliyor, tarif etmeni değil.\n` +
       `— Çok adımlı (2+) görevlerde MUTLAKA önce update_plan ile yapılacaklar listesini yaz (kullanıcı ilerlemeyi canlı "todo" kutusunda görür), her adım bitince planı güncelleyip [x] işaretle — bunu atlama.\n` +
       `— Görev BAĞIMSIZ paralel parçalara bölünebiliyorsa (ör. birden çok modülü ayrı ayrı incelemek) dispatch_agents ile alt-ajanlara dağıt; basitse kendin yap.\n` +
+      `— Kullanıcı bir görsel/resim/illüstrasyon istediğinde (komut/buton beklemeden, doğal dilden anla) generate_image'i çağır; dönen URL'i düz metin YAZMA, '![açıklama](url)' markdown biçiminde göm.\n` +
       `— Cevaplamadan önce ilgili dosyaları oku. Bağımsız okumaları TEK turda birlikte iste (paralel çalışır).\n` +
       `— list_files veya search_code ile önce yapıyı anla, sonra spesifik dosyalara gir.\n` +
       `— Var olan dosyada KÜÇÜK değişiklik için str_replace kullan (tüm dosyayı yeniden yazma); old_string ham metin olmalı (satır numarası DEĞİL), birebir ve benzersiz.\n` +
@@ -1676,6 +1679,32 @@ export async function POST(req: Request) {
             const combined = tasks.map((t, i) => `### ${t.title || "Alt görev"}\n${results[i]}`).join("\n\n");
             safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: `${tasks.length} alt-ajan tamamlandı` } })}\n\n`));
             resultById.set(tc.id, combined);
+            return;
+          }
+          /* generate_image: doğal dilden ("bana X görseli yap") tetiklenen görsel
+             üretimi — anahtarsız Pollinations tabanı (aynı, kanıtlanmış URL
+             kurucusu — /gorsel slash-komutunun kullandığı ile BİREBİR aynı
+             pipeline, yalnızca tetikleme yolu farklı: LLM kendi kararıyla
+             çağırıyor). v1 kapsamı bilinçli olarak repo bağlı sohbetlerle
+             sınırlı (repoCtx gerektirir) — bkz. mimari planın Faz 6 notu. */
+          if (tc.name === "generate_image") {
+            const prompt = String(args.prompt ?? "").trim();
+            const fail = (m: string) => {
+              safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: m } })}\n\n`));
+              resultById.set(tc.id, m);
+            };
+            if (!repoCtx) { fail("Hata: repo bağlı değil"); return; }
+            if (!prompt) { fail("Hata: prompt gerekli"); return; }
+            const DIMENSIONS: Record<string, { width: number; height: number }> = {
+              square: { width: 1024, height: 1024 },
+              landscape: { width: 1280, height: 768 },
+              portrait: { width: 768, height: 1280 },
+            };
+            const dims = DIMENSIONS[String(args.aspect_ratio ?? "square")] ?? DIMENSIONS.square;
+            const url = pollinationsImageUrl(prompt, { ...dims, seed: stableSeed(prompt) });
+            const markdown = `![${prompt.slice(0, 120)}](${url})`;
+            safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: "Görsel üretildi" } })}\n\n`));
+            resultById.set(tc.id, markdown);
             return;
           }
           /* Yıkıcı işlemler (silme/yeniden adlandırma): ASLA doğrudan yapılmaz.
