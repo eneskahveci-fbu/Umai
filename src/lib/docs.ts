@@ -1,6 +1,6 @@
-/* Doküman Stüdyosu çekirdeği — Notion'dan İLHAM alan (klonu değil) craft
+/* Doküman Stüdyosu çekirdeği — Notion'dan İLHAM alan (klonu değil) Umai
    yorumu: doküman = blok listesi (başlık, paragraf, madde, yapılacak, alıntı,
-   kod, ayraç). LLM yapılandırılmış blok JSON'u üretir; craft düzenler ve
+   kod, ayraç). LLM yapılandırılmış blok JSON'u üretir; Umai düzenler ve
    Markdown / bağımsız HTML olarak dışa aktarır. */
 import type { CraftDoc, DocBlock, DocBlockType } from "./types";
 import { escapeHtml } from "./slides";

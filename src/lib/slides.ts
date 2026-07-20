@@ -1,5 +1,5 @@
-/* Sunum Stüdyosu çekirdeği — Google Slides'tan İLHAM alan (klonu değil) craft
-   yorumu: LLM yapılandırılmış slayt JSON'u üretir, craft bunu deterministik
+/* Sunum Stüdyosu çekirdeği — Google Slides'tan İLHAM alan (klonu değil) Umai
+   yorumu: LLM yapılandırılmış slayt JSON'u üretir, Umai bunu deterministik
    temalarla render eder. Böylece her slayt düzenlenebilir veri olarak kalır
    (serbest HTML değil): tema değiştirmek, slayt eklemek, tek slaytı yeniden
    yazdırmak ve bağımsız HTML/PDF dışa aktarmak kayıpsızdır. */
