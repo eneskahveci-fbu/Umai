@@ -36,8 +36,8 @@ type ContentKind = "doc" | "form" | "notebook" | "design";
 type ContentItem = { id: string; projectId?: string; title?: string; name?: string };
 const CONTENT_META: Record<ContentKind, { key: "craftDocs" | "craftForms" | "craftNotebooks" | "studioProjects"; label: string; icon: typeof FileText; route: string; getTitle: (x: ContentItem) => string }> = {
   doc: { key: "craftDocs", label: "Dokümanlar", icon: FileText, route: "/studio/dokuman", getTitle: (x) => x.title ?? "" },
-  form: { key: "craftForms", label: "Anketler", icon: ListChecks, route: "/studio/anket", getTitle: (x) => x.title ?? "" },
-  notebook: { key: "craftNotebooks", label: "Defterler", icon: BookOpen, route: "/studio/defter", getTitle: (x) => x.title ?? "" },
+  form: { key: "craftForms", label: "Anketler", icon: ListChecks, route: "/studio/araclar?tab=anket", getTitle: (x) => x.title ?? "" },
+  notebook: { key: "craftNotebooks", label: "Defterler", icon: BookOpen, route: "/studio/araclar?tab=defter", getTitle: (x) => x.title ?? "" },
   design: { key: "studioProjects", label: "Tasarımlar", icon: Sparkles, route: "/studio", getTitle: (x) => x.name ?? "" },
 };
 
