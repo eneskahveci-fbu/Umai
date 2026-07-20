@@ -698,73 +698,6 @@ function SurveyCard({
   );
 }
 
-/* Yerel/tarayıcı-içi model (Qwen2.5-1.5B, transformers.js + WebGPU/WASM) —
-   send()'in izole "browser" dalı VE callApi()'ın kendisi (regenerate()/
-   continueLast()/editAndResend() callApi()'ı DOĞRUDAN çağırır, send()'i hiç
-   görmez) tarafından paylaşılan tek çekirdek. `useStore.getState()` ile HER
-   ZAMAN taze state okur — bileşen render'ında yakalanmış (stale) `chats`/
-   `config` closure'larına asla güvenilmez (önceki hata: pushMessage()'lardan
-   HEMEN SONRA stale `chats`'ten geçmiş okunuyordu, en son kullanıcı mesajı
-   modele hiç ulaşmıyordu). Assistant placeholder'ın (varsa) zaten PUSH
-   EDİLMİŞ olması beklenir — bu fonksiyon yalnız üretip günceller. */
-async function runBrowserChatTurn(): Promise<void> {
-  const store = useStore.getState();
-  try {
-    const { runBrowserLLM, browserLLMSupported, isBrowserLLMLoaded, BROWSER_MODEL_SIZE_MB } = await import("@/lib/browserLLM");
-    if (!browserLLMSupported()) {
-      store.updateLastContent(
-        "**Bu tarayıcı yerel modeli desteklemiyor.** Ayarlar → Modeller'den başka bir model seç.",
-        { isError: true },
-      );
-      return;
-    }
-    if (!isBrowserLLMLoaded()) {
-      store.updateLastThinking(`Yerel model indiriliyor (~${(BROWSER_MODEL_SIZE_MB / 1000).toFixed(1)} GB, yalnız ilk kullanımda bir kez)…`);
-    }
-    const history = (store.current()?.messages ?? [])
-      .filter((m) => (m.role === "user" || m.role === "assistant") && m.content.trim())
-      .map((m) => ({ role: m.role, content: m.content }));
-    /* Kimlik çapası: 1.5B'lik modeller "hangi modelsin" gibi öz-farkındalık
-       sorularında güvenilir değildir — eğitim verisindeki "Ben Claude/GPT'yim"
-       kalıplarını rastgele birleştirip uydurabilir (gerçek bir kullanıcı
-       raporunda görüldü: "Claude 3.5 Sonic, OpenAI'nin Claude modeli..." gibi
-       tutarsız bir karışım üretti). Kimliği DOĞRUDAN, tartışmaya yer
-       bırakmadan veriyoruz — küçük modeller doğrudan talimatları kendi
-       kendine çıkarım yapmaktan çok daha güvenilir takip eder. */
-    const IDENTITY =
-      "Sen Qwen2.5-1.5B-Instruct adlı, açık kaynaklı küçük bir dil modelisin. UMAI uygulamasının " +
-      "\"Tarayıcıda Çalıştır\" seçeneğiyle kullanıcının KENDİ CİHAZINDA/tarayıcısında, internete hiçbir veri " +
-      "göndermeden çalışıyorsun. Kimliğin sorulursa YALNIZCA bunu söyle — Claude, GPT, Gemini gibi başka bir " +
-      "model olduğunu ASLA iddia etme; geliştiricini/eğitim verini UYDURMA.";
-    const sysPrompt = store.config.systemPrompt?.trim()
-      ? `${IDENTITY} ${store.config.systemPrompt.trim()}`
-      : `${IDENTITY} Küçük bir model olduğun için karmaşık isteklerde hata yapabilirsin; kısa ve net yanıt ver.`;
-    let full = "";
-    const result = await runBrowserLLM(
-      [{ role: "system", content: sysPrompt }, ...history],
-      (delta) => { full += delta; useStore.getState().updateLastContent(full); },
-      {
-        onProgress: (pct) => {
-          if (pct < 1) useStore.getState().updateLastThinking(`Yerel model indiriliyor… %${Math.round(pct * 100)}`);
-        },
-      },
-    );
-    if (result === null) {
-      useStore.getState().updateLastContent(
-        "**Yerel model yüklenemedi.** Bu cihaz/tarayıcı desteklemiyor olabilir (WebGPU önerilir) ya da indirme sırasında bağlantı kesildi. Ayarlar → Modeller'den başka bir model seçebilirsin.",
-        { isError: true },
-      );
-    } else if (!result.trim()) {
-      useStore.getState().updateLastContent("_(Yerel model boş yanıt döndürdü.)_");
-    }
-  } catch (e) {
-    useStore.getState().updateLastContent(`**Hata:** ${friendlyError((e as Error).message)}`, { isError: true });
-  } finally {
-    useStore.getState().setStreaming(false);
-    void useStore.getState().persistCurrent();
-  }
-}
-
 export function CoderView() {
   const config = useStore((s) => s.config);
   const isAdmin = isAdminEmail(useStore((s) => s.userEmail));
@@ -1850,19 +1783,6 @@ export function CoderView() {
     let active = store.activeModel();
     if (!active) { store.setSettingsOpen(true); return; }
 
-    /* Yerel/tarayıcı-içi model: regenerate()/continueLast()/editAndResend()
-       callApi()'ı DOĞRUDAN çağırır — send()'in izole "browser" dalını hiç
-       görmez. Bu kontrol olmadan istek normal sunucu yoluna (boş baseUrl ile)
-       gidip anlamsız bir sunucu hatası/kota mesajı üretirdi (gerçek bir hata
-       raporundan bulundu). Araç kullanımı/Fusion/Ekip/Devam-modu bu
-       sağlayıcıda yok (v1 kapsamı) — bu yüzden aşağıdaki ağır pilot/swarm/
-       bağlam-sıkıştırma mantığına hiç girmeden doğrudan döner. */
-    if (active.provider === "browser") {
-      if (!opts?.continuation) store.pushMessage({ role: "assistant", content: "" });
-      store.setStreaming(true);
-      await runBrowserChatTurn();
-      return;
-    }
     /* Otomatik efor/Ajan-Ekibi için son kullanıcı mesajı. */
     const _lastUserText = String(store.current()?.messages.findLast?.((m) => m.role === "user")?.content ?? "");
     /* Ajan Ekibi: kullanıcı elle açtıysa VEYA otomatik eşik (açıkça çok-parçalı
@@ -2773,26 +2693,6 @@ export function CoderView() {
         });
       }
       void store.persistCurrent();
-      return;
-    }
-
-    /* Yerel/tarayıcı-içi model (Qwen2.5-1.5B, transformers.js + WebGPU/WASM) —
-       sunucuya (model indirmesi hariç) hiç istek gitmez, gerçek anlamda
-       ücretsiz+sınırsız+gizli. v1 kapsamı: yalnız düz metin sohbet — araç
-       kullanımı/Fusion/Swarm YOK (1.5B parametreli bir model güvenilir
-       tool-calling yapamaz) — bu yüzden CoderView'ın geri kalan ağır tur/araç
-       mantığından tamamen ayrı, kendi başına izole bir dal (image-gen/
-       compareMode dallarıyla aynı desende). */
-    const localActiveModel = store.activeModel();
-    if (localActiveModel?.provider === "browser" && text.trim()) {
-      setInput("");
-      setPendingImages([]);
-      setAttachedFiles([]);
-      store.pushMessage({ role: "user", content: text });
-      store.pushMessage({ role: "assistant", content: "" });
-      store.setStreaming(true);
-      coderAbort = new AbortController();
-      await runBrowserChatTurn();
       return;
     }
 

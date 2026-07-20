@@ -24,7 +24,6 @@ export const KEYLESS_PROVIDERS: ReadonlySet<Provider> = new Set<Provider>([
   "ovh",
   "ollama",
   "custom",
-  "browser",
 ]);
 
 /**

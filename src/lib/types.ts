@@ -163,8 +163,7 @@ export type Provider =
   | "github"
   | "nvidia"
   | "ovh"
-  | "custom"
-  | "browser";
+  | "custom";
 
 export interface ModelProfile {
   id: string;
