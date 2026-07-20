@@ -295,7 +295,7 @@ export function CardsStudio() {
           <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-16 flex flex-col gap-5">
             <div className="text-center">
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-balance">Neyi ezberleyelim… pardon, ÖĞRENELİM?</h1>
-              <p className="text-muted text-sm mt-1.5 text-balance">Konuyu anlat — craft atomik kartlar kursun; aralıklı tekrarla çalış, Anki&apos;ye aktar.</p>
+              <p className="text-muted text-sm mt-1.5 text-balance">Konuyu anlat — Umai atomik kartlar kursun; aralıklı tekrarla çalış, Anki&apos;ye aktar.</p>
             </div>
             <div className="rounded-2xl border border-line bg-surface elev-2 focus-within:border-brand/50 transition-colors">
               <textarea
