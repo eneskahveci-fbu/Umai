@@ -274,7 +274,7 @@ export function DesignStudio() {
             const active = store.strongestModel() ?? store.activeModel();
             if (!active) throw new Error("model yok");
             const freeModelNames = await fetchTextModels();
-            const manualFusionIds = store.config.fusionMode === "manual" ? store.config.fusionModelIds : undefined;
+            const manualFusionIds = store.config.qualityModelIds?.length ? store.config.qualityModelIds : undefined;
             const draftProfiles = pickDraftModels(store.config.models, active, 3, store.strongestModel(), freeModelNames, manualFusionIds);
             const slots = fillSelfConsistency(draftProfiles, active, 3);
             const withKeys = await Promise.all(slots.map(async (s) => ({
@@ -319,7 +319,7 @@ export function DesignStudio() {
             const active = store.strongestModel() ?? store.activeModel();
             if (active) {
               const freeModelNames = await fetchTextModels();
-              const manualFusionIds = store.config.fusionMode === "manual" ? store.config.fusionModelIds : undefined;
+              const manualFusionIds = store.config.qualityModelIds?.length ? store.config.qualityModelIds : undefined;
               const draftProfiles = pickDraftModels(store.config.models, active, 3, store.strongestModel(), freeModelNames, manualFusionIds);
               const slots = fillSelfConsistency(draftProfiles, active, 3);
               const withKeys = await Promise.all(slots.map(async (s) => ({

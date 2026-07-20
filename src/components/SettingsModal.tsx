@@ -679,7 +679,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   const ALL_TABS = [
     { key: "hesap", label: "Hesap", icon: User, admin: false, group: undefined },
     { key: "model", label: "Model", icon: Cpu, admin: false, group: undefined },
-    { key: "fusion", label: "Fusion", icon: Sparkles, admin: false, group: undefined },
+    { key: "fusion", label: "Kalite", icon: Sparkles, admin: false, group: undefined },
     { key: "github", label: "Git", icon: GitBranch, admin: false, group: "Çalışma Alanı" },
     { key: "extensions", label: "Eklentiler", icon: Blocks, admin: false, group: undefined },
     { key: "general", label: "Genel", icon: SlidersHorizontal, admin: false, group: undefined },
@@ -1399,8 +1399,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     title: "İnternette arama", desc: "Güncel bilgi gereken sorularda (döviz, haber, fiyat…) en yeni veriyi internetten çeker." },
                   { on: config.autoMemory !== false, toggle: () => saveConfig({ ...config, autoMemory: config.autoMemory === false }),
                     title: "Otomatik hatırlama", desc: "Tercihlerini (ör. hangi dili sevdiğin) kendiliğinden not eder, sonraki sohbetlerde hatırlar." },
-                  { on: config.qualityMode, toggle: () => saveConfig({ ...config, qualityMode: !config.qualityMode }),
-                    title: "Kalite modu", desc: "Yanıtı önce taslak, sonra öz-eleştiri ve düzeltmeyle üretir — daha doğru, biraz daha yavaş." },
                   { on: config.autoContinue !== false, toggle: () => saveConfig({ ...config, autoContinue: config.autoContinue === false }),
                     title: "Kesilince otomatik sürdür", desc: "Uzun yanıt sınıra takılıp yarıda kalırsa kaldığı yerden kendiliğinden devam eder." },
                   { on: config.agentsUseStrongestModel !== false, toggle: () => saveConfig({ ...config, agentsUseStrongestModel: config.agentsUseStrongestModel === false }),
@@ -1788,64 +1786,67 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
           </section>
         )}
 
-        {/* FUSION — herkese açık (admin şartı yok): taslak modeli seçimi. */}
+        {/* KALİTE — herkese açık (admin şartı yok). Önceki ayrı "Kalite Modu"
+           (Genel → Davranış) ve "Fusion" sekmesinin birleşimi (Tem 2026
+           kullanıcı kararı): iki örtüşen "yanıtı iyileştir" anahtarı yerine
+           tek 3 kademeli seçim — Kapalı / Standart / Yüksek. */}
         {tab === "fusion" && (
           <section className="flex flex-col gap-5">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-muted/45 -mb-2">Fusion</div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted/45 -mb-2">Kalite</div>
             <div className="premium-card rounded-xl p-4">
-              <h4 className="text-sm font-bold mb-1.5 flex items-center gap-1.5"><Sparkles size={14} className="text-brand" /> Fusion nedir?</h4>
+              <h4 className="text-sm font-bold mb-1.5 flex items-center gap-1.5"><Sparkles size={14} className="text-brand" /> Yanıt kalitesi</h4>
               <p className="text-xs text-muted leading-relaxed mb-3">
-                Kalite gerektiren üretim isteklerinde arka planda 1-3 İÇ TASLAK üretilir,
-                bir hakem en iyisini seçer, nihai yanıt bu taslaklar birleştirilerek yazılır —
-                sen yalnızca sonucu görürsün. Bu ayar taslakları HANGİ modellerin üreteceğini belirler.
+                <b>Standart</b>: yanıt önce taslak, sonra öz-eleştiri ve düzeltmeyle üretilir —
+                ekstra API çağrısı gerektirmez, biraz daha yavaş. <b>Yüksek</b> (Fusion): kalite
+                gerektiren üretim isteklerinde arka planda 1-3 İÇ TASLAK üretilir, bir hakem en
+                iyisini seçer, nihai yanıt bunlar birleştirilerek yazılır — daha güçlü ama daha yavaş.
               </p>
               <div className="flex flex-col sm:flex-row gap-2">
                 <button
-                  onClick={() => saveConfig({ ...config, fusionMode: "auto" })}
+                  onClick={() => saveConfig({ ...config, qualityTier: "off" })}
                   className={`flex-1 py-2.5 px-3 rounded-lg border text-sm font-semibold transition-colors text-left ${
-                    (config.fusionMode ?? "auto") === "auto" ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
-                  }`}
-                >
-                  Otomatik
-                  <span className="block text-[11px] font-normal text-muted/60 mt-0.5">craft en uygun modelleri kendi seçer</span>
-                </button>
-                <button
-                  onClick={() => saveConfig({ ...config, fusionMode: "manual" })}
-                  className={`flex-1 py-2.5 px-3 rounded-lg border text-sm font-semibold transition-colors text-left ${
-                    config.fusionMode === "manual" ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
-                  }`}
-                >
-                  Manuel
-                  <span className="block text-[11px] font-normal text-muted/60 mt-0.5">kendi modellerini seç (en fazla 3)</span>
-                </button>
-                <button
-                  onClick={() => saveConfig({ ...config, fusionMode: "off" })}
-                  className={`flex-1 py-2.5 px-3 rounded-lg border text-sm font-semibold transition-colors text-left ${
-                    config.fusionMode === "off" ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
+                    config.qualityTier === "off" ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
                   }`}
                 >
                   Kapalı
-                  <span className="block text-[11px] font-normal text-muted/60 mt-0.5">Fusion hiç çalışmasın, tek modelli yanıt üret</span>
+                  <span className="block text-[11px] font-normal text-muted/60 mt-0.5">tek modelli, hiçbir ek iyileştirme yok</span>
+                </button>
+                <button
+                  onClick={() => saveConfig({ ...config, qualityTier: "standard" })}
+                  className={`flex-1 py-2.5 px-3 rounded-lg border text-sm font-semibold transition-colors text-left ${
+                    (config.qualityTier ?? "standard") === "standard" ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
+                  }`}
+                >
+                  Standart
+                  <span className="block text-[11px] font-normal text-muted/60 mt-0.5">taslak→öz-eleştiri→düzeltme (varsayılan)</span>
+                </button>
+                <button
+                  onClick={() => saveConfig({ ...config, qualityTier: "high" })}
+                  className={`flex-1 py-2.5 px-3 rounded-lg border text-sm font-semibold transition-colors text-left ${
+                    config.qualityTier === "high" ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
+                  }`}
+                >
+                  Yüksek
+                  <span className="block text-[11px] font-normal text-muted/60 mt-0.5">Fusion — çoklu-model taslak + hakem</span>
                 </button>
               </div>
-              {config.fusionMode === "off" && (
+              {config.qualityTier === "off" && (
                 <p className="text-xs text-muted/70 leading-relaxed mt-3">
-                  Fusion artık Otomatik Pilot tetiklese bile devreye girmeyecek. Kalite Modu ayrı bir ayardır (Ayarlar → Genel) —
-                  açıksa yine de tek modelli, ekstra API çağrısı gerektirmeyen hafif bir taslak→öz-eleştiri→düzeltme turu uygular.
+                  Otomatik Pilot tetiklese bile hiçbir iyileştirme hattı devreye girmeyecek.
                 </p>
               )}
             </div>
 
-            {config.fusionMode === "manual" && (
+            {config.qualityTier === "high" && (
               <div className="premium-card rounded-xl p-4">
                 <h4 className="text-sm font-bold mb-1">Taslak modelleri</h4>
-                <p className="text-xs text-muted mb-3">{(config.fusionModelIds ?? []).length}/3 seçili.</p>
+                <p className="text-xs text-muted mb-3">{(config.qualityModelIds ?? []).length}/3 seçili — boş bırakırsan craft en uygun modelleri kendisi seçer.</p>
                 {config.models.length === 0 ? (
                   <p className="text-xs text-muted/60">Önce Model sekmesinden en az bir model ekle.</p>
                 ) : (
                   <div className="flex flex-col gap-1.5">
                     {config.models.map((m) => {
-                      const selectedIds = config.fusionModelIds ?? [];
+                      const selectedIds = config.qualityModelIds ?? [];
                       const selected = selectedIds.includes(m.id);
                       const atLimit = selectedIds.length >= 3;
                       const free = KEYLESS_PROVIDERS.has(m.provider);
@@ -1862,7 +1863,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                             disabled={!selected && atLimit}
                             onChange={() => {
                               const next = selected ? selectedIds.filter((id) => id !== m.id) : [...selectedIds, m.id].slice(0, 3);
-                              saveConfig({ ...config, fusionModelIds: next });
+                              saveConfig({ ...config, qualityModelIds: next });
                             }}
                             className="accent-brand shrink-0"
                           />
