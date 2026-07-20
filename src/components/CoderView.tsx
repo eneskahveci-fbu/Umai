@@ -2029,24 +2029,24 @@ export function CoderView() {
     let boostDrafts: import("@/lib/boost").DraftResult[] = [];
     let boostJudge: import("@/lib/boost").DraftJudge | null = null;
     const toolsWanted = store.toolsEnabled && (!!store.repo || !!(store.config.localMode && store.config.localBridgeUrl?.trim()));
-    /* FÜZYON yalnız üretim işlerinde (pilot.fusion — autoFusion, mesajda hem bir
-       üretim nesnesi (site/uygulama/kod…) hem üretim fiili birlikte geçtiğinde)
-       tetiklenir. ÖNCEDEN varsayılan-açık config.qualityMode de bu ağır 3-taslak+
-       hakem hattını tetikliyordu — "Otomatik Fusion her mesajda çalışıyor"
-       şikayetinin kök sebebi buydu (qualityMode her kullanıcıda varsayılan açık
-       olduğundan neredeyse her uygun mesaj bu pahalı hattı ateşliyordu). qualityMode
-       artık YALNIZCA aşağıdaki hafif, ekstra API çağrısı gerektirmeyen tek-geçişli
-       talimata etki eder (bkz. finalSystemPrompt) — Ayarlar → Fusion sekmesinin
-       "Kapalı" açıklamasında zaten belgelenen davranışla eşleşir. Kullanıcı
-       Ayarlar → Fusion'da "Kapalı" seçtiyse bu hat hiç çalışmaz. */
-    if (store.config.fusionMode !== "off" && pilot?.fusion && !useSwarm && !useResearch && !toolsWanted && !isContinuation) {
+    const qualityTier = store.config.qualityTier ?? "standard";
+    /* FÜZYON (kalite="high") yalnız üretim işlerinde (pilot.fusion — autoFusion,
+       mesajda hem bir üretim nesnesi (site/uygulama/kod…) hem üretim fiili
+       birlikte geçtiğinde) tetiklenir. ÖNCEDEN varsayılan-açık qualityMode de
+       bu ağır 3-taslak+hakem hattını tetikliyordu — "Otomatik Fusion her
+       mesajda çalışıyor" şikayetinin kök sebebi buydu (qualityMode her
+       kullanıcıda varsayılan açık olduğundan neredeyse her uygun mesaj bu
+       pahalı hattı ateşliyordu). "standard" kademe artık YALNIZCA aşağıdaki
+       hafif, ekstra API çağrısı gerektirmeyen tek-geçişli talimata etki eder
+       (bkz. finalSystemPrompt). Kullanıcı Ayarlar → Kalite'de "Kapalı" ya da
+       "Standart" seçtiyse bu ağır hat hiç çalışmaz — yalnız "Yüksek" tetikler. */
+    if (qualityTier === "high" && pilot?.fusion && !useSwarm && !useResearch && !toolsWanted && !isContinuation) {
       try {
         useStore.getState().updateLastThinking("✦ Füzyon: 3 iç taslak hazırlanıyor…");
         const freeModelNames = await fetchTextModels();
-        /* Manuel Fusion modunda kullanıcının Ayarlar → Fusion'da seçtiği model
-           id'leri kullanılır; "otomatik" (varsayılan) modda çeşitlilik sezgisi
-           çalışmaya devam eder (bkz. pickDraftModels). */
-        const manualFusionIds = store.config.fusionMode === "manual" ? store.config.fusionModelIds : undefined;
+        /* Ayarlar → Kalite'de kullanıcı model seçtiyse (qualityModelIds dolu)
+           o modeller kullanılır; boşsa çeşitlilik sezgisi çalışır (pickDraftModels). */
+        const manualFusionIds = store.config.qualityModelIds?.length ? store.config.qualityModelIds : undefined;
         const draftProfiles = pickDraftModels(
           store.config.models, active, 3, store.strongestModel(), freeModelNames, manualFusionIds,
         );
@@ -2103,7 +2103,7 @@ export function CoderView() {
        yanıt içinde uygulat (yalnızca nihai sürümü göster). */
     if (boostDrafts.length > 0) {
       finalSystemPrompt += buildBoostInstruction(boostDrafts.map((d) => d.text), boostJudge);
-    } else if (store.config.qualityMode || pilot?.quality) {
+    } else if (qualityTier !== "off") {
       finalSystemPrompt +=
         "\n\n[KALİTE MODU] Yanıtını üç aşamada üret ama YALNIZCA son sürümü göster: " +
         "(1) TASLAK: hızlı bir ilk çözüm düşün. " +

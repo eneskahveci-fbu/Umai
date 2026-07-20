@@ -689,10 +689,11 @@ export const DEFAULT_CONFIG: Config = {
   autoContinue: true,
   /* Görünmez süpervizör (Tem 2026 kullanıcı kararı): sohbette taslak→
      öz-eleştiri→düzeltme akışı varsayılan olarak açık — kullanıcı hiçbir
-     şeye dokunmadan en kaliteli/hatasız yanıtı ister. Ayarlar → Genel →
-     Davranış'tan istenirse kapatılabilir (hız/maliyet için); kapsam bilinçli
-     olarak yalnız ana sohbet — Stüdyolara henüz genişletilmedi. */
-  qualityMode: true,
+     şeye dokunmadan en kaliteli/hatasız yanıtı ister. "standard" kademesi bu
+     davranış; Ayarlar → Kalite'den "Kapalı"ya (hız/maliyet için) ya da "Yüksek"e
+     (Fusion — çoklu-model+hakem) değiştirilebilir. Kapsam bilinçli olarak
+     yalnız ana sohbet — Stüdyolara henüz genişletilmedi. */
+  qualityTier: "standard",
   learningMode: false,
   webSearch: true,
   agentsUseStrongestModel: true,
