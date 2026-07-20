@@ -43,6 +43,10 @@ describe("generateDeck", () => {
 describe("generateDeckFusion", () => {
   const fakeModel = { baseUrl: "https://x", model: "m", provider: "gemini", apiKey: "k" };
   const deckJson = (title: string) => JSON.stringify({ title, slides: [{ layout: "cover", title: "Kapak" }] });
+  /* generateDrafts artık DraftResult[] ({text, model}) döndürüyor (bkz.
+     boost.ts — Fusion rozeti mislabeling düzeltmesi); test taslaklarını da
+     bu şekle sar. */
+  const dr = (text: string) => ({ text, model: "m" });
 
   beforeEach(() => {
     mockedGenerateDrafts.mockReset();
@@ -50,7 +54,7 @@ describe("generateDeckFusion", () => {
   });
 
   it("hakem en iyisini seçer (best-of-N, birleştirme YOK)", async () => {
-    mockedGenerateDrafts.mockResolvedValueOnce([deckJson("A"), deckJson("B"), deckJson("C")]);
+    mockedGenerateDrafts.mockResolvedValueOnce([dr(deckJson("A")), dr(deckJson("B")), dr(deckJson("C"))]);
     mockedJudgeDrafts.mockResolvedValueOnce({ best: 2, guidance: "ikinci daha iyi" });
     const deck = await generateDeckFusion({
       brief: "bir brief", slideCount: 4,
@@ -62,7 +66,7 @@ describe("generateDeckFusion", () => {
   });
 
   it("geçersiz JSON üreten taslakları eler; hakem yalnız GEÇERLİ olanlara bakar", async () => {
-    mockedGenerateDrafts.mockResolvedValueOnce(["bozuk json değil bu", deckJson("Geçerli1"), deckJson("Geçerli2")]);
+    mockedGenerateDrafts.mockResolvedValueOnce([dr("bozuk json değil bu"), dr(deckJson("Geçerli1")), dr(deckJson("Geçerli2"))]);
     mockedJudgeDrafts.mockResolvedValueOnce({ best: 2, guidance: "x" });
     const deck = await generateDeckFusion({
       brief: "b", slideCount: 4, drafts: [fakeModel, fakeModel, fakeModel], judgeModel: fakeModel,
@@ -73,14 +77,14 @@ describe("generateDeckFusion", () => {
   });
 
   it("hiçbir taslak geçerli JSON üretmezse hata fırlatır", async () => {
-    mockedGenerateDrafts.mockResolvedValueOnce(["bozuk 1", "bozuk 2"]);
+    mockedGenerateDrafts.mockResolvedValueOnce([dr("bozuk 1"), dr("bozuk 2")]);
     await expect(
       generateDeckFusion({ brief: "b", slideCount: 4, drafts: [fakeModel, fakeModel], judgeModel: fakeModel }),
     ).rejects.toThrow();
   });
 
   it("yalnız 1 geçerli taslak varsa hakem HİÇ çağrılmaz, o taslak doğrudan döner", async () => {
-    mockedGenerateDrafts.mockResolvedValueOnce([deckJson("TekGeçerli")]);
+    mockedGenerateDrafts.mockResolvedValueOnce([dr(deckJson("TekGeçerli"))]);
     const deck = await generateDeckFusion({
       brief: "b", slideCount: 4, drafts: [fakeModel], judgeModel: fakeModel,
     });
@@ -89,7 +93,7 @@ describe("generateDeckFusion", () => {
   });
 
   it("hakem başarısız olursa (null döner) ilk geçerli taslağa düşer", async () => {
-    mockedGenerateDrafts.mockResolvedValueOnce([deckJson("İlk"), deckJson("İkinci")]);
+    mockedGenerateDrafts.mockResolvedValueOnce([dr(deckJson("İlk")), dr(deckJson("İkinci"))]);
     mockedJudgeDrafts.mockResolvedValueOnce(null);
     const deck = await generateDeckFusion({
       brief: "b", slideCount: 4, drafts: [fakeModel, fakeModel], judgeModel: fakeModel,
@@ -98,7 +102,7 @@ describe("generateDeckFusion", () => {
   });
 
   it("draft üretimi için deste şema+kurallarını (deckSystem) ve brief'i userText'e gömer", async () => {
-    mockedGenerateDrafts.mockResolvedValueOnce([deckJson("A"), deckJson("B")]);
+    mockedGenerateDrafts.mockResolvedValueOnce([dr(deckJson("A")), dr(deckJson("B"))]);
     mockedJudgeDrafts.mockResolvedValueOnce({ best: 1, guidance: "x" });
     await generateDeckFusion({ brief: "ÖZEL-BRIEF-123", slideCount: 5, drafts: [fakeModel, fakeModel], judgeModel: fakeModel });
     const call = mockedGenerateDrafts.mock.calls.at(-1)![0];

@@ -246,6 +246,12 @@ ${paged ? `<div class="navbtns">
 (function () {
   var KEY = ${JSON.stringify(storageKey)};
   var HEADERS = ${JSON.stringify(headers)};
+  /* Yanıt satırı HER ZAMAN yayınlanma anındaki soru sırasına göre pozisyonel
+     (row[0]=ilk soru...) — form sahibi YAYINDAN SONRA soru ekler/siler/
+     sıralarsa, mevcut form.questions'ın GÜNCEL sırası artık bu satırla
+     UYUŞMAZ (bkz. formAnalytics.ts answerAt). Bu kaymayı tespit edip doğru
+     eşleştirebilmek için o anki soru id'lerini de AYNI SIRADA gönderiyoruz. */
+  var QUESTION_IDS = ${JSON.stringify(form.questions.map((q) => q.id))};
   var LOGIC = ${JSON.stringify(logic)};
   var PAGES = ${JSON.stringify(pages)};
   var COLLECT = ${JSON.stringify(collect)};
@@ -335,7 +341,7 @@ ${paged ? `<div class="navbtns">
     if (COLLECT) {
       try {
         fetch(COLLECT.url, { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ formId: COLLECT.formId, answers: row }) }).catch(function () {});
+          body: JSON.stringify({ formId: COLLECT.formId, answers: row, questionIds: QUESTION_IDS }) }).catch(function () {});
       } catch (err) {}
     }
     form.reset(); form.style.display = "none";

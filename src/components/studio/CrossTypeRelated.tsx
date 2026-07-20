@@ -51,10 +51,10 @@ export function CrossTypeRelated({ kind, id }: { kind: RelatedKind; id: string }
     (async () => {
       setState("loading");
       const [freshChats, freshDocs, freshForms, freshNbs] = await Promise.all([
-        withFreshEmbeddings(chats, (c) => c.messages.length, chatEmbeddingText),
-        withFreshEmbeddings(docs, (d) => d.blocks.length, docEmbeddingText),
-        withFreshEmbeddings(forms, (f) => f.questions.length, formEmbeddingText),
-        withFreshEmbeddings(notebooks, (n) => n.sources.length, notebookEmbeddingText),
+        withFreshEmbeddings(chats, chatEmbeddingText),
+        withFreshEmbeddings(docs, docEmbeddingText),
+        withFreshEmbeddings(forms, formEmbeddingText),
+        withFreshEmbeddings(notebooks, notebookEmbeddingText),
       ]);
       if (freshChats.some((c, i) => c !== chats[i])) {
         updateChatEmbeddings(

@@ -2026,7 +2026,7 @@ export function CoderView() {
        3. bir ücretli çağrıya zorlamaz); elle açılan çip efor max olmasa bile
        en az 2 model birleştirir — buton gerçekten bir şey yapar. Başarılı
        füzyonun modelleri mesaja kalıcı bir rozet olarak iğnelenir. */
-    let boostDrafts: string[] = [];
+    let boostDrafts: import("@/lib/boost").DraftResult[] = [];
     let boostJudge: import("@/lib/boost").DraftJudge | null = null;
     const toolsWanted = store.toolsEnabled && (!!store.repo || !!(store.config.localMode && store.config.localBridgeUrl?.trim()));
     /* FÜZYON yalnız üretim işlerinde (pilot.fusion — autoFusion, mesajda hem bir
@@ -2066,14 +2066,17 @@ export function CoderView() {
              sentez bu karara göre en iyi taslağı omurga yapar. */
           useStore.getState().updateLastThinking("✦ Hakem: taslaklar karşılaştırılıyor…");
           boostJudge = await judgeDrafts({
-            userText: _lastUserText, drafts: boostDrafts,
+            userText: _lastUserText, drafts: boostDrafts.map((d) => d.text),
             model: { baseUrl: active.baseUrl, model: active.model, provider: active.provider, apiKey: reqKey },
             signal: coderAbort.signal,
           });
         }
         if (boostDrafts.length) {
           useStore.getState().updateLastThinking(`✦ Füzyon: ${boostDrafts.length} taslak${boostJudge ? " + hakem kararı" : ""} birleştiriliyor…`);
-          useStore.getState().setFusionModelsOnLast(slots.slice(0, boostDrafts.length).map((s) => s.profile.model));
+          /* GERÇEKTEN başarıyla taslak üreten modeller — slots'un İLK N elemanını
+             almak (önceki hata) bir slot elendiğinde YANLIŞ modelleri etiketlerdi
+             (bkz. generateDrafts'ın DraftResult.model'i). */
+          useStore.getState().setFusionModelsOnLast(boostDrafts.map((d) => d.model));
           trackEvent("fusion_used", undefined, { draftCount: boostDrafts.length, hasJudge: !!boostJudge });
         }
       } catch { boostDrafts = []; boostJudge = null; /* güçlendirme başarısızsa normal akış */ }
@@ -2099,7 +2102,7 @@ export function CoderView() {
     /* Çok-geçişli kalite modu: taslak → öz-eleştiri → düzeltme döngüsünü tek
        yanıt içinde uygulat (yalnızca nihai sürümü göster). */
     if (boostDrafts.length > 0) {
-      finalSystemPrompt += buildBoostInstruction(boostDrafts, boostJudge);
+      finalSystemPrompt += buildBoostInstruction(boostDrafts.map((d) => d.text), boostJudge);
     } else if (store.config.qualityMode || pilot?.quality) {
       finalSystemPrompt +=
         "\n\n[KALİTE MODU] Yanıtını üç aşamada üret ama YALNIZCA son sürümü göster: " +

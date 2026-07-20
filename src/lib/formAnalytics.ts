@@ -8,6 +8,12 @@ import type { CraftForm, FormQuestion } from "./types";
 export interface FormResponseRow {
   /** jsonb — string[] beklenir ama dış veri: her erişim korumalı. */
   answers: unknown;
+  /** Yanıt gönderilirken form.questions'ın O ANKİ sırasıyla aynı hizada
+      soru id'leri — form sahibi YAYINDAN SONRA soru ekler/siler/sıralarsa
+      answers'ın ham pozisyonu artık GÜNCEL form.questions ile uyuşmaz;
+      bu alan doğru eşleştirmeyi sağlar. Eski satırlarda yok (geriye dönük
+      uyum: pozisyonel varsayılır). */
+  question_ids?: unknown;
   created_at: string;
 }
 
@@ -32,9 +38,22 @@ export interface QuestionSummary {
 const MULTI_SEP = " | ";
 const MAX_SAMPLES = 8;
 
-function answerAt(row: FormResponseRow, i: number): string {
+/* `question`'ın bu satırdaki cevabını bulur. `question_ids` doluysa (yanıt bu
+   düzeltmeden SONRA toplanmış) o anki soru id sırasına göre eşleşir — form
+   sonradan düzenlense (soru eklenir/silinir/sıralanır) bile YANLIŞ sorunun
+   cevabı gösterilmez; id bu satırda hiç yoksa (soru o an henüz yoktu) boş
+   döner. `question_ids` yoksa (eski satır, geriye dönük uyum) pozisyonel `i`
+   varsayılır — eski davranış korunur. */
+function answerAt(row: FormResponseRow, question: FormQuestion, i: number): string {
   if (!Array.isArray(row.answers)) return "";
-  const v = (row.answers as unknown[])[i];
+  const answers = row.answers as unknown[];
+  if (Array.isArray(row.question_ids)) {
+    const idx = (row.question_ids as unknown[]).indexOf(question.id);
+    if (idx === -1) return "";
+    const v = answers[idx];
+    return typeof v === "string" ? v : "";
+  }
+  const v = answers[i];
   return typeof v === "string" ? v : "";
 }
 
@@ -45,18 +64,42 @@ function countValues(values: string[], declared: string[]): OptionCount[] {
   return [...map.entries()].map(([value, count]) => ({ value, count }));
 }
 
+/* `joined`, seçilen seçeneklerin MULTI_SEP ile birleştirilmiş hâlidir (bkz.
+   forms.ts). Naif `.split(MULTI_SEP)` bir seçenek METNİNİN KENDİSİ " | "
+   içeriyorsa (ör. "Kahve | Çay" adlı tek bir seçenek) yanlış parçalara
+   bölerdi — sayım gerçek seçimlerden SAPARDI. Bunun yerine `option`'ın
+   `joined` içinde TAM BİR TOKEN olarak (baş/son veya iki ayraç arasında)
+   geçip geçmediğini doğrudan sınar; asla bölme yapmaz, bu yüzden bir
+   seçeneğin metninin başka bir seçeneğin ÖN EKİ olması durumunda da
+   (ör. "Kırmızı" / "Kırmızı Koyu") yanlış pozitif vermez. */
+function hasOptionToken(joined: string, option: string, sep: string): boolean {
+  if (!option) return false;
+  if (joined === option) return true;
+  if (joined.startsWith(option + sep)) return true;
+  if (joined.endsWith(sep + option)) return true;
+  return joined.includes(sep + option + sep);
+}
+
 export function summarizeResponses(form: CraftForm, rows: FormResponseRow[]): QuestionSummary[] {
   return form.questions.map((question, i) => {
-    const values = rows.map((r) => answerAt(r, i)).filter((v) => v.trim() !== "");
+    const values = rows.map((r) => answerAt(r, question, i)).filter((v) => v.trim() !== "");
     const s: QuestionSummary = { question, answered: values.length };
     switch (question.type) {
       case "choice":
       case "dropdown":
         s.counts = countValues(values, question.options ?? []);
         break;
-      case "multi":
-        s.counts = countValues(values.flatMap((v) => v.split(MULTI_SEP)).filter(Boolean), question.options ?? []);
+      case "multi": {
+        /* .split(MULTI_SEP) YERİNE her bilinen seçeneği token olarak arar —
+           bir seçeneğin metni ayracı içerse bile yanlış bölünmez (bkz.
+           hasOptionToken). */
+        const opts = question.options ?? [];
+        s.counts = opts.map((opt) => ({
+          value: opt,
+          count: values.filter((v) => hasOptionToken(v, opt, MULTI_SEP)).length,
+        }));
         break;
+      }
       case "rating": {
         s.counts = countValues(values, ["1", "2", "3", "4", "5"]);
         const nums = values.map(Number).filter((n) => Number.isFinite(n));
@@ -76,7 +119,7 @@ export function responsesToCsv(form: CraftForm, rows: FormResponseRow[]): string
   const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
   const lines = [["Zaman", ...form.questions.map((q) => q.label)].map(esc).join(",")];
   for (const r of rows) {
-    lines.push([r.created_at, ...form.questions.map((_, i) => answerAt(r, i))].map(esc).join(","));
+    lines.push([r.created_at, ...form.questions.map((q, i) => answerAt(r, q, i))].map(esc).join(","));
   }
   return "\uFEFF" + lines.join("\n");
 }

@@ -14,7 +14,15 @@ interface PrReviewRequest {
 async function fetchGithubPrDiff(owner: string, repo: string, prNumber: number, token?: string): Promise<string> {
   const headers: Record<string, string> = { Accept: "application/vnd.github.v3.diff" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}`, { headers });
+  /* owner/repo kaçırılmadan URL'ye gömülüyordu — schema (prReviewSchema)
+     yalnız uzunluk sınırlar, karakter kümesini KISITLAMAZ; bir "owner" değeri
+     "/.." dizisi içerirse URL normalizasyonu (RFC 3986 §5.2.4) isteği
+     api.github.com'un TAMAMEN farklı bir uç noktasına (attacker-kontrollü
+     yol geçişi) yönlendirebilirdi. GitLab yolu zaten encodeURIComponent
+     kullanıyordu (aşağıda); GitHub yolu da aynı korumayı almalı. */
+  const o = encodeURIComponent(owner);
+  const r = encodeURIComponent(repo);
+  const res = await fetch(`https://api.github.com/repos/${o}/${r}/pulls/${prNumber}`, { headers });
   if (!res.ok) throw new Error(`GitHub PR fetch failed: ${res.status}`);
   return res.text();
 }

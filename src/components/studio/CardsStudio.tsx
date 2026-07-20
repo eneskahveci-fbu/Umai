@@ -144,17 +144,34 @@ export function CardsStudio() {
       const cards = parseCardsTsv(String(reader.result ?? ""));
       if (!cards.length) { addToast("İçe aktarılabilir kart bulunamadı (ön yüz<TAB>arka yüz formatı bekleniyor).", "error"); return; }
       if (deck) {
-        setDeck({ ...deck, cards: [...deck.cards, ...cards].slice(0, MAX_DECK_CARDS) });
-        addToast(`${cards.length} kart eklendi — Kaydet'i unutma.`, "success");
+        const merged = [...deck.cards, ...cards].slice(0, MAX_DECK_CARDS);
+        /* GERÇEKTEN eklenen sayı — deste üst sınırı (.slice) taşan kartları
+           sessizce atıyordu ama toast HER ZAMAN dosyadaki HAM sayıyı
+           ("cards.length") gösteriyordu; kullanıcı gerçekte daha AZ kart
+           eklendiğini fark etmiyordu. */
+        const added = merged.length - deck.cards.length;
+        setDeck({ ...deck, cards: merged });
+        addToast(
+          added < cards.length
+            ? `${added} kart eklendi (deste üst sınırı ${MAX_DECK_CARDS} nedeniyle ${cards.length - added} kart atlandı) — Kaydet'i unutma.`
+            : `${added} kart eklendi — Kaydet'i unutma.`,
+          added < cards.length ? "info" : "success",
+        );
         setTab("cards");
       } else {
+        const capped = cards.slice(0, MAX_DECK_CARDS);
         const now = Date.now();
         openDeck({
           id: `deck_${now.toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
           title: file.name.replace(/\.[^.]+$/, "") || "İçe aktarılan deste",
-          cards, createdAt: now, updatedAt: now,
+          cards: capped, createdAt: now, updatedAt: now,
         });
-        addToast(`${cards.length} kart içe aktarıldı.`, "success");
+        addToast(
+          capped.length < cards.length
+            ? `${capped.length} kart içe aktarıldı (deste üst sınırı ${MAX_DECK_CARDS} nedeniyle ${cards.length - capped.length} kart atlandı).`
+            : `${capped.length} kart içe aktarıldı.`,
+          capped.length < cards.length ? "info" : "success",
+        );
       }
     };
     reader.readAsText(file);
@@ -169,14 +186,26 @@ export function CardsStudio() {
     try {
       const cards = await cardsFromHighlights(sel);
       if (deck) {
-        const merged = { ...deck, cards: [...deck.cards, ...cards].slice(0, MAX_DECK_CARDS) };
-        setDeck(merged);
-        addToast(`${cards.length} kart eklendi — Kaydet'i unutma.`, "success");
+        const mergedCards = [...deck.cards, ...cards].slice(0, MAX_DECK_CARDS);
+        const added = mergedCards.length - deck.cards.length;
+        setDeck({ ...deck, cards: mergedCards });
+        addToast(
+          added < cards.length
+            ? `${added} kart eklendi (deste üst sınırı ${MAX_DECK_CARDS} nedeniyle ${cards.length - added} kart atlandı) — Kaydet'i unutma.`
+            : `${added} kart eklendi — Kaydet'i unutma.`,
+          added < cards.length ? "info" : "success",
+        );
         setTab("cards");
       } else {
+        const capped = cards.slice(0, MAX_DECK_CARDS);
         const now = Date.now();
-        openDeck({ id: `deck_${now.toString(36)}_${Math.random().toString(36).slice(2, 6)}`, title: "Vurgulardan", cards, createdAt: now, updatedAt: now });
-        addToast(`${cards.length} kart üretildi.`, "success");
+        openDeck({ id: `deck_${now.toString(36)}_${Math.random().toString(36).slice(2, 6)}`, title: "Vurgulardan", cards: capped, createdAt: now, updatedAt: now });
+        addToast(
+          capped.length < cards.length
+            ? `${capped.length} kart üretildi (deste üst sınırı ${MAX_DECK_CARDS} nedeniyle ${cards.length - capped.length} kart atlandı).`
+            : `${capped.length} kart üretildi.`,
+          capped.length < cards.length ? "info" : "success",
+        );
       }
       setPicked(new Set());
     } catch (e) {
