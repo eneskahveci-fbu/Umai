@@ -46,7 +46,7 @@ export async function GET(req: Request) {
 
   for (const t of targets) {
     const { title, body } = cardReminderMessage(t.dueCount);
-    await sendPushToUser(admin, t.userId, { title, body, url: "/studio/kartlar" });
+    await sendPushToUser(admin, t.userId, { title, body, url: "/studio/araclar?tab=kartlar" });
     await admin.from("card_reminder_state").upsert({ user_id: t.userId, last_sent_date: today });
   }
 
