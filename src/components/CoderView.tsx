@@ -135,7 +135,7 @@ declare global {
    yetenekler, "/" yazmayı bilmeyen kullanıcı için tek tıkla. Küratörlü alt
    küme — tam liste SlashMenu'de. Tıklama, SlashMenu seçimiyle AYNI yolu izler
    (setActiveAgent), yani ayrı bir gönderim mantığı YOK. */
-const CHIP_AGENT_IDS = ["image-gen", "research", "explain", "fix", "refactor"];
+const CHIP_AGENT_IDS = ["explain", "fix", "refactor"];
 const CHIP_AGENTS = CHIP_AGENT_IDS
   .map((id) => ALL_AGENTS.find((a) => a.id === id))
   .filter((a): a is Agent => !!a);
@@ -305,7 +305,7 @@ interface StatusBadgeInfo {
    tık'ta açılır. "Hassas veri?" bir uyarı olduğundan (rutin bir mod/durum
    değil) özetin DIŞINDA, her zaman görünür kalır. */
 function StatusBar({
-  safeMode, web, autoPilot, pilotReasons, autoSwarm, swarmMode, researchMode,
+  safeMode, web, autoPilot, pilotReasons, autoSwarm, swarm, research,
   toolsEnabled, learningMode, activeAgentLabel, sensitiveHits, budget,
 }: {
   safeMode?: boolean;
@@ -313,8 +313,8 @@ function StatusBar({
   autoPilot?: boolean;
   pilotReasons?: string[];
   autoSwarm?: boolean;
-  swarmMode: boolean;
-  researchMode: boolean;
+  swarm?: boolean;
+  research?: boolean;
   toolsEnabled: boolean;
   learningMode?: boolean;
   activeAgentLabel?: string;
@@ -332,11 +332,11 @@ function StatusBar({
       title: pilotReasons?.length ? `Bu mesajda: ${pilotReasons.join(" · ")}` : "Otomatik Pilot: eforu, web aramayı, araştırmayı, kaliteyi ve ajan ekibini craft seçer",
       className: "text-brand/80",
     });
-  } else if (autoSwarm !== false && !swarmMode) {
+  } else if (autoSwarm !== false) {
     badges.push({ key: "oto-ajan", icon: <Sparkles size={12} />, label: "Oto-ajan", title: "Otomatik ajan açık: ihtiyaca göre tek ajan veya ajan ekibi kendiliğinden çalışır", className: "text-muted/70" });
   }
-  if (swarmMode) badges.push({ key: "ekip", icon: <Users size={12} />, label: "Ekip", title: "Ajan Ekibi: planlayıcı → paralel uzman işçiler → birleştirici", className: "text-brand" });
-  if (researchMode) badges.push({ key: "arastirma", icon: <Search size={12} />, label: "Araştırma", title: "Derin Araştırma: çok-kaynaklı web araması → atıflı rapor", className: "text-brand" });
+  if (swarm) badges.push({ key: "ekip", icon: <Users size={12} />, label: "Ekip", title: "Ajan Ekibi: planlayıcı → paralel uzman işçiler → birleştirici", className: "text-brand" });
+  if (research) badges.push({ key: "arastirma", icon: <Search size={12} />, label: "Araştırma", title: "Derin Araştırma: çok-kaynaklı web araması → atıflı rapor", className: "text-brand" });
   if (toolsEnabled) badges.push({ key: "tools", icon: null, label: "Tools", title: "Tool-use açık", className: "text-green/80" });
   if (learningMode) badges.push({ key: "ogrenme", icon: <GraduationCap size={12} />, label: "Öğrenme", title: "Öğrenme Modu: adım adım eğitsel açıklama", className: "text-brand" });
   if (activeAgentLabel) badges.push({ key: "agent", icon: null, label: activeAgentLabel, title: "Aktif slash komutu", className: "text-brand" });
@@ -814,12 +814,10 @@ export function CoderView() {
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   /* Web araması artık MANUEL toggle DEĞİL — Otomatik Pilot (pilot.web) karar
-     verir. Döviz/güncel bilgi sorularında kendiliğinden çalışır (autoWeb). */
-  /* Çoklu-ajan ("Ajan Ekibi" / Swarm) modu: planlayıcı → paralel uzman işçiler
-     → birleştirici (/api/orchestrate). Tek mesajda bir ajan ekibi çalışır. */
-  const [swarmMode, setSwarmMode] = useState(false);
-  /* Derin Araştırma modu: çok-kaynaklı web araması → atıflı rapor (/api/research). */
-  const [researchMode, setResearchMode] = useState(false);
+     verir. Döviz/güncel bilgi sorularında kendiliğinden çalışır (autoWeb).
+     Ajan Ekibi ve Derin Araştırma da aynı şekilde elle çip DEĞİL — Otomatik
+     Pilot'un (pilot.swarm/pilot.research) veya "/research" gibi bir slash-
+     ajanın kararına bağlı, bkz. send() içindeki useSwarm/useResearch. */
   /* Karşılaştırma modu: sohbet + tool-loop yerine aynı mesajı 2-3 modelle
      paralel çalıştırıp sonuçları yan yana gösterir (bkz. send() içindeki
      erken intercept + MessageBubble'ın compareResults render dalı). */
@@ -831,10 +829,6 @@ export function CoderView() {
      Sidebar → Eklentiler'in yanındaki yeni "Araçlar" düğmesine taşındı —
      burada Efor + oturuma özgü kontroller kalıyor (bkz. Sidebar.tsx). */
   const [moreTab, setMoreTab] = useState<"workspace" | "modes">("workspace");
-  const swarmModeRef = useRef(false);
-  useEffect(() => { swarmModeRef.current = swarmMode; }, [swarmMode]);
-  const researchModeRef = useRef(false);
-  useEffect(() => { researchModeRef.current = researchMode; }, [researchMode]);
   /* Plan onayı: bir sonraki istekte plan-modu kapısını geçici aşar. */
   const planApprovedRef = useRef(false);
   /* afterEdit kancası geri-besleme döngü sayacı (her kullanıcı mesajında sıfırlanır,
@@ -1805,11 +1799,12 @@ export function CoderView() {
         )
       : null;
     setLastPilot(pilot);
-    const useSwarm = swarmModeRef.current
-      || (pilot ? pilot.swarm : (store.config.autoSwarm !== false && !opts?.continuation && autoSwarm(_lastUserText)));
-    /* Derin Araştırma: kullanıcı modu açtıysa, /research ajanı seçiliyse
-       ya da Otomatik Pilot gerek gördüyse (devam turlarında değil). */
-    const useResearch = (researchModeRef.current || overrideAgent?.id === "research" || !!pilot?.research) && !opts?.continuation;
+    /* Ajan Ekibi: elle çip artık yok — yalnız Otomatik Pilot'un kararına
+       (ya da Pilot devre dışıysa eski regex yedeğine) bağlı. */
+    const useSwarm = pilot ? pilot.swarm : (store.config.autoSwarm !== false && !opts?.continuation && autoSwarm(_lastUserText));
+    /* Derin Araştırma: kullanıcı "/research" ajanını seçtiyse ya da Otomatik
+       Pilot gerek gördüyse (devam turlarında değil). */
+    const useResearch = (overrideAgent?.id === "research" || !!pilot?.research) && !opts?.continuation;
     const wantWeb = !!pilot?.web;
     /* Ajan Ekibi / Araştırma turunda otomatik EN GÜÇLÜ modeli kullan (ayar açıksa)
        → en yetenekli modelle çalışır. Hata olursa (kredi/anahtar yok) aşağıdaki
@@ -2125,8 +2120,17 @@ export function CoderView() {
       /* Sunucu-proxy üzerinden çağrı (tüm sağlayıcılar için ortak; Pollinations
          doğrudan tarayıcı çağrısı başarısız olursa yedek olarak da kullanılır.
          Sunucu Pollinations'ı anahtarsız destekler). */
-      /* Ajan Ekibi modunda orkestrasyon endpoint'ine git (planlayıcı → paralel
-         işçiler → birleştirici). Aynı gövdeyi alır, aynı OpenAI-uyumlu SSE'yi döner. */
+      /* Ajan Ekibi/Derin Araştırma artık /api/chat İÇİNDE de birer araç olarak
+         çalışabiliyor (dispatch_agents/deep_research, bkz. tools.ts) — ama bu
+         araçlar yalnızca gerçek bir repo bağlıyken görünür (body.tools &&
+         body.repoCtx, bkz. api/chat/route.ts). /api/research ve /api/orchestrate
+         repo GEREKTİRMEZ (yalnızca web/alt-ajan çalıştırır) — bu yüzden repo
+         bağlı değilken (veya yalnız yerel köprü bağlıyken, ki o da gerçek bir
+         repoCtx üretmez) bu iki eski endpoint hâlâ TEK güvenilir yol. Bunu
+         şimdi /api/chat'e toptan taşımak, repo bağlamayan kullanıcılarda Ekip/
+         Araştırma'yı sessizce devre dışı bırakır — bu kasıtlı olarak ERTELENDİ
+         (mimari planın "Faz 6" notu: araçları repo'suz sohbete açmak ayrı bir
+         kullanıcı onayı gerektiriyor). */
       const endpoint = useResearch
         ? "/api/research"
         : useSwarm && !isContinuation ? "/api/orchestrate" : "/api/chat";
@@ -2936,7 +2940,7 @@ export function CoderView() {
              (eski "Araçlar" sekmesi — Kütüphane/Etkinlik Günlüğü/Kısayollar —
              Sidebar'ın "Araçlar" popover'ına taşındı, bkz. Sidebar.tsx). */}
           {/* Aktif-parıltı yalnız panel aç/kapa durumlarını yansıtır — mod durumları
-             (toolsEnabled/safeMode/swarmMode/researchMode) zaten StatusBar'da rozet
+             (toolsEnabled/safeMode/ekip/araştırma) zaten StatusBar'da rozet
              olarak görünür, burada tekrar sinyal vermeye gerek yok. */}
           <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen || wsOpen}>
             {/* Efor seçici herkese açık; "otomatik" dışı bir seviye seçilirse
@@ -3004,13 +3008,14 @@ export function CoderView() {
               </>
             )}
 
-            {/* Mod çipleri (elle geçersiz kılma) — herkese açık: Otomatik Pilot
-               Tools/Güvenli/Kalite/Ekip/Araştırma'yı sessizce yönetir (Tools:
-               repo bağlanınca kendiliğinden açılır; kalan dördü Otomatik
-               Pilot'ın mesaj-bazlı kararına bağlıdır) ama kullanıcı ne
-               olduğunu görüp isterse elle geçersiz kılabilsin diye burada
-               herkese gösteriliyor. Öğrenme Modu Ayarlar → Genel'den standing
-               tercih olarak da açılabilir. */}
+            {/* Mod çipleri (elle geçersiz kılma) — herkese açık. Ekip/Araştırma
+               çipleri KALDIRILDI (kullanıcı kararı): artık elle açılan bir mod
+               değiller, Otomatik Pilot'un mesaj-bazlı kararına (ya da "/research"
+               gibi bir slash-ajana) göre kendiliğinden devreye girerler — bkz.
+               send() içindeki useSwarm/useResearch. Tools repo bağlanınca
+               kendiliğinden açılır; Güvenli/Karşılaştır kalıcı olmayan, gerçek
+               elle-toggle'lar olduğundan burada kalıyor. Öğrenme Modu Ayarlar →
+               Genel'den standing tercih olarak açılabilir. */}
             {moreTab === "modes" && (
               <div className="px-1.5 pb-1 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
                 {config.autoPilot !== false && (
@@ -3024,14 +3029,7 @@ export function CoderView() {
                     store.setToolsEnabled(!store.toolsEnabled);
                   }}
                 />
-                {/* Öğrenme/Kalite çipleri kaldırıldı (kullanıcı onayı): aynı
-                   config anahtarları Ayarlar → Temel'de zaten var — kalıcı bir
-                   tercihin iki yerden değişmesi kafa karıştırıyordu. Kalanlar
-                   oturumluk/sohbetlik durumlar (Tools, Ekip, Araştırma) ya da
-                   Ayarlar'da olmayanlar. */}
                 <ModeChip icon={<ShieldCheck size={12} />} label="Güvenli" active={!!config.safeMode} onClick={() => useStore.getState().saveConfig({ ...config, safeMode: !config.safeMode })} />
-                <ModeChip icon={<Users size={12} />} label="Ekip" active={swarmMode} onClick={() => setSwarmMode((v) => !v)} />
-                <ModeChip icon={<Search size={12} />} label="Araştırma" active={researchMode} onClick={() => setResearchMode((v) => !v)} />
                 <ModeChip icon={<Columns size={12} />} label="Karşılaştır" active={compareMode} onClick={() => setCompareMode((v) => !v)} />
               </div>
             )}
@@ -3774,8 +3772,8 @@ export function CoderView() {
                   autoPilot={config.autoPilot}
                   pilotReasons={lastPilot?.reasons}
                   autoSwarm={config.autoSwarm}
-                  swarmMode={swarmMode}
-                  researchMode={researchMode}
+                  swarm={lastPilot?.swarm}
+                  research={lastPilot?.research}
                   toolsEnabled={toolsEnabled}
                   learningMode={config.learningMode}
                   activeAgentLabel={activeAgent?.command}
