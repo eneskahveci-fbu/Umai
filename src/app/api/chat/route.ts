@@ -10,7 +10,7 @@ import { filterByGlob } from "@/lib/glob";
 import { ipynbToReadable, isNotebook } from "@/lib/notebook";
 import { pruneMessages } from "@/lib/contextWindow";
 import { detectFrameworks, extractDeps, parseGitignore } from "@/lib/projectContext";
-import { CODER_TOOLS, GENERATE_IMAGE_TOOL } from "@/lib/tools";
+import { ASK_USER_TOOL, CODER_TOOLS, GENERATE_IMAGE_TOOL } from "@/lib/tools";
 import { EXTENSION_TOOLS } from "@/lib/extensions/registry";
 import { searchWeb, formatResults, fetchUrl } from "@/lib/webSearch";
 import { pollinationsImageUrl, stableSeed } from "@/lib/pollinations";
@@ -1264,16 +1264,19 @@ export async function POST(req: Request) {
     `ASLA yanıt metnine yazma. Doğrudan sonucu ver.`;
   /* Açıklayıcı diyalog (Claude Code'un plan-onay döngüsü gibi): belirsiz
      isteklerde rastgele varsayımla ilerlemek yerine tıklanabilir bir seçenek
-     listesi sun ve kullanıcının kararını bekle — ask_user aracı yokken (araç
-     kullanımı kapalı/repo bağlı değil) bile GFM checkbox listesi sohbette
-     gerçekten tıklanabilir olduğundan bu her modda işler. */
+     listesi sun ve kullanıcının kararını bekle. ask_user aracı artık HER
+     modda sunuluyor (repo bağlı olmasa bile, bkz. allTools aşağıda) — bu
+     yüzden birincil yol GERÇEK tool-call'dır (istemci bunu Claude'daki gibi
+     tıklanabilir bir anket kartı olarak render eder). GFM checkbox biçimi
+     yalnızca ask_user'ı desteklemeyen bir uca düşülürse (fallback zinciri
+     tool-calling'i reddederse) devreye giren İKİNCİL bir yedektir. */
   sysPrompt +=
     `\n\n[Açıklayıcı diyalog] İstek belirsizse veya birden fazla makul yorumu/parametresi ` +
-    `varsa hemen bir varsayımla ilerleme: kullanıcıya kısa, işaretlenebilir bir seçenek listesi ` +
-    `sun (GFM checkbox biçiminde, ör. "- [ ] Seçenek A") ve kararını bekle. Kullanıcı kutucukları ` +
-    `işaretleyip devam edince seçimlerine göre ilerle; hâlâ netlik gerekiyorsa yeni bir kısa ` +
-    `açıklayıcı liste daha sunarak bu turu birkaç kez tekrarlayabilirsin — ama gereksiz yere sorma, ` +
-    `istek zaten netse doğrudan işe koyul.`;
+    `varsa hemen bir varsayımla ilerleme: ask_user aracını çağırarak kısa, tıklanabilir bir ` +
+    `seçenek listesi sun ve kararını bekle (araç bir nedenle çağrılamıyorsa GFM checkbox ` +
+    `biçiminde yaz, ör. "- [ ] Seçenek A"). Kullanıcı yanıtlayınca seçimine göre ilerle; hâlâ ` +
+    `netlik gerekiyorsa aynı yolla yeni bir kısa soru daha sorarak bu turu birkaç kez ` +
+    `tekrarlayabilirsin — ama gereksiz yere sorma, istek zaten netse doğrudan işe koyul.`;
   /* Eklenen her model, içinde çalıştığı platformun tüm özelliklerini bilsin. */
   sysPrompt += `\n\n${PLATFORM_KNOWLEDGE}`;
   if (body.projectPrompt) sysPrompt += `\n\n[Proje talimatları]: ${body.projectPrompt}`;
@@ -1418,71 +1421,32 @@ export async function POST(req: Request) {
     ? [{ role: "system", content: sysPrompt }, { role: "system", content: `\n\n[Web arama sonuçları]:\n${body.searchContext}` }]
     : [{ role: "system", content: sysPrompt }];
 
-  /* Aşağıdaki iki yoldan (araçsız passthrough + araçlı tur döngüsü) HER
-     İKİSİ de fallback_event kodlamak için kullanır — tek bir encoder yeter. */
   const encoder = new TextEncoder();
 
-  /* Tool-use disabled: simple passthrough — adayları sırayla dene, ilk başarılı
-     olanın gövdesini stream et. Hiçbiri başarmazsa son hatayı dön.
-     ÖNEMLİ: seçili model için anahtar yoktu (noKeyFallback) YA DA birincil
-     aday başarısız olup bir sonrakine geçildiyse (c !== primary), akışın
-     BAŞINA bir fallback_event eklenir — aksi halde bu (en yaygın, araçsız
-     sohbet) yolda kullanıcı hangi modelin gerçekten yanıt verdiğini asla
-     göremez (bkz. streamRound tabanlı tool-use döngüsündeki eşdeğer mantık). */
-  if (!body.tools && !body.webSearch && !body.imageGen) {
-    const messages = [...systemMessages, ...body.messages];
-    let lastStatus = 502, lastDetail = "", lastCand: Candidate = primary;
-    for (const c of candidates) {
-      let upstream: Response;
-      try {
-        upstream = await openCandidate(c, messages);
-      } catch (err) {
-        lastStatus = 502; lastDetail = (err as Error).message; lastCand = c;
-        continue; // bağlantı hatası → sıradaki aday
-      }
-      if (upstream.ok && upstream.body) {
-        const headers = { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" };
-        if (!noKeyFallback && c === primary) {
-          return new Response(upstream.body, { headers });
-        }
-        /* Şeffaflık olayını akışın başına ekle, sonra upstream'i olduğu gibi ilet. */
-        const reader = upstream.body.getReader();
-        const prefix = encoder.encode(`data: ${JSON.stringify({
-          fallback_event: noKeyFallback
-            ? { provider: c.provider, model: c.model, reason: "no_key", requestedProvider, requestedModel }
-            : { provider: c.provider, model: c.model },
-        })}\n\n`);
-        const combined = new ReadableStream<Uint8Array>({
-          start(controller) {
-            controller.enqueue(prefix);
-          },
-          async pull(controller) {
-            const { done, value } = await reader.read();
-            if (done) { controller.close(); return; }
-            controller.enqueue(value);
-          },
-          cancel(reason) {
-            void reader.cancel(reason).catch(() => {});
-          },
-        });
-        return new Response(combined, { headers });
-      }
-      lastStatus = upstream.status || 500;
-      lastDetail = await upstream.text().catch(() => "");
-      lastCand = c;
-    }
-    return new Response(friendlyApiError(lastStatus, lastDetail, { model: lastCand.model, provider: lastCand.provider as Provider }), { status: lastStatus });
-  }
-
-  /* Tool-use loop */
+  /* Tool-use loop — HER istek (repo bağlı olmasa, Tools kapalı olsa bile) bu
+     yoldan geçer: ask_user (Faz 6 dar kapsam — bkz. tools.ts) her modda
+     sunulur ki belirsiz isteklerde Claude'daki gibi gerçek, tıklanabilir bir
+     anket kartı göster(ebil)sin. Eskiden araçsız/webSearch'süz/imageGen'siz
+     sohbet ham upstream body'sini doğrudan (zero-copy) ilettiği bir kısayola
+     sahipti; ask_user için tool-call'ları ayrıştırmak (streamRound) şart
+     olduğundan bu kısayol kaldırıldı — fallback zinciri + fallback_event
+     şeffaflığı aşağıdaki döngüde birebir korunuyor (bkz. "İlk tur" bloğu). */
   const repoCtx = body.repoCtx;
   const ownOrigin = new URL(req.url).origin;
+  /* Eskiden yalnız bu üçü tool-loop'a girerdi (araçsız düz sohbet passthrough
+     alırdı) — MCP sunucu çağrısı ve Supabase dayanıklılık kontrolü gibi EK
+     ağ maliyetli işler hâlâ SADECE bu durumlarda yapılsın; ask_user (her
+     modda sunulan tek küçük araç) bunları TETİKLEMESİN, aksi halde en yaygın
+     düz sohbet mesajına gereksiz MCP/Supabase gecikmesi eklenir. */
+  const wantsFullTools = !!(body.tools && body.repoCtx) || !!body.webSearch || !!body.imageGen;
   /* Yerleşik (self-hosted) sunucular göreli bir yol (/api/mcp/builtin/*) taşır
      — fetch() bunu tek başına çözemez, bu isteğin kendi origin'iyle mutlak
      hale getirilir (bkz. isSafeMcpServerUrl). */
-  const activeMcpServers = (body.mcpServers ?? [])
-    .filter((s) => s.enabled !== false)
-    .map((s) => (s.url?.startsWith("/") ? { ...s, url: `${ownOrigin}${s.url}` } : s));
+  const activeMcpServers = wantsFullTools
+    ? (body.mcpServers ?? [])
+        .filter((s) => s.enabled !== false)
+        .map((s) => (s.url?.startsWith("/") ? { ...s, url: `${ownOrigin}${s.url}` } : s))
+    : [];
   const convo: ChatRequest["messages"] = [
     ...systemMessages,
     ...body.messages,
@@ -1535,7 +1499,7 @@ export async function POST(req: Request) {
   /* run_command yalnızca istemcide terminal varsa sunulur (yoksa çıktı gelmez). */
   if (!body.terminalAvailable) coderTools = coderTools.filter((t) => t.function.name !== "run_command");
   let allTools = [
-    ...(body.tools && body.repoCtx ? coderTools : (body.imageGen ? [GENERATE_IMAGE_TOOL] : [])),
+    ...(body.tools && body.repoCtx ? coderTools : [ASK_USER_TOOL, ...(body.imageGen ? [GENERATE_IMAGE_TOOL] : [])]),
     ...(body.webSearch && !body.blockNetworkTools ? WEB_TOOLS : []),
     ...mcpToolDefs.map((t) => ({
       type: "function" as const,
@@ -1552,8 +1516,10 @@ export async function POST(req: Request) {
   /* Dayanıklılık: chatId verilmiş + kullanıcı girişliyse, sekme yanıt
      bitmeden kapansa bile nihai yanıt aşağıdaki after() bloğunda `chats`
      tablosuna yazılır + push bildirimi gönderilir. Supabase yoksa/girişsizse
-     ya da chatId gelmemişse (gizli sohbet vb.) davranış birebir eskisi gibi. */
-  const durableSupabase = await createClient();
+     ya da chatId gelmemişse (gizli sohbet vb.) davranış birebir eskisi gibi.
+     Yalnızca wantsFullTools'ta hesapla — düz sohbette (yalnız ask_user)
+     bu HER mesaja bir Supabase auth çağrısı ekler, önceden hiç yoktu. */
+  const durableSupabase = wantsFullTools ? await createClient() : null;
   const durableUser = durableSupabase ? (await durableSupabase.auth.getUser()).data.user : null;
   const durableChatId = durableUser && body.chatId ? body.chatId : null;
 
