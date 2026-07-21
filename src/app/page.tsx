@@ -3,14 +3,12 @@ import { ReferralCapture } from "@/components/ReferralCapture";
 import {
   ArrowRight,
   ChevronDown,
-  Code2,
   FileText,
   FlaskConical,
   Image as ImageIcon,
   LayoutTemplate,
   MessageCircle,
   ShieldCheck,
-  Wand2,
 } from "lucide-react";
 
 function LogoMark({ size = 28 }: { size?: number }) {
@@ -28,29 +26,6 @@ function LogoMark({ size = 28 }: { size?: number }) {
     </svg>
   );
 }
-
-/* İki yol — "akıllı ayrım": kullanıcı ilk saniyede kendini seçer. Her yol
-   kendi sade deneyimine gider (yaratıcı → stüdyo, kod → uygulama). */
-const PATHS = [
-  {
-    href: "/studio",
-    badge: "Yaratıcı işler",
-    title: "Tasarla, üret, sor",
-    desc: "Bir cümle yaz — web sitesi, sunum, afiş ya da görsel çıksın. Yapay zeka gerisini halleder. Hiçbir şey bilmene gerek yok.",
-    icon: <Wand2 size={24} />,
-    chips: ["Web sitesi", "Sunum", "Görsel", "Her şeyi sor"],
-    cta: "Yaratmaya başla",
-  },
-  {
-    href: "/app",
-    badge: "Kod & geliştirme",
-    title: "Kod yaz, depona bağlan",
-    desc: "Dosyalarını okur, kod üretir, GitHub/GitLab deponu gezer. Sohbet, kod ve terminal tek ekranda — istediğin modelle.",
-    icon: <Code2 size={24} />,
-    chips: ["Sohbet", "Depo bağla", "Ajan", "Commit"],
-    cta: "Kodlamaya başla",
-  },
-];
 
 /* İnsan diliyle "ne yapabilirsin" — jargon yok, herkes anlar. */
 const CAN_DO = [
@@ -134,46 +109,32 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* HERO */}
-      <header className="max-w-5xl mx-auto px-5 sm:px-6 pt-20 sm:pt-28 pb-14 text-center w-full">
+      {/* HERO — tek mesaj: asla ödeme yapmadan, asla limitle karşılaşmadan */}
+      <header className="max-w-3xl mx-auto px-5 sm:px-6 pt-20 sm:pt-28 pb-14 text-center w-full">
         <h1 className="font-serif text-[2.4rem] leading-[1.12] sm:text-5xl lg:text-6xl font-semibold tracking-tight text-balance">
-          UMAI, konuşarak üreten ve kod yazan yapay zeka platformu.
+          Asla ödeme yapmadan, asla limitle karşılaşmadan kod yaz ve sohbet et.
         </h1>
 
         <p className="text-lg text-muted max-w-2xl mx-auto mt-6 leading-relaxed text-balance">
-          Web sitesi, sunum ve görsel tasarla; kod yaz, GitHub veya GitLab deponu yönet —
-          tek platformda, istediğin yapay zeka modeliyle. Kurulum yok, ücretsiz başlar.
+          Kendi anahtarını getir ya da anahtarsız ücretsiz modellerle hemen başla — GitHub veya
+          GitLab deponu bağla, kod üret, sohbet et. Kurulum yok, kredi kartı yok, sürpriz ücret yok.
         </p>
 
-        {/* İKİ YOL — akıllı ayrım */}
-        <div className="grid sm:grid-cols-2 gap-4 mt-12 text-left">
-          {PATHS.map((p) => (
-            <Link
-              key={p.href}
-              href={p.href}
-              className="group premium-card rounded-2xl p-6 sm:p-7 flex flex-col transition-colors hover:border-brand/40"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <span className="w-11 h-11 rounded-xl bg-brand/12 border border-brand/20 grid place-items-center text-brand shrink-0">
-                  {p.icon}
-                </span>
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">{p.badge}</span>
-              </div>
-              <h2 className="text-xl font-bold tracking-tight mb-2">{p.title}</h2>
-              <p className="text-sm text-muted leading-relaxed mb-5 flex-1">{p.desc}</p>
-              <div className="flex flex-wrap gap-1.5 mb-5">
-                {p.chips.map((c) => (
-                  <span key={c} className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-bgsoft border border-line/70 text-ink/80">{c}</span>
-                ))}
-              </div>
-              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand">
-                {p.cta} <ArrowRight size={15} />
-              </span>
-            </Link>
-          ))}
+        <div className="flex justify-center mt-10">
+          <Link
+            href="/app"
+            className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-[#111110] font-semibold px-8 py-4 rounded-xl transition-colors text-[15px] shadow-sm shadow-brand/20"
+          >
+            Sohbete başla <ArrowRight size={17} />
+          </Link>
         </div>
 
-        <p className="text-xs text-muted/60 mt-6">İkisini de tek hesapta dener, istediğin zaman geçiş yaparsın.</p>
+        <p className="text-xs text-muted/60 mt-6">
+          Web sitesi, sunum ve görsel tasarımı mı arıyorsun?{" "}
+          <Link href="/studio" className="text-muted hover:text-brand underline underline-offset-2 transition-colors">
+            Stüdyo&apos;ya göz at
+          </Link>
+        </p>
       </header>
 
       {/* NE YAPABİLİRSİN — sade, dört öğe */}
