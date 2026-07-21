@@ -107,7 +107,7 @@ import { calcBudgetStatus, type BudgetStatus } from "@/lib/budget";
 import { buildContextSections } from "@/lib/prompt";
 import { detectSensitive } from "@/lib/pii";
 import { friendlyError } from "@/lib/friendlyError";
-import { autoEffort, autoSwarm, decidePilot, type PilotDecision } from "@/lib/autoPilot";
+import { autoEffort, autoSwarm, decidePilotAsync, type PilotDecision } from "@/lib/autoPilot";
 import { pickDraftModels, buildBoostInstruction, generateDrafts, fillSelfConsistency, judgeDrafts } from "@/lib/boost";
 import { runCompare } from "@/lib/compare";
 import { fetchTextModels } from "@/lib/pollinations";
@@ -1796,10 +1796,14 @@ export function CoderView() {
     const isAdminNow = isAdminEmail(store.userEmail);
     const pilotEnabled = isAdminNow ? store.config.autoPilot !== false : true;
     const pilotRepoCtx = !!store.repo || !!(store.config.localMode && store.config.localBridgeUrl?.trim());
-    const pilot: PilotDecision | null =
-      pilotEnabled && !opts?.continuation && !overrideAgent
-        ? decidePilot(_lastUserText, { hasRepo: pilotRepoCtx })
-        : null;
+    const pilotShouldRun = pilotEnabled && !opts?.continuation && !overrideAgent;
+    const pilot: PilotDecision | null = pilotShouldRun
+      ? await decidePilotAsync(
+          _lastUserText,
+          { hasRepo: pilotRepoCtx },
+          { baseUrl: active.baseUrl, model: active.model, apiKey: await usableApiKey(active) },
+        )
+      : null;
     setLastPilot(pilot);
     const useSwarm = swarmModeRef.current
       || (pilot ? pilot.swarm : (store.config.autoSwarm !== false && !opts?.continuation && autoSwarm(_lastUserText)));
