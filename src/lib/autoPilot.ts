@@ -18,6 +18,9 @@ export interface PilotDecision {
   fusion: boolean;
   /** Çok parçalı ağır iş → ajan ekibi (planlayıcı+paralel işçiler). */
   swarm: boolean;
+  /** Doğal dilden görsel/resim isteği → generate_image aracı (Faz 6: repo
+      bağlı olmasa bile bu TEK araç için tool-loop'u devreye sokar). */
+  image: boolean;
   /** Durum rozeti tooltip'i için kısa Türkçe etiketler. */
   reasons: string[];
 }
@@ -73,6 +76,36 @@ export function autoResearch(text: string): boolean {
   return /\b(derinlemesine araştır|kapsamlı (bir )?(rapor|araştırma|analiz)|karşılaştırmalı (analiz|rapor|inceleme)|literatür|kaynaklarıyla|kaynak göstererek|detaylı araştır)\b/.test(t);
 }
 
+/* Görsel üretim isteği. NOT: `\b` JS'te yalnız ASCII [A-Za-z0-9_]'yi "kelime
+   karakteri" sayar — "çiz"/"üret" gibi Türkçe karaktere BAŞLAYAN kelimelerde
+   boşluktan sonra hiç eşleşmez (iki taraf da \b'ye göre "kelime-dışı" kalır).
+   Bu yüzden burada \b yerine \p{L} (Unicode harf) tabanlı özel sınır +
+   gövdeye eklenen çekim eklerini yutan \p{L}* kullanılır ("çiz" → "çizer",
+   "resim" → "resmi" gibi biçimleri de yakalar).
+   Mantık: "çiz/draw/paint" gibi GÜÇLÜ (neredeyse yalnız görsel bağlamda
+   kullanılan) fiiller TEK BAŞINA yeterli ("bana bir kedi çiz" — isim GEÇMEZ
+   ama açık bir görsel isteğidir); "oluştur/yap/üret" gibi ZAYIF (kodlama
+   isteklerinde de son derece yaygın) fiiller yalnız bir görsel-ortam ismiyle
+   ("resim/görsel/logo/…") BİRLİKTE sayılır. Kod bağlamı ipucu varsa (bileşen/
+   API/fonksiyon/dosya) hiç tetiklenmez — "logo bileşeni oluştur" muhtemelen
+   bir kod isteğidir. Bu sinyal Faz 6'da YALNIZCA generate_image aracını repo
+   bağlı olmayan düz sohbette de açar (bkz. CoderView.tsx'teki wantImageGen +
+   api/chat/route.ts'in body.imageGen dalı) — deep_research/dispatch_agents
+   hâlâ repo gerektirir. */
+const IMG_CODE_CONTEXT = /(?<!\p{L})(bileşen|component|fonksiyon|function|değişken|variable|class|api|endpoint|route|dosya|file|kod)(?!\p{L})/iu;
+const IMG_STRONG_VERB = /(?<!\p{L})(çiz\p{L}*|resmet\p{L}*|draw\p{L}*|paint\p{L}*|sketch\p{L}*|illustrate\p{L}*)(?!\p{L})/iu;
+const IMG_NOUN = /(?<!\p{L})(res(?:im|m)\p{L}*|görsel\p{L}*|illüstrasyon\p{L}*|çizim\p{L}*|fotoğraf\p{L}*|foto\p{L}*|portre\p{L}*|karikatür\p{L}*|logo\p{L}*|afiş\p{L}*|manzara\p{L}*|duvar kağıdı\p{L}*|wallpaper|image|illustration|artwork|picture|drawing)(?!\p{L})/iu;
+const IMG_WEAK_VERB = /(?<!\p{L})(üret\p{L}*|oluştur\p{L}*|tasarla\p{L}*|hazırla\p{L}*|göster\p{L}*|yap\p{L}*|create|generate|make)(?!\p{L})/iu;
+
+export function autoImageGen(text: string): boolean {
+  const t = (text || "").trim();
+  if (t.length < 6) return false;
+  if (/```/.test(t)) return false;
+  if (IMG_CODE_CONTEXT.test(t)) return false;
+  if (IMG_STRONG_VERB.test(t)) return true;
+  return IMG_NOUN.test(t) && IMG_WEAK_VERB.test(t);
+}
+
 /* Kalite modu: yüksek nitelik beklenen üretim işlerinde taslak→eleştiri→düzelt. */
 export function autoQuality(text: string, effort: Effort): boolean {
   const t = (text || "").trim();
@@ -95,7 +128,7 @@ export function autoFusion(text: string): boolean {
 }
 
 function assemblePilotDecision(
-  effort: Effort, quality: boolean, fusion: boolean, web: boolean, research: boolean, swarm: boolean,
+  effort: Effort, quality: boolean, fusion: boolean, web: boolean, research: boolean, swarm: boolean, image: boolean,
 ): PilotDecision {
   const reasons: string[] = [];
   const effortLabel: Record<Effort, string> = { low: "hızlı", medium: "dengeli", high: "yüksek efor", max: "maksimum efor" };
@@ -105,7 +138,8 @@ function assemblePilotDecision(
   if (fusion) reasons.push("füzyon (3 model + hakem)");
   else if (quality) reasons.push("kalite turu");
   if (swarm) reasons.push("ajan ekibi");
-  return { effort, web, research, quality, fusion, swarm, reasons };
+  if (image) reasons.push("görsel üretimi");
+  return { effort, web, research, quality, fusion, swarm, image, reasons };
 }
 
 /** Tek karar noktası (senkron, regex-tabanlı) — ağ isteği ATMAZ. `decidePilotAsync`
@@ -118,12 +152,13 @@ export function decidePilot(text: string, ctx: { hasRepo: boolean }): PilotDecis
   const quality = autoQuality(text, effort);
   const fusion = autoFusion(text);
   const swarm = ctx.hasRepo && autoSwarm(text);
-  return assemblePilotDecision(effort, quality, fusion, web, research, swarm);
+  const image = autoImageGen(text);
+  return assemblePilotDecision(effort, quality, fusion, web, research, swarm, image);
 }
 
 /** LLM-tabanlı yönlendirme kararı — sabit regex yerine `/api/route-plan`'a
     hızlı bir sınıflandırma çağrısı yapar (yalnızca effort/quality/fusion;
-    web/research/swarm hâlâ regex'te kalır — bunlar artık organik araç
+    web/research/swarm/image hâlâ regex'te kalır — bunlar artık organik araç
     kararları, bkz. generate_image/deep_research/dispatch_agents araçları).
     Ağ/format hatasında SESSİZCE senkron `decidePilot`'a düşer — sohbet akışı
     asla bloklanmaz/bozulmaz. */
@@ -146,7 +181,8 @@ export async function decidePilotAsync(
           const research = autoResearch(text);
           const web = research || autoWeb(text);
           const swarm = ctx.hasRepo && autoSwarm(text);
-          return assemblePilotDecision(data.effort as Effort, !!data.quality, !!data.fusion, web, research, swarm);
+          const image = autoImageGen(text);
+          return assemblePilotDecision(data.effort as Effort, !!data.quality, !!data.fusion, web, research, swarm, image);
         }
       }
     } catch { /* ağ/zaman aşımı hatası — senkron yedeğe düş */ }

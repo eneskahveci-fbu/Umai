@@ -10,7 +10,7 @@ import { filterByGlob } from "@/lib/glob";
 import { ipynbToReadable, isNotebook } from "@/lib/notebook";
 import { pruneMessages } from "@/lib/contextWindow";
 import { detectFrameworks, extractDeps, parseGitignore } from "@/lib/projectContext";
-import { CODER_TOOLS } from "@/lib/tools";
+import { CODER_TOOLS, GENERATE_IMAGE_TOOL } from "@/lib/tools";
 import { EXTENSION_TOOLS } from "@/lib/extensions/registry";
 import { searchWeb, formatResults, fetchUrl } from "@/lib/webSearch";
 import { pollinationsImageUrl, stableSeed } from "@/lib/pollinations";
@@ -96,6 +96,9 @@ interface ChatRequest {
   projectPrompt?: string;
   tools?: boolean;
   webSearch?: boolean;
+  /** Faz 6 — yalnız generate_image: repo bağlı olmasa/Tools kapalı olsa bile
+      bu TEK aracı tool-loop'a ekler (bkz. autoPilot.ts'teki autoImageGen). */
+  imageGen?: boolean;
   requireWriteApproval?: boolean;
   safeMode?: boolean;
   toolPermissions?: Record<string, boolean>;
@@ -1383,6 +1386,17 @@ export async function POST(req: Request) {
       `Mevcut araçlar: web_search(query), read_url(url)\n` +
       `Bilgi gerektiren sorularda önce web_search ile ara, sonra ilgili sayfaları read_url ile oku.`;
   }
+  /* Faz 6 — yalnız generate_image: repo bağlı/Tools açık senaryoda bu araç
+     zaten yukarıdaki [Ajan modu] bloğunda anlatıldı (tekrar etme); burada
+     yalnızca O YOKKEN (repo bağlı değil veya Tools kapalı) bu TEK aracın
+     nasıl kullanılacağını ayrıca anlat. */
+  if (body.imageGen && !(body.tools && body.repoCtx)) {
+    sysPrompt +=
+      `\n\n[Görsel üretim modu]\n` +
+      `Mevcut araç: generate_image(prompt, aspect_ratio?) — kullanıcı bir görsel/resim/illüstrasyon ` +
+      `istediğinde (doğal dilden anla, komut/buton gerekmez) ÇAĞIR. Sonucu '![açıklama](url)' markdown ` +
+      `biçiminde yanıtına göm, URL'i düz metin olarak yazma.`;
+  }
 
   /* Aşağıdaki iki yoldan (araçsız passthrough + araçlı tur döngüsü) HER
      İKİSİ de fallback_event kodlamak için kullanır — tek bir encoder yeter. */
@@ -1395,7 +1409,7 @@ export async function POST(req: Request) {
      BAŞINA bir fallback_event eklenir — aksi halde bu (en yaygın, araçsız
      sohbet) yolda kullanıcı hangi modelin gerçekten yanıt verdiğini asla
      göremez (bkz. streamRound tabanlı tool-use döngüsündeki eşdeğer mantık). */
-  if (!body.tools && !body.webSearch) {
+  if (!body.tools && !body.webSearch && !body.imageGen) {
     const messages = [{ role: "system", content: sysPrompt }, ...body.messages];
     let lastStatus = 502, lastDetail = "", lastCand: Candidate = primary;
     for (const c of candidates) {
@@ -1501,7 +1515,7 @@ export async function POST(req: Request) {
   /* run_command yalnızca istemcide terminal varsa sunulur (yoksa çıktı gelmez). */
   if (!body.terminalAvailable) coderTools = coderTools.filter((t) => t.function.name !== "run_command");
   let allTools = [
-    ...(body.tools && body.repoCtx ? coderTools : []),
+    ...(body.tools && body.repoCtx ? coderTools : (body.imageGen ? [GENERATE_IMAGE_TOOL] : [])),
     ...(body.webSearch && !body.blockNetworkTools ? WEB_TOOLS : []),
     ...mcpToolDefs.map((t) => ({
       type: "function" as const,
@@ -1694,15 +1708,16 @@ export async function POST(req: Request) {
              üretimi — anahtarsız Pollinations tabanı (aynı, kanıtlanmış URL
              kurucusu — /gorsel slash-komutunun kullandığı ile BİREBİR aynı
              pipeline, yalnızca tetikleme yolu farklı: LLM kendi kararıyla
-             çağırıyor). v1 kapsamı bilinçli olarak repo bağlı sohbetlerle
-             sınırlı (repoCtx gerektirir) — bkz. mimari planın Faz 6 notu. */
+             çağırıyor). Faz 6 (kullanıcı kararı): bu TEK araç repo bağlı
+             OLMASA da çalışır — Pollinations URL kurucusu zaten repoCtx'e
+             hiç ihtiyaç duymuyordu, kısıtlama yalnız mimari tutarlılık için
+             vardı. deep_research/dispatch_agents hâlâ repo gerektiriyor. */
           if (tc.name === "generate_image") {
             const prompt = String(args.prompt ?? "").trim();
             const fail = (m: string) => {
               safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: m } })}\n\n`));
               resultById.set(tc.id, m);
             };
-            if (!repoCtx) { fail("Hata: repo bağlı değil"); return; }
             if (!prompt) { fail("Hata: prompt gerekli"); return; }
             const DIMENSIONS: Record<string, { width: number; height: number }> = {
               square: { width: 1024, height: 1024 },
