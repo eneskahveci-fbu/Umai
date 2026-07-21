@@ -105,30 +105,20 @@ export function buildFallbackChain(
     .map((m) => ({ provider: m.provider, baseUrl: m.baseUrl, model: m.model, apiKey: m.apiKey }))
     .sort((a, b) => rank(a.provider) - rank(b.provider));
 
-  const out: FallbackCandidate[] = [];
-  for (const c of candidates) {
-    const key = dedupeKey(c);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(c);
-  }
-
-  // Anahtarsız Pollinations tabanı: her zaman erişilebilir bir son çare.
+  /* Anahtarsız son çareler (Pollinations + OVH) önceden HESAPLA — aşağıda
+     kullanıcı adaylarına kaç yuva ayrılacağını belirlemek için gerekiyor. */
+  const backstops: FallbackCandidate[] = [];
   if (pollinationsBackstop) {
-    const backstop: FallbackCandidate = {
+    const pollinations: FallbackCandidate = {
       provider: POLLINATIONS_DEFAULT_MODEL.provider,
       baseUrl: POLLINATIONS_DEFAULT_MODEL.baseUrl,
       model: POLLINATIONS_DEFAULT_MODEL.model,
       apiKey: "",
     };
-    if (!seen.has(dedupeKey(backstop))) {
-      seen.add(dedupeKey(backstop));
-      out.push(backstop);
+    if (!seen.has(dedupeKey(pollinations))) {
+      seen.add(dedupeKey(pollinations));
+      backstops.push(pollinations);
     }
-    /* İkinci anahtarsız halka: OVHcloud AI Endpoints (anonim, AB). Anonim
-       oran sınırı IP başına 2 istek/dk olduğundan (sunucudan proxy'lenince
-       PAYLAŞIMLI) Pollinations'ın ÖNÜNE geçmez — yalnız zincirde yer kaldıysa
-       en sona eklenir; mevcut davranış değişmez, yedek derinleşir. */
     const ovh: FallbackCandidate = {
       provider: "ovh",
       baseUrl: OVH_FREE_MODEL.baseUrl,
@@ -137,9 +127,27 @@ export function buildFallbackChain(
     };
     if (!seen.has(dedupeKey(ovh))) {
       seen.add(dedupeKey(ovh));
-      out.push(ovh);
+      backstops.push(ovh);
     }
   }
 
+  /* "Asla ödeme yapmadan, asla limitle karşılaşmadan" sözü (prompt.md kuzey
+     yıldızı) yalnız bir SÖZ değil — anahtarsız son çareler kullanıcının
+     yapılandırdığı (kotası dolmuş/bozuk olabilecek) adaylar tarafından
+     zincirden İTİLMESİN diye kendilerine HER ZAMAN yer ayrılır. Önceden:
+     maxFallbacks=3 iken 2+ kullanılabilir aday varsa OVH sessizce kesiliyordu
+     — Pollinations tek başına kesintiye girdiğinde (olur, canlıda görüldü)
+     kullanıcı gerçek bir yedeği hiç denemeden duvara çarpıyordu. */
+  const userSlotLimit = Math.max(0, maxFallbacks - backstops.length);
+  const out: FallbackCandidate[] = [];
+  for (const c of candidates) {
+    if (out.length >= userSlotLimit) break;
+    const key = dedupeKey(c);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(c);
+  }
+
+  out.push(...backstops);
   return out.slice(0, maxFallbacks);
 }
