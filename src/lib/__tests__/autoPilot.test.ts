@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { decidePilot, autoEffort, autoWeb, autoResearch, autoFusion } from "../autoPilot";
+import { describe, expect, it, vi } from "vitest";
+import { decidePilot, decidePilotAsync, autoEffort, autoWeb, autoResearch, autoFusion } from "../autoPilot";
 
 const ctx = { hasRepo: true };
 
@@ -36,6 +36,46 @@ describe("decidePilot", () => {
   it("reasons okunur etiketler içerir", () => {
     const d = decidePilot("bugün en yeni Next.js sürümü çıktı mı?", ctx);
     expect(d.reasons).toContain("web");
+  });
+});
+
+describe("decidePilotAsync — LLM-tabanlı yönlendirme + senkron yedek", () => {
+  const llm = { baseUrl: "https://x", model: "m", apiKey: "k" };
+
+  it("başarılı /api/route-plan yanıtı effort/quality/fusion'ı uygular (web/research/swarm hâlâ regex'ten)", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify({ effort: "max", quality: true, fusion: false }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const d = await decidePilotAsync("selam", ctx, llm);
+    expect(d.effort).toBe("max");
+    expect(d.quality).toBe(true);
+    expect(d.fusion).toBe(false);
+    expect(d.web).toBe(false); // regex: "selam" web tetiklemez
+    vi.unstubAllGlobals();
+  });
+
+  it("ağ hatasında senkron decidePilot'a düşer (asla fırlatmaz)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("network down")));
+    const d = await decidePilotAsync("kapsamlı bir mimari kur", ctx, llm);
+    expect(d).toEqual(decidePilot("kapsamlı bir mimari kur", ctx));
+    vi.unstubAllGlobals();
+  });
+
+  it("geçersiz/eksik JSON yanıtında senkron decidePilot'a düşer", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 })));
+    const d = await decidePilotAsync("selam", ctx, llm);
+    expect(d).toEqual(decidePilot("selam", ctx));
+    vi.unstubAllGlobals();
+  });
+
+  it("llm bilgisi yoksa (baseUrl/model eksik) doğrudan senkron decidePilot'a düşer, ağ çağrısı yapmaz", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const d = await decidePilotAsync("selam", ctx, null);
+    expect(d).toEqual(decidePilot("selam", ctx));
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });
 
