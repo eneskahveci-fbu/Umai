@@ -53,11 +53,47 @@ export async function GET(request: Request) {
     if (r.user_id) activeUsers.add(r.user_id);
   }
 
+  /* Gün-üstü-gün (DoD) dönüş oranı — prompt.md Hamle 5: "kaç kullanıcı YARIN
+     da geri geldi" sorusuna somut bir cevap. Takvim günlerini (boş günler
+     dahil) baştan üretip her gün için bir SONRAKİ takvim gününde de aktif
+     olan kullanıcı oranını hesaplar. Ayrı bir sorgu gerektirmez — yukarıdaki
+     `rows` üzerinden türetilir. */
+  const dayKey = (iso: string) => iso.slice(0, 10);
+  const today = new Date();
+  const calendarDays: string[] = [];
+  for (let i = windowDays - 1; i >= 0; i--) {
+    calendarDays.push(dayKey(new Date(today.getTime() - i * 86_400_000).toISOString()));
+  }
+  const activeByDay: Record<string, Set<string>> = {};
+  for (const day of calendarDays) activeByDay[day] = new Set();
+  for (const r of rows ?? []) {
+    if (!r.user_id) continue;
+    const day = dayKey(r.created_at);
+    activeByDay[day]?.add(r.user_id);
+  }
+  const retention = calendarDays.map((day, i) => {
+    const activeSet = activeByDay[day];
+    const nextDay = calendarDays[i + 1];
+    if (!nextDay || activeSet.size === 0) {
+      return { day, activeUsers: activeSet.size, returnedNextDay: null as number | null, returnRatePct: null as number | null };
+    }
+    const nextSet = activeByDay[nextDay];
+    let returned = 0;
+    for (const uid of activeSet) if (nextSet.has(uid)) returned++;
+    return { day, activeUsers: activeSet.size, returnedNextDay: returned, returnRatePct: Math.round((returned / activeSet.size) * 1000) / 10 };
+  });
+  const ratedDays = retention.filter((d) => d.returnRatePct !== null);
+  const avgReturnRatePct = ratedDays.length
+    ? Math.round((ratedDays.reduce((sum, d) => sum + (d.returnRatePct ?? 0), 0) / ratedDays.length) * 10) / 10
+    : null;
+
   return NextResponse.json({
     windowDays,
     totalEvents: rows?.length ?? 0,
     activeUsers: activeUsers.size,
     byEvent,
     bySurface,
+    retention,
+    avgReturnRatePct,
   });
 }
