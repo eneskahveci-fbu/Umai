@@ -128,11 +128,12 @@ export function StudioHomeScreen({
                 placeholder="Bir şey iste — örn. 'bir fitness uygulaması için onboarding ekranı' ya da 'JSON'ı CSV'ye çeviren bir Python fonksiyonu'…"
                 className="w-full bg-transparent resize-none outline-none px-5 pt-4 text-[15px] leading-relaxed placeholder:text-muted/45 min-h-[76px]"
               />
-              <div className="flex items-center justify-between gap-1.5 px-3 pb-3 pt-1">
-                {/* flex-wrap: dar mobil ekranda kontroller ikinci satıra düşer,
-                    yatay kaydırma yerine (bkz. ComposerExtras.tsx'teki align
-                    hesabı — popover'lar da ekran dışına taşmaz). */}
-                <div className="flex-1 min-w-0 flex flex-wrap items-center gap-1.5">
+              <div className="flex items-center gap-2 px-3 pb-3 pt-1">
+                {/* Tek satır, yatay kaydırma + sağda soluklaşma ipucu — çok
+                    satıra bölünmek (eski flex-wrap) dar ekranda dağınık
+                    duruyordu. Popover'lar yine ComposerExtras.tsx'teki align
+                    hesabıyla ekran dışına taşmaz. */}
+                <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-fade-x py-0.5">
                   <input
                     ref={fileRef}
                     type="file"
@@ -145,7 +146,7 @@ export function StudioHomeScreen({
                     onClick={() => fileRef.current?.click()}
                     title="Referans görsel ekle"
                     aria-label="Referans görsel ekle"
-                    className="shrink-0 w-9 h-9 rounded-xl grid place-items-center text-muted hover:text-ink hover:bg-bgsoft transition-colors"
+                    className="shrink-0 w-9 h-9 rounded-xl border border-line/70 bg-bgsoft/60 hover:border-brand/40 grid place-items-center text-muted hover:text-ink transition-colors"
                   >
                     <Paperclip size={15} />
                   </button>
@@ -153,6 +154,7 @@ export function StudioHomeScreen({
                   <ModelPicker fusionEnabled={fusionEnabled} onFusionChange={onFusionChange} />
                   <TemplatePicker onPick={onPickTemplate} />
                   <VoiceButton
+                    pill
                     onTranscript={(text, isFinal) => {
                       if (isFinal) setBrief((brief ? `${brief} ` : "") + text);
                     }}

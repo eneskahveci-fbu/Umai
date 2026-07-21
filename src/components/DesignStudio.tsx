@@ -164,11 +164,12 @@ function ChatPanel({
             placeholder="Değişiklik iste — 'başlığı büyüt', 'mavi yap', 'yeni bölüm ekle'…"
             className="w-full bg-transparent resize-none outline-none text-[15px] leading-relaxed py-1 max-h-28 placeholder:text-muted/45"
           />
-          <div className="flex items-center justify-between gap-1.5">
-            {/* flex-wrap: dar mobil ekranda kontroller ikinci satıra düşer,
-                yatay kaydırma yerine — hem popover'lar hem düğmeler her zaman
-                tam görünür kalır (bkz. ComposerExtras.tsx'teki align hesabı). */}
-            <div className="flex-1 min-w-0 flex flex-wrap items-center gap-1.5">
+          <div className="flex items-center gap-2">
+            {/* Tek satır, yatay kaydırma + sağda soluklaşma ipucu — çok satıra
+                bölünmek (eski flex-wrap) dar ekranda dağınık duruyordu.
+                Popover'lar yine ComposerExtras.tsx'teki align hesabıyla ekran
+                dışına taşmaz. */}
+            <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-fade-x py-0.5">
               <input
                 ref={fileRef}
                 type="file"
@@ -181,7 +182,7 @@ function ChatPanel({
                 onClick={() => fileRef.current?.click()}
                 title="Referans görsel ekle"
                 aria-label="Referans görsel ekle"
-                className="shrink-0 w-9 h-9 rounded-xl grid place-items-center text-muted hover:text-ink hover:bg-bgsoft transition-colors"
+                className="shrink-0 w-9 h-9 rounded-xl border border-line/70 bg-bgsoft/60 hover:border-brand/40 grid place-items-center text-muted hover:text-ink transition-colors"
               >
                 <Paperclip size={15} />
               </button>
@@ -189,6 +190,7 @@ function ChatPanel({
               <ModelPicker fusionEnabled={fusionEnabled} onFusionChange={onFusionChange} />
               <TemplatePicker onPick={onPickTemplate} />
               <VoiceButton
+                pill
                 onTranscript={(text, isFinal) => {
                   if (isFinal) setInput((cur) => (cur ? `${cur} ` : "") + text);
                 }}

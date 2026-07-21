@@ -68,7 +68,7 @@ export function DesignSystemPicker({ value, onChange }: { value: string; onChang
         className="shrink-0 flex items-center gap-1.5 px-2.5 h-9 rounded-xl border border-line/70 bg-bgsoft/60 hover:border-brand/40 text-xs font-medium text-muted hover:text-ink transition-colors"
       >
         <Palette size={13} />
-        <span className="max-w-[76px] truncate">{current.name}</span>
+        <span className="max-w-[110px] truncate">{current.name}</span>
         <ChevronDown size={11} />
       </button>
       {open && (
@@ -141,7 +141,7 @@ export function ModelPicker({
         }`}
       >
         <Cpu size={13} />
-        <span className="max-w-[96px] truncate">{label}</span>
+        <span className="max-w-[130px] truncate">{label}</span>
         <ChevronDown size={11} />
       </button>
       {open && (
