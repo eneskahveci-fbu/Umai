@@ -1,1 +1,1 @@
-# Umai
+glpat-7eWYXI31dx0dRr8_AwpnRWM6MQpvOjEKdTpuM3RoZA8.01.1703cwim7 https://gitlab.com/eneskahveci.bs/umai-studio
