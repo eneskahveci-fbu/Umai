@@ -148,6 +148,19 @@ export const PRESETS: Record<Provider, Preset> = {
     model: "meta/llama-3.3-70b-instruct",
     keyHint: "nvapi-… (build.nvidia.com — ücretsiz anahtar)",
   },
+  /* Tem 2026'da çıktı, agentic kodlama için güçlü — ama "gray release"
+     (sınırlı/seçili kullanıcı) aşamasında: anahtar gerekiyor, herkese açık
+     kayıt akışı belgelerde netleşmemiş (bkz. wiki.agnes-ai.com/en/docs/
+     agnes-25-flash). Bu yüzden KEYLESS_PROVIDERS'a eklenmedi ve fallback
+     zincirinde Pollinations/OVH gibi "her zaman erişilebilir taban"
+     muamelesi görmüyor — kullanıcı kendi anahtarını girdiğinde diğer
+     anahtarlı sağlayıcılarla aynı şekilde çalışır. */
+  agnes: {
+    label: "🌊 Agnes AI (Ücretsiz — sınırlı erişim)",
+    baseUrl: "https://apihub.agnes-ai.com/v1",
+    model: "agnes-2.5-flash",
+    keyHint: "Agnes AI anahtarı (agnes-ai.com — gray-release, hesabına erişim tanımlanmış olmalı)",
+  },
   ollama: {
     label: "💻 Ollama (Yerel / Ücretsiz)",
     baseUrl: "http://localhost:11434/v1",
@@ -287,6 +300,11 @@ export const PROVIDER_MODELS: Record<Provider, string[]> = {
     "moonshotai/kimi-k2-instruct",
     "nvidia/llama-3.1-nemotron-70b-instruct",
   ],
+  /* wiki.agnes-ai.com/en/docs/agnes-25-flash (Tem 2026): 512K bağlam, 65.5K
+     çıktı, agentic kodlama/araç çağrısı için güçlendirilmiş. 2.5, hesabında
+     henüz açılmamışsa (gray-release) belge "agnes-2.0-flash"a geç öneriyor —
+     o da burada ikinci seçenek olarak duruyor. */
+  agnes: ["agnes-2.5-flash", "agnes-2.0-flash"],
   ollama: [
     "qwen2.5-coder:7b",
     "qwen2.5-coder:14b",
