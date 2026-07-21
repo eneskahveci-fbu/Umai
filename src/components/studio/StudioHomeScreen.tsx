@@ -1,14 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import {
   ArrowUp, BarChart3, BookOpen, Code2, FileText,
   Layers, ListChecks, Network, Palette, Presentation, Sparkles,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { TemplateGallery } from "./TemplateGallery";
 import { useSurfaceNav, type Surface } from "@/lib/surfaceNav";
-import { templatesByCategory, type StudioTemplate } from "@/lib/studioTemplates";
 
 /* Stüdyo anasayfası — claude.ai'yi açınca gelen ilk ekrana birebir paralel:
    ortalanmış karşılama + TEK büyük prompt kutusu + biçim/araç kartları ızgarası
@@ -22,11 +19,8 @@ import { templatesByCategory, type StudioTemplate } from "@/lib/studioTemplates"
        gibi tek-seferlik üretimle ASLA karşılanamayacak özellikler taşıdığından
        tek tuval üzerinden değil kendi tam sayfalarında açılırlar (eskiden
        Sidebar → "Araçlar" açılır listesindeydi, artık buradan erişiliyor).
-   Şablon ızgarası (TemplateGallery) artık kategori sekmeli, HER ZAMAN GÖRÜNÜR
-   bir vitrin olarak burada duruyor (Tem 2026 kullanıcı kararı: eskiden
-   varsayılan kapalı bir "Hazır şablonlardan başla" açılır menüsüydü —
-   Claude Design'ın kendi ana ekranındaki gibi kategori sekmesi + doğrudan
-   ızgaraya geçildi, gizli bir adım kalmadı). */
+   Hazır şablon vitrini (kategori sekmeli galeri) kaldırıldı (Tem 2026
+   kullanıcı kararı) — biçim/araç kartları tek başlangıç noktası. */
 
 interface QuickCard {
   label: string;
@@ -75,18 +69,14 @@ function Card({ card, onClick }: { card: QuickCard; onClick: () => void }) {
 }
 
 export function StudioHomeScreen({
-  brief, setBrief, onSubmit, onPickTemplate, busy,
+  brief, setBrief, onSubmit, busy,
 }: {
   brief: string;
   setBrief: (s: string) => void;
   onSubmit: (text: string) => void;
-  onPickTemplate: (t: StudioTemplate) => void;
   busy: boolean;
 }) {
-  const templateGroups = templatesByCategory();
-  const [activeCategory, setActiveCategory] = useState(() => templateGroups[0]?.category ?? "");
   const nav = useSurfaceNav();
-  const activeTemplates = templateGroups.find((g) => g.category === activeCategory)?.items ?? [];
 
   const submit = () => {
     const t = brief.trim();
@@ -136,27 +126,6 @@ export function StudioHomeScreen({
           <div className="w-full grid grid-cols-2 sm:grid-cols-3 gap-2.5">
             {PREFILL_CARDS.map((c) => <Card key={c.label} card={c} onClick={() => setBrief(c.brief)} />)}
             {TOOL_CARDS.map((c) => <Card key={c.label} card={c} onClick={() => nav.go(c.surface)} />)}
-          </div>
-
-          {/* Şablon vitrini — her zaman görünür, kategori sekmeli (Claude
-              Design'ın kendi ana ekranındaki gibi). */}
-          <div className="w-full flex flex-col gap-3">
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-              {templateGroups.map((g) => (
-                <button
-                  key={g.category}
-                  onClick={() => setActiveCategory(g.category)}
-                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                    activeCategory === g.category
-                      ? "bg-ink text-bg"
-                      : "text-muted hover:text-ink hover:bg-bgsoft/60"
-                  }`}
-                >
-                  {g.category}
-                </button>
-              ))}
-            </div>
-            <TemplateGallery templates={activeTemplates} onPick={onPickTemplate} />
           </div>
         </div>
       </div>
