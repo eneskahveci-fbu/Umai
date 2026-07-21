@@ -4,19 +4,20 @@
    TASARIM STÜDYOSU — Claude Design'ın ETKİLEŞİM desenine paralel: sol
    sohbet, sağ TEK canlı tasarım tuvali. "OpenDesignStudio" (çoklu sayfa/
    format/deck/katman editörü) sadeleştirilerek buna dönüştürüldü — tek
-   tasarım alanı, hazır şablonlar (studioTemplates.ts). Marka seçici YOK:
-   ÜRETİM her zaman sabit "claude" tasarım sistemini kullanır
-   (designSystems.ts) — çıktı kalitesi kanıtlanmış bir sistemden gelsin diye
-   (Temmuz 2026 kararı: bu, ÇIKTI için sabit tutuldu). Arayüzün KENDİSİ artık
-   `.theme-claude` TAŞIMIYOR (Tem 2026 kullanıcı kararı) — kroma Umai'nin
-   kendi teması uygulanır, yalnız üretilen artifact'in KENDİ gömülü CSS'i
-   (iframe içinde, ayrı) Claude'un paletini kullanmaya devam eder. Tuval,
-   sohbetin ArtifactPanel'iyle AYNI ArtifactCanvas bileşenini paylaşır
-   (önizleme/kod, sürüm gezinme, kopyala/indir/yayınla — tek kaynak).
+   tasarım alanı, hazır şablonlar (studioTemplates.ts). Composer, Claude
+   Design'ın kendi prompt kutusundaki seçeneklerle eşleşir: ataç (referans
+   görsel), tasarım sistemi seçici, çoklu model seçici (bkz.
+   studio/ComposerExtras.tsx) — kullanıcı kararı (Tem 2026): marka seçici
+   geri getirildi, varsayılan Umai'nin kendi sistemi ("craft"). Arayüzün
+   KENDİSİ `.theme-claude` TAŞIMAZ — kroma Umai'nin kendi teması uygulanır,
+   yalnız üretilen artifact'in KENDİ gömülü CSS'i (iframe içinde, ayrı)
+   seçili tasarım sisteminin paletini kullanır. Tuval, sohbetin
+   ArtifactPanel'iyle AYNI ArtifactCanvas bileşenini paylaşır (önizleme/kod,
+   sürüm gezinme, kopyala/indir/yayınla — tek kaynak).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUp, FileCode2, FileText, FolderOpen, Loader2, Save, Sparkles, Square, X } from "lucide-react";
+import { ArrowUp, FileCode2, FileText, FolderOpen, Loader2, Paperclip, Save, Sparkles, Square, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
@@ -27,6 +28,8 @@ import { type StudioTemplate } from "@/lib/studioTemplates";
 import { generateDeck, generateDeckFusion } from "@/lib/slidesGen";
 import { deckToHtml, SLIDE_THEMES } from "@/lib/slides";
 import { StudioHomeScreen, EmptyChatHint } from "./studio/StudioHomeScreen";
+import { DesignSystemPicker, ModelPicker, ImagePreviewStrip } from "./studio/ComposerExtras";
+import { VoiceButton } from "./VoiceButton";
 import { ArtifactCanvas } from "./ArtifactCanvas";
 import { StudioTopBar } from "./studio/StudioTopBar";
 import { SavedItemsModal } from "./studio/SavedItemsModal";
@@ -71,6 +74,8 @@ function newDesignProject(): StudioProject {
 
 function ChatPanel({
   messages, busy, phase, onFollowup, onStop, prefill,
+  designSystemId, onDesignSystemChange, fusionEnabled, onFusionChange,
+  pendingImages, onAddImages, onRemoveImage,
 }: {
   messages: DesignMsg[];
   busy: boolean;
@@ -80,8 +85,16 @@ function ChatPanel({
   /** İşaretle & Değiştir'den gelen seçim — nonce her seçimde değişir, metin
       composer'a EKLENIR (yazılmakta olan taslak ezilmez). */
   prefill?: { text: string; nonce: number } | null;
+  designSystemId: string;
+  onDesignSystemChange: (id: string) => void;
+  fusionEnabled: boolean;
+  onFusionChange: (v: boolean) => void;
+  pendingImages: string[];
+  onAddImages: (files: FileList) => void;
+  onRemoveImage: (i: number) => void;
 }) {
   const [input, setInput] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
 
   /* Önceki-değer deseni (render-anı türetme, effect yok): yeni bir seçim
      gelince composer'a ekle. */
@@ -134,9 +147,12 @@ function ChatPanel({
       </div>
 
       {/* Yüzen composer — ana sohbetin (CoderView) "Claude design" composer'ıyla
-          BİREBİR aynı görsel dil: composer-glow, camsı zemin, rounded-[20px]. */}
+          BİREBİR aynı görsel dil: composer-glow, camsı zemin, rounded-[20px].
+          Alt kontrol satırı Claude Design'ın prompt kutusundaki seçeneklerle
+          eşleşir: ataç, tasarım sistemi, model (çoklu). */}
       <div className="shrink-0 p-2.5">
-        <div className="composer-glow flex items-end gap-2 bg-surface/85 backdrop-blur-xl border border-line rounded-[20px] pl-4 pr-2 py-2.5">
+        <ImagePreviewStrip images={pendingImages} onRemove={onRemoveImage} />
+        <div className="composer-glow flex flex-col gap-1.5 bg-surface/85 backdrop-blur-xl border border-line rounded-[20px] px-3 pt-3 pb-2">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -145,28 +161,55 @@ function ChatPanel({
             }}
             rows={1}
             placeholder="Değişiklik iste — 'başlığı büyüt', 'mavi yap', 'yeni bölüm ekle'…"
-            className="flex-1 bg-transparent resize-none outline-none text-[15px] leading-relaxed py-1 max-h-28 placeholder:text-muted/45"
+            className="w-full bg-transparent resize-none outline-none text-[15px] leading-relaxed py-1 max-h-28 placeholder:text-muted/45"
           />
-          {busy ? (
-            <button
-              onClick={onStop}
-              className="shrink-0 w-9 h-9 rounded-xl bg-red hover:bg-red/80 active:bg-red/70 text-white grid place-items-center transition-all hover:scale-105 active:scale-95"
-              title="Durdur"
-              aria-label="Durdur"
-            >
-              <Square size={13} />
-            </button>
-          ) : (
-            <button
-              onClick={submit}
-              disabled={!input.trim()}
-              className="shrink-0 w-9 h-9 rounded-xl bg-brand hover:bg-branddim active:bg-branddim text-[#111110] grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95"
-              title="Gönder"
-              aria-label="Gönder"
-            >
-              <ArrowUp size={17} />
-            </button>
-          )}
+          <div className="flex items-center justify-between gap-1.5">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => { if (e.target.files?.length) onAddImages(e.target.files); e.target.value = ""; }}
+              />
+              <button
+                onClick={() => fileRef.current?.click()}
+                title="Referans görsel ekle"
+                aria-label="Referans görsel ekle"
+                className="shrink-0 w-9 h-9 rounded-xl grid place-items-center text-muted hover:text-ink hover:bg-bgsoft transition-colors"
+              >
+                <Paperclip size={15} />
+              </button>
+              <DesignSystemPicker value={designSystemId} onChange={onDesignSystemChange} />
+              <ModelPicker fusionEnabled={fusionEnabled} onFusionChange={onFusionChange} />
+              <VoiceButton
+                onTranscript={(text, isFinal) => {
+                  if (isFinal) setInput((cur) => (cur ? `${cur} ` : "") + text);
+                }}
+              />
+            </div>
+            {busy ? (
+              <button
+                onClick={onStop}
+                className="shrink-0 w-9 h-9 rounded-xl bg-red hover:bg-red/80 active:bg-red/70 text-white grid place-items-center transition-all hover:scale-105 active:scale-95"
+                title="Durdur"
+                aria-label="Durdur"
+              >
+                <Square size={13} />
+              </button>
+            ) : (
+              <button
+                onClick={submit}
+                disabled={!input.trim()}
+                className="shrink-0 w-9 h-9 rounded-xl bg-brand hover:bg-branddim active:bg-branddim text-[#111110] grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95"
+                title="Gönder"
+                aria-label="Gönder"
+              >
+                <ArrowUp size={17} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -210,6 +253,12 @@ export function DesignStudio() {
   const [versionIndex, setVersionIndex] = useState(0);
   const [savedOpen, setSavedOpen] = useState(false);
   const [fusionEnabled, setFusionEnabled] = useState(false);
+  /* Composer'daki tasarım sistemi seçici — Umai'nin kendi kimliği varsayılan,
+     kullanıcı diğer sistemler arasından seçebilir (bkz. ComposerExtras.tsx). */
+  const [designSystemId, setDesignSystemId] = useState("craft");
+  /* Composer'daki ataç ile eklenen referans görsel(ler) — henüz gönderilmemiş,
+     bir sonraki üretimde tüketilip temizlenir. */
+  const [pendingImages, setPendingImages] = useState<string[]>([]);
   /* Anasayfanın (StudioHomeScreen) kendi brief taslağı — sohbet başlayınca
      bir daha görünmez, ChatPanel kendi composer'ına geçer. */
   const [homeBrief, setHomeBrief] = useState("");
@@ -250,10 +299,14 @@ export function DesignStudio() {
        Python script isteğine "hero+CTA" talimatı enjekte etmek anlamsızdı. */
     const skillId = template?.skillId ?? (followup ? project.skillId : autoStudioSkill(brief));
     const directionId = template?.directionId ?? project.directionId;
-    /* Marka seçici kaldırıldı — Stüdyo artık her zaman sabit "Claude" tasarım
-       sistemini kullanır (çıktılar da arayüz gibi Claude Design'a paralel). */
-    const designSystemId = "claude";
+    /* Marka seçici composer'a geri getirildi (kullanıcı kararı) — üretim,
+       composer'da seçili tasarım sistemini kullanır (bkz. designSystemId
+       state'i, varsayılan Umai'nin kendi sistemi "craft"). */
     const system = designSystemById(designSystemId);
+    /* Bu turun referans görsel(ler)i — gönderilir gönderilmez composer'daki
+       önizleme şeridi temizlenir (bir sonraki mesajı kirletmesin). */
+    const imagesForThisRun = pendingImages;
+    setPendingImages([]);
 
     try {
       let result: { artifact: Artifact; text: string };
@@ -355,6 +408,7 @@ export function DesignStudio() {
           designSystemPrompt: system ? designSystemPromptText(system) : undefined,
           /* Takip mesajlarında mevcut tasarımı TEMEL al — ilk üretimde yok. */
           prevHtml: followup ? project.html : undefined,
+          images: imagesForThisRun.length ? imagesForThisRun : undefined,
           boostInstruction,
           onDelta: (txt) => setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: txt || "Tasarım üretiliyor…" }; return c; }),
           onPhase: setPhase,
@@ -400,9 +454,27 @@ export function DesignStudio() {
       setPhase(null);
       abortRef.current = null;
     }
-  }, [busy, project, fusionEnabled, addToast]);
+  }, [busy, project, fusionEnabled, addToast, designSystemId, pendingImages]);
 
   const stop = useCallback(() => { abortRef.current?.abort(); }, []);
+
+  /* ── Composer eki: referans görsel(ler) ───────────────────────────
+     CoderView'daki readFileIntoInput'un (görsel kısmının) sadeleştirilmiş
+     karşılığı — Stüdyo'da yalnız görsel referans anlamlı (kod/metin dosyası
+     değil), bu yüzden ayrı MoreMenu yerine tek bir ataç düğmesi yeterli. */
+  const addImageFiles = useCallback((files: FileList) => {
+    for (const f of Array.from(files)) {
+      if (!f.type.startsWith("image/")) continue;
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") setPendingImages((p) => [...p, reader.result as string]);
+      };
+      reader.readAsDataURL(f);
+    }
+  }, []);
+  const removeImage = useCallback((i: number) => {
+    setPendingImages((p) => p.filter((_, j) => j !== i));
+  }, []);
 
   /* ── Kaydet / Projelerim ───────────────────────────────────────── */
 
@@ -522,28 +594,17 @@ export function DesignStudio() {
       )}
       <button onClick={saveProject} title="Kaydet" aria-label="Kaydet" className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
       <button onClick={() => setSavedOpen(true)} title="Projelerim" aria-label="Projelerim" className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
-      <button
-        onClick={() => setFusionEnabled((f) => !f)}
-        title="Fusion: 3 model + hakem ile üretim"
-        aria-label="Fusion: 3 model + hakem ile üretim"
-        className={`w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg transition-colors ${fusionEnabled ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
-      ><Sparkles size={15} /></button>
     </>
   );
 
   /* Anasayfada henüz kaydedilecek bir tasarım yok — yalnız Projelerim (eski
-     bir işe dönmek için) ve Fusion (bir sonraki üretimi etkiler) anlamlı. */
+     bir işe dönmek için) anlamlı. Fusion/model seçimi artık composer'daki
+     ModelPicker'da (bkz. ComposerExtras.tsx) — burada ayrı bir düğmeye gerek yok. */
   const homeActionButtons = (
     <>
       {savedProjects.length > 0 && (
         <button onClick={() => setSavedOpen(true)} title="Projelerim" aria-label="Projelerim" className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
       )}
-      <button
-        onClick={() => setFusionEnabled((f) => !f)}
-        title="Fusion: 3 model + hakem ile üretim"
-        aria-label="Fusion: 3 model + hakem ile üretim"
-        className={`w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg transition-colors ${fusionEnabled ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"}`}
-      ><Sparkles size={15} /></button>
     </>
   );
 
@@ -565,6 +626,13 @@ export function DesignStudio() {
           setBrief={setHomeBrief}
           busy={busy}
           onSubmit={(t) => { setHomeBrief(""); runGenerate(t, false); }}
+          designSystemId={designSystemId}
+          onDesignSystemChange={setDesignSystemId}
+          fusionEnabled={fusionEnabled}
+          onFusionChange={setFusionEnabled}
+          pendingImages={pendingImages}
+          onAddImages={addImageFiles}
+          onRemoveImage={removeImage}
         />
       ) : (
         <div className="flex-1 min-h-0 flex">
@@ -583,6 +651,13 @@ export function DesignStudio() {
               onFollowup={(t) => runGenerate(t, true)}
               onStop={stop}
               prefill={annotatePrefill}
+              designSystemId={designSystemId}
+              onDesignSystemChange={setDesignSystemId}
+              fusionEnabled={fusionEnabled}
+              onFusionChange={setFusionEnabled}
+              pendingImages={pendingImages}
+              onAddImages={addImageFiles}
+              onRemoveImage={removeImage}
             />
           </div>
 

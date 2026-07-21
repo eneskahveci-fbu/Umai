@@ -23,6 +23,10 @@ export interface GenerateOptions {
   prevHtml?: string;
   /** Yorum-modu: önizlemede seçilen öğeye dair hedefli düzenleme notu. */
   comment?: string;
+  /** Referans görsel(ler) — composer'daki ataç düğmesinden eklenir (data URI).
+      Vision-uyumlu modelde brief'in yanında gönderilir (ör. "bu görseldeki
+      gibi bir tasarım yap"). */
+  images?: string[];
   /** Hareketli/animasyonlu çıktı (CSS animasyonları). */
   animate?: boolean;
   /** Fusion: `boost.ts`'in `buildBoostInstruction()`'ından gelen gizli-taslak
@@ -114,12 +118,17 @@ export async function generateArtifact(opts: GenerateOptions): Promise<GenerateR
   const sys = buildStudioSystem(opts);
 
   opts.onPhase?.("generating");
+  /* Referans görsel(ler) varsa mesajı çok-parçalı (vision) içerik olarak kur —
+     ana sohbetteki (CoderView) `m.images` → image_url dönüşümüyle AYNI şekil. */
+  const userContent: unknown = opts.images?.length
+    ? [...opts.images.map((img) => ({ type: "image_url", image_url: { url: img } })), { type: "text", text: opts.brief }]
+    : opts.brief;
   const res = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal: opts.signal,
     body: JSON.stringify({
-      messages: [{ role: "user", content: opts.brief }],
+      messages: [{ role: "user", content: userContent }],
       baseUrl: resolved.baseUrl, model: resolved.model, apiKey: resolved.apiKey, provider: resolved.provider,
       systemPrompt: sys,
       fallbacks: buildFallbackChain(cfg.models, cfg.activeModelId),
