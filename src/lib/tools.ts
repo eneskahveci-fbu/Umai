@@ -37,6 +37,50 @@ export const GENERATE_IMAGE_TOOL: ToolDefinition = {
   },
 };
 
+/* Ayrı export: repo bağlı olmayan düz sohbette de (Faz 6 — yalnız bu araç
+   için) tek başına sunulabilsin diye CODER_TOOLS listesinden bağımsız
+   referans edilebilir tutulur — bkz. api/chat/route.ts. Repo/dosya erişimi
+   GEREKTİRMEZ (yalnızca yapılandırılmış bir soru olayı yayınlar), bu yüzden
+   generate_image ile aynı "dar kapsam" mantığına uyar. */
+export const ASK_USER_TOOL: ToolDefinition = {
+  type: "function",
+  function: {
+    name: "ask_user",
+    description:
+      "Kullanıcıya tıklanabilir seçenekli yapılandırılmış soru(lar) sor. KOD YAZMADAN ÖNCE belirsizlikleri netleştirmek; yaklaşım, kütüphane, kapsam, tasarım veya YAYIN ortamı gibi sana bırakılan önemli kararları sormak için kullan. Kullanıcı bir veya birden çok seçeneği tıklar ya da 'Diğer' alanına serbest metin yazar. Cevabı aldıktan SONRA elde edilen bilgiyle görevi tamamla. Tahmin etmek yerine SOR — ama yalnızca gerçekten gerektiğinde (1-2 net karar). Kullanıcının cevabı hâlâ yeterli netliği sağlamadıysa (ör. seçtiği seçenek yeni bir alt-karar açtıysa) ask_user'ı TEKRAR çağırarak birkaç tur boyunca netleştirmeyi sürdürebilirsin — tek seferlik bir soru sınırı yok, Claude Code'un plan-onay döngüsü gibi düşün.",
+    parameters: {
+      type: "object",
+      properties: {
+        questions: {
+          type: "array",
+          description: "1–4 adet soru. Her soru: kısa başlık (header), tam soru metni (question), 2–4 seçenek (options).",
+          items: {
+            type: "object",
+            properties: {
+              header: { type: "string", description: "Kısa başlık (≤12 karakter). Örn: 'Kütüphane', 'Yaklaşım', 'Yayın'" },
+              question: { type: "string", description: "Tam soru metni. Soru işaretiyle bit." },
+              options: {
+                type: "array",
+                description: "2–4 seçenek. Her biri: label (kısa etiket) + description (ne zaman tercih edilir).",
+                items: {
+                  type: "object",
+                  properties: {
+                    label: { type: "string", description: "Seçenek etiketi (1–5 kelime)" },
+                    description: { type: "string", description: "Seçeneği açıklayan kısa not / takas" },
+                  },
+                  required: ["label"],
+                },
+              },
+            },
+            required: ["header", "question", "options"],
+          },
+        },
+      },
+      required: ["questions"],
+    },
+  },
+};
+
 export const CODER_TOOLS: ToolDefinition[] = [
   {
     type: "function",
@@ -320,44 +364,7 @@ export const CODER_TOOLS: ToolDefinition[] = [
       },
     },
   },
-  {
-    type: "function",
-    function: {
-      name: "ask_user",
-      description:
-        "Kullanıcıya tıklanabilir seçenekli yapılandırılmış soru(lar) sor. KOD YAZMADAN ÖNCE belirsizlikleri netleştirmek; yaklaşım, kütüphane, kapsam, tasarım veya YAYIN ortamı gibi sana bırakılan önemli kararları sormak için kullan. Kullanıcı bir veya birden çok seçeneği tıklar ya da 'Diğer' alanına serbest metin yazar. Cevabı aldıktan SONRA elde edilen bilgiyle görevi tamamla. Tahmin etmek yerine SOR — ama yalnızca gerçekten gerektiğinde (1-2 net karar). Kullanıcının cevabı hâlâ yeterli netliği sağlamadıysa (ör. seçtiği seçenek yeni bir alt-karar açtıysa) ask_user'ı TEKRAR çağırarak birkaç tur boyunca netleştirmeyi sürdürebilirsin — tek seferlik bir soru sınırı yok, Claude Code'un plan-onay döngüsü gibi düşün.",
-      parameters: {
-        type: "object",
-        properties: {
-          questions: {
-            type: "array",
-            description: "1–4 adet soru. Her soru: kısa başlık (header), tam soru metni (question), 2–4 seçenek (options).",
-            items: {
-              type: "object",
-              properties: {
-                header: { type: "string", description: "Kısa başlık (≤12 karakter). Örn: 'Kütüphane', 'Yaklaşım', 'Yayın'" },
-                question: { type: "string", description: "Tam soru metni. Soru işaretiyle bit." },
-                options: {
-                  type: "array",
-                  description: "2–4 seçenek. Her biri: label (kısa etiket) + description (ne zaman tercih edilir).",
-                  items: {
-                    type: "object",
-                    properties: {
-                      label: { type: "string", description: "Seçenek etiketi (1–5 kelime)" },
-                      description: { type: "string", description: "Seçeneği açıklayan kısa not / takas" },
-                    },
-                    required: ["label"],
-                  },
-                },
-              },
-              required: ["header", "question", "options"],
-            },
-          },
-        },
-        required: ["questions"],
-      },
-    },
-  },
+  ASK_USER_TOOL,
 ];
 
 export interface ToolCall {
