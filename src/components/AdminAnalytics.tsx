@@ -1,8 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BarChart3, Loader2, Users } from "lucide-react";
+import { BarChart3, Loader2, RefreshCw, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+
+interface RetentionDay {
+  day: string;
+  activeUsers: number;
+  returnedNextDay: number | null;
+  returnRatePct: number | null;
+}
 
 interface AdminAnalyticsData {
   windowDays: number;
@@ -10,6 +17,8 @@ interface AdminAnalyticsData {
   activeUsers: number;
   byEvent: Record<string, number>;
   bySurface: Record<string, number>;
+  retention: RetentionDay[];
+  avgReturnRatePct: number | null;
 }
 
 /* Admin-only TOPLU ürün analitiği — AnalyticsSettings.tsx'in KİŞİSEL
@@ -66,7 +75,7 @@ export function AdminAnalytics() {
 
       {state.status === "ok" && (
         <>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <div className="premium-card rounded-xl p-3 text-center">
               <BarChart3 size={15} className="text-brand/70 mx-auto mb-1" />
               <div className="text-lg font-bold leading-none">{state.data.totalEvents.toLocaleString("tr-TR")}</div>
@@ -77,7 +86,34 @@ export function AdminAnalytics() {
               <div className="text-lg font-bold leading-none">{state.data.activeUsers.toLocaleString("tr-TR")}</div>
               <div className="text-[10px] text-muted/55 mt-1">Aktif kullanıcı</div>
             </div>
+            <div className="premium-card rounded-xl p-3 text-center">
+              <RefreshCw size={15} className="text-brand/70 mx-auto mb-1" />
+              <div className="text-lg font-bold leading-none">
+                {state.data.avgReturnRatePct === null ? "—" : `%${state.data.avgReturnRatePct}`}
+              </div>
+              <div className="text-[10px] text-muted/55 mt-1">Ort. ertesi gün dönüş</div>
+            </div>
           </div>
+
+          {/* prompt.md Hamle 5: "kaç kullanıcı YARIN da geri geldi" — gün
+              bazlı dönüş oranı, yeni özellik yerine bu soruya bakmayı
+              alışkanlık hâline getirmek için. */}
+          {state.data.retention.length > 0 && (
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-muted/45 mb-1.5">Gün-üstü-gün dönüş (D+1)</div>
+              <div className="space-y-1">
+                {state.data.retention.map((d) => (
+                  <div key={d.day} className="flex items-center gap-2 text-xs">
+                    <span className="flex-1 truncate text-muted/80 font-mono">{d.day}</span>
+                    <span className="text-muted/60 text-[11px]">{d.activeUsers} aktif</span>
+                    <span className="font-mono text-[11px] w-14 text-right shrink-0 text-muted/70">
+                      {d.returnRatePct === null ? "—" : `%${d.returnRatePct}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {Object.keys(state.data.bySurface).length > 0 && (
             <div>
