@@ -1806,6 +1806,11 @@ export function CoderView() {
        Pilot gerek gördüyse (devam turlarında değil). */
     const useResearch = (overrideAgent?.id === "research" || !!pilot?.research) && !opts?.continuation;
     const wantWeb = !!pilot?.web;
+    /* Faz 6 (kullanıcı kararı): yalnız generate_image — repo bağlı olmasa/
+       Tools kapalı olsa bile doğal dilden görsel isteği algılanırsa bu TEK
+       araç sunucudaki tool-loop'a eklenir (bkz. api/chat/route.ts'in
+       body.imageGen dalı). deep_research/dispatch_agents hâlâ repo ister. */
+    const wantImageGen = !!pilot?.image;
     /* Ajan Ekibi / Araştırma turunda otomatik EN GÜÇLÜ modeli kullan (ayar açıksa)
        → en yetenekli modelle çalışır. Hata olursa (kredi/anahtar yok) aşağıdaki
        catch bloğu sessizce AKTİF modele döner ve tekrar dener. */
@@ -2156,6 +2161,7 @@ export function CoderView() {
           })),
           tools: toolsEnabled,
           webSearch: wantWeb,
+          imageGen: wantImageGen,
           requireWriteApproval: store.config.requireWriteApproval,
           safeMode: store.config.safeMode,
           toolPermissions: store.config.toolPermissions,
@@ -2198,10 +2204,10 @@ export function CoderView() {
          sunucu IP'si paylaşıldığında oluşan rate-limit sorunu önlenir). CORS açık. */
       let res: Response;
       /* Pollinations'ı yalnızca DÜZ sohbette doğrudan tarayıcıdan çağır (hızlı +
-         kullanıcının kendi IP'si). Araç-kullanımı/web-arama TOOL-LOOP gerektirir
-         → bunlar sunucu-proxy'ye gider (yoksa araçlar sessizce çalışmaz, model
-         repodan habersiz kalır). */
-      if (active.provider === "pollinations" && !toolsEnabled && !wantWeb) {
+         kullanıcının kendi IP'si). Araç-kullanımı/web-arama/görsel-üretimi
+         TOOL-LOOP gerektirir → bunlar sunucu-proxy'ye gider (yoksa araçlar
+         sessizce çalışmaz, model repodan/araçlardan habersiz kalır). */
+      if (active.provider === "pollinations" && !toolsEnabled && !wantWeb && !wantImageGen) {
         /* Bağlam blokları sunucu (/api/chat) ile ORTAK tek kaynaktan gelir →
            Pollinations kullanıcıları da aynı, eksiksiz bağlamı alır. PLATFORM_KNOWLEDGE
            eklenir ki bu sağlayıcıdaki model de platformun farkında olsun. */

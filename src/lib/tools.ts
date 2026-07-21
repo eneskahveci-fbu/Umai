@@ -18,6 +18,25 @@ export interface ToolDefinition {
   };
 }
 
+/* Ayrı export: repo bağlı olmayan düz sohbette de (Faz 6 — yalnız bu araç
+   için, kullanıcı kararıyla) tek başına sunulabilsin diye CODER_TOOLS
+   listesinden bağımsız referans edilebilir tutulur — bkz. api/chat/route.ts. */
+export const GENERATE_IMAGE_TOOL: ToolDefinition = {
+  type: "function",
+  function: {
+    name: "generate_image",
+    description: "Kullanıcı bir görsel/resim/illüstrasyon istediğinde ÇAĞIR — 'bir X görseli yap', 'bana Y resmi çiz' gibi doğal dil isteklerinde, herhangi bir komut/buton gerekmeden. Sonuç bir görsel URL'i döner; yanıtına '![açıklama](url)' markdown biçiminde ekle, URL'i düz metin olarak yazma.",
+    parameters: {
+      type: "object",
+      properties: {
+        prompt: { type: "string", description: "Görselin İngilizce, betimleyici üretim istemi (ör. 'a red fox in a snowy forest, digital art')" },
+        aspect_ratio: { type: "string", description: "Görsel oranı", enum: ["square", "landscape", "portrait"] },
+      },
+      required: ["prompt"],
+    },
+  },
+};
+
 export const CODER_TOOLS: ToolDefinition[] = [
   {
     type: "function",
@@ -199,21 +218,7 @@ export const CODER_TOOLS: ToolDefinition[] = [
       },
     },
   },
-  {
-    type: "function",
-    function: {
-      name: "generate_image",
-      description: "Kullanıcı bir görsel/resim/illüstrasyon istediğinde ÇAĞIR — 'bir X görseli yap', 'bana Y resmi çiz' gibi doğal dil isteklerinde, herhangi bir komut/buton gerekmeden. Sonuç bir görsel URL'i döner; yanıtına '![açıklama](url)' markdown biçiminde ekle, URL'i düz metin olarak yazma.",
-      parameters: {
-        type: "object",
-        properties: {
-          prompt: { type: "string", description: "Görselin İngilizce, betimleyici üretim istemi (ör. 'a red fox in a snowy forest, digital art')" },
-          aspect_ratio: { type: "string", description: "Görsel oranı", enum: ["square", "landscape", "portrait"] },
-        },
-        required: ["prompt"],
-      },
-    },
-  },
+  GENERATE_IMAGE_TOOL,
   {
     type: "function",
     function: {
