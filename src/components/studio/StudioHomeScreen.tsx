@@ -7,7 +7,8 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useSurfaceNav, type Surface } from "@/lib/surfaceNav";
-import { DesignSystemPicker, ModelPicker, ImagePreviewStrip } from "./ComposerExtras";
+import { DesignSystemPicker, ModelPicker, TemplatePicker, ImagePreviewStrip } from "./ComposerExtras";
+import type { StudioTemplate } from "@/lib/studioTemplates";
 import { VoiceButton } from "../VoiceButton";
 
 /* Stüdyo anasayfası — claude.ai'yi açınca gelen ilk ekrana birebir paralel:
@@ -72,7 +73,7 @@ function Card({ card, onClick }: { card: QuickCard; onClick: () => void }) {
 }
 
 export function StudioHomeScreen({
-  brief, setBrief, onSubmit, busy,
+  brief, setBrief, onSubmit, busy, onPickTemplate,
   designSystemId, onDesignSystemChange, fusionEnabled, onFusionChange,
   pendingImages, onAddImages, onRemoveImage,
 }: {
@@ -80,6 +81,7 @@ export function StudioHomeScreen({
   setBrief: (s: string) => void;
   onSubmit: (text: string) => void;
   busy: boolean;
+  onPickTemplate: (t: StudioTemplate) => void;
   designSystemId: string;
   onDesignSystemChange: (id: string) => void;
   fusionEnabled: boolean;
@@ -127,7 +129,10 @@ export function StudioHomeScreen({
                 className="w-full bg-transparent resize-none outline-none px-5 pt-4 text-[15px] leading-relaxed placeholder:text-muted/45 min-h-[76px]"
               />
               <div className="flex items-center justify-between gap-1.5 px-3 pb-3 pt-1">
-                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                {/* flex-wrap: dar mobil ekranda kontroller ikinci satıra düşer,
+                    yatay kaydırma yerine (bkz. ComposerExtras.tsx'teki align
+                    hesabı — popover'lar da ekran dışına taşmaz). */}
+                <div className="flex-1 min-w-0 flex flex-wrap items-center gap-1.5">
                   <input
                     ref={fileRef}
                     type="file"
@@ -146,6 +151,7 @@ export function StudioHomeScreen({
                   </button>
                   <DesignSystemPicker value={designSystemId} onChange={onDesignSystemChange} />
                   <ModelPicker fusionEnabled={fusionEnabled} onFusionChange={onFusionChange} />
+                  <TemplatePicker onPick={onPickTemplate} />
                   <VoiceButton
                     onTranscript={(text, isFinal) => {
                       if (isFinal) setBrief((brief ? `${brief} ` : "") + text);

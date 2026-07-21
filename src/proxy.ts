@@ -83,10 +83,12 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user && path.startsWith("/app")) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
+  /* Önce dene, sonra kaydol (prompt.md Hamle 2): /app'i misafirden ZORLA
+     /login'e atan bu kural, app/page.tsx'teki client-side gate kaldırılırken
+     unutulmuştu — sunucu tarafı middleware client koddan ÖNCE çalıştığından
+     tek başına aynı engeli yeniden kuruyordu (bkz. canlıda doğrulanan 307
+     yönlendirmesi). Giriş artık tamamen isteğe bağlı; zorlayan tek nokta
+     buradan da kaldırıldı. */
   if (user && path === "/login") {
     return NextResponse.redirect(new URL("/app", request.url));
   }

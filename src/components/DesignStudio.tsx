@@ -28,7 +28,7 @@ import { type StudioTemplate } from "@/lib/studioTemplates";
 import { generateDeck, generateDeckFusion } from "@/lib/slidesGen";
 import { deckToHtml, SLIDE_THEMES } from "@/lib/slides";
 import { StudioHomeScreen, EmptyChatHint } from "./studio/StudioHomeScreen";
-import { DesignSystemPicker, ModelPicker, ImagePreviewStrip } from "./studio/ComposerExtras";
+import { DesignSystemPicker, ModelPicker, TemplatePicker, ImagePreviewStrip } from "./studio/ComposerExtras";
 import { VoiceButton } from "./VoiceButton";
 import { ArtifactCanvas } from "./ArtifactCanvas";
 import { StudioTopBar } from "./studio/StudioTopBar";
@@ -75,7 +75,7 @@ function newDesignProject(): StudioProject {
 function ChatPanel({
   messages, busy, phase, onFollowup, onStop, prefill,
   designSystemId, onDesignSystemChange, fusionEnabled, onFusionChange,
-  pendingImages, onAddImages, onRemoveImage,
+  pendingImages, onAddImages, onRemoveImage, onPickTemplate,
 }: {
   messages: DesignMsg[];
   busy: boolean;
@@ -92,6 +92,7 @@ function ChatPanel({
   pendingImages: string[];
   onAddImages: (files: FileList) => void;
   onRemoveImage: (i: number) => void;
+  onPickTemplate: (t: StudioTemplate) => void;
 }) {
   const [input, setInput] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -164,7 +165,10 @@ function ChatPanel({
             className="w-full bg-transparent resize-none outline-none text-[15px] leading-relaxed py-1 max-h-28 placeholder:text-muted/45"
           />
           <div className="flex items-center justify-between gap-1.5">
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            {/* flex-wrap: dar mobil ekranda kontroller ikinci satıra düşer,
+                yatay kaydırma yerine — hem popover'lar hem düğmeler her zaman
+                tam görünür kalır (bkz. ComposerExtras.tsx'teki align hesabı). */}
+            <div className="flex-1 min-w-0 flex flex-wrap items-center gap-1.5">
               <input
                 ref={fileRef}
                 type="file"
@@ -183,6 +187,7 @@ function ChatPanel({
               </button>
               <DesignSystemPicker value={designSystemId} onChange={onDesignSystemChange} />
               <ModelPicker fusionEnabled={fusionEnabled} onFusionChange={onFusionChange} />
+              <TemplatePicker onPick={onPickTemplate} />
               <VoiceButton
                 onTranscript={(text, isFinal) => {
                   if (isFinal) setInput((cur) => (cur ? `${cur} ` : "") + text);
@@ -626,6 +631,7 @@ export function DesignStudio() {
           setBrief={setHomeBrief}
           busy={busy}
           onSubmit={(t) => { setHomeBrief(""); runGenerate(t, false); }}
+          onPickTemplate={(t) => { setHomeBrief(""); runGenerate(t.brief, false, t); }}
           designSystemId={designSystemId}
           onDesignSystemChange={setDesignSystemId}
           fusionEnabled={fusionEnabled}
@@ -651,6 +657,7 @@ export function DesignStudio() {
               onFollowup={(t) => runGenerate(t, true)}
               onStop={stop}
               prefill={annotatePrefill}
+              onPickTemplate={(t) => runGenerate(t.brief, true, t)}
               designSystemId={designSystemId}
               onDesignSystemChange={setDesignSystemId}
               fusionEnabled={fusionEnabled}
