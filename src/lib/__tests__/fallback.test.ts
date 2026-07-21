@@ -67,16 +67,19 @@ describe("buildFallbackChain", () => {
     expect(chain.every((c) => c.apiKey === "")).toBe(true);
   });
 
-  it("OVH tabanı Pollinations'ın ÖNÜNE geçmez (yalnız yer kaldıysa en sona eklenir)", () => {
-    /* 2 kullanılabilir aday + Pollinations = 3 (maxFallbacks) → OVH kesilir;
-       mevcut davranış değişmedi, yalnız yedek derinleşti. */
+  it("anahtarsız son çareler (Pollinations + OVH) kullanıcı adaylarınca kesilmez — kendilerine yer ayrılır", () => {
+    /* 2+ kullanılabilir kullanıcı adayı olsa bile maxFallbacks=3'te SON 2 yuva
+       her zaman Pollinations+OVH'e ayrılır — yalnız EN YÜKSEK sıralı kullanıcı
+       adayı (gemini) kalan tek yuvaya girer. Amaç: kullanıcının yapılandırdığı
+       adaylar (kotası dolmuş/bozuk olabilir) güvenilir anahtarsız son çareyi
+       zincirden itmesin (bkz. prompt.md kuzey yıldızı). */
     const models = [
       m({ id: "active", provider: "deepseek" }),
       m({ id: "g", provider: "gemini" }),
       m({ id: "q", provider: "groq" }),
     ];
     const chain = buildFallbackChain(models, "active");
-    expect(chain.map((c) => c.provider)).toEqual(["gemini", "groq", "pollinations"]);
+    expect(chain.map((c) => c.provider)).toEqual(["gemini", "pollinations", "ovh"]);
   });
 
   it("yinelenen (aynı provider+url+model) adayları teklerleştirir", () => {

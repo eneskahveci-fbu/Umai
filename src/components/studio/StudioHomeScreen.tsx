@@ -97,15 +97,17 @@ export function StudioHomeScreen({
             </p>
           </div>
 
-          {/* Büyük prompt kutusu — Claude'un anasayfa besteci kutusuna paralel */}
-          <div className="w-full max-w-2xl rounded-[24px] border border-line bg-surface elev-2 focus-within:border-brand/50 transition-colors">
+          {/* Büyük prompt kutusu — ana sohbetin (CoderView) "Claude design"
+              composer'ıyla BİREBİR aynı görsel dil: composer-glow, camsı
+              zemin (bg-surface/85 backdrop-blur-xl), aynı gönder butonu. */}
+          <div className="composer-glow w-full max-w-2xl rounded-[24px] border border-line bg-surface/85 backdrop-blur-xl transition-colors">
             <textarea
               value={brief}
               onChange={(e) => setBrief(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
               rows={3}
               placeholder="Bir şey iste — örn. 'bir fitness uygulaması için onboarding ekranı' ya da 'JSON'ı CSV'ye çeviren bir Python fonksiyonu'…"
-              className="w-full bg-transparent resize-none outline-none px-5 pt-4 text-[15px] placeholder:text-muted/60 min-h-[76px]"
+              className="w-full bg-transparent resize-none outline-none px-5 pt-4 text-[15px] leading-relaxed placeholder:text-muted/45 min-h-[76px]"
             />
             <div className="flex items-center justify-end gap-1.5 px-3 pb-3 pt-1">
               <button
@@ -113,9 +115,9 @@ export function StudioHomeScreen({
                 disabled={busy || !brief.trim()}
                 aria-label="Gönder"
                 title="Gönder"
-                className="flex items-center justify-center w-9 h-9 rounded-full bg-brand text-bg disabled:opacity-30 hover:bg-branddim transition-colors"
+                className="shrink-0 w-9 h-9 rounded-xl bg-brand hover:bg-branddim active:bg-branddim text-[#111110] grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95"
               >
-                <ArrowUp size={16} />
+                <ArrowUp size={17} />
               </button>
             </div>
           </div>
