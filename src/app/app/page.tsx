@@ -49,8 +49,12 @@ export default function AppPage() {
   const everExtensionStore = useEverOpened(useStore((s) => s.extensionStoreOpen));
   const kbOpen = useKeyboardOpen();
   const router = useRouter();
-  /* Giriş zorunlu: Supabase yapılandırılmışsa oturumsuz kullanıcı uygulamayı
-     açamaz, login/kayıt ekranına gider. Supabase yoksa (yerel mod) serbest. */
+  /* Önce dene, sonra kaydol (prompt.md Hamle 2): Supabase yapılandırılmış
+     olsa bile oturumsuz kullanıcı /app'i misafir olarak açabilir — sohbet
+     eder, kod yazar (anahtarsız ücretsiz sağlayıcı zinciriyle). Kalıcı bulut
+     senkronu/Git bağlama gibi hesap gerektiren işler zaten kullanıcı id'sine
+     bakıyor (aşağıdaki efektler) ve misafirde sessizce atlanıyor; giriş daveti
+     AuthButton üzerinden istendiğinde yapılır, zorla değil. */
   const [authState, setAuthState] = useState<"checking" | "in" | "out">(
     supabaseConfigured ? "checking" : "in",
   );
@@ -228,16 +232,8 @@ export default function AppPage() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  /* Oturumsuz → login ekranına yönlendir (giriş zorunlu). */
-  useEffect(() => {
-    if (authState === "out") router.replace("/login");
-  }, [authState, router]);
-
   if (authState === "checking") {
     return <div className="h-screen grid place-items-center bg-bg text-muted/60 text-sm">Yükleniyor…</div>;
-  }
-  if (authState === "out") {
-    return <div className="h-screen grid place-items-center bg-bg text-muted/60 text-sm">Giriş ekranına yönlendiriliyor…</div>;
   }
 
   return (
