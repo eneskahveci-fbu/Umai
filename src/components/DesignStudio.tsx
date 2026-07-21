@@ -16,7 +16,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FileCode2, FileText, FolderOpen, Loader2, Save, Send, Sparkles, Square, X } from "lucide-react";
+import { ArrowUp, FileCode2, FileText, FolderOpen, Loader2, Save, Sparkles, Square, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useSurfaceNav, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
@@ -133,9 +133,10 @@ function ChatPanel({
         )}
       </div>
 
-      {/* Yüzen/gölgeli composer — CoderView'ın composer'ıyla aynı dil (elev-2). */}
+      {/* Yüzen composer — ana sohbetin (CoderView) "Claude design" composer'ıyla
+          BİREBİR aynı görsel dil: composer-glow, camsı zemin, rounded-[20px]. */}
       <div className="shrink-0 p-2.5">
-        <div className="flex items-end gap-1.5 rounded-2xl border border-line bg-surface elev-2 focus-within:border-brand/50 transition-colors px-3 py-2">
+        <div className="composer-glow flex items-end gap-2 bg-surface/85 backdrop-blur-xl border border-line rounded-[20px] pl-4 pr-2 py-2.5">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -144,21 +145,26 @@ function ChatPanel({
             }}
             rows={1}
             placeholder="Değişiklik iste — 'başlığı büyüt', 'mavi yap', 'yeni bölüm ekle'…"
-            className="flex-1 bg-transparent resize-none outline-none text-sm py-1 max-h-28"
+            className="flex-1 bg-transparent resize-none outline-none text-[15px] leading-relaxed py-1 max-h-28 placeholder:text-muted/45"
           />
           {busy ? (
-            <button onClick={onStop} className="shrink-0 w-8 h-8 grid place-items-center rounded-full text-muted hover:text-red hover:bg-bgsoft transition-colors" title="Durdur" aria-label="Durdur">
-              <Square size={14} />
+            <button
+              onClick={onStop}
+              className="shrink-0 w-9 h-9 rounded-xl bg-red hover:bg-red/80 active:bg-red/70 text-white grid place-items-center transition-all hover:scale-105 active:scale-95"
+              title="Durdur"
+              aria-label="Durdur"
+            >
+              <Square size={13} />
             </button>
           ) : (
             <button
               onClick={submit}
               disabled={!input.trim()}
-              className="shrink-0 w-8 h-8 grid place-items-center rounded-full bg-brand text-bg disabled:opacity-30 hover:bg-branddim transition-colors"
+              className="shrink-0 w-9 h-9 rounded-xl bg-brand hover:bg-branddim active:bg-branddim text-[#111110] grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95"
               title="Gönder"
               aria-label="Gönder"
             >
-              <Send size={14} />
+              <ArrowUp size={17} />
             </button>
           )}
         </div>
@@ -559,7 +565,6 @@ export function DesignStudio() {
           setBrief={setHomeBrief}
           busy={busy}
           onSubmit={(t) => { setHomeBrief(""); runGenerate(t, false); }}
-          onPickTemplate={(t) => { setHomeBrief(""); runGenerate(t.brief, false, t); }}
         />
       ) : (
         <div className="flex-1 min-h-0 flex">
