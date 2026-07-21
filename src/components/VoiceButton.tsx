@@ -24,6 +24,9 @@ type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 interface VoiceButtonProps {
   onTranscript: (text: string, isFinal: boolean) => void;
   lang?: string;
+  /** Stüdyo composer'ındaki bordürlü pil düğmelerle (ataç/model/vb.) görsel
+      tutarlılık için — varsayılan (false) ana sohbetteki hayalet ikon stilini korur. */
+  pill?: boolean;
 }
 
 function getSpeechCtor(): SpeechRecognitionCtor | null {
@@ -32,7 +35,7 @@ function getSpeechCtor(): SpeechRecognitionCtor | null {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
-export function VoiceButton({ onTranscript, lang = "tr-TR" }: VoiceButtonProps) {
+export function VoiceButton({ onTranscript, lang = "tr-TR", pill = false }: VoiceButtonProps) {
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<SpeechRecognitionLike | null>(null);
@@ -103,7 +106,7 @@ export function VoiceButton({ onTranscript, lang = "tr-TR" }: VoiceButtonProps) 
         listening ? "Dinlemeyi durdur" :
         "Sesli dikte (Tarayıcı izni gerekebilir)"
       }
-      className={`shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl grid place-items-center transition-all ${
+      className={`shrink-0 ${pill ? "w-9 h-9 border border-line/70 bg-bgsoft/60 hover:border-brand/40" : "w-10 h-10 sm:w-9 sm:h-9"} rounded-xl grid place-items-center transition-all ${
         listening
           ? "bg-red/15 text-red ring-2 ring-red/40 animate-pulse"
           : "text-muted hover:text-ink hover:bg-bgsoft"

@@ -17,7 +17,7 @@ function tokens(o: { brand: string; bg: string; surface: string; ink: string; mu
 
 export const bundledDesignSystems: DesignSystem[] = [
   {
-    id: "craft", name: "Umai (Varsayılan)", category: "Umai", accent: "#c8a87e",
+    id: "craft", name: "Umai", category: "Varsayılan", accent: "#c8a87e",
     designMd: "Sıcak amber vurgu (#c8a87e) üzerine koyu, sofistike bir palet. Arka plan #111110, yüzey #181714, metin #f0ebe0, yardımcı metin #9a9080. Tipografi: temiz sans-serif, dengeli ölçek. Köşeler orta-yumuşak (12px). Ton: premium, sade, güven veren. Bol nefes alanı, ince kenarlıklar (#2e2a24).",
     tokensCss: tokens({ brand: "#c8a87e", bg: "#111110", surface: "#181714", ink: "#f0ebe0", muted: "#9a9080", radius: "12px", font: "system-ui, -apple-system, sans-serif" }),
   },

@@ -577,6 +577,14 @@ html.light .user-bubble {
   display: none;
 }
 
+/* Yatay kaydırılabilir composer kontrol şeritlerinde (Stüdyo) sağ kenara
+   ince bir soluklaşma — daha fazla düğme olduğunu ima eder, kesik bir
+   kenar hissi vermez. */
+.scroll-fade-x {
+  mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
+}
+
 /* ─── FAQ details/summary açılış animasyonu ─── */
 details[open] > summary ~ * {
   animation: faq-open 0.2s ease-out;
