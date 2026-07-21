@@ -3,11 +3,15 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 @AGENTS.md
+@prompt.md
 
 # craft.ai — Proje Rehberi (CLAUDE.md)
 
 > Bu dosya Claude / yapay zekâ asistanları için proje bağlamını özetler.
-> Framework özelindeki kritik uyarılar için yukarıdaki `@AGENTS.md`'yi de oku.
+> Framework özelindeki kritik uyarılar için yukarıdaki `@AGENTS.md`'yi,
+> ürün stratejisi/konumlandırma ve "stüdyolar ön planda olmasın ama
+> kaldırılmasın" gibi KALICI kısıtlar için `@prompt.md`'yi de oku — özellikle
+> açık uçlu ("sırada ne var?" tarzı) isteklerde bu belge varsayılan pusula.
 
 ## Proje Nedir?
 
