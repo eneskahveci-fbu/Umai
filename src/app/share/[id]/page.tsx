@@ -61,8 +61,9 @@ export default async function SharedChatPage({ params }: Props) {
         </div>
 
         <div className="mt-10 text-center">
+          <p className="text-xs text-muted mb-3">Bununla UMAI&apos;de ücretsiz üretildi — kayıt olmadan, kredi kartsız.</p>
           <Link href="/app" className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-[#111110] font-semibold px-6 py-3 rounded-2xl transition-colors">
-            ⚡ UMAI ile kendi sohbetini başlat
+            ⚡ Sen de bedava dene
           </Link>
         </div>
       </main>

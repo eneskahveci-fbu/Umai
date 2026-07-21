@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { ArrowRight } from "lucide-react";
 import type { Artifact } from "@/lib/types";
 import { buildArtifactSrcDoc } from "@/lib/artifactDoc";
 
@@ -65,6 +66,24 @@ export default async function PublishedArtifactPage({ params }: Props) {
             className="w-full h-full border-0"
             title={data.title || "Yayınlanan artifact"}
           />
+        </div>
+
+        {/* Büyüme döngüsü imzası (prompt.md Hamle 3): her paylaşılan çıktı,
+            görüntüleyeni tek tıkla ücretsiz denemeye davet etsin. */}
+        <div className="shrink-0 border-t border-line/60 bg-surface/95 backdrop-blur px-4 sm:px-6 py-2.5 flex items-center justify-center gap-2 text-xs text-muted text-center">
+          <span>
+            Bununla{" "}
+            <Link href="/" className="font-semibold text-ink hover:text-brand transition-colors">
+              UMAI
+            </Link>
+            &apos;de ücretsiz üretildi.
+          </span>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1 font-semibold text-brand hover:text-branddim transition-colors shrink-0"
+          >
+            Sen de bedava dene <ArrowRight size={13} />
+          </Link>
         </div>
       </main>
     </div>
