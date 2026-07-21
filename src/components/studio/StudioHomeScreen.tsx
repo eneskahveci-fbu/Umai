@@ -1,11 +1,14 @@
 "use client";
 
+import { useRef } from "react";
 import {
   ArrowUp, BarChart3, BookOpen, Code2, FileText,
-  Layers, ListChecks, Network, Palette, Presentation, Sparkles,
+  Layers, ListChecks, Network, Paperclip, Palette, Presentation, Sparkles,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useSurfaceNav, type Surface } from "@/lib/surfaceNav";
+import { DesignSystemPicker, ModelPicker, ImagePreviewStrip } from "./ComposerExtras";
+import { VoiceButton } from "../VoiceButton";
 
 /* Stüdyo anasayfası — claude.ai'yi açınca gelen ilk ekrana birebir paralel:
    ortalanmış karşılama + TEK büyük prompt kutusu + biçim/araç kartları ızgarası
@@ -70,13 +73,23 @@ function Card({ card, onClick }: { card: QuickCard; onClick: () => void }) {
 
 export function StudioHomeScreen({
   brief, setBrief, onSubmit, busy,
+  designSystemId, onDesignSystemChange, fusionEnabled, onFusionChange,
+  pendingImages, onAddImages, onRemoveImage,
 }: {
   brief: string;
   setBrief: (s: string) => void;
   onSubmit: (text: string) => void;
   busy: boolean;
+  designSystemId: string;
+  onDesignSystemChange: (id: string) => void;
+  fusionEnabled: boolean;
+  onFusionChange: (v: boolean) => void;
+  pendingImages: string[];
+  onAddImages: (files: FileList) => void;
+  onRemoveImage: (i: number) => void;
 }) {
   const nav = useSurfaceNav();
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const submit = () => {
     const t = brief.trim();
@@ -99,26 +112,56 @@ export function StudioHomeScreen({
 
           {/* Büyük prompt kutusu — ana sohbetin (CoderView) "Claude design"
               composer'ıyla BİREBİR aynı görsel dil: composer-glow, camsı
-              zemin (bg-surface/85 backdrop-blur-xl), aynı gönder butonu. */}
-          <div className="composer-glow w-full max-w-2xl rounded-[24px] border border-line bg-surface/85 backdrop-blur-xl transition-colors">
-            <textarea
-              value={brief}
-              onChange={(e) => setBrief(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
-              rows={3}
-              placeholder="Bir şey iste — örn. 'bir fitness uygulaması için onboarding ekranı' ya da 'JSON'ı CSV'ye çeviren bir Python fonksiyonu'…"
-              className="w-full bg-transparent resize-none outline-none px-5 pt-4 text-[15px] leading-relaxed placeholder:text-muted/45 min-h-[76px]"
-            />
-            <div className="flex items-center justify-end gap-1.5 px-3 pb-3 pt-1">
-              <button
-                onClick={submit}
-                disabled={busy || !brief.trim()}
-                aria-label="Gönder"
-                title="Gönder"
-                className="shrink-0 w-9 h-9 rounded-xl bg-brand hover:bg-branddim active:bg-branddim text-[#111110] grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95"
-              >
-                <ArrowUp size={17} />
-              </button>
+              zemin (bg-surface/85 backdrop-blur-xl). Alt kontrol satırı
+              Claude Design'ın prompt kutusundaki seçeneklerle eşleşir: ataç,
+              tasarım sistemi, model (çoklu). */}
+          <div className="w-full max-w-2xl">
+            <ImagePreviewStrip images={pendingImages} onRemove={onRemoveImage} />
+            <div className="composer-glow rounded-[24px] border border-line bg-surface/85 backdrop-blur-xl transition-colors">
+              <textarea
+                value={brief}
+                onChange={(e) => setBrief(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
+                rows={3}
+                placeholder="Bir şey iste — örn. 'bir fitness uygulaması için onboarding ekranı' ya da 'JSON'ı CSV'ye çeviren bir Python fonksiyonu'…"
+                className="w-full bg-transparent resize-none outline-none px-5 pt-4 text-[15px] leading-relaxed placeholder:text-muted/45 min-h-[76px]"
+              />
+              <div className="flex items-center justify-between gap-1.5 px-3 pb-3 pt-1">
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => { if (e.target.files?.length) onAddImages(e.target.files); e.target.value = ""; }}
+                  />
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    title="Referans görsel ekle"
+                    aria-label="Referans görsel ekle"
+                    className="shrink-0 w-9 h-9 rounded-xl grid place-items-center text-muted hover:text-ink hover:bg-bgsoft transition-colors"
+                  >
+                    <Paperclip size={15} />
+                  </button>
+                  <DesignSystemPicker value={designSystemId} onChange={onDesignSystemChange} />
+                  <ModelPicker fusionEnabled={fusionEnabled} onFusionChange={onFusionChange} />
+                  <VoiceButton
+                    onTranscript={(text, isFinal) => {
+                      if (isFinal) setBrief((brief ? `${brief} ` : "") + text);
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={submit}
+                  disabled={busy || !brief.trim()}
+                  aria-label="Gönder"
+                  title="Gönder"
+                  className="shrink-0 w-9 h-9 rounded-xl bg-brand hover:bg-branddim active:bg-branddim text-[#111110] grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95"
+                >
+                  <ArrowUp size={17} />
+                </button>
+              </div>
             </div>
           </div>
 
