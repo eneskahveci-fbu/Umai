@@ -126,7 +126,14 @@ export async function generateArtifact(opts: GenerateOptions): Promise<GenerateR
       tools: false, webSearch: false, temperature: 0.6,
     }),
   });
-  if (!res.ok || !res.body) throw new Error(`LLM ${res.status}`);
+  if (!res.ok || !res.body) {
+    /* /api/chat, tüm adaylar tükendiğinde gövdeye OKUNABİLİR bir hata metni
+       (friendlyApiError) yazar — bunu okumadan ham "LLM 500" göstermek
+       kullanıcıya hiçbir şey anlatmıyordu (bkz. CoderView.tsx'in ana send()'i,
+       aynı deseni zaten kullanıyor). */
+    const detail = await res.text().catch(() => "");
+    throw new Error(detail || `Sağlayıcı hatası (${res.status})`);
+  }
 
   const reader = res.body.getReader();
   const dec = new TextDecoder();
