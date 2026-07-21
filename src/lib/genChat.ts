@@ -39,7 +39,10 @@ export async function streamChat(opts: GenChatOptions): Promise<string> {
       tools: false, webSearch: false, temperature: opts.temperature ?? 0.7,
     }),
   });
-  if (!res.ok || !res.body) throw new Error(`LLM ${res.status}`);
+  if (!res.ok || !res.body) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(detail || `Sağlayıcı hatası (${res.status})`);
+  }
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = ""; let full = "";
