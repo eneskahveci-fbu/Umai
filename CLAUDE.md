@@ -304,6 +304,20 @@ Playwright ile.
   **nereye** gideceğini belirler: `"github"` / `"gitlab"` → ilgili Git API
   (`src/app/api/github/*`, `src/lib/gitlab.ts`); `"local"` → hibrit köprü dosya
   sistemi. Araç çağrıları sunucuda döngüyle çözülür.
+- **Token/maliyet optimizasyonu** (repo bağlı sohbette sistem promptu ~12-13K
+  token olabiliyor, BYOK kullanıcı kendi faturasını ödüyor): `src/lib/
+  repoContextCache.ts` — repo dosya ağacı/SOUL.md/package.json/.gitignore
+  içeriğini kısa ömürlü (3dk) bellek-içi `Map` ile önbellekler; hem gereksiz
+  GitHub/GitLab API tekrarını önler hem de bu metnin ardışık turlarda BAYT-BAYT
+  aynı kalmasını garanti eder (rate-limit.ts'teki AYNI desen — kalıcı depo
+  yok, kabul edilebilir). Bu STABİLİTE, `chat/route.ts`'in `body.searchContext`'i
+  (turdan turа değişen TEK parça) sysPrompt'un geri kalanından AYRI, ikinci bir
+  system mesajı olarak en sona eklemesiyle birleşince Anthropic prompt caching'i
+  (`src/lib/anthropic.ts`'teki `convertMessages` — yalnız SON system bloğu
+  `cache_control` almaz, önündekiler önbellekten okunur) gerçekten isabet eder:
+  büyük, turlar arası sabit blok (repo haritası + SOUL.md + araç talimatları +
+  PLATFORM_KNOWLEDGE) yalnız ilk turda tam fiyata gider, sonraki turlarda
+  Anthropic'in ucuz cache-read fiyatından okunur.
 - **Sağlayıcı sabitleri:** `src/lib/constants.ts` → `PRESETS`, `DEFAULT_CONFIG`,
   `DEFAULT_SKILLS`, `PROVIDER_MODELS`. Varsayılan model anahtarsız
   `pollinations-free`.
