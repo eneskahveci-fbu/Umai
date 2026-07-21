@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { decidePilot, decidePilotAsync, autoEffort, autoWeb, autoResearch, autoFusion } from "../autoPilot";
+import { decidePilot, decidePilotAsync, autoEffort, autoWeb, autoResearch, autoFusion, autoImageGen } from "../autoPilot";
 
 const ctx = { hasRepo: true };
 
@@ -95,6 +95,28 @@ describe("yardımcılar", () => {
   });
   it("autoResearch: kısa metinde tetiklenmez", () => {
     expect(autoResearch("kapsamlı rapor")).toBe(false);
+  });
+});
+
+describe("autoImageGen — Faz 6: yalnız generate_image için doğal dil sinyali", () => {
+  it("açık görsel isteklerinde tetiklenir", () => {
+    expect(autoImageGen("bana gün batımında sisli bir dağ manzarası çiz")).toBe(true);
+    expect(autoImageGen("bir kedi resmi oluştur")).toBe(true);
+    expect(autoImageGen("draw a red fox in a snowy forest")).toBe(true);
+    expect(autoImageGen("şirketim için bir logo tasarla")).toBe(true);
+  });
+  it("kod bağlamlı benzer cümlelerde tetiklenmez (yanlış-pozitif koruması)", () => {
+    expect(autoImageGen("logo bileşeni için bir component oluştur")).toBe(false);
+    expect(autoImageGen("kullanıcı fotoğrafı yükleme fonksiyonu yaz")).toBe(false);
+    expect(autoImageGen("```\nconst resim = 'x'\n``` bunu düzelt")).toBe(false);
+  });
+  it("normal sohbet/kod isteklerinde tetiklenmez", () => {
+    expect(autoImageGen("merhaba nasılsın")).toBe(false);
+    expect(autoImageGen("bu fonksiyonu refactor et")).toBe(false);
+    expect(autoImageGen("bir React bileşeni yaz")).toBe(false);
+  });
+  it("çok kısa metinde tetiklenmez", () => {
+    expect(autoImageGen("resim")).toBe(false);
   });
 });
 

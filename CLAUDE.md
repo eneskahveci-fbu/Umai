@@ -256,13 +256,24 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   `autoSwarm`) — bunlar artık organik ARAÇ kararları. Repo bağlıyken
   `generate_image`/`deep_research`/`dispatch_agents` `/api/chat`'in kendi
   tool-calling döngüsünde çalışır (`src/lib/tools.ts` + `chat/route.ts`,
-  yalnız `body.tools && body.repoCtx` iken görünür). Repo BAĞLI DEĞİLKEN bu
-  araçlar yok — bu yüzden `CoderView.tsx`'in `send()`'i o durumda hâlâ eski
-  `/api/research`/`/api/orchestrate` SSE endpoint'lerine düşer (bilinçli
-  olarak korundu, ayrı bir "Faz 6" kullanıcı onayı bekliyor — repo'suz
-  sohbete araç erişimini açmak). Durum çubuğunda "Ekip"/"Araştırma" rozetleri
-  artık o mesajın Otomatik Pilot kararını (`lastPilot.swarm`/`.research`)
-  yansıtır, manuel toggle değil.
+  yalnız `body.tools && body.repoCtx` iken görünür). Repo BAĞLI DEĞİLKEN
+  `deep_research`/`dispatch_agents` hâlâ yok — bu yüzden `CoderView.tsx`'in
+  `send()`'i o durumda hâlâ eski `/api/research`/`/api/orchestrate` SSE
+  endpoint'lerine düşer (bilinçli olarak korundu — bu ikisini repo'suz
+  sohbete de tool-loop üzerinden açmak ayrı bir kullanıcı onayı gerektiriyor).
+  **`generate_image` istisna** (Faz 6, kullanıcı kararıyla dar kapsamlı
+  açıldı): `autoPilot.ts`'teki `autoImageGen()` (regex-tabanlı, NOT: JS `\b`
+  Türkçe karaktere başlayan kelimelerde çalışmadığından `\p{L}` tabanlı özel
+  sınır kullanır) doğal dilden görsel isteği algılarsa, `body.imageGen` bayrağı
+  bu TEK aracı repo bağlı olmasa/Tools kapalı olsa da `/api/chat`'in tool-
+  loop'una ekler (`GENERATE_IMAGE_TOOL`, `tools.ts`'ten ayrı export) — hem
+  Gate 1'i (`!body.tools && !body.webSearch && !body.imageGen`) hem araç
+  listesini gevşetir. Anahtarsız Pollinations'ın kendi tarayıcı-doğrudan hızlı
+  yoluna (`CoderView.tsx`, `!toolsEnabled && !wantWeb && !wantImageGen` koşulu)
+  bu üçüncü bayrak da eklendi — görsel isteği algılanınca o yol da sunucu-
+  proxy'ye düşer. Durum çubuğunda "Ekip"/"Araştırma" rozetleri artık o
+  mesajın Otomatik Pilot kararını (`lastPilot.swarm`/`.research`) yansıtır,
+  manuel toggle değil.
 
 ## Geliştirme Komutları
 
