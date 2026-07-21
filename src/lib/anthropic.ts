@@ -50,7 +50,7 @@ function contentToBlocks(content: unknown): Block[] {
    - tool rolü → user içinde tool_result bloğu
    - assistant tool_calls → assistant içinde tool_use blokları
    - ardışık aynı-rol mesajları birleştirilir (Claude alternasyon ister). */
-function convertMessages(messages: OAIMsg[]): { system: Block[]; messages: AMsg[] } {
+export function convertMessages(messages: OAIMsg[]): { system: Block[]; messages: AMsg[] } {
   const sysParts: string[] = [];
   const out: AMsg[] = [];
   const push = (role: "user" | "assistant", blocks: Block[]) => {
@@ -81,8 +81,19 @@ function convertMessages(messages: OAIMsg[]): { system: Block[]; messages: AMsg[
     }
     push("user", contentToBlocks(m.content));
   }
-  const sysText = sysParts.join("\n\n");
-  const system: Block[] = sysText ? [{ type: "text", text: sysText, cache_control: EPHEMERAL }] : [];
+  /* Her system mesajı KENDİ bloğu olur (join edilip TEK blok yapılmaz) —
+     böylece çağıran taraf (chat/route.ts) sabit/önbelleklenebilir içeriği
+     (repo haritası, SOUL.md, araç talimatları) turlar arası değişen bir
+     kuyruktan (ör. web arama sonuçları) ayrı bloklar olarak gönderebilir.
+     Kural: SON blok HARİÇ hepsi cache_control alır — yalnızca 1 blok varsa
+     (bugüne kadarki her çağıran) o TEK blok yine önbelleklenir (davranış
+     korunur); 2+ blok varsa sondaki (değişken kabul edilir) önbelleksiz
+     kalır, önündekiler önbellekten okunabilir. */
+  const system: Block[] = sysParts.map((text, i) => {
+    const block: Block = { type: "text", text };
+    if (sysParts.length === 1 || i < sysParts.length - 1) block.cache_control = EPHEMERAL;
+    return block;
+  });
   return { system, messages: out };
 }
 

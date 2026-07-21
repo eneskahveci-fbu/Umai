@@ -15,6 +15,7 @@ import { EXTENSION_TOOLS } from "@/lib/extensions/registry";
 import { searchWeb, formatResults, fetchUrl } from "@/lib/webSearch";
 import { pollinationsImageUrl, stableSeed } from "@/lib/pollinations";
 import { runDeepResearch } from "@/lib/researchPipeline";
+import { cached, repoCacheKey } from "@/lib/repoContextCache";
 import { isSafeRemoteUrl } from "@/lib/urlSafety";
 import { isBuiltinMcpServerId } from "@/lib/mcpBuiltins";
 import { after } from "next/server";
@@ -1276,24 +1277,33 @@ export async function POST(req: Request) {
   /* Eklenen her model, içinde çalıştığı platformun tüm özelliklerini bilsin. */
   sysPrompt += `\n\n${PLATFORM_KNOWLEDGE}`;
   if (body.projectPrompt) sysPrompt += `\n\n[Proje talimatları]: ${body.projectPrompt}`;
-  /* Stil + hafıza + skills + arama bağlamı — istemci ile ortak tek kaynak. */
+  /* Stil + hafıza + skills — istemci ile ortak tek kaynak. searchContext
+     BİLİNÇLİ OLARAK burada DEĞİL (bkz. aşağıdaki volatileTail): bu turdan
+     turа değişen TEK parça olduğundan, sysPrompt'un geri kalanından (repo
+     haritası/SOUL.md/araç talimatları — hepsi turlar arası SABİT) ayrı
+     tutulursa Anthropic prompt caching (anthropic.ts) sysPrompt'un büyük,
+     değişmeyen kısmını gerçekten önbellekten okuyabilir. */
   sysPrompt += buildContextSections({
     style: body.style,
     memories: body.memories,
     skills: body.skills,
-    searchContext: body.searchContext,
   });
   if (body.tools && body.repoCtx) {
-    /* SOUL.md — OpenClaw-inspired project context file */
-    const soulContent = await fetchSoulFile(body.repoCtx).catch(() => null);
+    const rc = body.repoCtx;
+    /* SOUL.md / repo ağacı / package.json / .gitignore — kısa ömürlü (3dk)
+       sunucu-taraflı önbellek: hem gereksiz GitHub/GitLab API tekrarını
+       önler hem de bu metnin ardışık turlarda BAYT-BAYT aynı kalmasını
+       garanti eder → Anthropic prompt caching (anthropic.ts) gerçekten
+       isabet eder (bkz. repoContextCache.ts). */
+    const soulContent = await cached(repoCacheKey(rc, "soul"), () => fetchSoulFile(rc)).catch(() => null);
     if (soulContent) {
       sysPrompt += `\n\n[Proje bağlamı — SOUL.md]:\n${soulContent.slice(0, 6000)}`;
     }
     /* Proje profili: framework algılama (package.json) + .gitignore farkındalığı.
        Tek seferlik, paralel çekim; hata olursa sessiz geçilir. */
     const [pkgRaw, gitignoreRaw] = await Promise.all([
-      getFileRaw(body.repoCtx, "package.json").then((r) => (r.ok ? r.content : null)).catch(() => null),
-      getFileRaw(body.repoCtx, ".gitignore").then((r) => (r.ok ? r.content : null)).catch(() => null),
+      cached(repoCacheKey(rc, "pkg"), () => getFileRaw(rc, "package.json").then((r) => (r.ok ? r.content : null))).catch(() => null),
+      cached(repoCacheKey(rc, "gitignore"), () => getFileRaw(rc, ".gitignore").then((r) => (r.ok ? r.content : null))).catch(() => null),
     ]);
     const frameworks = pkgRaw ? detectFrameworks({ deps: extractDeps(pkgRaw) }) : [];
     if (frameworks.length || gitignoreRaw) {
@@ -1308,7 +1318,7 @@ export async function POST(req: Request) {
        list_files çağırmadan yapıyı bilir, doğru dosyayı hedefler. Tek tree
        çağrısı; Anthropic'te cache'lenir, diğerlerinde kompakt (yalnız yollar). */
     try {
-      const allPaths = await getAllPaths(body.repoCtx);
+      const allPaths = await cached(repoCacheKey(rc, "tree"), () => getAllPaths(rc));
       if (allPaths.length) {
         sysPrompt += `\n\n[Repo dosya haritası — ${allPaths.length} dosya]\n${buildRepoMap(allPaths)}`;
       }
@@ -1398,6 +1408,16 @@ export async function POST(req: Request) {
       `biçiminde yanıtına göm, URL'i düz metin olarak yazma.`;
   }
 
+  /* searchContext'i (varsa) AYRI, İKİNCİ bir system mesajı olarak en sona
+     ekle. anthropic.ts'teki convertMessages yalnız SON system bloğunu
+     önbelleksiz bırakır (cache_control almaz) — böylece önündeki büyük,
+     turlar arası sabit blok (repo haritası + SOUL.md + araç talimatları +
+     PLATFORM_KNOWLEDGE) gerçekten önbellekten okunur, yalnız bu küçük
+     değişken kuyruk her seferinde tam fiyata gider. */
+  const systemMessages: { role: "system"; content: string }[] = body.searchContext
+    ? [{ role: "system", content: sysPrompt }, { role: "system", content: `\n\n[Web arama sonuçları]:\n${body.searchContext}` }]
+    : [{ role: "system", content: sysPrompt }];
+
   /* Aşağıdaki iki yoldan (araçsız passthrough + araçlı tur döngüsü) HER
      İKİSİ de fallback_event kodlamak için kullanır — tek bir encoder yeter. */
   const encoder = new TextEncoder();
@@ -1410,7 +1430,7 @@ export async function POST(req: Request) {
      sohbet) yolda kullanıcı hangi modelin gerçekten yanıt verdiğini asla
      göremez (bkz. streamRound tabanlı tool-use döngüsündeki eşdeğer mantık). */
   if (!body.tools && !body.webSearch && !body.imageGen) {
-    const messages = [{ role: "system", content: sysPrompt }, ...body.messages];
+    const messages = [...systemMessages, ...body.messages];
     let lastStatus = 502, lastDetail = "", lastCand: Candidate = primary;
     for (const c of candidates) {
       let upstream: Response;
@@ -1464,7 +1484,7 @@ export async function POST(req: Request) {
     .filter((s) => s.enabled !== false)
     .map((s) => (s.url?.startsWith("/") ? { ...s, url: `${ownOrigin}${s.url}` } : s));
   const convo: ChatRequest["messages"] = [
-    { role: "system", content: sysPrompt },
+    ...systemMessages,
     ...body.messages,
   ];
 
