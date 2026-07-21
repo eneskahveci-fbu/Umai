@@ -67,18 +67,43 @@ function reactDoc(code: string, css: string): string {
   const mount = isNextRootFile
     ? `document.getElementById('root').innerHTML='<p style="font-family:system-ui;color:#666;padding:1rem;line-height:1.5">Bu dosya kendi &lt;html&gt;/&lt;body&gt; etiketlerini tanımlıyor (ör. Next.js <code>layout.tsx</code>) — çok dosyalı bir projenin parçası olduğundan tek başına canlı önizlenemez. Gerçek bir sayfa/bileşen bloğu (ör. <code>page.tsx</code>) varsa o gösterilir; yoksa bu dosyayı bağımsız bir HTML olarak indirip tarayıcıda aç.</p>';`
     : comp
-    ? `try{ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(${comp}));}catch(e){document.getElementById('root').innerHTML='<pre style="color:#c00;white-space:pre-wrap;padding:1rem">'+(e&&e.stack||e)+'</pre>';}`
+    ? `ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(${comp}));`
     : `document.getElementById('root').innerHTML='<p style="font-family:system-ui;color:#666;padding:1rem">Önizlenecek bir React bileşeni bulunamadı (App veya büyük-harfli bir bileşen tanımla).</p>';`;
+  /* Babel'ın kendi otomatik <script type="text/babel"> tarayıcısı YERİNE
+     Babel.transform()'u BİZ, kendi (aynı-belge) script'imizden çağırıyoruz.
+     Neden: sandbox'lı iframe'in ("allow-same-origin" YOK) opak origin'i
+     yüzünden, otomatik tarayıcının İÇİNDE (babel.min.js — cross-origin
+     script) fırlayan bir sözdizimi hatası window.onerror'a opak, tanısız
+     bir "Script error." olarak düşüyordu — try/catch'imiz hiç devreye
+     girmiyordu (yalnız ÇALIŞTIRMA adımını sarıyordu, DÖNÜŞTÜRME adımını
+     değil). Transform'u kendi try/catch'imizin İÇİNDE çağırınca (normal bir
+     fonksiyon çağrısı — Babel global'i cross-origin'den gelse de burada
+     throw ettiği hata window.onerror'a değil doğrudan bizim catch'imize
+     düşer) hem sözdizimi hem çalışma-zamanı hataları aynı okunaklı kırmızı
+     kutuda görünür. */
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <script crossorigin src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
 <script crossorigin src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
 <style>body{margin:0;font-family:system-ui,sans-serif;background:#fff}${css}</style>
 </head><body>${CONSOLE_UI}<div id="root"></div>
-<script type="text/babel" data-presets="typescript,react">
-const {useState,useEffect,useRef,useMemo,useCallback,useReducer,useContext,Fragment}=React;
-${safeScript(src)}
-${mount}
+<script type="text/plain" id="__src">${safeScript(src)}</script>
+<script>
+(function(){
+  function showError(e){
+    document.getElementById('root').innerHTML='<pre style="color:#c00;white-space:pre-wrap;padding:1rem;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace">'+((e&&(e.stack||e.message))||e)+'</pre>';
+  }
+  /* mount build-time'da bilinen sabit kod — JSON.stringify her tırnak/
+     ters eğik çizgiyi doğru kaçırır, elle escape hataya açık. */
+  var MOUNT_CODE = ${JSON.stringify(mount)};
+  try {
+    var raw = document.getElementById('__src').textContent;
+    var transformed = Babel.transform(raw, {presets:['typescript','react'], filename:'component.tsx'}).code;
+    var runner = new Function('React','ReactDOM','useState','useEffect','useRef','useMemo','useCallback','useReducer','useContext','Fragment',
+      transformed + '\\n' + MOUNT_CODE);
+    runner(React,ReactDOM,React.useState,React.useEffect,React.useRef,React.useMemo,React.useCallback,React.useReducer,React.useContext,React.Fragment);
+  } catch(e) { showError(e); }
+})();
 </script></body></html>`;
 }
 
