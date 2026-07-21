@@ -226,9 +226,13 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   ile parent'a gelir (TEK istisna mesaj yolu; doğrulama parent'ta —
   e.source + veri şekli) ve composer'a taşınır. Script yalnız CANLI iframe'e
   enjekte edilir; yayınlanan `/a/[id]` sayfası temiz `buildArtifactSrcDoc`
-  kullanır. Composer'da ayrıca **AI Chips** (girdi boşken 5 küratörlü
-  slash-agent çipi, `CoderView.tsx` → `CHIP_AGENTS`) ve sesli dikte
-  (`VoiceButton.tsx`) var.
+  kullanır. Composer'da ayrıca **AI Chips** (girdi boşken 3 küratörlü
+  slash-agent çipi — Açıkla/Düzelt/Refactor, `CoderView.tsx` → `CHIP_AGENTS`)
+  ve sesli dikte (`VoiceButton.tsx`) var. Görsel üretimi (`/gorsel`) ve Derin
+  Araştırma (`/research`) çipleri kaldırıldı (Tem 2026 kullanıcı kararı) —
+  eşdeğerleri artık `generate_image`/`deep_research` araçlarıyla doğal
+  dilden tetiklenebiliyor (repo bağlıyken, bkz. "Oto-ajan" bölümü); slash
+  komutları (`/gorsel`, `/research`) hâlâ SlashMenu'den elle çağrılabilir.
 - **Öğrenme Modu** (`config.learningMode`): açıkken sistem prompt'una eğitsel
   yönerge eklenir (adım adım açıklama, kavram tanımı, "neden", "Sırada öğren").
   MoreMenu'den toggle; durum çubuğunda rozet. Üniversite öğrencileri için.
@@ -243,10 +247,22 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   (`config.autoPilot`, admin dışı hesaplarda zaten her zaman açık) kendi
   kalite sezgisiyle (`pilot?.quality`) örtüşür ama manuel anahtar her zaman
   önceliklidir.
-- **Oto-ajan**: `autoSwarm(text)` eşik geçince Ajan Ekibi (planlayıcı→paralel
-  işçiler→birleştirici, `/api/orchestrate`) butona basmadan devreye girer; repo
-  bağlanınca araçlar otomatik açılır. Durum çubuğunda "Oto-ajan" göstergesi.
-  Mod enjeksiyonu/tetikleme `CoderView.tsx` içinde (`finalSystemPrompt`).
+- **Oto-ajan / Otomatik Pilot** (`src/lib/autoPilot.ts`): Ekip/Araştırma artık
+  elle açılan çip DEĞİL (Tem 2026 kullanıcı kararı — mod çipleri tamamen
+  kaldırıldı) — `decidePilotAsync()` her mesajda `/api/route-plan`'a hafif bir
+  LLM sınıflandırma çağrısı yapıp effort/quality/fusion kararı alır (ağ/format
+  hatasında sessizce senkron regex-tabanlı `decidePilot()`'a düşer); web/
+  research/swarm sinyalleri hâlâ regex'te (`autoWeb`/`autoResearch`/
+  `autoSwarm`) — bunlar artık organik ARAÇ kararları. Repo bağlıyken
+  `generate_image`/`deep_research`/`dispatch_agents` `/api/chat`'in kendi
+  tool-calling döngüsünde çalışır (`src/lib/tools.ts` + `chat/route.ts`,
+  yalnız `body.tools && body.repoCtx` iken görünür). Repo BAĞLI DEĞİLKEN bu
+  araçlar yok — bu yüzden `CoderView.tsx`'in `send()`'i o durumda hâlâ eski
+  `/api/research`/`/api/orchestrate` SSE endpoint'lerine düşer (bilinçli
+  olarak korundu, ayrı bir "Faz 6" kullanıcı onayı bekliyor — repo'suz
+  sohbete araç erişimini açmak). Durum çubuğunda "Ekip"/"Araştırma" rozetleri
+  artık o mesajın Otomatik Pilot kararını (`lastPilot.swarm`/`.research`)
+  yansıtır, manuel toggle değil.
 
 ## Geliştirme Komutları
 
