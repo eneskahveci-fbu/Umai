@@ -94,14 +94,9 @@ export function autoFusion(text: string): boolean {
   return FUSION_NOUN.test(t) && FUSION_VERB.test(t);
 }
 
-/** Tek karar noktası — CoderView gönderim anında çağırır. */
-export function decidePilot(text: string, ctx: { hasRepo: boolean }): PilotDecision {
-  const effort = autoEffort(text);
-  const research = autoResearch(text);
-  const web = research || autoWeb(text);
-  const quality = autoQuality(text, effort);
-  const fusion = autoFusion(text);
-  const swarm = ctx.hasRepo && autoSwarm(text);
+function assemblePilotDecision(
+  effort: Effort, quality: boolean, fusion: boolean, web: boolean, research: boolean, swarm: boolean,
+): PilotDecision {
   const reasons: string[] = [];
   const effortLabel: Record<Effort, string> = { low: "hızlı", medium: "dengeli", high: "yüksek efor", max: "maksimum efor" };
   reasons.push(effortLabel[effort]);
@@ -111,6 +106,52 @@ export function decidePilot(text: string, ctx: { hasRepo: boolean }): PilotDecis
   else if (quality) reasons.push("kalite turu");
   if (swarm) reasons.push("ajan ekibi");
   return { effort, web, research, quality, fusion, swarm, reasons };
+}
+
+/** Tek karar noktası (senkron, regex-tabanlı) — ağ isteği ATMAZ. `decidePilotAsync`
+    başarısız olduğunda (ağ hatası, format hatası) düştüğü güvenli yedek; ayrıca
+    birim testlerde saf/deterministik davranış için kullanılır. */
+export function decidePilot(text: string, ctx: { hasRepo: boolean }): PilotDecision {
+  const effort = autoEffort(text);
+  const research = autoResearch(text);
+  const web = research || autoWeb(text);
+  const quality = autoQuality(text, effort);
+  const fusion = autoFusion(text);
+  const swarm = ctx.hasRepo && autoSwarm(text);
+  return assemblePilotDecision(effort, quality, fusion, web, research, swarm);
+}
+
+/** LLM-tabanlı yönlendirme kararı — sabit regex yerine `/api/route-plan`'a
+    hızlı bir sınıflandırma çağrısı yapar (yalnızca effort/quality/fusion;
+    web/research/swarm hâlâ regex'te kalır — bunlar artık organik araç
+    kararları, bkz. generate_image/deep_research/dispatch_agents araçları).
+    Ağ/format hatasında SESSİZCE senkron `decidePilot`'a düşer — sohbet akışı
+    asla bloklanmaz/bozulmaz. */
+export async function decidePilotAsync(
+  text: string,
+  ctx: { hasRepo: boolean },
+  llm: { baseUrl: string; model: string; apiKey: string } | null,
+): Promise<PilotDecision> {
+  if (llm?.baseUrl && llm?.model) {
+    try {
+      const res = await fetch("/api/route-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, hasRepo: ctx.hasRepo, baseUrl: llm.baseUrl, model: llm.model, apiKey: llm.apiKey }),
+        signal: AbortSignal.timeout(6000),
+      });
+      if (res.ok) {
+        const data = await res.json() as { effort?: string; quality?: boolean; fusion?: boolean };
+        if (data && (["low", "medium", "high", "max"] as string[]).includes(data.effort ?? "")) {
+          const research = autoResearch(text);
+          const web = research || autoWeb(text);
+          const swarm = ctx.hasRepo && autoSwarm(text);
+          return assemblePilotDecision(data.effort as Effort, !!data.quality, !!data.fusion, web, research, swarm);
+        }
+      }
+    } catch { /* ağ/zaman aşımı hatası — senkron yedeğe düş */ }
+  }
+  return decidePilot(text, ctx);
 }
 
 /* Stüdyo için otomatik çıktı türü (skill) seçimi — brief'ten. Open Design/
