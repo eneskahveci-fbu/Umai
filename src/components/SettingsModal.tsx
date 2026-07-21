@@ -96,6 +96,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   /* Admin kapısı: hassas sunucu/terminal ayarları yalnız admin e-postasına açık.
      Liste boşken (kurulum öncesi) herkese açık — kimse kilitlenmez. */
   const isAdmin = isAdminEmail(useStore((s) => s.userEmail));
+  const userId = useStore((s) => s.userId);
   const updateModel = useStore((s) => s.updateModel);
   const removeModel = useStore((s) => s.removeModel);
   const setActiveModel = useStore((s) => s.setActiveModel);
@@ -479,6 +480,13 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     const sb = createClient();
     if (!sb) {
       addToast("Supabase bağlı değil — aşağıdan token ile ekleyebilirsin.", "error");
+      return;
+    }
+    /* linkIdentity aktif bir Supabase oturumu ister — misafir (giriş yapmamış)
+       kullanıcı buraya kadar gelirse anlamsız bir Supabase hatası yerine net
+       bir giriş daveti göster (prompt.md Hamle 2: zorla değil, istendiğinde). */
+    if (!userId) {
+      addToast("Git hesabını bulut senkronuyla bağlamak için önce giriş yap. (Token ile bağlamak giriş gerektirmez — aşağıdan.)", "info");
       return;
     }
     setOauthBusy(prov);
