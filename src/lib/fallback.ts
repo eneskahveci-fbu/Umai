@@ -37,6 +37,7 @@ const PROVIDER_RANK: Partial<Record<Provider, number>> = {
   cerebras: 2, // hızlı, ücretsiz
   nvidia: 2.5, // NVIDIA NIM — ücretsiz, geniş açık model kataloğu
   github: 3, // GitHub Models — ücretsiz
+  agnes: 3.5, // Agnes AI — ücretsiz ama gray-release/sınırlı erişim, kanıtlanmış gibi öne alınmadı
   openrouter: 4, // birçok ücretsiz model
   pollinations: 5, // anahtarsız taban
   ovh: 5.5, // anahtarsız (anonim 2 istek/dk — paylaşımlı, bu yüzden tabandan sonra)

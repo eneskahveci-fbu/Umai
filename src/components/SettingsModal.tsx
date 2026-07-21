@@ -541,6 +541,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     hf: "https://huggingface.co/settings/tokens",
     github: "https://github.com/settings/tokens",
     nvidia: "https://build.nvidia.com",
+    agnes: "https://agnes-ai.com",
   };
   /* PRESET etiketinden kısa, temiz ad (emoji + parantez kırpılır). */
   const cleanLabel = (p: Provider) => PRESETS[p].label.replace(/\s*\([^)]*\)\s*$/, "").replace(/^[^\p{L}]*/u, "").trim();
