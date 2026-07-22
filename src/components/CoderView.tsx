@@ -239,13 +239,15 @@ function ModelSwitcher() {
       </button>
     );
   }
+  const activeLabel = active?.label || active?.model || "Model seç";
   return (
     <MoreMenu
-      placement="bottom"
+      placement="top"
+      title={activeLabel}
       icon={
-        <span className="flex items-center gap-1.5 text-sm">
+        <span className="flex items-center gap-1.5 text-sm" title={activeLabel}>
           <span className="w-1.5 h-1.5 rounded-full bg-green shrink-0" />
-          <span className="truncate max-w-[160px] sm:max-w-[220px] font-semibold text-ink">{active?.label || active?.model || "Model seç"}</span>
+          <span className="truncate max-w-[140px] sm:max-w-[200px] font-semibold text-ink">{activeLabel}</span>
           <ChevronDown size={13} className="text-muted/50 shrink-0" />
         </span>
       }
@@ -2886,19 +2888,20 @@ export function CoderView() {
           </div>
         </div>
       )}
-      {/* Header — ChatGPT tarzı 3 sütun: sol (sidebar+marka) · orta (model,
-         bar'ın görsel odağı) · sağ (rozetler + tek ⋯ menü). Az kullanılan
-         eylemler (Editör/Skills) ⋯ menüsünün "Hızlı eylemler" bölümüne
-         taşındı — normal (görünür) sohbet için tek giriş noktası artık
-         yalnız Sidebar. "Gizli sohbet" bunun istisnası: farklı bir yetenek
-         (incognito) sunduğundan, Sidebar'da hiç karşılığı olmayan ⋯
-         menüsündeki tek yolu kalıyor (Ctrl/Cmd+Shift+N kısayolu da var,
-         bkz. app/page.tsx). */}
+      {/* Header — Claude tarzı 2 bölge: sol (sidebar+marka) · sağ (rozetler +
+         tek ⋯ menü). Model seçici artık burada değil — composer'ın alt
+         satırında (bkz. "Alt durum çubuğu"), Claude'daki gibi giriş
+         alanının parçası. Az kullanılan eylemler (Editör/Skills) ⋯
+         menüsünün "Hızlı eylemler" bölümüne taşındı — normal (görünür)
+         sohbet için tek giriş noktası artık yalnız Sidebar. "Gizli sohbet"
+         bunun istisnası: farklı bir yetenek (incognito) sunduğundan,
+         Sidebar'da hiç karşılığı olmayan ⋯ menüsündeki tek yolu kalıyor
+         (Ctrl/Cmd+Shift+N kısayolu da var, bkz. app/page.tsx). */}
       <div
-        className="brand-rule shrink-0 grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 sm:gap-2 px-2 sm:px-3 bg-surface/60 backdrop-blur-sm overflow-x-auto scrollbar-none"
+        className="brand-rule shrink-0 flex items-center justify-between gap-1.5 sm:gap-2 px-2 sm:px-3 bg-surface/60 backdrop-blur-sm overflow-x-auto scrollbar-none"
         style={{ height: "calc(3rem + env(safe-area-inset-top))", paddingTop: "env(safe-area-inset-top)" }}
       >
-        <div className="flex items-center gap-2 min-w-0 justify-self-start">
+        <div className="flex items-center gap-2 min-w-0">
           <button
             onClick={() => setSidebarOpen(true)}
             title="Yan panel (Ctrl+B)"
@@ -2923,12 +2926,7 @@ export function CoderView() {
           </div>
         </div>
 
-        {/* Orta: model switcher — bar'ın görsel odağı (ChatGPT'deki gibi ortada). */}
-        <div className="min-w-0 justify-self-center">
-          <ModelSwitcher />
-        </div>
-
-        <div className="flex items-center gap-1 min-w-0 justify-self-end shrink-0">
+        <div className="flex items-center gap-1 min-w-0 shrink-0">
           {/* Token + maliyet — masaüstünde görünür (ayrıntı Ayarlar → Kullanım'da). */}
           {config.models.length > 0 && (
             <div className="hidden sm:block shrink-0">
@@ -3758,8 +3756,11 @@ export function CoderView() {
                 )}
               </div>
 
-              {/* Alt durum çubuğu */}
-              <div className="flex flex-wrap items-center justify-end gap-y-1 mt-2 px-0.5">
+              {/* Alt durum çubuğu — sol: model seçici (Claude'daki gibi giriş
+                  alanının bir parçası, artık ayrı bir üst header'da değil).
+                  Sağ: aktif mod rozetleri. */}
+              <div className="flex flex-wrap items-center justify-between gap-y-1 mt-2 px-0.5">
+                <ModelSwitcher />
                 <StatusBar
                   safeMode={config.safeMode}
                   web={lastPilot?.web}
