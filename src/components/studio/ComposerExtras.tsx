@@ -339,7 +339,7 @@ export function TemplatePicker({ onPick }: { onPick: (t: StudioTemplate) => void
                   style={{ background: `linear-gradient(135deg, ${t.accent}, ${t.accent}55)` }}
                   aria-hidden
                 />
-                <span className="text-[10px] font-medium text-center leading-tight truncate w-full">{t.name}</span>
+                <span className="text-[10px] font-medium text-center leading-tight line-clamp-2 w-full">{t.name}</span>
               </button>
             ))
           )}

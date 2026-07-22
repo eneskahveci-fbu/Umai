@@ -130,7 +130,7 @@ export function MapStudio() {
 
   const slimActionsRow = view === "work" && map && (
     <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
-      <button onClick={() => { setMap(null); setView("home"); setBrief(""); setSelectedId(null); }} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink shrink-0">+ Yeni</button>
+      <button onClick={() => { setMap(null); setView("home"); setBrief(""); setSelectedId(null); }} className="text-xs px-2.5 py-2 sm:py-1 rounded-lg border border-line text-muted hover:text-ink hover:bg-bgsoft shrink-0 transition-colors">+ Yeni</button>
       <input
         value={map.title}
         onChange={(e) => setMap({ ...map, title: e.target.value })}
@@ -139,8 +139,8 @@ export function MapStudio() {
         aria-label="Kroki başlığı"
       />
       <div className="ml-auto flex items-center gap-1 shrink-0">
-        <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
-        <button onClick={saveMap} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+        <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-9 h-9 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
+        <button onClick={saveMap} title="Kaydet" className="w-9 h-9 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
         <ExportMenu
           options={[
             { key: "svg", label: "SVG indir", icon: <Download size={14} className="text-brand" />, onSelect: () => downloadBlob(mapToSvg(map), "image/svg+xml;charset=utf-8", `${safeFileName(map.title, "kroki")}.svg`) },

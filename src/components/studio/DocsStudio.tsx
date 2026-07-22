@@ -260,17 +260,17 @@ export function DocsStudio() {
 
   const slimActionsRow = view === "work" && doc && (
     <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
-      <button onClick={() => { setDoc(null); setView("home"); setBrief(""); }} className="text-xs px-2.5 py-1 rounded-lg border border-line text-muted hover:text-ink shrink-0">+ Yeni</button>
+      <button onClick={() => { setDoc(null); setView("home"); setBrief(""); }} className="text-xs px-2.5 py-2 sm:py-1 rounded-lg border border-line text-muted hover:text-ink hover:bg-bgsoft shrink-0 transition-colors">+ Yeni</button>
       <div className="ml-auto flex items-center gap-1 shrink-0">
-        <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
-        <button onClick={saveDoc} title="Kaydet" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
-        <button onClick={() => void runProofread()} title="Yazım denetimi (AI)" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors disabled:opacity-40" disabled={proofBusy}>
+        <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-9 h-9 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
+        <button onClick={saveDoc} title="Kaydet" className="w-9 h-9 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
+        <button onClick={() => void runProofread()} title="Yazım denetimi (AI)" className="w-9 h-9 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors disabled:opacity-40" disabled={proofBusy}>
           {proofBusy ? <Loader2 size={15} className="animate-spin" /> : <SpellCheck size={15} />}
         </button>
         <button
           onClick={() => pickTemplateFile((t) => { if (t.kind === "doc") openDoc(t.data); else addToast("Bu dosya bir doküman şablonu değil.", "error"); }, (m) => addToast(m, "error"))}
           title="Şablon içe aktar (.json)"
-          className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"
+          className="w-9 h-9 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"
         ><Download size={15} className="rotate-180" /></button>
         <ExportMenu
           options={[
