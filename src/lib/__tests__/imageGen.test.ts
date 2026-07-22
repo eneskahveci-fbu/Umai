@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { pickImageModel, IMAGE_PROVIDERS } from "../imageGen";
-import type { ModelProfile } from "../types";
+import { pickImageModel, pickImageProvider, IMAGE_PROVIDERS } from "../imageGen";
+import type { Config, ModelProfile } from "../types";
 
 const mk = (provider: ModelProfile["provider"], id = provider): ModelProfile => ({
   id, label: id, provider, baseUrl: "", model: "m", apiKey: "k",
 });
+
+const mkConfig = (over: Partial<Config> = {}): Config => ({ models: [], ...over } as Config);
 
 describe("pickImageModel — sağlayıcı önceliği", () => {
   it("görüntü-yetenekli sağlayıcı yoksa null", () => {
@@ -22,5 +24,38 @@ describe("pickImageModel — sağlayıcı önceliği", () => {
   });
   it("öncelik listesi /api/image'ın desteklediği kümedir", () => {
     expect([...IMAGE_PROVIDERS]).toEqual(["gemini", "openai", "xai", "hf"]);
+  });
+});
+
+describe("pickImageProvider — Ayarlar → Görsel üretimi tercihi (bkz. imageModelProvider)", () => {
+  it("tercih yoksa (varsayılan) auto gibi davranır: öncelik sırasına göre seçer", async () => {
+    const cfg = mkConfig({ models: [mk("hf"), mk("openai")] });
+    expect((await pickImageProvider(cfg))?.provider).toBe("openai");
+  });
+
+  it("'pollinations' seçiliyse BYOK anahtarı olsa bile null döner (zorla ücretsiz)", async () => {
+    const cfg = mkConfig({ models: [mk("gemini"), mk("openai")], imageModelProvider: "pollinations" });
+    expect(await pickImageProvider(cfg)).toBeNull();
+  });
+
+  it("belirli bir sağlayıcı sabitlenmişse ve modeli/anahtarı varsa ONU döner (öncelik sırasını atlar)", async () => {
+    const cfg = mkConfig({ models: [mk("gemini"), mk("hf")], imageModelProvider: "hf" });
+    expect((await pickImageProvider(cfg))?.provider).toBe("hf");
+  });
+
+  it("sabitlenen sağlayıcının modeli artık yoksa sessizce auto (öncelik sıralı) davranışa düşer", async () => {
+    const cfg = mkConfig({ models: [mk("gemini"), mk("hf")], imageModelProvider: "openai" });
+    expect((await pickImageProvider(cfg))?.provider).toBe("gemini");
+  });
+
+  it("sabitlenen sağlayıcının anahtarı boşsa (model var ama key yok) auto'ya düşer", async () => {
+    const noKey: ModelProfile = { id: "hf2", label: "hf2", provider: "hf", baseUrl: "", model: "m", apiKey: "" };
+    const cfg = mkConfig({ models: [noKey, mk("gemini")], imageModelProvider: "hf" });
+    expect((await pickImageProvider(cfg))?.provider).toBe("gemini");
+  });
+
+  it("hiç görüntü-yetenekli model yoksa (herhangi bir tercihte) null döner", async () => {
+    expect(await pickImageProvider(mkConfig({ models: [mk("groq")] }))).toBeNull();
+    expect(await pickImageProvider(mkConfig({ models: [mk("groq")], imageModelProvider: "gemini" }))).toBeNull();
   });
 });
