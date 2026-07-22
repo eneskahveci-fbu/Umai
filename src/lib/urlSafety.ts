@@ -6,12 +6,8 @@
    tam engellemez (bunun için çözümleme gerekir) ama yaygın saldırı yüzeyini
    (literal iç IP'ler, localhost, özel aralıklar) kapatır. */
 
-/** IPv4 literalini özel/dahili aralıkta mı diye kontrol eder. */
-function isPrivateIPv4(host: string): boolean {
-  const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (!m) return false;
-  const o = m.slice(1).map(Number);
-  if (o.some((n) => n > 255)) return true; // geçersiz → reddet
+/** Dört sekizli (0-255) → özel/dahili aralık kontrolü (kanonik biçim). */
+function octetsArePrivate(o: number[]): boolean {
   const [a, b] = o;
   if (a === 0 || a === 127) return true;              // 0.0.0.0/8, loopback
   if (a === 10) return true;                          // 10/8
@@ -20,6 +16,51 @@ function isPrivateIPv4(host: string): boolean {
   if (a === 169 && b === 254) return true;            // link-local + metadata
   if (a === 100 && b >= 64 && b <= 127) return true;  // CGNAT 100.64/10
   return false;
+}
+
+/** IPv4'ün TÜM meşru gösterimlerini kanonik dört-sekizliye çözer; IPv4 değilse null.
+ *  WHATWG URL host ayrıştırıcısı bu biçimleri OLDUĞU GİBİ bırakır ama Node/OS
+ *  DNS çözümleyicisi (getaddrinfo/inet_aton) hepsini aynı adrese çözer:
+ *    2130706433 (decimal), 0x7f000001 (hex), 0177.0.0.1 (octal), 127.1 (kısa).
+ *  Yalnız dotted-decimal'i kontrol etmek bu kodlamalarla loopback/metadata'ya
+ *  SSRF bypass'ına açık kapı bırakıyordu — hepsini normalize edip kontrol et. */
+function parseIPv4(host: string): number[] | null {
+  const parts = host.split(".");
+  if (parts.length === 0 || parts.length > 4) return null;
+  /* Her parça decimal/hex(0x)/octal(0…) olabilir (inet_aton semantiği). */
+  const nums: number[] = [];
+  for (const p of parts) {
+    if (p === "") return null;
+    let n: number;
+    if (/^0[xX][0-9a-fA-F]+$/.test(p)) n = parseInt(p, 16);
+    else if (/^0[0-7]+$/.test(p)) n = parseInt(p, 8);
+    else if (/^[0-9]+$/.test(p)) n = parseInt(p, 10);
+    else return null; // sayısal olmayan parça → IPv4 değil (alan adı)
+    if (!Number.isFinite(n) || n < 0) return null;
+    nums.push(n);
+  }
+  /* inet_aton: son parça kalan tüm baytları doldurur (a, a.b, a.b.c, a.b.c.d). */
+  const octets = new Array<number>(4).fill(0);
+  const n = nums.length;
+  for (let i = 0; i < n - 1; i++) {
+    if (nums[i]! > 255) return null;
+    octets[i] = nums[i]!;
+  }
+  const last = nums[n - 1]!;
+  const maxLast = Math.pow(256, 4 - (n - 1)) - 1;
+  if (last > maxLast) return null;
+  /* Son değeri kalan sekizlilere böl (big-endian). */
+  for (let i = 3; i >= n - 1; i--) {
+    octets[i] = Math.floor(last / Math.pow(256, 3 - i)) % 256;
+  }
+  return octets;
+}
+
+/** IPv4 literalini (her kodlamada) özel/dahili aralıkta mı diye kontrol eder. */
+function isPrivateIPv4(host: string): boolean {
+  const octets = parseIPv4(host);
+  if (!octets) return false; // IPv4 değil (alan adı) → burada karar verme
+  return octetsArePrivate(octets);
 }
 
 /** Kullanıcı URL'ini yönlendirmeleri TEK TEK doğrulayarak getirir.
