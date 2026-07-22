@@ -77,6 +77,22 @@ describe("isSafeRemoteUrl", () => {
     expect(isSafeRemoteUrl("http://169.254.169.254/latest/meta-data/")).toBe(false);
   });
 
+  it("noktalı-ondalık OLMAYAN IP kodlamalarıyla loopback bypass'ını reddeder", () => {
+    expect(isSafeRemoteUrl("http://2130706433/")).toBe(false);       // decimal 127.0.0.1
+    expect(isSafeRemoteUrl("http://0x7f000001/")).toBe(false);       // hex 127.0.0.1
+    expect(isSafeRemoteUrl("http://0177.0.0.1/")).toBe(false);       // octal 127.0.0.1
+    expect(isSafeRemoteUrl("http://127.1/")).toBe(false);            // kısa 127.0.0.1
+    expect(isSafeRemoteUrl("http://0x7f.0.0.1/")).toBe(false);       // karışık hex
+    expect(isSafeRemoteUrl("http://2852039166/")).toBe(false);       // decimal 169.254.169.254
+    expect(isSafeRemoteUrl("http://0/")).toBe(false);                // 0.0.0.0
+    expect(isSafeRemoteUrl("http://017700000001/")).toBe(false);     // octal 127.0.0.1
+  });
+
+  it("meşru genel IP'leri sayısal biçimlerde de kabul eder", () => {
+    expect(isSafeRemoteUrl("http://134744072/")).toBe(true);         // decimal 8.8.8.8
+    expect(isSafeRemoteUrl("http://0x08080808/")).toBe(true);        // hex 8.8.8.8
+  });
+
   it("IPv4-mapped IPv6 iç adresi reddeder", () => {
     expect(isSafeRemoteUrl("http://[::ffff:10.0.0.1]/")).toBe(false);
   });

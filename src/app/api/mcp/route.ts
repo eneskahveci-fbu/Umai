@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { checkLimit } from "@/lib/rate-limit";
-import { isSafeRemoteUrl } from "@/lib/urlSafety";
+import { isSafeRemoteUrl, safeFetch } from "@/lib/urlSafety";
 import { isBuiltinMcpServerId } from "@/lib/mcpBuiltins";
 
 export const runtime = "nodejs";
@@ -20,8 +20,14 @@ function sameOrigin(req: Request): boolean {
   try { return new URL(origin).host === host; } catch { return false; }
 }
 
-async function fetchMcpTools(server: McpServerConfig): Promise<{ name: string; description: string; inputSchema: object }[]> {
-  const res = await fetch(`${server.url}/tools/list`, {
+/* Güvenilir (builtin/own-origin) sunucularda ham fetch; DIŞ sunucularda safeFetch
+   → her yönlendirme hop'u isSafeRemoteUrl'den yeniden geçer, aksi halde public bir
+   MCP URL'i 302 ile iç ağa/metadata'ya (169.254.169.254) sıçrayıp yanıtı çağırana
+   döndürebilirdi (read SSRF). Builtin'ler own-origin'e mutlaklaştığından (localhost
+   dev'de safeFetch onları yanlışlıkla engellerdi) ham fetch kullanır. */
+async function fetchMcpTools(server: McpServerConfig, trusted: boolean): Promise<{ name: string; description: string; inputSchema: object }[]> {
+  const doFetch = trusted ? fetch : (u: string, i?: RequestInit) => safeFetch(u, i);
+  const res = await doFetch(`${server.url}/tools/list`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(server.headers ?? {}) },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
@@ -36,8 +42,10 @@ async function callMcpTool(
   server: McpServerConfig,
   toolName: string,
   args: Record<string, unknown>,
+  trusted: boolean,
 ): Promise<string> {
-  const res = await fetch(`${server.url}/tools/call`, {
+  const doFetch = trusted ? fetch : (u: string, i?: RequestInit) => safeFetch(u, i);
+  const res = await doFetch(`${server.url}/tools/call`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(server.headers ?? {}) },
     body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: toolName, arguments: args } }),
@@ -67,11 +75,11 @@ export async function POST(req: NextRequest) {
     }
     const server = { ...body.server, url };
     if (body.action === "list") {
-      const tools = await fetchMcpTools(server);
+      const tools = await fetchMcpTools(server, isBuiltin);
       return Response.json({ tools });
     }
     if (body.action === "call" && body.tool) {
-      const result = await callMcpTool(server, body.tool, body.args ?? {});
+      const result = await callMcpTool(server, body.tool, body.args ?? {}, isBuiltin);
       return Response.json({ result });
     }
     return Response.json({ error: "Invalid action" }, { status: 400 });

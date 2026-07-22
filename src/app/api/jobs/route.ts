@@ -159,6 +159,9 @@ export async function DELETE(req: Request) {
   if (!supabase) return Response.json({ ok: true });
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ ok: true });
-  await supabase.from("background_jobs").delete().eq("id", id);
+  /* Savunma derinliği: yalnız RLS'e güvenme — user_id filtresini de ekle. RLS
+     delete politikası eksik/yanlış yapılandırılırsa, id bilen biri başkasının
+     job'unu silebilirdi. */
+  await supabase.from("background_jobs").delete().eq("id", id).eq("user_id", user.id);
   return Response.json({ ok: true });
 }
