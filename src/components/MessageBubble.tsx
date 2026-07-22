@@ -1032,6 +1032,19 @@ function MessageBubbleImpl({
                 rehypePlugins={[rehypeHighlight, rehypeKatex]}
                 components={{
                   pre: CodeBlock,
+                  /* generate_image ARACI çağrıldıktan sonra model kendi metnine
+                     '![prompt](url)' markdown'ı gömer — bu ReactMarkdown'ın ÇIPLAK
+                     <img>'ına düşüyordu: Pollinations URL'i İSTEK ANINDA (ilk fetch'te)
+                     üretir, yani görsel birkaç saniye sürebilir; çıplak <img> bu süre
+                     boyunca hiçbir gösterge vermeden boş/kırık ikon gösteriyordu
+                     ("kozmetik olarak kötü" — kullanıcı raporu). Aynı üretimin ESKİ
+                     (/gorsel komut) yolu için zaten var olan, kanıtlanmış GeneratedImage
+                     (shimmer + nefes alan Sparkles + yumuşak geçiş + oto-yeniden-dene)
+                     bileşenini burada da kullan — iki yol da artık aynı animasyona sahip. */
+                  img: function MarkdownImage({ src, alt }: { src?: string | Blob; alt?: string }) {
+                    if (typeof src !== "string" || !src) return null;
+                    return <GeneratedImage src={src} alt={alt} />;
+                  },
                   /* Geniş tablolar taşmasın — yatay kaydırmalı sarmalayıcı. */
                   table: (props) => (
                     <div className="table-wrap">
