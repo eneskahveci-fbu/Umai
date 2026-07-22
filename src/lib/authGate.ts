@@ -1,17 +1,19 @@
 "use client";
 
-/* Uygulama yüzeyi rotaları (/studio*) için paylaşılan giriş kapısı + tema
-   uygulayıcı. /app kendi (daha kapsamlı) akışını korur; bu kanca yeni
-   rotaların aynı kurallarla korunmasını sağlar: Supabase yapılandırılmışsa
-   oturumsuz kullanıcı /login'e gider; kullanıcı kimliği store'a yazılır
-   (saveConfig'in Supabase senkronu çalışsın diye). */
+/* Uygulama yüzeyi rotaları için paylaşılan kimlik durumu + tema uygulayıcı.
+   Kullanıcı kimliği store'a yazılır (saveConfig'in Supabase senkronu
+   çalışsın diye); Supabase yapılandırılmışsa oturum kontrol edilir. */
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient, supabaseConfigured } from "./supabase/client";
 import { useStore } from "./store";
 
-export function useAuthGate(): "checking" | "in" | "out" {
-  const router = useRouter();
+/** Yalnız kimlik DURUMUNU döner, asla yönlendirmez — "önce dene, sonra
+    kaydol" (prompt.md Hamle 2) felsefesinin /app dışındaki yüzeylere de
+    (Stüdyo/Ayarlar/Kütüphane) taşınmış hali: misafir kullanıcı bu sayfaları
+    da açabilir, yalnız hesap gerektiren işler (bulut senkronu vb.) "out"
+    durumunda sessizce atlanır. Yalnızca "checking" render'ı bekletir. */
+export function useAuthState(): "checking" | "in" | "out" {
   const [state, setState] = useState<"checking" | "in" | "out">(
     supabaseConfigured ? "checking" : "in",
   );
@@ -26,6 +28,16 @@ export function useAuthGate(): "checking" | "in" | "out" {
       setState(u ? "in" : "out");
     });
   }, []);
+
+  return state;
+}
+
+/** Girişi ZORUNLU kılan yüzeyler için: oturumsuz kullanıcıyı /login'e yönlendirir.
+    Misafir-erişimli yüzeyler (Stüdyo/Ayarlar/Kütüphane) artık bunun yerine
+    üstteki useAuthState()'i doğrudan kullanır — bkz. /app'teki aynı desen. */
+export function useAuthGate(): "checking" | "in" | "out" {
+  const router = useRouter();
+  const state = useAuthState();
 
   useEffect(() => {
     if (state === "out") {

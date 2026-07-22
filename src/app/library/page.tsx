@@ -4,7 +4,7 @@ import { ArrowLeft, BookOpen, FileText, Images, LayoutPanelTop, ListChecks, Wren
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
-import { useAuthGate, useThemeClasses } from "@/lib/authGate";
+import { useAuthState, useThemeClasses } from "@/lib/authGate";
 import type { MediaAsset } from "@/lib/types";
 
 type Tab = "all" | "media" | "design" | "docs" | "forms" | "notebooks";
@@ -19,9 +19,11 @@ const tabs: { id: Tab; label: string; icon: typeof Images }[] = [
 ];
 
 export default function LibraryPage() {
-  /* /studio ve /app ile AYNI giriş kapısı (tutarlılık) + tema sınıfları
-     (koyu/açık tercihi bu bağımsız rotada da uygulansın). */
-  const auth = useAuthGate();
+  /* /studio ve /app ile AYNI misafir-erişimli davranış (tutarlılık) + tema
+     sınıfları (koyu/açık tercihi bu bağımsız rotada da uygulansın). Kütüphane
+     yalnız yerel config'i (mediaAssets/studioProjects/craftDocs vb.) okuduğundan
+     hesap gerektirmez. */
+  const auth = useAuthState();
   useThemeClasses();
   const router = useRouter();
   const config = useStore((s) => s.config);
@@ -30,7 +32,7 @@ export default function LibraryPage() {
   const media = useMemo(() => [...(config.mediaAssets ?? [])].sort((a, b) => b.createdAt - a.createdAt), [config.mediaAssets]);
   const show = (kind: Tab) => tab === "all" || tab === kind;
 
-  if (auth !== "in") {
+  if (auth === "checking") {
     return <div className="h-screen grid place-items-center bg-bg text-muted/60 text-sm">Yükleniyor…</div>;
   }
 
