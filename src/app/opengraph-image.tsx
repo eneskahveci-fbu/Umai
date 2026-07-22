@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "UMAI — AI kod asistanı";
+export const alt = "UMAI — Yapay Zeka Stüdyosu";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -69,7 +69,7 @@ export default function OpengraphImage() {
             marginBottom: 24,
           }}
         >
-          Terminalin ve tarayıcın için AI kod asistanı
+          Herkes için yapay zeka stüdyosu
         </div>
         <div
           style={{
@@ -80,7 +80,7 @@ export default function OpengraphImage() {
             lineHeight: 1.4,
           }}
         >
-          Hugging Face · DeepSeek · OpenRouter · Ollama — istediğin modelle
+          Web sitesi, sunum, görsel, sohbet ve kod — tek yerde, kurulum yok
         </div>
         <div
           style={{
@@ -91,10 +91,10 @@ export default function OpengraphImage() {
           }}
         >
           {[
+            "Stüdyo",
             "Sohbet",
+            "Görsel Üretimi",
             "GitHub Coder",
-            "Gizli mod",
-            "Çoklu model",
           ].map((tag) => (
             <div
               key={tag}

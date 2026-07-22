@@ -32,13 +32,17 @@ const notoEmoji = Noto_Emoji({
 
 export const metadata: Metadata = {
   title: {
-    default: "UMAI — AI kod asistanı",
+    default: "UMAI — Yapay Zeka Stüdyosu",
     template: "%s — UMAI",
   },
   description:
-    "OpenAI-uyumlu herhangi bir modelle çalışan AI kod asistanı. Sohbet, gizli sohbet, geçmiş senkron ve GitHub deposuna bağlı Coder sekmesi.",
+    "Herkes için yapay zeka stüdyosu. Web sitesi ve sunum tasarla, görsel üret, her şeyi sor — ya da kod yazıp GitHub/GitLab depona bağlan. Kurulum yok, ücretsiz başlar.",
   keywords: [
+    "yapay zeka stüdyosu",
     "AI kod asistanı",
+    "web sitesi tasarımı",
+    "sunum tasarımı",
+    "görsel üretimi",
     "yapay zeka",
     "Hugging Face",
     "DeepSeek",
@@ -59,9 +63,9 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "UMAI — AI kod asistanı",
+    title: "UMAI — Yapay Zeka Stüdyosu",
     description:
-      "İstediğin modelle çalışan AI kod asistanı. Sohbet, GitHub Coder, gizli mod.",
+      "Herkes için yapay zeka stüdyosu. Web sitesi ve sunum tasarla, görsel üret, her şeyi sor — ya da kod yazıp deponuza bağlanın.",
     siteName: "UMAI",
     type: "website",
     locale: "tr_TR",
@@ -69,9 +73,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "UMAI — AI kod asistanı",
+    title: "UMAI — Yapay Zeka Stüdyosu",
     description:
-      "İstediğin modelle çalışan AI kod asistanı. Sohbet, GitHub Coder, gizli mod.",
+      "Herkes için yapay zeka stüdyosu. Web sitesi ve sunum tasarla, görsel üret, her şeyi sor — ya da kod yazıp deponuza bağlanın.",
   },
   robots: {
     index: true,

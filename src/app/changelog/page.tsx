@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { CHANGELOG_ENTRIES, type ChangelogTag } from "@/lib/changelog";
+import { MarketingHeader, OpenAppCta } from "@/components/MarketingHeader";
 
 export const metadata: Metadata = {
   title: "Değişiklikler — UMAI",
@@ -43,19 +44,7 @@ export default function ChangelogPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-bg text-ink">
-      <nav className="sticky top-0 z-50 backdrop-blur-md bg-bg/85 border-b border-line/40">
-        <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
-            <ArrowLeft size={15} /> UMAI
-          </Link>
-          <Link
-            href="/app"
-            className="bg-brand hover:bg-branddim text-[#111110] font-semibold px-4 py-2 rounded-xl text-sm transition-colors"
-          >
-            Uygulamayı Aç
-          </Link>
-        </div>
-      </nav>
+      <MarketingHeader maxWidthClass="max-w-3xl" right={<OpenAppCta />} />
 
       <main className="max-w-3xl mx-auto px-6 py-16 w-full flex-1">
         <div className="mb-14 text-center">

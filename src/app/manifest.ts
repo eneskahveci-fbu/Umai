@@ -2,10 +2,10 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "UMAI — AI kod asistanı",
+    name: "UMAI — Yapay Zeka Stüdyosu",
     short_name: "UMAI",
     description:
-      "OpenAI-uyumlu herhangi bir modelle çalışan AI kod asistanı.",
+      "Herkes için yapay zeka stüdyosu. Web sitesi ve sunum tasarla, görsel üret, her şeyi sor — ya da kod yazıp deponuza bağlanın.",
     start_url: "/app",
     id: "/app",
     scope: "/",
