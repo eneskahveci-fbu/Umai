@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, type Dispatch, type SetStateAction } from "react";
 import {
   ArrowUp, BarChart3, BookOpen, Code2, FileText,
   Layers, ListChecks, Network, Paperclip, Palette, Presentation, Sparkles,
@@ -78,7 +78,10 @@ export function StudioHomeScreen({
   pendingImages, onAddImages, onRemoveImage,
 }: {
   brief: string;
-  setBrief: (s: string) => void;
+  /* Gerçek dispatcher (parent useState setter'ı): functional updater'a izin verir —
+     VoiceButton'ın art arda final transkriptlerinde bayat `brief` üzerine yazmasını
+     önler (aksi halde ikinci sonuç ilkini düşürebiliyordu). */
+  setBrief: Dispatch<SetStateAction<string>>;
   onSubmit: (text: string) => void;
   busy: boolean;
   onPickTemplate: (t: StudioTemplate) => void;
@@ -156,7 +159,7 @@ export function StudioHomeScreen({
                   <VoiceButton
                     pill
                     onTranscript={(text, isFinal) => {
-                      if (isFinal) setBrief((brief ? `${brief} ` : "") + text);
+                      if (isFinal) setBrief((cur) => (cur ? `${cur} ` : "") + text);
                     }}
                   />
                 </div>
