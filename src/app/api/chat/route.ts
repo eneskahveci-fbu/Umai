@@ -100,6 +100,11 @@ interface ChatRequest {
   /** Faz 6 — yalnız generate_image: repo bağlı olmasa/Tools kapalı olsa bile
       bu TEK aracı tool-loop'a ekler (bkz. autoPilot.ts'teki autoImageGen). */
   imageGen?: boolean;
+  /** İstemcinin (Ayarlar → Model → Görsel üretimi tercihine göre, bkz.
+      imageGen.ts pickImageProvider) ÖNCEDEN çözdüğü BYOK görsel sağlayıcısı +
+      anahtarı. Verilmezse (ya da üretim başarısız olursa) generate_image
+      anahtarsız Pollinations tabanına düşer — "istek asla düşmez" sözleşmesi. */
+  imageModel?: { provider: string; apiKey: string };
   requireWriteApproval?: boolean;
   safeMode?: boolean;
   toolPermissions?: Record<string, boolean>;
@@ -1768,13 +1773,14 @@ export async function POST(req: Request) {
             return;
           }
           /* generate_image: doğal dilden ("bana X görseli yap") tetiklenen görsel
-             üretimi — anahtarsız Pollinations tabanı (aynı, kanıtlanmış URL
-             kurucusu — /gorsel slash-komutunun kullandığı ile BİREBİR aynı
-             pipeline, yalnızca tetikleme yolu farklı: LLM kendi kararıyla
-             çağırıyor). Faz 6 (kullanıcı kararı): bu TEK araç repo bağlı
-             OLMASA da çalışır — Pollinations URL kurucusu zaten repoCtx'e
-             hiç ihtiyaç duymuyordu, kısıtlama yalnız mimari tutarlılık için
-             vardı. deep_research/dispatch_agents hâlâ repo gerektiriyor. */
+             üretimi. Faz 6 (kullanıcı kararı): bu TEK araç repo bağlı OLMASA da
+             çalışır. ÖNCELİK: istemci bir BYOK görsel sağlayıcısı çözdüyse
+             (Ayarlar → Model → Görsel üretimi tercihi, bkz. body.imageModel)
+             önce ONU dene — kullanıcının aktif sohbet modeli neyse görsel
+             üretiminin sessizce hep Pollinations'a düşmesi kafa karıştırıcıydı
+             ("Model X seçili ama Pollinations kullanılıyor" raporu). BYOK
+             yoksa/başarısız olursa anahtarsız Pollinations tabanına düş — aynı,
+             kanıtlanmış URL kurucusu (/gorsel komutuyla BİREBİR aynı pipeline). */
           if (tc.name === "generate_image") {
             const prompt = String(args.prompt ?? "").trim();
             const fail = (m: string) => {
@@ -1788,8 +1794,30 @@ export async function POST(req: Request) {
               portrait: { width: 768, height: 1280 },
             };
             const dims = DIMENSIONS[String(args.aspect_ratio ?? "square")] ?? DIMENSIONS.square;
-            const url = pollinationsImageUrl(prompt, { ...dims, seed: stableSeed(prompt) });
-            const markdown = `![${prompt.slice(0, 120)}](${url})`;
+            let markdown: string | null = null;
+            if (body.imageModel?.provider && body.imageModel?.apiKey) {
+              try {
+                const byokRes = await fetch(`${ownOrigin}/api/image`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    provider: body.imageModel.provider,
+                    apiKey: body.imageModel.apiKey,
+                    prompt,
+                    size: `${dims.width}x${dims.height}`,
+                  }),
+                  signal: AbortSignal.timeout(70_000),
+                });
+                const byokData = await byokRes.json().catch(() => ({})) as { image?: string; error?: string };
+                if (byokRes.ok && byokData.image) {
+                  markdown = `![${prompt.slice(0, 120)}](${byokData.image})`;
+                }
+              } catch { /* BYOK başarısız → aşağıda Pollinations'a düş */ }
+            }
+            if (!markdown) {
+              const url = pollinationsImageUrl(prompt, { ...dims, seed: stableSeed(prompt) });
+              markdown = `![${prompt.slice(0, 120)}](${url})`;
+            }
             safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: "Görsel üretildi" } })}\n\n`));
             resultById.set(tc.id, markdown);
             return;

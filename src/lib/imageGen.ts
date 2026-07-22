@@ -31,8 +31,22 @@ export function pickImageModel(models: ModelProfile[]): ModelProfile | null {
 }
 
 /** Config'ten kullanılabilir BYOK görsel sağlayıcısını + çözülmüş anahtarını
-    döndürür; uygun model veya anahtar yoksa null (→ Pollinations tabanı). */
+    döndürür; uygun model veya anahtar yoksa null (→ Pollinations tabanı).
+    `config.imageModelProvider` (Ayarlar → Model → Görsel üretimi) tercihini
+    onurlandırır: "pollinations" ise BYOK'a hiç bakmadan direkt null döner
+    (kullanıcı ücretsiz tabanı bilerek seçmiştir); belirli bir sağlayıcı
+    sabitlenmişse önce ONU dener, model/anahtar artık yoksa "auto" (öncelik
+    sıralı) davranışa sessizce düşer. */
 export async function pickImageProvider(config: Config): Promise<{ provider: ImageProvider; apiKey: string } | null> {
+  const pref = config.imageModelProvider ?? "auto";
+  if (pref === "pollinations") return null;
+  if (pref !== "auto") {
+    const pinned = config.models.find((m) => m.provider === pref);
+    if (pinned) {
+      const apiKey = await resolveModelApiKey(pinned, config.providerKeys);
+      if (apiKey) return { provider: pref, apiKey };
+    }
+  }
   const model = pickImageModel(config.models);
   if (!model) return null;
   const apiKey = await resolveModelApiKey(model, config.providerKeys);

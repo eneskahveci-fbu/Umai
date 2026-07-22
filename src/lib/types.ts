@@ -645,6 +645,13 @@ export interface Config {
   /** "high" kademesinde taslak üretecek `models` id'leri (en fazla 3) — boşsa
       craft en uygun modelleri kendisi seçer (eski fusionMode "auto"). */
   qualityModelIds?: string[];
+  /** Görsel üretimi (generate_image aracı + /gorsel komutu) hangi sağlayıcıyı
+      kullansın: "auto" (varsayılan) — kullanıcının EKLEDİĞİ modeller arasından
+      görüntü-yetenekli ilkini önceliğe göre seçer (bkz. imageGen.ts IMAGE_PROVIDERS),
+      "pollinations" — anahtar gerektirmeyen ücretsiz tabanı ZORLA kullan (BYOK
+      anahtarı olsa bile), ya da belirli bir sağlayıcıyı SABİTLE. Sabitlenen
+      sağlayıcı için model/anahtar artık yoksa sessizce "auto" davranışına döner. */
+  imageModelProvider?: "auto" | "pollinations" | "gemini" | "openai" | "xai" | "hf";
 }
 
 export interface RepoState {

@@ -1802,6 +1802,20 @@ export function CoderView() {
        araç sunucudaki tool-loop'a eklenir (bkz. api/chat/route.ts'in
        body.imageGen dalı). deep_research/dispatch_agents hâlâ repo ister. */
     const wantImageGen = !!pilot?.image;
+    /* Sunucu (route.ts'in generate_image işleyicisi) her zaman anahtarsız
+       Pollinations'a düşüyordu — kullanıcının Ayarlar → Model'de seçtiği/
+       eklediği modelden TAMAMEN bağımsız, kafa karıştırıcıydı ("Model X seçili
+       ama Pollinations kullanılıyor" raporu). Ayarlar → Görsel üretimi
+       tercihine göre (auto/pollinations/sabit sağlayıcı) BYOK sağlayıcıyı
+       burada, istekten ÖNCE çöz ve sunucuya ilet — /gorsel komutunun zaten
+       kullandığı AYNI pickImageProvider mantığı. */
+    let imageModelPref: { provider: string; apiKey: string } | null = null;
+    if (wantImageGen) {
+      try {
+        const { pickImageProvider } = await import("@/lib/imageGen");
+        imageModelPref = await pickImageProvider(store.config);
+      } catch { /* yoksay → sunucu Pollinations tabanına düşer */ }
+    }
     /* Ajan Ekibi / Araştırma turunda otomatik EN GÜÇLÜ modeli kullan (ayar açıksa)
        → en yetenekli modelle çalışır. Hata olursa (kredi/anahtar yok) aşağıdaki
        catch bloğu sessizce AKTİF modele döner ve tekrar dener. */
@@ -2153,6 +2167,7 @@ export function CoderView() {
           tools: toolsEnabled,
           webSearch: wantWeb,
           imageGen: wantImageGen,
+          imageModel: imageModelPref ?? undefined,
           requireWriteApproval: store.config.requireWriteApproval,
           safeMode: store.config.safeMode,
           toolPermissions: store.config.toolPermissions,

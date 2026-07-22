@@ -28,6 +28,7 @@ import {
   Server,
   Sparkles,
   Sun,
+  Image as ImageIcon,
   Trash2,
   User,
   Cpu,
@@ -53,6 +54,7 @@ import { AdminUsers } from "@/components/AdminUsers";
 import { createClient } from "@/lib/supabase/client";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, ALL_TOOL_CATALOG } from "@/lib/constants";
 import { buildFallbackChain, KEYLESS_PROVIDERS } from "@/lib/fallback";
+import { IMAGE_PROVIDERS, IMAGE_PROVIDER_LABEL } from "@/lib/imageGen";
 import { calculateCost, formatCost } from "@/lib/pricing";
 import { quickComplete } from "@/lib/quickComplete";
 import { fetchUserRepos } from "@/lib/github";
@@ -1062,6 +1064,53 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 </div>
               );
             })()}
+
+            {/* Görsel üretimi — hangi sağlayıcı: sohbette "bir X görseli yap"
+               dediğinde (generate_image aracı) ya da /gorsel komutunda hangi
+               sağlayıcı kullanılsın. Önceden HER ZAMAN anahtarsız Pollinations'a
+               düşüyordu, kullanıcının seçtiği/eklediği modelden bağımsız —
+               kafa karıştırıcıydı ("Model X seçili ama Pollinations kullanılıyor"
+               raporu). Yalnız kullanıcının ZATEN eklediği (anahtarı olan)
+               sağlayıcılar listelenir — "halihazırda var olan anahtarlarla". */}
+            <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <ImageIcon size={13} className="text-brand shrink-0" />
+                <span className="text-xs font-bold text-muted uppercase tracking-wide">Görsel üretimi</span>
+              </div>
+              <p className="text-xs text-muted leading-relaxed mb-2.5">
+                Sohbette bir görsel istediğinde hangi sağlayıcı kullanılsın? <b>Otomatik</b>, eklediğin
+                modeller arasından görüntü-yetenekli olanı önceliğe göre (Gemini → OpenAI → xAI → Hugging Face)
+                kendi seçer; istersen ücretsiz Pollinations&apos;ı ya da belirli bir sağlayıcıyı sabitleyebilirsin.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {([
+                  { value: "auto" as const, label: "Otomatik (en iyisi)" },
+                  { value: "pollinations" as const, label: "Pollinations · ücretsiz" },
+                  ...IMAGE_PROVIDERS
+                    .filter((p) => config.models.some((m) => m.provider === p))
+                    .map((p) => ({ value: p, label: IMAGE_PROVIDER_LABEL[p] })),
+                ]).map((opt) => {
+                  const active = (config.imageModelProvider ?? "auto") === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => saveConfig({ ...config, imageModelProvider: opt.value })}
+                      className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+                        active ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink hover:border-brand/40"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {IMAGE_PROVIDERS.every((p) => !config.models.some((m) => m.provider === p)) && (
+                <p className="text-xs text-muted/60 leading-relaxed mt-2.5">
+                  Gemini/OpenAI/xAI/Hugging Face gibi görsel-yetenekli bir model eklersen burada
+                  sabitleyebileceğin bir seçenek olarak görünür.
+                </p>
+              )}
+            </div>
           </section>
         )}
 
