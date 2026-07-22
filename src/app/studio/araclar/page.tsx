@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { StudioHub } from "@/components/studio/StudioHub";
 import { SurfacePage, type SurfaceFlag } from "@/components/studio/SurfacePage";
 
@@ -18,19 +19,32 @@ const TAB_FLAGS: Record<string, SurfaceFlag> = {
    mount'a (router.push) neden oluyordu. Artık hepsi bu TEK rotada; sekme
    değişimi surfaceNav.go()'nun "aynı sayfadaysa yalnız bayrak değiştir"
    dalıyla anında, yeniden mount olmadan gerçekleşiyor. ?tab= yalnız İLK
-   açılışta hangi aracın aktif olacağını belirler (login/page.tsx'teki
-   safeNext ile aynı desen: window.location.search'ten lazy-init, Suspense
-   gerektiren useSearchParams yerine); StudioHub içindeki sekmeler arası
-   geçiş bundan sonra URL'e dokunmaz. */
-export default function ContentToolsPage() {
-  const [flag] = useState<SurfaceFlag>(() => {
-    if (typeof window === "undefined") return "formsStudioOpen";
-    const tab = new URLSearchParams(window.location.search).get("tab") ?? "";
-    return TAB_FLAGS[tab] ?? "formsStudioOpen";
-  });
+   açılışta hangi aracın aktif olacağını belirler.
+
+   BUG (düzeltildi): eskiden `useState(() => window.location.search'ten oku)`
+   ile lazy-init yapılıyordu — /studio/kroki gibi eski bir rotadan `router.
+   replace("/studio/araclar?tab=kroki")` ile gelindiğinde, bu bileşenin İLK
+   render'ı bazen tarayıcı URL'i henüz güncellenmeden önce gerçekleşiyor,
+   `window.location.search` boş okunup HER ZAMAN "anket"e (varsayılan) düşü-
+   yordu — Kroki/Defter/Kartlar kartlarının hiçbiri doğru ekranı açmıyordu.
+   `useSearchParams()` Next.js router'ın kendi reaktif state'i olduğundan bu
+   yarış durumuna hiç girmiyor — her zaman GERÇEKTEN navigasyon edilen rotanın
+   parametrelerini yansıtır. */
+function ContentToolsInner() {
+  const searchParams = useSearchParams();
+  const tab = searchParams.get("tab") ?? "";
+  const flag = TAB_FLAGS[tab] ?? "formsStudioOpen";
   return (
     <SurfacePage flag={flag}>
       <StudioHub />
     </SurfacePage>
+  );
+}
+
+export default function ContentToolsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ContentToolsInner />
+    </Suspense>
   );
 }
