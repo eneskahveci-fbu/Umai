@@ -331,7 +331,14 @@ async function getFileRaw(
   );
   if (!res.ok) return { ok: false, error: `Hata: ${res.status} — dosya bulunamadı (${path})` };
   const data = await res.json();
-  if (data.size > 100_000) return { ok: false, error: `Hata: dosya çok büyük (${data.size} bayt). 100KB üstü desteklenmiyor.` };
+  /* GitHub contents API bir DİZİN için dizi, hata için `{message}` döner — ikisinde
+     de `data.content` yok. `Buffer.from(undefined,...)` TypeError fırlatır; bu
+     fonksiyon checkpoint ön-okumasında (write_file/str_replace) try/catch DIŞINDA
+     çağrıldığından fırlatma tüm stream'i çökertiyordu. Dosya-obje olduğunu doğrula. */
+  if (Array.isArray(data) || typeof data?.content !== "string") {
+    return { ok: false, error: `Hata: '${path}' bir dosya değil (dizin veya erişilemez).` };
+  }
+  if (typeof data.size === "number" && data.size > 100_000) return { ok: false, error: `Hata: dosya çok büyük (${data.size} bayt). 100KB üstü desteklenmiyor.` };
   const content = Buffer.from(data.content, "base64").toString("utf-8");
   cache?.set(path, content);
   return { ok: true, content };
@@ -487,6 +494,7 @@ async function execSearchFiles(ctx: RepoCtx, args: { query: string }): Promise<s
     );
     if (!res.ok) return `Hata: ${res.status}`;
     const data = await res.json();
+    if (!Array.isArray(data)) return `Hata: beklenmeyen yanıt (ağaç alınamadı).`;
     const q = args.query.toLowerCase();
     const matches = (data as { path: string; type: string }[])
       .filter((t) => t.type === "blob" && t.path.toLowerCase().includes(q))
@@ -500,6 +508,9 @@ async function execSearchFiles(ctx: RepoCtx, args: { query: string }): Promise<s
   );
   if (!res.ok) return `Hata: ${res.status}`;
   const data = await res.json();
+  /* Cast, `{message:"..."}` (rate-limit/404) gibi hatalı gövdelerde `.filter`'ı
+     undefined üzerinde çağırıp fırlatıyordu; dizi olduğunu doğrula. */
+  if (!Array.isArray(data?.tree)) return `Hata: beklenmeyen yanıt (ağaç alınamadı).`;
   const q = args.query.toLowerCase();
   const matches = (data.tree as { path: string; type: string }[])
     .filter((t) => t.type === "blob" && t.path.toLowerCase().includes(q))
@@ -967,7 +978,11 @@ async function executeTool(
     }
     /* Try MCP servers for unknown tools */
     for (const srv of (mcpServers ?? [])) {
-      if (!srv.enabled) continue;
+      /* enabled === undefined ise araç LİSTELEMEDE sunuluyor (filtre
+         `s.enabled !== false`), dolayısıyla çalıştırmada da sunulmalı — aksi
+         halde araç modele gösterilip her çağrıda "Bilinmeyen araç" dönüyordu.
+         İki predicate'i eşitle: yalnız açıkça false olanı atla. */
+      if (srv.enabled === false) continue;
       const result = await callMcpTool(srv, name, args, ownOrigin ?? "");
       if (!result.startsWith("MCP hata:")) return result;
     }
@@ -1498,8 +1513,17 @@ export async function POST(req: Request) {
   }
   /* run_command yalnızca istemcide terminal varsa sunulur (yoksa çıktı gelmez). */
   if (!body.terminalAvailable) coderTools = coderTools.filter((t) => t.function.name !== "run_command");
+  /* ask_user (Claude tarzı tıklanabilir anket) düz sohbette de sunulur AMA yalnız
+     tool-YETENEKLİ (anahtarlı) birincil sağlayıcıda: Pollinations/OVH gibi anahtarsız
+     ücretsiz uçlar function-calling desteklemeyip `tools` alanına 400 verebilir →
+     en yaygın ücretsiz sohbet yolunu kırardı (regresyon). Anahtarsızda araç eklenmez;
+     allTools boş kalırsa aşağıda zero-copy passthrough'a düşülür (hız + 400 riski yok),
+     netleştirme GFM-checkbox ikincil yoluyla yine interaktif kalır. */
+  const askUserCapable = !KEYLESS_CHAT_PROVIDERS.has(provider);
   let allTools = [
-    ...(body.tools && body.repoCtx ? coderTools : [ASK_USER_TOOL, ...(body.imageGen ? [GENERATE_IMAGE_TOOL] : [])]),
+    ...(body.tools && body.repoCtx
+      ? coderTools
+      : [...(askUserCapable ? [ASK_USER_TOOL] : []), ...(body.imageGen ? [GENERATE_IMAGE_TOOL] : [])]),
     ...(body.webSearch && !body.blockNetworkTools ? WEB_TOOLS : []),
     ...mcpToolDefs.map((t) => ({
       type: "function" as const,
@@ -1511,6 +1535,54 @@ export async function POST(req: Request) {
   if (body.toolPermissions) {
     const perms = body.toolPermissions;
     allTools = allTools.filter((t) => perms[t.function.name] !== false);
+  }
+
+  /* A1 — düz sohbet hızlı yolu (regresyon düzeltmesi): hiç araç yoksa (anahtarsız
+     düz sohbet: ask_user tool-yetenekli değil, repo/webSearch/imageGen yok) tool-loop
+     yerine ilk başarılı adayın gövdesini ZERO-COPY ilet — hem sıcak yol yeniden
+     kodlama maliyeti ortadan kalkar hem de `tools` alanı hiç gönderilmez (uyumsuz
+     uçlarda 400 riski yok). Şeffaflık (noKeyFallback / birincilden fallback'e geçiş)
+     birebir korunur. wantsFullTools'ta ASLA girme (repo/websearch/imageGen tool-loop'a
+     ait; durability orada). */
+  if (allTools.length === 0 && !wantsFullTools) {
+    const messages = [...systemMessages, ...body.messages];
+    let lastStatus = 502, lastDetail = "", lastCand: Candidate = primary;
+    for (const c of candidates) {
+      let upstream: Response;
+      try {
+        upstream = await openCandidate(c, messages);
+      } catch (err) {
+        lastStatus = 502; lastDetail = (err as Error).message; lastCand = c;
+        continue; // bağlantı hatası → sıradaki aday
+      }
+      if (upstream.ok && upstream.body) {
+        const headers = { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" };
+        if (!noKeyFallback && c === primary) {
+          return new Response(upstream.body, { headers });
+        }
+        /* Şeffaflık olayını akışın başına ekle, sonra upstream'i olduğu gibi ilet. */
+        const reader = upstream.body.getReader();
+        const prefix = encoder.encode(`data: ${JSON.stringify({
+          fallback_event: noKeyFallback
+            ? { provider: c.provider, model: c.model, reason: "no_key", requestedProvider, requestedModel }
+            : { provider: c.provider, model: c.model },
+        })}\n\n`);
+        const combined = new ReadableStream<Uint8Array>({
+          start(controller) { controller.enqueue(prefix); },
+          async pull(controller) {
+            const { done, value } = await reader.read();
+            if (done) { controller.close(); return; }
+            controller.enqueue(value);
+          },
+          cancel(reason) { void reader.cancel(reason).catch(() => {}); },
+        });
+        return new Response(combined, { headers });
+      }
+      lastStatus = upstream.status || 500;
+      lastDetail = await upstream.text().catch(() => "");
+      lastCand = c;
+    }
+    return new Response(friendlyApiError(lastStatus, lastDetail, { model: lastCand.model, provider: lastCand.provider as Provider }), { status: lastStatus });
   }
 
   /* Dayanıklılık: chatId verilmiş + kullanıcı girişliyse, sekme yanıt
@@ -1623,7 +1695,12 @@ export async function POST(req: Request) {
           safe.enqueue(encoder.encode(`data: ${JSON.stringify({ usage_event: { prompt: realUsage.prompt, completion: realUsage.completion } })}\n\n`));
         }
 
-        if (toolCalls.length === 0 || finishReason === "stop") {
+        /* Araç çağrısı VARSA onları çalıştır — finishReason'a bakma. Bazı OpenAI-
+           uyumlu sağlayıcılar tool_calls yayıp finish_reason:"stop" (veya boş)
+           gönderiyor; eski `|| finishReason==="stop"` koşulu bu durumda çağrıları
+           çalıştırMADAN kırılıp istenen eylemi sessizce düşürüyordu. Yalnız HİÇ
+           araç yoksa bitir. */
+        if (toolCalls.length === 0) {
           /* Bitiş nedenini istemciye ilet: "length" ⇒ yanıt token sınırında
              kesildi → istemci kesilme şeridi gösterir / otomatik devam eder. */
           if (finishReason && finishReason !== "tool_calls") {
@@ -1807,9 +1884,16 @@ export async function POST(req: Request) {
              gönderilir → istemcide geri al = dosyayı sil. */
           let prevContent: string | null | undefined;
           if ((tc.name === "write_file" || tc.name === "str_replace") && repoCtx && typeof args.path === "string") {
-            const old = await getFileRaw(repoCtx, args.path, readCache);
-            if (old.ok) prevContent = old.content;
-            else if (tc.name === "write_file") prevContent = null;
+            /* Savunma derinliği: getFileRaw sertleştirildi ama yine de bir
+               fırlatma (ağ/parse) BÜTÜN stream'i çökertmemeli — checkpoint
+               yoksa geri-al kaybolur, üretim değil; yut ve devam et. */
+            try {
+              const old = await getFileRaw(repoCtx, args.path, readCache);
+              if (old.ok) prevContent = old.content;
+              else if (tc.name === "write_file") prevContent = null;
+            } catch {
+              if (tc.name === "write_file") prevContent = null;
+            }
           }
           /* Yazma araçları → toplu commit buffer'ına ekle; diğerleri anında çalış. */
           const result = await executeTool(
