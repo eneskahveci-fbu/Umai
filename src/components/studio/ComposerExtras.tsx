@@ -29,27 +29,32 @@ interface PopoverPos { left?: number; right?: number; bottom: number }
 function usePopoverPortal(
   triggerRef: RefObject<HTMLButtonElement | null>,
   panelRef: RefObject<HTMLDivElement | null>,
+  desktopWidth = 256,
 ) {
   const [open, setOpenState] = useState(false);
   const [sheet, setSheet] = useState(false);
   const [pos, setPos] = useState<PopoverPos | null>(null);
 
-  const openPopover = () => {
+  /* Tetikleyicinin ANLIK konumundan pos'u (yeniden) hesapla. Açılışta VE açıkken
+     kaydırma/yeniden boyutlandırmada çağrılır → overflow-x-auto kontrol satırında
+     tetikleyici kayınca fixed panel kopmasın, breakpoint geçişinde sheet/dropdown
+     varyantı da güncellensin. */
+  const computePos = () => {
     const isSheet = window.matchMedia("(max-width: 639px)").matches;
     setSheet(isSheet);
-    if (!isSheet) {
-      const r = triggerRef.current?.getBoundingClientRect();
-      if (r) {
-        const spaceRight = window.innerWidth - r.left;
-        setPos(
-          spaceRight < 300
-            ? { right: window.innerWidth - r.right, bottom: window.innerHeight - r.top + 8 }
-            : { left: r.left, bottom: window.innerHeight - r.top + 8 },
-        );
-      }
-    }
-    setOpenState(true);
+    if (isSheet) { setPos(null); return; }
+    const r = triggerRef.current?.getBoundingClientRect();
+    if (!r) return;
+    /* Eşik GERÇEK panel genişliğinden türetilir (+ küçük pay). Sabit 300, w-80
+       (320px) TemplatePicker panelinde sağ kenardan taşmaya yol açıyordu. */
+    const spaceRight = window.innerWidth - r.left;
+    setPos(
+      spaceRight < desktopWidth + 16
+        ? { right: window.innerWidth - r.right, bottom: window.innerHeight - r.top + 8 }
+        : { left: r.left, bottom: window.innerHeight - r.top + 8 },
+    );
   };
+  const openPopover = () => { computePos(); setOpenState(true); };
   const close = () => setOpenState(false);
   const toggle = () => (open ? close() : openPopover());
 
@@ -60,11 +65,23 @@ function usePopoverPortal(
       if (!triggerRef.current?.contains(t) && !panelRef.current?.contains(t)) close();
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    /* Scroll/resize'da rAF ile throttle'lı yeniden konumla (aşırı render olmasın).
+       scroll capture=true → yalnız pencere değil iç kaydırıcıları da yakalar. */
+    let raf = 0;
+    const onReflow = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => { raf = 0; computePos(); });
+    };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onReflow, true);
+    window.addEventListener("resize", onReflow);
     return () => {
+      if (raf) cancelAnimationFrame(raf);
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onReflow, true);
+      window.removeEventListener("resize", onReflow);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- triggerRef/panelRef kimliği sabit
   }, [open]);
@@ -122,7 +139,7 @@ function PopoverPanel({
 export function DesignSystemPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const { open, toggle, close, sheet, pos } = usePopoverPortal(triggerRef, panelRef);
+  const { open, toggle, close, sheet, pos } = usePopoverPortal(triggerRef, panelRef, 224); // w-56
   const current = bundledDesignSystems.find((s) => s.id === value) ?? bundledDesignSystems[0];
 
   return (
@@ -235,7 +252,16 @@ export function ModelPicker({
                 </button>
                 {!checked && (
                   <button
-                    onClick={() => { setActiveModel(m.id); onFusionChange(false); close(); }}
+                    onClick={() => {
+                      /* Tek modele geç: Fusion'ı kapat VE qualityModelIds'i temizle.
+                         Önceden yalnız Fusion kapatılıp seçili id'ler kalıyordu →
+                         picker tekrar açılınca 2-3 kutu işaretli ama Fusion OFF
+                         (çelişki, "2+ = Fusion" değişmezini bozuyordu). */
+                      setActiveModel(m.id);
+                      onFusionChange(false);
+                      if (qualityModelIds.length) saveConfig({ ...config, qualityModelIds: [] });
+                      close();
+                    }}
                     className={`text-[10px] font-semibold px-1.5 py-1 rounded shrink-0 ${isActive ? "text-brand" : "text-muted/50 hover:text-brand"}`}
                   >
                     {isActive ? "✓ Aktif" : "Kullan"}
@@ -256,7 +282,7 @@ export function ModelPicker({
 export function TemplatePicker({ onPick }: { onPick: (t: StudioTemplate) => void }) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const { open, toggle, close, sheet, pos } = usePopoverPortal(triggerRef, panelRef);
+  const { open, toggle, close, sheet, pos } = usePopoverPortal(triggerRef, panelRef, 320); // w-80
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const filtered = q

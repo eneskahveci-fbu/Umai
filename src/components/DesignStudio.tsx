@@ -259,7 +259,11 @@ export function DesignStudio() {
   const [phase, setPhase] = useState<StudioPhase | null>(null);
   const [versionIndex, setVersionIndex] = useState(0);
   const [savedOpen, setSavedOpen] = useState(false);
-  const [fusionEnabled, setFusionEnabled] = useState(false);
+  /* Fusion durumu KALICI qualityModelIds'ten başlatılır (lazy init): kullanıcı
+     Ayarlar → Kalite'de (ya da önceki oturumda ModelPicker'da) 2+ model seçmişse
+     Studio açılışında ModelPicker kutuları işaretli görünüp Fusion KAPALI kalıyordu
+     → "2+ seçim Fusion'ı açar" kuralı mevcut seçimlere uygulanmıyordu. */
+  const [fusionEnabled, setFusionEnabled] = useState(() => (config.qualityModelIds?.length ?? 0) >= 2);
   /* Composer'daki tasarım sistemi seçici — Umai'nin kendi kimliği varsayılan,
      kullanıcı diğer sistemler arasından seçebilir (bkz. ComposerExtras.tsx). */
   const [designSystemId, setDesignSystemId] = useState("craft");
@@ -470,15 +474,27 @@ export function DesignStudio() {
      karşılığı — Stüdyo'da yalnız görsel referans anlamlı (kod/metin dosyası
      değil), bu yüzden ayrı MoreMenu yerine tek bir ataç düğmesi yeterli. */
   const addImageFiles = useCallback((files: FileList) => {
+    const MAX_IMAGES = 6;        // referans görsel üst sınırı (payload şişmesin)
+    const MAX_BYTES = 5 * 1024 * 1024; // dosya başına ~5MB
     for (const f of Array.from(files)) {
-      if (!f.type.startsWith("image/")) continue;
+      if (!f.type.startsWith("image/")) { addToast(`'${f.name}' bir görsel değil, atlandı.`, "info"); continue; }
+      if (f.size > MAX_BYTES) { addToast(`'${f.name}' çok büyük (max 5MB), atlandı.`, "error"); continue; }
+      /* Sayı sınırını EKLEMEDEN önce kontrol et (base64 her görseli ~%33 büyütür
+         ve tümü LLM payload'ına gider). setPendingImages içinde sınırla ki art
+         arda okumalar yarışmasın. */
       const reader = new FileReader();
       reader.onload = () => {
-        if (typeof reader.result === "string") setPendingImages((p) => [...p, reader.result as string]);
+        if (typeof reader.result !== "string") return;
+        setPendingImages((p) => {
+          if (p.length >= MAX_IMAGES) { addToast(`En fazla ${MAX_IMAGES} görsel eklenebilir.`, "info"); return p; }
+          return [...p, reader.result as string];
+        });
       };
+      /* Önceden onerror yoktu → bozuk/okunamayan dosya SESSİZCE kayboluyordu. */
+      reader.onerror = () => addToast(`'${f.name}' okunamadı.`, "error");
       reader.readAsDataURL(f);
     }
-  }, []);
+  }, [addToast]);
   const removeImage = useCallback((i: number) => {
     setPendingImages((p) => p.filter((_, j) => j !== i));
   }, []);
@@ -540,18 +556,22 @@ export function DesignStudio() {
      ezilirken ekranda hâlâ eski/görüntülenen sürüm kalıyordu, ikisi ayrışıyordu)
      görünüm de son sürüme kaydırılır ki ekran ile depo hep tutarlı kalsın. */
   const changeDeckTheme = useCallback((themeId: string) => {
-    let newLen = 0;
+    /* Yeni uzunluğu SAF (updater DIŞINDA) hesapla: React batching'de setProject
+       updater'ı SENKRON çalışmayabilir → önceki `let newLen` deseninde `newLen`
+       hâlâ 0 iken setVersionIndex atlanıyor, ekran/depo ayrışıyordu (yorumun
+       çözdüğünü iddia ettiği tam desync). restyle son sürümü GÜNCELLER (yeni
+       eklemez); mevcut sürüm yoksa 1 olur. */
+    const nextLen = Math.max(1, (project.versions ?? []).length);
     setProject((p) => {
       if (!p.deckData) return p;
       const deck: SlideDeck = { ...p.deckData, themeId };
       const html = deckToHtml(deck);
       const versions = [...(p.versions ?? [])];
       if (versions.length) versions[versions.length - 1] = html; else versions.push(html);
-      newLen = versions.length;
       return { ...p, deckData: deck, html, versions, updatedAt: Date.now() };
     });
-    if (newLen > 0) setVersionIndex(newLen - 1);
-  }, []);
+    setVersionIndex(nextLen - 1);
+  }, [project.versions]);
 
   /* ── Dışa Aktar (ArtifactCanvas'ın indir/yayınla'sına ek: PDF yazdır) ── */
 
