@@ -30,13 +30,20 @@ export function pickImageModel(models: ModelProfile[]): ModelProfile | null {
   return null;
 }
 
+function isImageProvider(p: string): p is ImageProvider {
+  return (IMAGE_PROVIDERS as readonly string[]).includes(p);
+}
+
 /** Config'ten kullanılabilir BYOK görsel sağlayıcısını + çözülmüş anahtarını
     döndürür; uygun model veya anahtar yoksa null (→ Pollinations tabanı).
     `config.imageModelProvider` (Ayarlar → Model → Görsel üretimi) tercihini
     onurlandırır: "pollinations" ise BYOK'a hiç bakmadan direkt null döner
     (kullanıcı ücretsiz tabanı bilerek seçmiştir); belirli bir sağlayıcı
-    sabitlenmişse önce ONU dener, model/anahtar artık yoksa "auto" (öncelik
-    sıralı) davranışa sessizce düşer. */
+    sabitlenmişse önce ONU dener, model/anahtar artık yoksa "auto" davranışa
+    sessizce düşer. "auto" (varsayılan, kullanıcı kararı): kullanıcı beklentisi
+    "hangi model seçiliyse görsel de onunla üretilsin" — önce O AN AKTİF sohbet
+    modelinin sağlayıcısı görüntü-yetenekliyse ONU kullanır; değilse öncelik
+    sıralı listeye (gemini→openai→xai→hf, bkz. pickImageModel) düşer. */
 export async function pickImageProvider(config: Config): Promise<{ provider: ImageProvider; apiKey: string } | null> {
   const pref = config.imageModelProvider ?? "auto";
   if (pref === "pollinations") return null;
@@ -46,6 +53,11 @@ export async function pickImageProvider(config: Config): Promise<{ provider: Ima
       const apiKey = await resolveModelApiKey(pinned, config.providerKeys);
       if (apiKey) return { provider: pref, apiKey };
     }
+  }
+  const active = config.models.find((m) => m.id === config.activeModelId);
+  if (active && isImageProvider(active.provider)) {
+    const apiKey = await resolveModelApiKey(active, config.providerKeys);
+    if (apiKey) return { provider: active.provider, apiKey };
   }
   const model = pickImageModel(config.models);
   if (!model) return null;

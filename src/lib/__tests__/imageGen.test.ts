@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { pickImageModel, pickImageProvider, IMAGE_PROVIDERS } from "../imageGen";
 import type { Config, ModelProfile } from "../types";
 
-const mk = (provider: ModelProfile["provider"], id = provider): ModelProfile => ({
+const mk = (provider: ModelProfile["provider"], id: string = provider): ModelProfile => ({
   id, label: id, provider, baseUrl: "", model: "m", apiKey: "k",
 });
 
@@ -57,5 +57,35 @@ describe("pickImageProvider — Ayarlar → Görsel üretimi tercihi (bkz. image
   it("hiç görüntü-yetenekli model yoksa (herhangi bir tercihte) null döner", async () => {
     expect(await pickImageProvider(mkConfig({ models: [mk("groq")] }))).toBeNull();
     expect(await pickImageProvider(mkConfig({ models: [mk("groq")], imageModelProvider: "gemini" }))).toBeNull();
+  });
+
+  /* "auto" — kullanıcı beklentisi: "hangi model seçiliyse görsel de onunla
+     üretilsin". Öncelik sıralı liste yalnız AKTİF model görüntü-yetenekli
+     DEĞİLSE devreye girer. */
+  describe("'auto' önce AKTİF sohbet modelini dener (kullanıcı kararı)", () => {
+    it("aktif model görüntü-yetenekliyse öncelik sırasını atlar, ONU kullanır", async () => {
+      const cfg = mkConfig({ models: [mk("gemini"), mk("hf", "hf-active")], activeModelId: "hf-active" });
+      /* Normal öncelikte gemini kazanırdı — ama aktif model hf, o yüzden hf seçilmeli. */
+      expect((await pickImageProvider(cfg))?.provider).toBe("hf");
+    });
+
+    it("aktif model görüntü-yeteneksizse (ör. agnes) öncelik sıralı listeye düşer", async () => {
+      const cfg = mkConfig({
+        models: [mk("agnes", "agnes-active"), mk("hf"), mk("openai")],
+        activeModelId: "agnes-active",
+      });
+      expect((await pickImageProvider(cfg))?.provider).toBe("openai");
+    });
+
+    it("aktif model görüntü-yetenekli ama anahtarı yoksa öncelik sıralı listeye düşer", async () => {
+      const noKeyActive: ModelProfile = { id: "hf-nokey", label: "hf", provider: "hf", baseUrl: "", model: "m", apiKey: "" };
+      const cfg = mkConfig({ models: [noKeyActive, mk("openai")], activeModelId: "hf-nokey" });
+      expect((await pickImageProvider(cfg))?.provider).toBe("openai");
+    });
+
+    it("activeModelId yoksa/eşleşmiyorsa doğrudan öncelik sıralı listeye düşer (eski davranış)", async () => {
+      const cfg = mkConfig({ models: [mk("hf"), mk("openai")], activeModelId: "olmayan-id" });
+      expect((await pickImageProvider(cfg))?.provider).toBe("openai");
+    });
   });
 });
