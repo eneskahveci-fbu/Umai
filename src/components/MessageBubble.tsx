@@ -580,13 +580,21 @@ function ToolCallGroup({ calls, checkpoints }: { calls: NonNullable<ChatMessage[
 
 /* ── AI görsel üretimi (ChatGPT/Gemini tarzı) ──────────────────────────
    Pollinations/BYOK görselleri İSTEK ANINDA üretilir (statik dosya değil) —
-   bu yüzden `<img>` yüklenmesi 5-40sn sürebilir ve bazen (aşırı yük/NSFW
-   filtresi/zaman aşımı) başarısız olur. Eskiden çıplak bir <img> vardı:
-   yavaşken hiçbir gösterge yoktu, başarısız olunca sessizce kayboluyordu.
-   Artık: yüklenirken nabız atan shimmer iskelet, gelince yumuşak geçiş,
-   başarısız olursa 2 kez sessizce otomatik yeniden dener, hâlâ olmazsa
-   elle "Tekrar dene" gösterir. */
-const IMAGE_AUTO_RETRY_DELAYS_MS = [1500, 3000];
+   bu yüzden `<img>` yüklenmesi birkaç saniyeden 30sn+'ye kadar sürebilir.
+   CANLIDA DOĞRULANDI (curl ile): aynı anonim istemciden art arda hızlı 2-3
+   istek gönderilince Pollinations üçüncü isteği SESSİZCE ASIYOR (ne hata ne
+   yanıt — 30sn+ sıfır bayt), birkaç saniye soğumadan sonra normale dönüyor.
+   Bu yüzden ESKİ kısa gecikmeler (1.5sn/3sn) sorunu ÇÖZMÜYOR, muhtemelen
+   ONU TETİKLİYORDU (hâlâ kısıtlı/aşırı-yüklü uca hemen tekrar vurmak). Artık:
+   (1) çok daha uzun, katlanarak artan bekleme (4/9/16sn) — uca soğuma payı
+   verir; (2) yeniden denemede `enhance` parametresi düşürülür (Pollinations
+   tarafında ekstra bir LLM-yeniden-yazma adımı — gecikmeyi/yükü azaltır,
+   canlıda enhance'siz istek tutarlı biçimde daha hızlı döndü); (3) açık bir
+   yükleme zaman aşımı (25sn) — `<img>`'ın kendi ağ zaman aşımı çok uzun/
+   belirsiz olabileceğinden (tarayıcıya göre değişir), sessiz asılı kalma
+   yerine kendi retry/hata döngümüzü devreye sokar. */
+const IMAGE_AUTO_RETRY_DELAYS_MS = [4000, 9000, 16000];
+const IMAGE_LOAD_TIMEOUT_MS = 25000;
 
 /* `key`'i çağıran tarafta `src`'e bağlayarak (bkz. kullanım yeri) prompt
    değişince bileşen tamamen yeniden monte olur — durumu sıfırlamak için
@@ -596,10 +604,16 @@ function GeneratedImage({ src, alt }: { src: string; alt?: string }) {
   const [bust, setBust] = useState(0);
   const autoRetriesRef = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => () => { if (retryTimerRef.current) clearTimeout(retryTimerRef.current); }, []);
+  const clearTimers = () => {
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+  };
+  useEffect(() => clearTimers, []);
 
   const handleError = () => {
+    clearTimers();
     if (autoRetriesRef.current < IMAGE_AUTO_RETRY_DELAYS_MS.length) {
       const delay = IMAGE_AUTO_RETRY_DELAYS_MS[autoRetriesRef.current];
       autoRetriesRef.current += 1;
@@ -610,12 +624,36 @@ function GeneratedImage({ src, alt }: { src: string; alt?: string }) {
   };
 
   const retryManually = () => {
+    clearTimers();
     autoRetriesRef.current = 0;
     setStatus("loading");
     setBust((b) => b + 1);
   };
 
-  const loadSrc = bust === 0 ? src : `${src}${src.includes("?") ? "&" : "?"}_r=${bust}`;
+  /* Her deneme (bust değişince) yeni bir zaman-aşımı penceresi başlatır;
+     onLoad/onError bu pencere BİTMEDEN tetiklenirse effect temizlenince
+     iptal olur. */
+  useEffect(() => {
+    if (status !== "loading") return;
+    const t = setTimeout(() => { if (status === "loading") handleError(); }, IMAGE_LOAD_TIMEOUT_MS);
+    loadTimeoutRef.current = t;
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- yalnız deneme değişince (bust) yeniden başlat
+  }, [bust]);
+
+  /* Deneme 0: istek sahibinin verdiği tam URL (enhance dahilse kalır).
+     Sonraki denemeler: cache-bust + `enhance` düşürülür (bkz. üstteki not). */
+  const loadSrc = (() => {
+    if (bust === 0) return src;
+    try {
+      const u = new URL(src);
+      u.searchParams.delete("enhance");
+      u.searchParams.set("_r", String(bust));
+      return u.toString();
+    } catch {
+      return `${src}${src.includes("?") ? "&" : "?"}_r=${bust}`;
+    }
+  })();
 
   return (
     <div className="relative w-full max-w-[280px] aspect-square overflow-hidden rounded-xl border border-line bg-surface mb-3">
@@ -625,7 +663,7 @@ function GeneratedImage({ src, alt }: { src: string; alt?: string }) {
           key={bust}
           src={loadSrc}
           alt={alt ?? ""}
-          onLoad={() => setStatus("loaded")}
+          onLoad={() => { clearTimers(); setStatus("loaded"); }}
           onError={handleError}
           className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-500 ${
             status === "loaded" ? "opacity-100" : "opacity-0"
