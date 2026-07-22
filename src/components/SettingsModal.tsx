@@ -800,7 +800,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             </div>
             <button
               onClick={() => { setOnboardingDone(false); close(); }}
-              className="w-full flex items-center justify-between premium-card rounded-lg px-3 py-2.5 text-xs font-semibold hover:border-brand/40 transition-colors"
+              className="w-full flex items-center justify-between premium-card rounded-xl px-3 py-2.5 text-xs font-semibold hover:border-brand/40 transition-colors"
             >
               <span className="flex items-center gap-2"><RotateCcw size={13} className="text-brand" /> Tanıtım turunu tekrar izle</span>
             </button>
@@ -813,7 +813,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 { href: "/cookies", label: "Çerezler" },
                 { href: "/pricing", label: "Fiyatlandırma" },
               ].map((l) => (
-                <a key={l.href} href={l.href} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between premium-card rounded-lg px-3 py-2 text-xs font-semibold hover:border-brand/40 transition-colors">
+                <a key={l.href} href={l.href} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between premium-card rounded-xl px-3 py-2 text-xs font-semibold hover:border-brand/40 transition-colors">
                   {l.label} <ExternalLink size={12} className="text-muted/50" />
                 </a>
               ))}
