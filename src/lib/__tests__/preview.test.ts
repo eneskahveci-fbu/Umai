@@ -55,6 +55,57 @@ describe("buildPreview", () => {
     expect(blocks[0].lang).toBe("ts");
     expect(blocks[0].code).toContain("const x=1");
   });
+
+  it("B1: çok-satırlı import'u temizler (kırık sözdizimi bırakmaz)", () => {
+    const md = "```jsx\nimport React, {\n  useState,\n  useEffect,\n} from 'react';\nimport './styles.css';\nfunction App(){return <h1>Hi</h1>;}\n```";
+    const a = buildPreview(md);
+    expect(a?.content).toContain("React.createElement(App)");
+    /* import satırlarının hiçbir parçası kaynağa sızmamalı. */
+    expect(a?.content).not.toContain("from 'react'");
+    expect(a?.content).not.toContain("useState,\n  useEffect");
+    expect(a?.content).not.toContain("import './styles.css'");
+  });
+
+  it("B2: son büyük-harfli SABİT bileşen sanılmaz", () => {
+    const md = "```jsx\nfunction Widget(){return <div/>;}\nconst COLORS = ['red','blue'];\n```";
+    const a = buildPreview(md);
+    /* COLORS bir dizi → bileşen değil; gerçek bileşen Widget mount edilmeli. */
+    expect(a?.content).toContain("React.createElement(Widget)");
+    expect(a?.content).not.toContain("React.createElement(COLORS)");
+  });
+
+  it("B2: ok-fonksiyonu const bileşeni algılanır", () => {
+    const md = "```jsx\nconst App = () => <h1>Ok</h1>;\n```";
+    const a = buildPreview(md);
+    expect(a?.content).toContain("React.createElement(App)");
+  });
+
+  it("B3: saf TS (generic'li, JSX'siz) React sanılmaz → önizlenmez", () => {
+    const md = "```ts\nconst m = new Map<string, number>();\nfunction sum(a: Array<number>){return a.reduce((x,y)=>x+y,0);}\n```";
+    const a = buildPreview(md);
+    /* JSX yok → React adayı değil; başka önizlenebilir blok da yok → null. */
+    expect(a).toBeNull();
+  });
+
+  it("B3: JSX içeren TS bloğu yine önizlenir", () => {
+    const md = "```ts\nconst App = () => <h1>x</h1>;\n```";
+    const a = buildPreview(md);
+    expect(a?.title).toBe("React Önizleme");
+  });
+
+  it("B4: yaygın React 18 hook'ları çıplak kullanılabilir (destructuring enjekte)", () => {
+    const a = buildPreview("```jsx\nfunction App(){return <div/>;}\n```");
+    expect(a?.content).toContain("useLayoutEffect");
+    expect(a?.content).toContain("useId");
+    expect(a?.content).toContain("=React;");
+  });
+
+  it("B5: CSS içindeki </style> kaçırılır", () => {
+    const md = "```html\n<div>x</div>\n```\n```css\n.a::after{content:'</style>'}\n```";
+    const a = buildPreview(md);
+    expect(a?.content).toContain("<\\/style>");
+    expect(a?.content).not.toContain("content:'</style>'");
+  });
 });
 
 describe("çok dosyalı yanıtlarda doğru bileşen seçimi", () => {
