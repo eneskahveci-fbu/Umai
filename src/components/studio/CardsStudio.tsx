@@ -5,6 +5,7 @@ import {
   Download, FolderOpen, Highlighter, Layers, Loader2, Plus, RotateCcw, Save, Sparkles, Trash2, Upload,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { friendlyError } from "@/lib/friendlyError";
 import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { SavedItemsModal } from "./SavedItemsModal";
 import { safeFileName } from "./DocsStudio";
@@ -50,7 +51,6 @@ export function CardsStudio() {
   const [brief, setBrief] = useState("");
   const [deck, setDeck] = useState<CraftDeck | null>(null);
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [savedOpen, setSavedOpen] = useState(false);
   /* Çalışma oturumu: vadesi gelen kart id sırası + açık/kapalı arka yüz. */
   const [queue, setQueue] = useState<string[]>([]);
@@ -91,12 +91,12 @@ export function CardsStudio() {
   const generate = async () => {
     const b = brief.trim();
     if (!b || busy) return;
-    setBusy(true); setProgress(0);
+    setBusy(true);
     try {
-      const d = await generateDeck({ brief: b, onDelta: (t) => setProgress(t.length) });
+      const d = await generateDeck({ brief: b });
       openDeck(d);
     } catch (e) {
-      addToast(`Kartlar üretilemedi: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+      addToast(`Kartlar üretilemedi: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
     } finally { setBusy(false); }
   };
 
@@ -217,7 +217,7 @@ export function CardsStudio() {
       }
       setPicked(new Set());
     } catch (e) {
-      addToast(`Üretilemedi: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+      addToast(`Üretilemedi: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
     } finally { setGenFromHl(false); }
   };
 
@@ -328,7 +328,7 @@ export function CardsStudio() {
             {busy && (
               <div className="flex flex-col items-center gap-2.5">
                 <GenSkeleton />
-                <p className="text-center text-xs text-muted/60">Kartlar kurgulanıyor… ({progress} karakter)</p>
+                <p className="text-center text-xs text-muted/60">Kartlar kurgulanıyor…</p>
               </div>
             )}
             <div className="grid sm:grid-cols-2 gap-2">

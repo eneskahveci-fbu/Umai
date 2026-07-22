@@ -6,6 +6,7 @@ import {
   Plus, Save, SpellCheck, Sparkles, Trash2, Wand2, X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { friendlyError } from "@/lib/friendlyError";
 import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { SavedItemsModal } from "./SavedItemsModal";
 import { ExportMenu } from "./ExportMenu";
@@ -53,7 +54,6 @@ export function DocsStudio() {
   const [brief, setBrief] = useState("");
   const [doc, setDoc] = useState<CraftDoc | null>(null);
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [contBusy, setContBusy] = useState(false);
   const [contText, setContText] = useState("");
   const [savedOpen, setSavedOpen] = useState(false);
@@ -91,12 +91,12 @@ export function DocsStudio() {
   const generate = async () => {
     const b = brief.trim();
     if (!b || busy) return;
-    setBusy(true); setProgress(0);
+    setBusy(true);
     try {
-      const d = await generateDoc({ brief: b, onDelta: (t) => setProgress(t.length) });
+      const d = await generateDoc({ brief: b });
       setDoc(d); setView("work");
     } catch (e) {
-      addToast(`Doküman üretilemedi: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+      addToast(`Doküman üretilemedi: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
     } finally { setBusy(false); }
   };
 
@@ -133,7 +133,7 @@ export function DocsStudio() {
       patchDoc({ ...doc, blocks: [...doc.blocks, ...extra].slice(0, MAX_DOC_BLOCKS) });
       setContText("");
     } catch (e) {
-      addToast(`Devam üretilemedi: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+      addToast(`Devam üretilemedi: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
     } finally { setContBusy(false); }
   };
 
@@ -158,7 +158,7 @@ export function DocsStudio() {
       if (!issues.length) { setProofRows(null); addToast("Sorun bulunamadı — metin temiz.", "success"); }
       else setProofRows(issues.map((issue) => ({ issue, blockId: segBlocks[issue.blockIndex].id })));
     } catch (e) {
-      addToast(`Denetim başarısız: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+      addToast(`Denetim başarısız: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
     } finally { setProofBusy(false); }
   };
 
@@ -315,7 +315,7 @@ export function DocsStudio() {
             {busy && (
               <div className="flex flex-col items-center gap-2.5">
                 <GenSkeleton />
-                <p className="text-center text-xs text-muted/60">Doküman kurgulanıyor… ({progress} karakter)</p>
+                <p className="text-center text-xs text-muted/60">Doküman kurgulanıyor…</p>
               </div>
             )}
             <div className="grid sm:grid-cols-2 gap-2">

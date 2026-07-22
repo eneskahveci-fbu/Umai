@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, FileCode2, FileText, FolderOpen, Loader2, Paperclip, Save, Sparkles, Square, X } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { friendlyError } from "@/lib/friendlyError";
 import { useSurfaceNav, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
 import { autoStudioSkill } from "@/lib/autoPilot";
@@ -456,16 +457,15 @@ export function DesignStudio() {
       if ((e as Error)?.name === "AbortError") {
         setMessages((m) => m.slice(0, -1));
       } else {
-        const msg = e instanceof Error ? e.message : "bilinmeyen hata";
+        const msg = friendlyError(e instanceof Error ? e.message : "bilinmeyen hata");
         setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: `Hata: ${msg}` }; return c; });
-        addToast(`Üretim hatası: ${msg}`, "error");
       }
     } finally {
       setBusy(false);
       setPhase(null);
       abortRef.current = null;
     }
-  }, [busy, project, fusionEnabled, addToast, designSystemId, pendingImages]);
+  }, [busy, project, fusionEnabled, designSystemId, pendingImages]);
 
   const stop = useCallback(() => { abortRef.current?.abort(); }, []);
 
