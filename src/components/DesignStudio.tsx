@@ -162,7 +162,7 @@ function ChatPanel({
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
             }}
             rows={1}
-            placeholder="Değişiklik iste — 'başlığı büyüt', 'mavi yap', 'yeni bölüm ekle'…"
+            placeholder="Değişiklik iste — 'başlığı büyüt'…"
             className="w-full bg-transparent resize-none outline-none text-[15px] leading-relaxed py-1 max-h-28 placeholder:text-muted/45"
           />
           <div className="flex items-center gap-2">
