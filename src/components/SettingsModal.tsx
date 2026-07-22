@@ -1078,9 +1078,10 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 <span className="text-xs font-bold text-muted uppercase tracking-wide">Görsel üretimi</span>
               </div>
               <p className="text-xs text-muted leading-relaxed mb-2.5">
-                Sohbette bir görsel istediğinde hangi sağlayıcı kullanılsın? <b>Otomatik</b>, eklediğin
-                modeller arasından görüntü-yetenekli olanı önceliğe göre (Gemini → OpenAI → xAI → Hugging Face)
-                kendi seçer; istersen ücretsiz Pollinations&apos;ı ya da belirli bir sağlayıcıyı sabitleyebilirsin.
+                Sohbette bir görsel istediğinde hangi sağlayıcı kullanılsın? <b>Otomatik</b>, önce o an
+                aktif sohbet modelin görüntü-yetenekliyse ONU kullanır; değilse eklediğin modeller
+                arasından uygun olanı önceliğe göre (Gemini → OpenAI → xAI → Hugging Face) kendi seçer.
+                İstersen ücretsiz Pollinations&apos;ı ya da belirli bir sağlayıcıyı sabitleyebilirsin.
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {([
