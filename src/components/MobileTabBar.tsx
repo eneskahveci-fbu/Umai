@@ -10,8 +10,11 @@
    (`/library`) gider — üretilen çıktılar mobilde de üst seviyede keşfedilebilir
    olsun diye. "Ayarlar" gerçek `/settings` rotasına gider (Sidebar'ın
    masaüstündeki düğmesiyle aynı hizada), böylece diğer sekmelerle aynı
-   aktif-vurgu deseni otomatik çalışır. Aktif sekme marka renginde; safe-area
-   alt boşluğu korunur. */
+   aktif-vurgu deseni otomatik çalışır. Stüdyo/Kütüphane/Ayarlar rotalarının
+   üçü de artık misafir-erişimlidir (bkz. authGate.ts useAuthState) —
+   önceden bu üçü de girişsiz kullanıcıyı /login'e atıyordu, oysa AYNI
+   Ayarlar modalı /app içinde Ctrl+, ile misafir olarak açılabiliyordu.
+   Aktif sekme marka renginde; safe-area alt boşluğu korunur. */
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Images, MessageSquare, Settings, Sparkles } from "lucide-react";

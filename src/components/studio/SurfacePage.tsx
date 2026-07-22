@@ -7,7 +7,7 @@
    `pb-[var(--surface-pb,0px)] sm:pb-0` ile kullanır (kaplama modunda 0). */
 import { useEffect } from "react";
 import { useStore } from "@/lib/store";
-import { useAuthGate, useThemeClasses } from "@/lib/authGate";
+import { useAuthState, useThemeClasses } from "@/lib/authGate";
 import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MobileTabBar, useKeyboardOpen } from "@/components/MobileTabBar";
@@ -21,7 +21,13 @@ export function SurfacePage({ flag, children }: {
   flag: SurfaceFlag;
   children: React.ReactNode;
 }) {
-  const auth = useAuthGate();
+  /* Misafir erişimi (prompt.md Hamle 2, /app'teki AYNI karar): Stüdyo'nun
+     kendisi hesap gerektirmez (yerel/anahtarsız üretim), yalnız bulut
+     senkronu gibi hesap-bağlı işler sessizce atlanır. Önceden useAuthGate
+     kullanılıyordu — oturumsuz kullanıcıyı /login'e yönlendirip Sidebar/
+     mobil alt çubuktan Stüdyo'ya HİÇ girilemiyordu, landing sayfasının
+     "herkes için AI stüdyosu" vaadiyle çelişiyordu. */
+  const auth = useAuthState();
   useThemeClasses();
   const kbOpen = useKeyboardOpen();
 
@@ -48,7 +54,7 @@ export function SurfacePage({ flag, children }: {
     };
   }, [flag]);
 
-  if (auth !== "in") {
+  if (auth === "checking") {
     return <div className="h-screen grid place-items-center bg-bg text-muted/60 text-sm">Yükleniyor…</div>;
   }
   return (
