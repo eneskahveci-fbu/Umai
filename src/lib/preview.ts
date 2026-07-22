@@ -30,6 +30,13 @@ function safeScript(code: string): string {
   return code.replace(/<\/script>/gi, "<\\/script>");
 }
 
+/* Aynı şekilde <style> enjeksiyonunda: kullanıcı CSS'i (ör. `content:"</style>"`
+   ya da bir yorum) literal </style> içerirse stil etiketini erken kapatıp belgeyi
+   bozar. safeScript yalnız </script>'i kaçırdığından ayrı bir yardımcı gerekiyor. */
+function safeStyle(css: string): string {
+  return css.replace(/<\/style>/gi, "<\\/style>");
+}
+
 /* Gömülü console paneli — iframe'in KENDİ içinde çalışır (parent'a mesaj yok →
    sandbox basit kalır). console.log/info/warn/error + yakalanmayan hataları alt
    panelde gösterir. Öğrenciler için öğretici; çıktı olmadıkça gizli durur.
@@ -53,17 +60,25 @@ function reactDoc(code: string, css: string): string {
      yine de buraya düşer — sessizce boş render etmek yerine net bir mesaj
      göster (kullanıcı "önizleme çalışmıyor" sanıp aramasın). */
   const isNextRootFile = /<html[\s>]/i.test(code);
-  /* ESM import/export CDN-global yaklaşımıyla uyumsuz → temizle. */
+  /* ESM import/export CDN-global yaklaşımıyla uyumsuz → temizle. ÖNEMLİ: import
+     ÇOK SATIRA yayılabilir (LLM'ler sık üretir: `import React, {\n useState,\n}
+     from 'react';`). Eski `import[^\n]*\n` yalnız İLK satırı silip geriye bozuk
+     sözdizimi bırakıyordu → Babel fırlatıyor, önizleme kırılıyordu. Hem `from`'lu
+     (adlandırılmış/varsayılan, çok-satır dahil) hem yan-etkili (`import 'x'`)
+     biçimleri kaldır. */
   const src = code
-    .replace(/^\s*import[^\n]*\n/gm, "")
+    .replace(/^\s*import\s+[\s\S]*?\s+from\s+['"][^'"]*['"]\s*;?/gm, "")
+    .replace(/^\s*import\s+['"][^'"]*['"]\s*;?[ \t]*$/gm, "")
     .replace(/export\s+default\s+/g, "")
     .replace(/^\s*export\s+/gm, "");
-  /* Mount edilecek bileşeni bul: önce App, yoksa son tanımlı büyük-harfli bileşen. */
-  let comp = /\b(?:function|const|class)\s+App\b/.test(src) ? "App" : "";
-  if (!comp) {
-    const names = [...src.matchAll(/(?:function|const|class)\s+([A-Z]\w*)/g)].map((x) => x[1]);
-    comp = names[names.length - 1] || "";
-  }
+  /* Mount edilecek bileşeni bul: önce App, yoksa son BİLEŞEN-BENZERİ tanım.
+     Yalnız [A-Z]\w* eşlemek `const COLORS=[...]`, `const API_URL="..."` gibi
+     büyük-harfli SABİTLERİ de yakalayıp `React.createElement(COLORS)` ile
+     çökertiyordu. Sadece function/class ya da fonksiyon-değerli const (ok
+     fonksiyonu / function / React.memo|forwardRef) say. */
+  const compRe = /(?:function|class)\s+([A-Z]\w*)|const\s+([A-Z]\w*)\s*=\s*(?:React\.(?:memo|forwardRef)\b|function\b|async\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)/g;
+  const names = [...src.matchAll(compRe)].map((m) => m[1] || m[2]).filter(Boolean) as string[];
+  const comp = names.includes("App") ? "App" : (names[names.length - 1] || "");
   const mount = isNextRootFile
     ? `document.getElementById('root').innerHTML='<p style="font-family:system-ui;color:#666;padding:1rem;line-height:1.5">Bu dosya kendi &lt;html&gt;/&lt;body&gt; etiketlerini tanımlıyor (ör. Next.js <code>layout.tsx</code>) — çok dosyalı bir projenin parçası olduğundan tek başına canlı önizlenemez. Gerçek bir sayfa/bileşen bloğu (ör. <code>page.tsx</code>) varsa o gösterilir; yoksa bu dosyayı bağımsız bir HTML olarak indirip tarayıcıda aç.</p>';`
     : comp
@@ -85,7 +100,7 @@ function reactDoc(code: string, css: string): string {
 <script crossorigin src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
 <script crossorigin src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
-<style>body{margin:0;font-family:system-ui,sans-serif;background:#fff}${css}</style>
+<style>body{margin:0;font-family:system-ui,sans-serif;background:#fff}${safeStyle(css)}</style>
 </head><body>${CONSOLE_UI}<div id="root"></div>
 <script type="text/plain" id="__src">${safeScript(src)}</script>
 <script>
@@ -96,19 +111,24 @@ function reactDoc(code: string, css: string): string {
   /* mount build-time'da bilinen sabit kod — JSON.stringify her tırnak/
      ters eğik çizgiyi doğru kaçırır, elle escape hataya açık. */
   var MOUNT_CODE = ${JSON.stringify(mount)};
+  /* import strip'lendiğinden hook'lar ÇIPLAK çağrılır (useState(), useEffect()…).
+     Önceden yalnız 8 hook parametre olarak veriliyordu → useLayoutEffect/useId/
+     useTransition vb. ReferenceError. Tüm yaygın React 18 API'sini destructuring
+     ile tek seferde ver. */
+  var REACT_GLOBALS = 'const {useState,useEffect,useRef,useMemo,useCallback,useReducer,useContext,useLayoutEffect,useId,useTransition,useDeferredValue,useImperativeHandle,useSyncExternalStore,useInsertionEffect,Fragment,createContext,memo,forwardRef,Children,cloneElement,isValidElement,createElement,Suspense,StrictMode}=React;';
   try {
     var raw = document.getElementById('__src').textContent;
     var transformed = Babel.transform(raw, {presets:['typescript','react'], filename:'component.tsx'}).code;
-    var runner = new Function('React','ReactDOM','useState','useEffect','useRef','useMemo','useCallback','useReducer','useContext','Fragment',
-      transformed + '\\n' + MOUNT_CODE);
-    runner(React,ReactDOM,React.useState,React.useEffect,React.useRef,React.useMemo,React.useCallback,React.useReducer,React.useContext,React.Fragment);
+    var runner = new Function('React','ReactDOM',
+      REACT_GLOBALS + '\\n' + transformed + '\\n' + MOUNT_CODE);
+    runner(React,ReactDOM);
   } catch(e) { showError(e); }
 })();
 </script></body></html>`;
 }
 
 function jsDoc(js: string, css: string): string {
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;margin:1rem}${css}</style></head><body>${CONSOLE_UI}
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;margin:1rem}${safeStyle(css)}</style></head><body>${CONSOLE_UI}
 <script>try{${safeScript(js)}}catch(e){document.body.innerHTML='<pre style="color:#c00;white-space:pre-wrap">'+(e&&e.stack||e)+'</pre>';}</script></body></html>`;
 }
 
@@ -118,13 +138,23 @@ function htmlDoc(html: string, css: string, js: string): string {
     let doc = html;
     /* replacement FONKSİYON olmalı: kullanıcı CSS/JS'i string olarak verilirse
        içindeki $&, $' gibi kalıplar replace tarafından yorumlanıp çıktıyı bozar. */
-    if (css) doc = /<\/head>/i.test(doc) ? doc.replace(/<\/head>/i, () => `<style>${css}</style></head>`) : `<style>${css}</style>` + doc;
+    if (css) doc = /<\/head>/i.test(doc) ? doc.replace(/<\/head>/i, () => `<style>${safeStyle(css)}</style></head>`) : `<style>${safeStyle(css)}</style>` + doc;
     if (js) doc = /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, () => `<script>${safeScript(js)}</script></body>`) : doc + `<script>${safeScript(js)}</script>`;
     return doc;
   }
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;margin:1rem}${css}</style></head><body>${CONSOLE_UI}
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:system-ui,sans-serif;margin:1rem}${safeStyle(css)}</style></head><body>${CONSOLE_UI}
 ${html}
 ${js ? `<script>${safeScript(js)}</script>` : ""}</body></html>`;
+}
+
+/* TS bloğunun GERÇEKTEN JSX içerip içermediğini ayırt eder. `<[A-Za-z]` tek başına
+   TS generic'lerini (`Array<string>`, `useState<Foo>()`, `Map<K,V>`) JSX sanıp saf
+   TS'i reactDoc'a yönlendiriyor, "React bileşeni bulunamadı" gösteriyordu. Kapanış/
+   kendine-kapanan etiket (`</x` veya `/>`) ya da JSX-bağlamı (return/=>/paren ardından
+   `<Tag`) generic'lerde YOK — güvenilir ayraç. */
+function looksLikeJsx(code: string): boolean {
+  return /<\/[A-Za-z]/.test(code) || /\/>/.test(code) ||
+    /(?:return|=>|\(|,|&&|\|\||\?|:)\s*<[A-Za-z][\w.]*[\s/>]/.test(code);
 }
 
 /** Markdown yanıtından canlı önizlenebilir bir Artifact üretir; yoksa null. */
@@ -141,7 +171,7 @@ export function buildPreview(markdown: string): Artifact | null {
      mount edilince (children prop'u boş) tamamen BOŞ render eder, hata da
      vermez. Böyle bloklar elenir; kalan adaylardan SONUNCUSU (genelde asıl
      önizlenecek bileşen) seçilir. Tek aday varsa davranış değişmez. */
-  const reactCandidates = blocks.filter((b) => isReact(b.lang) || (isTs(b.lang) && /<[A-Za-z]/.test(b.code)));
+  const reactCandidates = blocks.filter((b) => isReact(b.lang) || (isTs(b.lang) && looksLikeJsx(b.code)));
   const previewable = reactCandidates.filter((b) => !/<html[\s>]/i.test(b.code));
   const react = previewable[previewable.length - 1] ?? reactCandidates[reactCandidates.length - 1];
   const svg = blocks.find((b) => b.lang === "svg" || (!b.lang && b.code.trimStart().startsWith("<svg")));
