@@ -19,8 +19,23 @@ export interface OpenAIChatBody {
   model: string;
   messages: OAIMsg[];
   tools?: OAITool[];
+  tool_choice?: "auto" | "none" | "required" | { type: "function"; function: { name: string } };
   max_tokens?: number;
   temperature?: number;
+}
+
+/* OpenAI tool_choice → Anthropic tool_choice. Eşlenmezse (undefined) alan hiç
+   gönderilmez → Claude varsayılanı (araç varsa auto) geçerli olur. Kritik olan
+   son-tur `"none"`: route bunu metin cevabı ZORLAMAK için ayarlar ama önceden
+   Anthropic yoluna hiç iletilmiyordu → Claude son turda yine tool_use çıkarıp
+   döngü metin üretmeden bitebiliyordu. */
+function convertToolChoice(tc: OpenAIChatBody["tool_choice"]): Record<string, unknown> | undefined {
+  if (!tc) return undefined;
+  if (tc === "auto") return { type: "auto" };
+  if (tc === "none") return { type: "none" };
+  if (tc === "required") return { type: "any" };
+  if (typeof tc === "object" && tc.function?.name) return { type: "tool", name: tc.function.name };
+  return undefined;
 }
 
 type Block = Record<string, unknown>;
@@ -204,6 +219,11 @@ export async function anthropicUpstream(
   };
   if (system.length) reqBody.system = system;
   if (tools) reqBody.tools = tools;
+  /* tool_choice yalnız araç varken anlamlı (Anthropic araçsız tool_choice'u reddeder). */
+  if (tools) {
+    const tc = convertToolChoice(body.tool_choice);
+    if (tc) reqBody.tool_choice = tc;
+  }
   if (typeof body.temperature === "number") reqBody.temperature = body.temperature;
 
   let res: Response;
