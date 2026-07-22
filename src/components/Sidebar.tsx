@@ -25,6 +25,7 @@ import { chatEmbeddingText, findRelated, withFreshEmbeddings } from "@/lib/relat
 import { AuthButton } from "./AuthButton";
 import { AccordionSection } from "./Accordion";
 import { BrandMark } from "./BrandMark";
+import { useModKey } from "@/lib/useModKey";
 
 /* "Araçlar" — Tem 2026 kullanıcı kararı: sağ üst ⋯ menüsündeki Kütüphane/
    Etkinlik günlüğü/Kısayollar buraya (Sidebar → Eklentiler'in yanına)
@@ -121,6 +122,7 @@ function SidebarToolsButton({ variant, onNavigate }: { variant: "rail" | "nav"; 
    AÇMAZ — ExtensionStoreModal'ı (aynı McpGallery verisini paylaşan hafif bir
    modal) açar. */
 export function Sidebar() {
+  const mod = useModKey();
   const chats = useStore((s) => s.chats);
   const currentId = useStore((s) => s.currentId);
   const newChat = useStore((s) => s.newChat);
@@ -160,20 +162,10 @@ export function Sidebar() {
         <div className="h-14 flex items-center justify-center border-b border-line/60 shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
-            title="Paneli aç (Ctrl+B)"
+            title={`Paneli aç (${mod}+B)`}
             className="w-9 h-9 rounded-xl bg-brand/10 border border-brand/30 grid place-items-center hover:bg-brand/15 transition-colors"
           >
             <BrandMark size={20} />
-          </button>
-        </div>
-
-        <div className="px-2 py-3 border-b border-line/60 shrink-0">
-          <button
-            onClick={() => newChat(false)}
-            title="Yeni oturum (Ctrl+N)"
-            className="w-full h-9 rounded-xl bg-brand hover:bg-branddim text-[#111110] grid place-items-center transition-colors"
-          >
-            <Plus size={16} />
           </button>
         </div>
 
@@ -182,7 +174,7 @@ export function Sidebar() {
         <div className="px-2 pt-2 shrink-0">
           <button
             onClick={() => setCommandPaletteOpen(true)}
-            title="Ara (⌘K)"
+            title={`Ara (${mod}K)`}
             className="w-full h-9 rounded-xl text-muted/60 hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
           >
             <Search size={14} />
@@ -217,7 +209,7 @@ export function Sidebar() {
           <SidebarToolsButton variant="rail" />
           <button
             onClick={() => router.push("/settings")}
-            title="Ayarlar (Ctrl+,)"
+            title={`Ayarlar (${mod}+,)`}
             className={`w-full h-9 rounded-xl border grid place-items-center transition-colors ${
               pathname === "/settings"
                 ? "border-brand/40 bg-brand/10 text-brand"
@@ -225,6 +217,17 @@ export function Sidebar() {
             }`}
           >
             <Settings size={14} />
+          </button>
+          {/* Genişletilmiş görünümdeki alt-köşe "Yeni sohbet" FAB'ıyla aynı
+             konum (en altta) ve aynı şekil (rounded-full) — daraltıp
+             genişletince birincil eylem yer/şekil değiştirmesin. */}
+          <button
+            onClick={() => newChat(false)}
+            title={`Yeni sohbet (${mod}+N)`}
+            aria-label="Yeni sohbet"
+            className="w-full h-9 rounded-full bg-brand hover:bg-branddim text-[#111110] grid place-items-center transition-colors"
+          >
+            <Plus size={16} />
           </button>
         </div>
       </aside>
@@ -248,7 +251,7 @@ export function Sidebar() {
         </div>
         <button
           onClick={() => setSidebarOpen(false)}
-          title="Kapat (Ctrl+B)"
+          title={`Kapat (${mod}+B)`}
           className="w-10 h-10 sm:w-7 sm:h-7 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors"
         >
           <X size={16} />
@@ -269,7 +272,7 @@ export function Sidebar() {
         >
           <Search size={16} className="text-muted/60 shrink-0" />
           <span className="flex-1 text-left">Ara</span>
-          <span className="text-[10px] text-muted/40 font-mono shrink-0">⌘K</span>
+          <span className="text-[10px] text-muted/40 font-mono shrink-0">{mod}K</span>
         </button>
         <button
           onClick={() => { router.push("/chats"); closeOnMobile(); }}
@@ -371,7 +374,7 @@ export function Sidebar() {
         <AuthButton />
         <button
           onClick={() => { newChat(false); closeOnMobile(); }}
-          title="Yeni sohbet (Ctrl+N)"
+          title={`Yeni sohbet (${mod}+N)`}
           aria-label="Yeni sohbet"
           className="w-10 h-10 rounded-full bg-brand hover:bg-branddim text-[#111110] grid place-items-center transition-colors shrink-0"
         >

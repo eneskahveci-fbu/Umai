@@ -4,6 +4,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useModalA11y } from "@/lib/useModalA11y";
 import { useExitAnimation } from "@/lib/useExitAnimation";
+import { useModKey } from "@/lib/useModKey";
 import {
   Bell,
   Brain,
@@ -90,6 +91,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   initialTab?: SettingsTab;
   onTabChange?: (t: SettingsTab) => void;
 } = {}) {
+  const mod = useModKey();
   const storeOpen = useStore((s) => s.settingsOpen);
   const open = routeMode || storeOpen;
   const setOpen = useStore((s) => s.setSettingsOpen);
@@ -1781,7 +1783,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 <div>
                   <h4 className="text-sm font-bold mb-2">Klavye Kısayolları</h4>
                   <div className="grid gap-1.5 text-xs">
-                    {[["Ctrl + N", "Yeni sohbet"], ["Ctrl + Shift + N", "Gizli sohbet"], ["Ctrl + ,", "Ayarlar"]].map(([key, desc]) => (
+                    {[[`${mod} + N`, "Yeni sohbet"], [`${mod} + Shift + N`, "Gizli sohbet"], [`${mod} + ,`, "Ayarlar"]].map(([key, desc]) => (
                       <div key={key} className="flex items-center gap-3">
                         <kbd className="px-2 py-0.5 rounded bg-bgsoft border border-line font-mono text-[11px] text-muted">{key}</kbd>
                         <span className="text-muted">{desc}</span>

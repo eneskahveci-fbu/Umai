@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Command, Keyboard, Monitor, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useModalA11y } from "@/lib/useModalA11y";
 import { useExitAnimation } from "@/lib/useExitAnimation";
+import { useMacMode, setMacMode } from "@/lib/useModKey";
 
 interface Shortcut { keys: string[]; label: string; }
 
@@ -12,7 +13,7 @@ const GROUPS: { title: string; items: Shortcut[] }[] = [
   {
     title: "Genel",
     items: [
-      { keys: ["mod", "N"], label: "Yeni oturum" },
+      { keys: ["mod", "N"], label: "Yeni sohbet" },
       { keys: ["mod", "B"], label: "Yan paneli aç/kapat" },
       { keys: ["mod", "K"], label: "Komut paleti" },
       { keys: ["mod", "P"], label: "Komut paleti (hızlı dosya bulucu)" },
@@ -43,23 +44,12 @@ const GROUPS: { title: string; items: Shortcut[] }[] = [
   },
 ];
 
-const MAC_KEY = "craftai_mac_mode";
-
 export function KeyboardShortcuts() {
   const open = useStore((s) => s.shortcutsOpen);
   const setOpen = useStore((s) => s.setShortcutsOpen);
-  const [macMode, setMacMode] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const saved = localStorage.getItem(MAC_KEY);
-    if (saved !== null) return saved === "1";
-    return navigator.platform.toUpperCase().includes("MAC");
-  });
+  const macMode = useMacMode();
 
-  const toggleMac = () => {
-    const next = !macMode;
-    setMacMode(next);
-    if (typeof window !== "undefined") localStorage.setItem(MAC_KEY, next ? "1" : "0");
-  };
+  const toggleMac = () => setMacMode(!macMode);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

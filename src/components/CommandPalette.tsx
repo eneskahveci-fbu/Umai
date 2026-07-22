@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useModalA11y } from "@/lib/useModalA11y";
+import { useModKey } from "@/lib/useModKey";
 import { setSurfaceOpenItem } from "@/lib/surfaceNav";
 import type { TreeNode } from "@/lib/types";
 
@@ -54,6 +55,7 @@ function flattenTree(node: TreeNode | null): { name: string; path: string }[] {
 }
 
 export function CommandPalette() {
+  const mod = useModKey();
   const open = useStore((s) => s.commandPaletteOpen);
   const setOpen = useStore((s) => s.setCommandPaletteOpen);
   const theme = useStore((s) => s.config.theme);
@@ -73,7 +75,7 @@ export function CommandPalette() {
       id: "new-chat",
       label: "Yeni sohbet",
       icon: <MessageSquare size={16} />,
-      shortcut: "Ctrl+N",
+      shortcut: `${mod}+N`,
       action: () => {
         useStore.getState().newChat(false);
         setOpen(false);
@@ -84,7 +86,7 @@ export function CommandPalette() {
       id: "incognito-chat",
       label: "Gizli sohbet",
       icon: <VenetianMask size={16} />,
-      shortcut: "Ctrl+Shift+N",
+      shortcut: `${mod}+Shift+N`,
       action: () => {
         useStore.getState().newChat(true);
         setOpen(false);
@@ -95,7 +97,7 @@ export function CommandPalette() {
       id: "settings",
       label: "Ayarlar",
       icon: <Settings size={16} />,
-      shortcut: "Ctrl+,",
+      shortcut: `${mod}+,`,
       action: () => {
         useStore.getState().setSettingsOpen(true);
         setOpen(false);
