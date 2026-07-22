@@ -230,7 +230,7 @@ export function ModelPicker({
       <button
         ref={triggerRef}
         onClick={toggle}
-        title="Model seçimi — birden fazla işaretlersen Fusion (taslak + hakem) devreye girer"
+        title={fusionEnabled ? label : `${label} — birden fazla işaretlersen Fusion (taslak + hakem) devreye girer`}
         className={`shrink-0 flex items-center gap-1.5 px-2.5 h-9 rounded-xl border text-xs font-medium transition-colors ${
           fusionEnabled
             ? "border-brand/50 bg-brand/10 text-brand"
@@ -238,7 +238,7 @@ export function ModelPicker({
         }`}
       >
         <Cpu size={13} />
-        <span className="max-w-[130px] truncate">{label}</span>
+        <span className="max-w-[140px] sm:max-w-[200px] truncate">{label}</span>
         <ChevronDown size={11} />
       </button>
       <PopoverPanel open={open} sheet={sheet} pos={pos} panelRef={panelRef} onClose={close} title="Model" widthClass="w-64">
