@@ -827,6 +827,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
 
         {tab === "model" && (
           <section>
+            <h4 className="text-sm font-bold flex items-center gap-2 mb-1"><Cpu size={16} className="text-brand" /> Model</h4>
             <p className="text-xs text-muted mb-3">Birden fazla model ekleyebilirsin. Anahtarlar yalnızca bu tarayıcıda saklanır.</p>
             
             {/* Birleşik model ekleme — hızlı kurulum + gelişmiş TEK alanda.
