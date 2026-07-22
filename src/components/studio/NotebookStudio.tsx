@@ -6,6 +6,7 @@ import {
   Sparkles, Trash2, Users, Volume2, VolumeX,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { friendlyError } from "@/lib/friendlyError";
 import { SavedItemsModal } from "./SavedItemsModal";
 import type { CraftNotebook, NotebookSource } from "@/lib/types";
 import { streamChat } from "@/lib/genChat";
@@ -162,7 +163,7 @@ export function NotebookStudio() {
       setSources((s) => [...s, { id: newSourceId(), name, text: data.text!, url: u, enabled: true }]);
       setUrlInput("");
     } catch (e) {
-      addToast(`URL getirilemedi: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+      addToast(`URL getirilemedi: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
     } finally { setFetching(false); }
   };
 
@@ -177,7 +178,7 @@ export function NotebookStudio() {
       const text = await extractPdfText(f);
       setSources((s) => [...s, { id: newSourceId(), name: f.name, text, enabled: true }]);
     } catch (e) {
-      addToast(`PDF okunamadı: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+      addToast(`PDF okunamadı: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
     } finally { setPdfBusy(false); }
   };
 
@@ -200,7 +201,7 @@ export function NotebookStudio() {
       });
     } catch (e) {
       if ((e as Error)?.name !== "AbortError") {
-        setMsgs([...history, { role: "assistant", content: `Hata: ${e instanceof Error ? e.message : "bilinmeyen"}` }]);
+        setMsgs([...history, { role: "assistant", content: `Hata: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}` }]);
       }
     } finally { setBusy(false); abortRef.current = null; }
   };
@@ -226,8 +227,7 @@ export function NotebookStudio() {
         playTts(text, config.ttsVoice || "nova", () => setSpeaking(false));
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "bilinmeyen";
-      addToast(`Özet üretilemedi: ${msg}`, "error");
+      const msg = friendlyError(e instanceof Error ? e.message : "bilinmeyen");
       setMsgs([...history, { role: "assistant", content: `Hata: ${msg}` }]);
     } finally { setNarrating(false); }
   };
@@ -265,8 +265,7 @@ export function NotebookStudio() {
       const voiceB = config.ttsVoiceB || "onyx";
       playPodcast(turns, (speaker) => (speaker === "B" ? voiceB : voiceA), undefined, () => setPlayingPodcast(false));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "bilinmeyen";
-      addToast(`Podcast üretilemedi: ${msg}`, "error");
+      const msg = friendlyError(e instanceof Error ? e.message : "bilinmeyen");
       setMsgs([...history, { role: "assistant", content: `Hata: ${msg}` }]);
     } finally { setPodcasting(false); }
   };
@@ -303,8 +302,7 @@ export function NotebookStudio() {
         onDelta: (full) => setMsgs([...history, { role: "assistant", content: full }]),
       });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "bilinmeyen";
-      addToast(kind === "guide" ? `Çalışma rehberi üretilemedi: ${msg}` : `SSS üretilemedi: ${msg}`, "error");
+      const msg = friendlyError(e instanceof Error ? e.message : "bilinmeyen");
       setMsgs([...history, { role: "assistant", content: `Hata: ${msg}` }]);
     } finally { setKindBusy(false); }
   };

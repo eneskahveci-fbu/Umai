@@ -5,6 +5,7 @@ import {
   Download, FolderOpen, GitBranch, Loader2, Network, Plus, Save, Sparkles, Trash2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { friendlyError } from "@/lib/friendlyError";
 import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { SavedItemsModal } from "./SavedItemsModal";
 import { ExportMenu } from "./ExportMenu";
@@ -39,7 +40,6 @@ export function MapStudio() {
   const [brief, setBrief] = useState("");
   const [map, setMap] = useState<CraftMap | null>(null);
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [savedOpen, setSavedOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expanding, setExpanding] = useState(false);
@@ -65,12 +65,12 @@ export function MapStudio() {
   const generate = async () => {
     const b = brief.trim();
     if (!b || busy) return;
-    setBusy(true); setProgress(0);
+    setBusy(true);
     try {
-      const m = await generateMap({ brief: b, onDelta: (t) => setProgress(t.length) });
+      const m = await generateMap({ brief: b });
       setMap(m); setView("work"); setSelectedId(null);
     } catch (e) {
-      addToast(`Kroki üretilemedi: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+      addToast(`Kroki üretilemedi: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
     } finally { setBusy(false); }
   };
 
@@ -103,7 +103,7 @@ export function MapStudio() {
       for (const t of texts) root = addChild(root, selectedId, newNode(t));
       patchRoot(root);
     } catch (e) {
-      addToast(`Dallandırılamadı: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+      addToast(`Dallandırılamadı: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
     } finally { setExpanding(false); }
   };
 
@@ -184,7 +184,7 @@ export function MapStudio() {
             {busy && (
               <div className="flex flex-col items-center gap-2.5">
                 <GenSkeleton />
-                <p className="text-center text-xs text-muted/60">Dallar kurgulanıyor… ({progress} karakter)</p>
+                <p className="text-center text-xs text-muted/60">Dallar kurgulanıyor…</p>
               </div>
             )}
             <div className="grid sm:grid-cols-2 gap-2">

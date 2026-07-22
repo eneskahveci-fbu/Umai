@@ -6,6 +6,7 @@ import {
   Plus, Save, Sparkles, Trash2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { friendlyError } from "@/lib/friendlyError";
 import { createClient } from "@/lib/supabase/client";
 import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { GenSkeleton } from "./GenSkeleton";
@@ -42,7 +43,6 @@ export function FormsStudio() {
   const [brief, setBrief] = useState("");
   const [form, setForm] = useState<CraftForm | null>(null);
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [savedOpen, setSavedOpen] = useState(false);
   const [responsesOpen, setResponsesOpen] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
@@ -77,12 +77,12 @@ export function FormsStudio() {
   const generate = async () => {
     const b = brief.trim();
     if (!b || busy) return;
-    setBusy(true); setProgress(0);
+    setBusy(true);
     try {
-      const f = await generateForm({ brief: b, onDelta: (t) => setProgress(t.length) });
+      const f = await generateForm({ brief: b });
       setForm(f); setView("work");
     } catch (e) {
-      addToast(`Anket üretilemedi: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
+      addToast(`Anket üretilemedi: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
     } finally { setBusy(false); }
   };
 
@@ -226,7 +226,7 @@ export function FormsStudio() {
             {busy && (
               <div className="flex flex-col items-center gap-2.5">
                 <GenSkeleton />
-                <p className="text-center text-xs text-muted/60">Sorular kurgulanıyor… ({progress} karakter)</p>
+                <p className="text-center text-xs text-muted/60">Sorular kurgulanıyor…</p>
               </div>
             )}
             <div className="grid sm:grid-cols-2 gap-2">
