@@ -77,6 +77,7 @@ const RealTerminal = dynamic(() => import("./RealTerminal").then((m) => m.RealTe
 });
 const CameraCaptureModal = dynamic(() => import("./CameraCapture").then((m) => m.CameraCaptureModal), { ssr: false });
 import { useStore } from "@/lib/store";
+import { useModKey } from "@/lib/useModKey";
 import { isMobile as isMobileDevice, isSupported as isWebContainerSupported } from "@/lib/webcontainer";
 import { isAdminEmail } from "@/lib/admin";
 import { extractCheckedItems } from "@/lib/checklist";
@@ -692,6 +693,7 @@ function SurveyCard({
 }
 
 export function CoderView() {
+  const mod = useModKey();
   const config = useStore((s) => s.config);
   const isAdmin = isAdminEmail(useStore((s) => s.userEmail));
   const repo = useStore((s) => s.repo);
@@ -2904,7 +2906,7 @@ export function CoderView() {
         <div className="flex items-center gap-2 min-w-0">
           <button
             onClick={() => setSidebarOpen(true)}
-            title="Yan panel (Ctrl+B)"
+            title={`Yan panel (${mod}+B)`}
             className="w-8 h-8 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors shrink-0"
           >
             <PanelLeft size={16} />
