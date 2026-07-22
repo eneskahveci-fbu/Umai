@@ -124,7 +124,7 @@ export default function HelpCenterPage() {
               </div>
               <div className="space-y-3">
                 {cat.faqs.map((faq) => (
-                  <details key={faq.q} className="group premium-card rounded-2xl overflow-hidden">
+                  <details key={faq.q} className="group premium-card rounded-xl overflow-hidden">
                     <summary className="flex items-center justify-between px-6 py-4 cursor-pointer font-semibold text-[15px] list-none hover:text-brand transition-colors">
                       {faq.q}
                       <ChevronDown size={16} className="text-muted transition-transform duration-200 group-open:rotate-180 flex-shrink-0 ml-3" />

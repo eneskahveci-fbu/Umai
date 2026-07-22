@@ -173,7 +173,7 @@ function MoreMenu({ active, children, placement = "top", icon, title = "Daha faz
         ref={btnRef}
         onClick={() => setOpen((o) => !o)}
         title={title}
-        className={`flex items-center gap-1.5 text-[12px] px-2.5 py-2.5 sm:px-2 sm:py-1.5 rounded-lg transition-colors active:scale-95 ${
+        className={`flex items-center gap-1.5 text-[12px] px-2.5 py-2.5 sm:px-2 sm:py-1.5 rounded-xl transition-colors active:scale-95 ${
           open || active ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft active:bg-bgsoft"
         }`}
       >
