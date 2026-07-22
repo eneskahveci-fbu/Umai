@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { MarketingHeader } from "@/components/MarketingHeader";
 
 export const metadata: Metadata = {
   title: "Gizlilik Politikası — UMAI",
@@ -10,20 +11,15 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen flex flex-col bg-bg text-ink">
-      <nav className="sticky top-0 z-50 backdrop-blur bg-bg/70 border-b border-line">
-        <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-extrabold">
-            <span className="w-6 h-6 rounded-md bg-brand/10 border border-brand/25 grid place-items-center text-brand text-xs">
-              ◇
-            </span>
-            UMAI
-          </Link>
+      <MarketingHeader
+        maxWidthClass="max-w-3xl"
+        right={
           <div className="flex items-center gap-4 text-sm text-muted">
             <Link href="/terms" className="hover:text-ink">Kullanım Şartları</Link>
             <Link href="/cookies" className="hover:text-ink">Çerez Politikası</Link>
           </div>
-        </div>
-      </nav>
+        }
+      />
 
       <main className="max-w-3xl mx-auto px-6 py-14 flex-1 w-full">
         <div className="mb-8">

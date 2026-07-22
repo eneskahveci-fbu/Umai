@@ -24,15 +24,7 @@ import type { Chat } from "@/lib/types";
 import { chatEmbeddingText, findRelated, withFreshEmbeddings } from "@/lib/relatedItems";
 import { AuthButton } from "./AuthButton";
 import { AccordionSection } from "./Accordion";
-
-function SidebarLogo({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-      <path d="M14 4L23 9.5V18.5L14 24L5 18.5V9.5L14 4Z" stroke="#5c9478" strokeWidth="1.7" strokeLinejoin="round" fill="none" />
-      <circle cx="14" cy="14" r="2.8" fill="#5c9478" fillOpacity="0.9" />
-    </svg>
-  );
-}
+import { BrandMark } from "./BrandMark";
 
 /* "Araçlar" — Tem 2026 kullanıcı kararı: sağ üst ⋯ menüsündeki Kütüphane/
    Etkinlik günlüğü/Kısayollar buraya (Sidebar → Eklentiler'in yanına)
@@ -171,7 +163,7 @@ export function Sidebar() {
             title="Paneli aç (Ctrl+B)"
             className="w-9 h-9 rounded-xl bg-brand/10 border border-brand/30 grid place-items-center hover:bg-brand/15 transition-colors"
           >
-            <SidebarLogo size={20} />
+            <BrandMark size={20} />
           </button>
         </div>
 
@@ -251,7 +243,7 @@ export function Sidebar() {
       {/* Header */}
       <div className="h-14 px-4 flex items-center justify-between border-b border-line/60 shrink-0">
         <div className="flex items-center gap-2 font-extrabold text-base tracking-tight">
-          <SidebarLogo size={22} />
+          <BrandMark size={22} />
           <span className="text-ink">UMAI</span>
         </div>
         <button

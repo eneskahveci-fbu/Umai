@@ -788,7 +788,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               <span className="w-12 h-12 rounded-2xl bg-brand/12 border border-brand/20 grid place-items-center text-brand"><Info size={22} /></span>
               <div>
                 <div className="text-base font-bold">UMAI</div>
-                <div className="text-[11px] text-muted/60">Tarayıcıda çalışan Türkçe AI kodlama asistanı</div>
+                <div className="text-[11px] text-muted/60">Herkes için yapay zeka stüdyosu — sohbet, tasarım ve kod</div>
               </div>
             </div>
             <div className="premium-card rounded-xl p-4 space-y-2 text-xs">

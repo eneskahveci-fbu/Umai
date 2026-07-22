@@ -89,9 +89,13 @@ body {
      containers via overflow-y:auto */
   overscroll-behavior-y: none;
   /* Hiçbir içerik görünen alanı yatayda aşmasın — iOS'ta sağ kenardan taşma /
-     "zoom" görüntüsünü kökten engeller. */
+     "zoom" görüntüsünü kökten engeller. `hidden` kullanılırsa CSS Overflow
+     spec'inin "mutual overflow" kuralı overflow-y'yi de zımnen `auto`
+     yapar (bir eksen clip, diğeri visible olamaz) ve <body> kendi iç scroll
+     konteynerine dönüşüp window.scrollY'nin kopmasına yol açar — bu yüzden
+     yan etkisiz `clip` kullanılıyor. */
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 body {
   background: var(--color-bg);

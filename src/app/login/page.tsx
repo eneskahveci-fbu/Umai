@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowRight, Eye, EyeOff, KeyRound, Loader2, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { captureReferralCode } from "@/lib/referral";
+import { BrandMark } from "@/components/BrandMark";
 
 type Mode = "login" | "signup";
 
@@ -176,11 +177,7 @@ export default function LoginPage() {
       </div>
 
       <Link href="/" className="flex items-center gap-2.5 font-extrabold text-xl mb-10 group">
-        <svg width="36" height="36" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-          <rect width="28" height="28" rx="7" fill="#5c9478" fillOpacity="0.12" />
-          <path d="M14 5L22 10.5V17.5L14 23L6 17.5V10.5L14 5Z" stroke="#5c9478" strokeWidth="1.6" strokeLinejoin="round" fill="none" />
-          <circle cx="14" cy="14" r="2.8" fill="#5c9478" fillOpacity="0.85" />
-        </svg>
+        <BrandMark size={36} />
         <span className="text-ink">UMAI</span>
       </Link>
 

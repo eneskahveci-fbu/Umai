@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { ReferralCapture } from "@/components/ReferralCapture";
+import { BrandMark } from "@/components/BrandMark";
+import { MarketingHeader, OpenAppCta } from "@/components/MarketingHeader";
 import {
   ArrowRight,
   ChevronDown,
@@ -10,22 +12,6 @@ import {
   MessageCircle,
   ShieldCheck,
 } from "lucide-react";
-
-function LogoMark({ size = 28 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-      <rect width="28" height="28" rx="7" fill="#5c9478" fillOpacity="0.12" />
-      <path
-        d="M14 5L22 10.5V17.5L14 23L6 17.5V10.5L14 5Z"
-        stroke="#5c9478"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-        fill="none"
-      />
-      <circle cx="14" cy="14" r="2.8" fill="#5c9478" fillOpacity="0.85" />
-    </svg>
-  );
-}
 
 /* İnsan diliyle "ne yapabilirsin" — jargon yok, herkes anlar. */
 const CAN_DO = [
@@ -88,26 +74,21 @@ export default function Home() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_APP) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_FAQ) }} />
 
-      {/* NAV */}
-      <nav className="sticky top-0 z-50 glass border-b border-line/40">
-        <div className="max-w-6xl mx-auto px-5 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5 font-extrabold text-xl tracking-tight">
-            <LogoMark size={28} />
-            <span className="text-ink">UMAI</span>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3">
+      {/* NAV — diğer statik sayfalarla (Pricing/Help/Changelog/hukuki) AYNI
+         paylaşılan kabuk (bkz. MarketingHeader); önceden bu sayfa tek başına
+         farklı bir saydamlık stili (.glass), farklı bir CTA metni ("Başla"
+         vs diğerlerinin "Uygulamayı Aç") kullanıyordu. */}
+      <MarketingHeader
+        maxWidthClass="max-w-6xl"
+        right={
+          <>
             <Link href="/pricing" className="hidden sm:inline-flex text-sm text-muted hover:text-ink font-medium px-3 py-2 transition-colors">
               Fiyatlandırma
             </Link>
-            <Link
-              href="/app"
-              className="flex items-center gap-1.5 bg-brand hover:bg-branddim text-[#111110] font-semibold px-4 py-2 rounded-xl text-sm transition-colors shadow-sm shadow-brand/20"
-            >
-              Başla <ArrowRight size={15} />
-            </Link>
-          </div>
-        </div>
-      </nav>
+            <OpenAppCta />
+          </>
+        }
+      />
 
       {/* HERO — tek mesaj: asla ödeme yapmadan, asla limitle karşılaşmadan */}
       <header className="max-w-3xl mx-auto px-5 sm:px-6 pt-20 sm:pt-28 pb-14 text-center w-full">
@@ -225,7 +206,7 @@ export default function Home() {
       <footer className="border-t border-line mt-auto">
         <div className="max-w-6xl mx-auto px-5 sm:px-6 py-12 text-center">
           <div className="flex items-center justify-center gap-2 font-extrabold text-lg mb-3">
-            <LogoMark size={22} />
+            <BrandMark size={22} />
             <span className="text-ink">UMAI</span>
           </div>
           <p className="text-sm text-muted">Web sitesi, sunum ve görsel tasarla · kod yaz ve depona bağlan</p>
