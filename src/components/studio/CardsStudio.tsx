@@ -9,7 +9,7 @@ import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav"
 import { SavedItemsModal } from "./SavedItemsModal";
 import { safeFileName } from "./DocsStudio";
 import { GenSkeleton } from "./GenSkeleton";
-import type { CraftDeck, FlashCard } from "@/lib/types";
+import type { CraftDeck, FlashCard, Highlight } from "@/lib/types";
 import {
   cardsFromHighlights, deckToTsv, dueCards, generateDeck, gradeCard,
   MAX_DECK_CARDS, newCard, newClozeCard, parseCardsTsv, renderCloze,
@@ -30,10 +30,18 @@ const SUGGESTIONS = [
 
 type Tab = "study" | "cards" | "highlights";
 
+/* Modül-seviyesi SABİT referans — Zustand selector'ı içinde `?? []` yazmak
+   (aşağıdaki gibi HER render'da yeni bir dizi döndürür) React 19'un
+   useSyncExternalStore'unu "store değişti" sanmaya, bu da sonsuz render
+   döngüsüne ("Maximum update depth exceeded") sokuyordu — config.highlights
+   tanımsızken canlıda ASLA render edilemiyordu. Aynı (sabit) referansı her
+   seferinde dönmek Object.is eşitliğini korur, döngü oluşmaz. */
+const EMPTY_HIGHLIGHTS: Highlight[] = [];
+
 export function CardsStudio() {
   const open = useStore((s) => s.cardsStudioOpen);
   const addToast = useStore((s) => s.addToast);
-  const highlights = useStore((s) => s.config.highlights ?? []);
+  const highlights = useStore((s) => s.config.highlights ?? EMPTY_HIGHLIGHTS);
   const removeHighlight = useStore((s) => s.removeHighlight);
   const { saved, save, remove } = useStudioProject<CraftDeck>("craftDecks", 40);
 
