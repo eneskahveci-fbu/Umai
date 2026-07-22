@@ -24,7 +24,7 @@ import { useStore } from "@/lib/store";
 import { bundledDesignSystems } from "@/lib/designSystems";
 import { STUDIO_TEMPLATES, type StudioTemplate } from "@/lib/studioTemplates";
 
-interface PopoverPos { left?: number; right?: number; bottom: number }
+interface PopoverPos { left?: number; right?: number; bottom?: number; top?: number; maxHeight: number }
 
 function usePopoverPortal(
   triggerRef: RefObject<HTMLButtonElement | null>,
@@ -48,11 +48,24 @@ function usePopoverPortal(
     /* Eşik GERÇEK panel genişliğinden türetilir (+ küçük pay). Sabit 300, w-80
        (320px) TemplatePicker panelinde sağ kenardan taşmaya yol açıyordu. */
     const spaceRight = window.innerWidth - r.left;
-    setPos(
-      spaceRight < desktopWidth + 16
-        ? { right: window.innerWidth - r.right, bottom: window.innerHeight - r.top + 8 }
-        : { left: r.left, bottom: window.innerHeight - r.top + 8 },
-    );
+    const horiz = spaceRight < desktopWidth + 16
+      ? { right: window.innerWidth - r.right }
+      : { left: r.left };
+    /* DİKEY yön: önceden panel HER ZAMAN tetikleyicinin ÜSTÜNE açılıyordu,
+       yukarıda yer olup olmadığına bakmadan — composer ekranın üst kısmına
+       yakınken (ör. Stüdyo ana ekranı) listenin ilk satırları viewport
+       dışına (y<0) taşıp görünmez oluyordu; Şablon panelinde arama kutusu
+       bile kayboluyordu. Artık üstte/altta GERÇEKTEN ne kadar yer olduğu
+       ölçülüp daha GENİŞ olan tarafa açılıyor, max-height de o alana göre
+       sınırlanıyor (sabit 70vh değil) — panel hiçbir yönde ekran dışına taşmaz. */
+    const GAP = 8, MARGIN = 12;
+    const spaceAbove = r.top - GAP - MARGIN;
+    const spaceBelow = window.innerHeight - r.bottom - GAP - MARGIN;
+    const openAbove = spaceAbove >= spaceBelow;
+    const vert = openAbove
+      ? { bottom: window.innerHeight - r.top + GAP, maxHeight: Math.max(120, spaceAbove) }
+      : { top: r.bottom + GAP, maxHeight: Math.max(120, spaceBelow) };
+    setPos({ ...horiz, ...vert });
   };
   const openPopover = () => { computePos(); setOpenState(true); };
   const close = () => setOpenState(false);
@@ -127,8 +140,8 @@ function PopoverPanel({
   return createPortal(
     <div
       ref={panelRef}
-      style={{ position: "fixed", left: pos.left, right: pos.right, bottom: pos.bottom }}
-      className={`${widthClass ?? "w-64"} max-h-[70vh] overflow-auto bg-surface border border-line rounded-xl shadow-2xl shadow-black/40 z-[80] py-1.5 animate-modal-bg`}
+      style={{ position: "fixed", left: pos.left, right: pos.right, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight }}
+      className={`${widthClass ?? "w-64"} overflow-auto bg-surface border border-line rounded-xl shadow-2xl shadow-black/40 z-[80] py-1.5 animate-modal-bg`}
     >
       {children}
     </div>,

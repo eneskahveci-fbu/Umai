@@ -14,10 +14,20 @@
    üçü de artık misafir-erişimlidir (bkz. authGate.ts useAuthState) —
    önceden bu üçü de girişsiz kullanıcıyı /login'e atıyordu, oysa AYNI
    Ayarlar modalı /app içinde Ctrl+, ile misafir olarak açılabiliyordu.
-   Aktif sekme marka renginde; safe-area alt boşluğu korunur. */
+   Aktif sekme marka renginde; safe-area alt boşluğu korunur.
+
+   BUG (düzeltildi): /app üzerinde Ctrl+, ile SettingsModal AYNI sayfada
+   overlay olarak açılınca (pathname hâlâ "/app") bu çubuk z-[70] ile
+   modalın (z-50) ÜSTÜNDE kalıp alt içeriği kesiyordu, ÜSTELİK "Ayarlar"
+   değil "Sohbet" aktif görünüyordu (pathname'e bakan eski mantık modal
+   durumunu bilmiyordu). Aynı sorun Skills/Kütüphane modalleri için de
+   geçerliydi. Çözüm: bu üç tam-ekran overlay'den biri açıkken çubuğun
+   TAMAMEN gizlenmesi — hem z-index çakışması hem yanlış aktif-sekme
+   göstergesi tek seferde ortadan kalkıyor. */
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Images, MessageSquare, Settings, Sparkles } from "lucide-react";
+import { useStore } from "@/lib/store";
 
 /* Sanal klavye açık mı? (mobil) — visualViewport küçülmesiyle algılanır.
    Alt bar klavye açıkken gizlenir; sayfalar alt boşluğu buna göre sıfırlar. */
@@ -47,8 +57,9 @@ export function MobileTabBar() {
   const router = useRouter();
   const pathname = usePathname() ?? "";
   const kbOpen = useKeyboardOpen();
+  const overlayOpen = useStore((s) => s.settingsOpen || s.skillsOpen || s.libraryOpen);
 
-  if (kbOpen) return null;
+  if (kbOpen || overlayOpen) return null;
   return (
     <nav
       className="sm:hidden fixed inset-x-0 bottom-0 z-[70] glass border-t border-line flex items-stretch"
