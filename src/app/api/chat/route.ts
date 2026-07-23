@@ -17,6 +17,7 @@ import { pollinationsImageUrl, stableSeed } from "@/lib/pollinations";
 import { runDeepResearch } from "@/lib/researchPipeline";
 import { cached, repoCacheKey } from "@/lib/repoContextCache";
 import { isSafeRemoteUrl } from "@/lib/urlSafety";
+import { markProviderDown, markProviderUp, prioritizeHealthyCandidates } from "@/lib/providerHealth";
 import { isBuiltinMcpServerId } from "@/lib/mcpBuiltins";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -1253,6 +1254,13 @@ export async function POST(req: Request) {
     }
   }
 
+  /* Güvenilirlik: bu sıcak süreçte az önce hata verdiği bilinen adaylar
+     (kota/5xx/bağlantı) soğuma süresi dolana kadar ertelenir — aynı isteğin
+     içinde saniyelerce sürebilecek bir zaman aşımını beklemeden doğrudan
+     sıradaki adaya geçilir. Hepsi "down" işaretliyse TAM listeye düşülür,
+     bir aday asla kalıcı olarak elenmez (bkz. providerHealth.ts). */
+  const tryOrder = prioritizeHealthyCandidates(candidates);
+
   /* Bir adayı çağırır (Anthropic native ucu ayrı; diğerleri OpenAI-uyumlu fetch).
      Pollinations anonim istekleri için `referrer` ekler. */
   const openCandidate = async (c: Candidate, messages: unknown, extra: Record<string, unknown> = {}): Promise<Response> => {
@@ -1552,15 +1560,17 @@ export async function POST(req: Request) {
   if (allTools.length === 0 && !wantsFullTools) {
     const messages = [...systemMessages, ...body.messages];
     let lastStatus = 502, lastDetail = "", lastCand: Candidate = primary;
-    for (const c of candidates) {
+    for (const c of tryOrder) {
       let upstream: Response;
       try {
         upstream = await openCandidate(c, messages);
       } catch (err) {
+        markProviderDown(c.provider, c.baseUrl);
         lastStatus = 502; lastDetail = (err as Error).message; lastCand = c;
         continue; // bağlantı hatası → sıradaki aday
       }
       if (upstream.ok && upstream.body) {
+        markProviderUp(c.provider, c.baseUrl);
         const headers = { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" };
         if (!noKeyFallback && c === primary) {
           return new Response(upstream.body, { headers });
@@ -1583,6 +1593,7 @@ export async function POST(req: Request) {
         });
         return new Response(combined, { headers });
       }
+      markProviderDown(c.provider, c.baseUrl);
       lastStatus = upstream.status || 500;
       lastDetail = await upstream.text().catch(() => "");
       lastCand = c;
@@ -1669,15 +1680,17 @@ export async function POST(req: Request) {
         } else {
           /* İlk tur: henüz hiç byte yazılmadı → adayları sırayla güvenle dene. */
           let lastStatus = 502, lastDetail = "", lastCand = primary;
-          for (const c of candidates) {
+          for (const c of tryOrder) {
             let r: Response;
             try {
               const { messages: msgs, extra } = toolBodyFor(c, lastRound);
               r = await openCandidate(c, msgs, extra);
             } catch (err) {
+              markProviderDown(c.provider, c.baseUrl);
               lastStatus = 502; lastDetail = (err as Error).message; lastCand = c; continue;
             }
-            if (r.ok && r.body) { chosen = c; upstream = r; break; }
+            if (r.ok && r.body) { markProviderUp(c.provider, c.baseUrl); chosen = c; upstream = r; break; }
+            markProviderDown(c.provider, c.baseUrl);
             lastStatus = r.status || 500; lastDetail = await r.text().catch(() => ""); lastCand = c;
           }
           if (!upstream) {
