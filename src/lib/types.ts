@@ -289,6 +289,10 @@ export interface DesignSystem {
   accent: string;
   designMd: string;
   tokensCss: string;
+  /** Gerçek Google Fonts aileleri kullanılıyorsa hazır <link> etiketi (H3) —
+      studioGen.ts üretim SONRASI bunu <head>'e ENJEKTE EDER (yalnız system
+      promptuyla "isteme" güvenmez); yoksa yalnız sistem yazı tipi kullanılır. */
+  fontLink?: string;
 }
 
 /** Stüdyo projesi — kaydedilen bir tasarım (üretilen artifact + meta). user_config

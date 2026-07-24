@@ -457,6 +457,7 @@ export function DesignStudio() {
           skillId,
           directionId,
           designSystemPrompt: system ? designSystemPromptText(system) : undefined,
+          fontLink: system?.fontLink,
           /* Takip mesajlarında mevcut tasarımı TEMEL al — ilk üretimde yok. */
           prevHtml: followup ? project.html : undefined,
           images: imagesForThisRun.length ? imagesForThisRun : undefined,

@@ -4,7 +4,8 @@ import { decryptField, isEncrypted } from "./secureKeys";
 import { buildSingleBlockPreview, parseBlocks } from "./preview";
 import { CATEGORY_CRAFT, CRAFT_RULES, lintArtifact } from "./studioCraft";
 import { skillById, directionById } from "./studioConstants";
-import type { Artifact } from "./types";
+import { extractJson } from "./slides";
+import type { Artifact, Config } from "./types";
 
 /* Stüdyo üretim motoru — Claude Artifacts paritesi: brief (+ opsiyonel skill/yön)
    → LLM formatı SEÇER (html/jsx/kod/markdown/mermaid) → uygun tipte artifact
@@ -32,6 +33,11 @@ export interface GenerateOptions {
   /** Fusion: `boost.ts`'in `buildBoostInstruction()`'ından gelen gizli-taslak
       sentez talimatı — verilmişse sistem promptunun en sonuna eklenir. */
   boostInstruction?: string;
+  /** Aktif marka tasarım sisteminin Google Fonts <link> etiketi (varsa) —
+      designSystems.ts'teki DesignSystem.fontLink. Üretim SONRASI html
+      artifact'ın <head>'ine enjekte edilir (bkz. ensureFontLink) — modelin
+      bunu kendi başına eklemesine GÜVENİLMEZ. */
+  fontLink?: string;
   onDelta?: (text: string) => void;
   onPhase?: (p: StudioPhase) => void;
   signal?: AbortSignal;
@@ -68,9 +74,113 @@ const ANIMATE_INSTRUCTION =
   "\n\n[ANİMASYON]: Zarif CSS animasyonları ekle — öğeler için yumuşak giriş (fade/slide-up, kademeli gecikme), " +
   "hover mikro-etkileşimleri ve sürekli ince hareketler (arka plan gradyan kayması vb.). Abartma; akıcı ve profesyonel olsun.";
 
+/* Referans görsel derinleştirme (H2): önceden görsel(ler) yalnız vision
+   mesajının içine ekleniyordu, sistem promptu görseli NASIL kullanacağını
+   hiç söylemiyordu — model çoğu zaman görseli göz ardı edip brief metnine
+   yaslanıyordu. Artık AÇIKÇA: paleti/tipografi hissini/kompozisyon mantığını
+   ÇIKAR ve uygula (birebir kopya değil, ilham) deniyor; marka tasarım
+   sistemiyle çakışırsa (designSystemPrompt) marka kazanır — kompozisyon
+   sırası bunu zaten garanti eder (bu talimat marka bloğundan SONRA eklenir). */
+const IMAGE_REFERENCE_INSTRUCTION =
+  "\n\n[REFERANS GÖRSEL]: Kullanıcı yukarıda bir veya daha fazla referans görsel ekledi. Bunları SADECE " +
+  "betimleme olarak değil, somut tasarım girdisi olarak kullan: baskın renk paletini, tipografi hissini " +
+  "(kalın/ince, geometrik/organik), kompozisyon/mizanpaj mantığını ve genel tonu (ör. minimal/maksimalist, " +
+  "koyu/açık) ÇIKAR ve üretime YANSIT — birebir kopyalama değil, ilham al. Aktif bir marka tasarım sistemi " +
+  "varsa (yukarıda) O OTORİTER kalır; çakışmada marka kazanır, görsel yalnız onu tamamlar.";
+
 /* JSON/kod blokları dışındaki metni göster (akışta 'üretiliyor' hissi). */
 function stripCode(s: string): string {
   return s.replace(/```[\s\S]*?(```|$)/g, "").trim();
+}
+
+/* H3 — modelin fontLink talimatına uyacağını UMMAK yerine GARANTİ eder
+   (G1'deki "her slayta görsel garantisi" ile aynı ilke): <head> varsa içine,
+   yoksa (parçalı/component çıktı) dokunmadan bırakır. Zaten eklenmişse
+   (model yine de eklediyse) yinelenmez. */
+export function ensureFontLink(html: string, fontLink: string | undefined): string {
+  if (!fontLink || html.includes("fonts.googleapis.com")) return html;
+  const closeIdx = html.search(/<\/head>/i);
+  if (closeIdx !== -1) return html.slice(0, closeIdx) + fontLink + html.slice(closeIdx);
+  const openMatch = html.match(/<head[^>]*>/i);
+  if (openMatch && openMatch.index !== undefined) {
+    const i = openMatch.index + openMatch[0].length;
+    return html.slice(0, i) + fontLink + html.slice(i);
+  }
+  return html;
+}
+
+/** Eleştiri yanıtından notu ayıklar (kod çiti/fazla metne dayanıklı; saf →
+    testli — boost.ts'in parseJudge()'ıyla AYNI desen). */
+export function parseCritique(raw: string): string | null {
+  const json = extractJson(raw);
+  if (!json) return null;
+  try {
+    const parsed = JSON.parse(json) as { ok?: boolean; note?: string };
+    return parsed.note?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/* H1 — Üretim sonrası görsel kalite eleştirisi: lintArtifact (yukarıda,
+   regex-tabanlı: hex sayısı/klişe palet/lorem-ipsum/viewport) YAKALAYAMADIĞI
+   şeyleri hedefler — hiyerarşi, klişe kompozisyon, ritim. boost.ts'in
+   judgeDrafts()'ıyla AYNI ruhta ek/ucuz bir LLM turu (tek taslak, kısa JSON
+   yanıt). Yalnız html artifact'larda anlamlı; başarısızlıkta/zaman aşımında
+   SESSİZCE null döner — üretimi ASLA engellemez, yalnız notu eksik kalır. */
+async function critiqueArtifact(
+  html: string, brief: string,
+  resolved: { baseUrl: string; model: string; apiKey: string; provider: string },
+  cfg: Config, signal?: AbortSignal,
+): Promise<string | null> {
+  const sys =
+    "Sen kıdemli bir art director'sın. Sana bir isteğe karşılık üretilmiş HTML/tasarım kodu verilecek. " +
+    "Görsel hiyerarşi, kontrast, boşluk ritmi, tipografik tutarlılık ve klişe kompozisyon (jenerik gradient " +
+    "kutular, tekdüze kart ızgaraları, aşırı emoji) açısından değerlendir. Yalnız GERÇEKTEN göze çarpan EN ÖNEMLİ " +
+    "sorunu bul; küçük/tartışmalı kusurları görmezden gel. " +
+    'SADECE şu JSON ile yanıt ver: {"ok": true|false, "note": "sorun yoksa boş string, varsa tek somut ' +
+    'iyileştirme önerisi — kısa, Türkçe, 1 cümle"}';
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 20_000);
+  signal?.addEventListener("abort", () => ctrl.abort(), { once: true });
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: ctrl.signal,
+      body: JSON.stringify({
+        messages: [{ role: "user", content: `İSTEK: ${brief.slice(0, 500)}\n\nÜRETİLEN KOD:\n${html.slice(0, 6000)}` }],
+        baseUrl: resolved.baseUrl, model: resolved.model, apiKey: resolved.apiKey, provider: resolved.provider,
+        systemPrompt: sys, fallbacks: buildFallbackChain(cfg.models, cfg.activeModelId),
+        tools: false, webSearch: false, temperature: 0.2, jsonMode: true,
+      }),
+    });
+    if (!res.ok || !res.body) return null;
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = ""; let full = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n"); buf = lines.pop() || "";
+      for (const ln of lines) {
+        const tl = ln.trim();
+        if (!tl.startsWith("data:")) continue;
+        const p = tl.slice(5).trim();
+        if (!p || p === "[DONE]") continue;
+        try {
+          const j = JSON.parse(p) as { choices?: { delta?: { content?: string } }[] };
+          full += j.choices?.[0]?.delta?.content ?? "";
+        } catch { /* parça */ }
+      }
+    }
+    return parseCritique(full);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 /* Sunum Stüdyosu (slidesGen) da aynı model çözümlemesini kullanır. */
@@ -86,11 +196,12 @@ export async function resolveKey(): Promise<{ baseUrl: string; model: string; ap
   return { baseUrl: active.baseUrl, model: active.model, apiKey, provider: active.provider };
 }
 
-export function buildStudioSystem(opts: Pick<GenerateOptions, "skillId" | "directionId" | "designSystemPrompt" | "prevHtml" | "comment" | "animate" | "boostInstruction">): string {
+export function buildStudioSystem(opts: Pick<GenerateOptions, "skillId" | "directionId" | "designSystemPrompt" | "prevHtml" | "comment" | "animate" | "boostInstruction" | "images">): string {
   /* Kompozisyon sırası (Open Design dersi): marka sözleşmesi ÖNCE ve otoriter,
      zanaat kuralları sonra (çakışmada marka kazanır), tür talimatı en sonda. */
   let sys = STUDIO_SYSTEM_BASE;
   if (opts.designSystemPrompt?.trim()) sys += `\n\n[Marka tasarım sistemi — YALNIZCA görsel/HTML çıktı üretiyorsan renk/tipografi/boşlukta OTORİTER, buna UY; kod/doküman/diyagram üretiyorsan bu bölümü YOK SAY]:\n${opts.designSystemPrompt.trim()}`;
+  if (opts.images?.length) sys += IMAGE_REFERENCE_INSTRUCTION;
   sys += CRAFT_RULES;
   const skill = skillById(opts.skillId);
   if (skill) {
@@ -181,11 +292,22 @@ export async function generateArtifact(opts: GenerateOptions): Promise<GenerateR
   if (!artifact && /<[a-z]/i.test(full)) artifact = buildSingleBlockPreview("html", full);
   if (!artifact) { opts.onPhase?.("error"); throw new Error("Üretim ayrıştırılamadı — brief'i biraz daha açık yaz."); }
 
+  /* H3: marka fontu varsa <head>'e GARANTİ et (yalnız html artifact'larda). */
+  if (artifact.type === "html" && opts.fontLink) {
+    artifact = { ...artifact, content: ensureFontLink(artifact.content, opts.fontLink) };
+  }
+
   opts.onPhase?.("done");
   /* Kalite denetimi (danışma niteliğinde) yalnızca görsel/HTML çıktılar için
      anlamlı — kod/doküman/diyagram çıktılarında hex renk/viewport kontrolü
      konu dışı, sessizce atlanır. */
   const warnings = artifact.type === "html" ? lintArtifact(artifact.content) : [];
-  const note = warnings.length ? `\n\n🧹 Kalite notu: ${warnings.join(" · ")}. İstersen "düzelt" de, gidereyim.` : "";
+  /* H1: rule-based lint'in yakalayamadığı görsel/kompozisyon sorunları için
+     ek bir LLM eleştirisi — yalnız html'de, başarısızsa sessizce atlanır. */
+  const critique = artifact.type === "html"
+    ? await critiqueArtifact(artifact.content, opts.brief, resolved, cfg, opts.signal).catch(() => null)
+    : null;
+  const allNotes = [...warnings, ...(critique ? [critique] : [])];
+  const note = allNotes.length ? `\n\n🧹 Kalite notu: ${allNotes.join(" · ")}. İstersen "düzelt" de, gidereyim.` : "";
   return { artifact, text: (stripCode(full) || "Oluşturdum.") + note };
 }
