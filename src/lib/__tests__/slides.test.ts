@@ -98,6 +98,24 @@ describe("deckToHtml — bağımsız dışa aktarma", () => {
     expect(html).toContain("ArrowRight");
     expect(html).toContain("@media print");
   });
+
+  it("görselli slaytlarda kırık-resim ikonu yerine CSS yer tutucuya düşen onerror fallback'i içerir", () => {
+    const deck: SlideDeck = {
+      id: "d2", title: "Görselli Sunum", themeId: "gece", createdAt: 0, updatedAt: 0,
+      slides: [
+        { id: "s1", layout: "cover", title: "Kapak", imagePrompt: "a photo of a mountain" },
+        { id: "s2", layout: "image", title: "Odak görsel", imagePrompt: "a photo of a city" },
+        { id: "s3", layout: "two-col", title: "İki sütun", body: undefined, bullets: ["x"], imagePrompt: "a diagram" },
+      ],
+    };
+    const html = deckToHtml(deck);
+    // cover: dekoratif — hata olursa sadece gizlenir
+    expect(html).toContain(`class="coverimg" src=`);
+    expect(html).toContain("onerror=\"this.style.display='none'\"");
+    // image: hata olursa gizlenir ve hemen yanındaki .imgph görünür olur
+    expect(html).toContain("onerror=\"this.style.display='none'; this.nextElementSibling.style.display='block'\"");
+    expect(html).toContain(`<div class="imgph" style="display:none"></div>`);
+  });
 });
 
 describe("yardımcılar", () => {

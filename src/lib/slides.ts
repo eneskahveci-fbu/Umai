@@ -155,6 +155,14 @@ export function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/* Pollinations üretim görselleri ağa bağımlı ve bazen yavaş/hatalı olabiliyor
+   (yavaş üretim, ara sıra 5xx). Ham <img> başarısız olursa varsayılan kırık-
+   resim ikonu yerine sessizce kaybolsun (dekoratif kapak arka planı/iki-sütun
+   görseli) veya zaten var olan gradyan yer tutucuya (.imgph) düşsün (odak
+   noktası "image" düzeninde) — hiçbir zaman kırık ikon görünmesin. */
+const IMG_HIDE_ONERROR = `onerror="this.style.display='none'"`;
+const IMG_FALLBACK_ONERROR = `onerror="this.style.display='none'; this.nextElementSibling.style.display='block'"`;
+
 function slideInnerHtml(s: Slide, t: SlideTheme): string {
   const img = slideImageSrc(s, 1280, 720);
   const title = s.title ? escapeHtml(s.title) : "";
@@ -165,7 +173,7 @@ function slideInnerHtml(s: Slide, t: SlideTheme): string {
     case "cover":
     case "end":
       return `<div class="center">
-        ${img ? `<img class="coverimg" src="${escapeHtml(img)}" alt="">` : ""}
+        ${img ? `<img class="coverimg" src="${escapeHtml(img)}" alt="" ${IMG_HIDE_ONERROR}>` : ""}
         <h1>${title}</h1>
         ${subtitle ? `<p class="sub">${subtitle}</p>` : ""}
       </div>`;
@@ -174,10 +182,12 @@ function slideInnerHtml(s: Slide, t: SlideTheme): string {
     case "quote":
       return `<div class="center"><blockquote>“${body || title}”</blockquote>${subtitle ? `<p class="sub">${subtitle}</p>` : ""}</div>`;
     case "image":
-      return `<div class="imgwrap">${img ? `<img src="${escapeHtml(img)}" alt="">` : `<div class="imgph"></div>`}</div>
+      return `<div class="imgwrap">${img
+        ? `<img src="${escapeHtml(img)}" alt="" ${IMG_FALLBACK_ONERROR}><div class="imgph" style="display:none"></div>`
+        : `<div class="imgph"></div>`}</div>
         <div class="imgcap"><h2>${title}</h2>${body ? `<p>${body}</p>` : ""}</div>`;
     case "two-col":
-      return `<h2>${title}</h2><div class="cols"><ul>${bullets}</ul><div class="colbody">${body ? `<p>${body}</p>` : (img ? `<img src="${escapeHtml(img)}" alt="">` : "")}</div></div>`;
+      return `<h2>${title}</h2><div class="cols"><ul>${bullets}</ul><div class="colbody">${body ? `<p>${body}</p>` : (img ? `<img src="${escapeHtml(img)}" alt="" ${IMG_HIDE_ONERROR}>` : "")}</div></div>`;
     case "bullets":
     default:
       return `<h2>${title}</h2>${subtitle ? `<p class="sub">${subtitle}</p>` : ""}<ul>${bullets}</ul>${body ? `<p>${body}</p>` : ""}`;
