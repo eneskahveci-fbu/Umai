@@ -15,6 +15,24 @@ function sseResponse(text: string, status = 200): Response {
   return new Response(stream, { status });
 }
 
+/* sseResponse tek bir dev "delta" chunk'ıyla gönderir — gerçek streaming'i
+   taklit etmek (ve maxChars'ın araya girip erken durdurabilmesi) için metni
+   küçük parçalara böler. */
+function sseChunkedResponse(text: string, chunkSize = 500, status = 200): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (let i = 0; i < text.length; i += chunkSize) {
+        const part = text.slice(i, i + chunkSize);
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: part } }] })}\n\n`));
+      }
+      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+      controller.close();
+    },
+  });
+  return new Response(stream, { status });
+}
+
 const m = (id: string, provider: string): ModelProfile =>
   ({ id, label: id, provider, baseUrl: "", model: id, apiKey: "" } as unknown as ModelProfile);
 
@@ -191,5 +209,35 @@ describe("generateDrafts — DraftResult model eşlemesi (Fusion rozeti mislabel
     const results = await generateDrafts({ userText: "brief", models, fallbacks: [fallback] });
     expect(results).toHaveLength(1);
     expect(results[0].model).toBe("model-YEDEK");
+  });
+});
+
+describe("generateDrafts — maxChars/maxTokens (şemalı JSON taslakları için genişletilmiş bütçe)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("varsayılan 6000 karakter sınırını maxChars ile aşabilir (uzun taslak kesilmez)", async () => {
+    const longText = "x".repeat(7000);
+    const models = [{ baseUrl: "https://x", model: "m", provider: "custom", apiKey: "k" }];
+
+    vi.stubGlobal("fetch", vi.fn(async () => sseChunkedResponse(longText)));
+    const short = await generateDrafts({ userText: "brief", models });
+    expect(short[0].text.length).toBeLessThanOrEqual(6500); // erken durdu, tam 7000 gelmedi
+
+    vi.stubGlobal("fetch", vi.fn(async () => sseChunkedResponse(longText)));
+    const long = await generateDrafts({ userText: "brief", models, maxChars: 8000 });
+    expect(long[0].text.length).toBe(7000); // tamamı geldi, kesilmedi
+  });
+
+  it("maxTokens verilirse istek gövdesine geçer", async () => {
+    const fetchMock = vi.fn(async (_url: unknown, init: { body: string }) => {
+      void init;
+      return sseResponse("kısa yanıt");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const models = [{ baseUrl: "https://x", model: "m", provider: "custom", apiKey: "k" }];
+
+    await generateDrafts({ userText: "brief", models, maxTokens: 12000 });
+    const body = JSON.parse(fetchMock.mock.calls[0]![1]!.body) as { maxTokens?: number };
+    expect(body.maxTokens).toBe(12000);
   });
 });
