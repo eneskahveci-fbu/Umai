@@ -105,7 +105,7 @@ import { ALL_AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/
 import { pollinationsImageUrl } from "@/lib/pollinations";
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
 import { calcBudgetStatus, type BudgetStatus } from "@/lib/budget";
-import { buildContextSections } from "@/lib/prompt";
+import { buildContextSections, selectRelevantSkills } from "@/lib/prompt";
 import { detectSensitive } from "@/lib/pii";
 import { friendlyError } from "@/lib/friendlyError";
 import { autoEffort, autoSwarm, decidePilotAsync, type PilotDecision } from "@/lib/autoPilot";
@@ -2117,20 +2117,12 @@ export function CoderView() {
       const allEnabledSkills = projectSkillIds && projectSkillIds.length > 0
         ? (store.config.skills ?? []).filter((s) => projectSkillIds.includes(s.id))
         : (store.config.skills ?? []).filter((s) => s.enabled);
-      /* Relevance scoring: compare skill text against the last user message.
-         If ≤5 skills, include all; otherwise pick top-5 by keyword overlap. */
-      const activeSkills = (() => {
-        if (allEnabledSkills.length <= 5) return allEnabledSkills;
-        const lastUserText = (chat?.messages.findLast?.((m) => m.role === "user")?.content ?? "").toLowerCase();
-        const queryWords = new Set(lastUserText.split(/\W+/).filter((w) => w.length > 3));
-        if (queryWords.size === 0) return allEnabledSkills.slice(0, 5);
-        const scored = allEnabledSkills.map((s) => {
-          const haystack = (s.title + " " + s.content + " " + (s.tags ?? []).join(" ")).toLowerCase().split(/\W+/);
-          const hits = haystack.filter((w) => queryWords.has(w)).length;
-          return { skill: s, hits };
-        });
-        return scored.sort((a, b) => b.hits - a.hits).slice(0, 5).map((x) => x.skill);
-      })();
+      /* Alaka seçimi (K1): 5'ten fazla etkin skill varsa son kullanıcı
+         mesajıyla anahtar-kelime örtüşmesine göre en alakalı 5'i seç —
+         genChat.ts'in Stüdyo motorlarıyla PAYLAŞILAN tek kaynak (bkz.
+         selectRelevantSkills, prompt.ts). */
+      const lastUserText = String(chat?.messages.findLast?.((m) => m.role === "user")?.content ?? "");
+      const activeSkills = selectRelevantSkills(allEnabledSkills, lastUserText);
       /* Sunucu-proxy üzerinden çağrı (tüm sağlayıcılar için ortak; Pollinations
          doğrudan tarayıcı çağrısı başarısız olursa yedek olarak da kullanılır.
          Sunucu Pollinations'ı anahtarsız destekler). */

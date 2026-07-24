@@ -54,6 +54,17 @@ const CLAUDE_THINKING_RE = /claude-3-7|sonnet-4|opus-4|haiku-4/i;
    gpt-4.1/gpt-3.5 gibi "non-reasoning" modeller bu alanı reddedebilir. */
 const OPENAI_REASONING_RE = /^o1|^o3|^o4|^gpt-5/i;
 
+export type Effort = "low" | "medium" | "high" | "max";
+
+/* Efor→max_tokens ve efor→thinking-bütçesi eşlemeleri — chat/route.ts VE
+   orchestrate/route.ts AYNI kaynağı kullanır (J1/J3: önceden ikisi ayrı ayrı
+   tanımlıyordu, orchestrate hiç thinking/native reasoning_effort göndermiyordu
+   ve Anthropic'e YANLIŞ uç/gövde şekliyle istek atıyordu — bkz. anthropicUpstream
+   çağrısı, orchestrate/route.ts). THINKING_BUDGET her zaman ilgili EFFORT_TOKENS
+   tavanının altında (thinking + nihai yanıt birlikte max_tokens'ı aşamaz). */
+export const EFFORT_TOKENS: Record<Effort, number> = { low: 4096, medium: 8192, high: 16384, max: 32768 };
+export const THINKING_BUDGET: Record<Effort, number> = { low: 2048, medium: 6000, high: 12000, max: 24000 };
+
 export function detectModelCapabilities(provider: Provider | string, model: string): ModelCapabilities {
   const m = (model || "").trim();
   const p = provider as Provider;

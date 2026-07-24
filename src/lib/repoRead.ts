@@ -57,6 +57,21 @@ export const READONLY_TOOLS: ReadToolDef[] = [
       parameters: { type: "object", properties: { path: { type: "string", description: "Repo köküne göre yol" } }, required: ["path"] },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "search_code",
+      description: "Dosya İÇERİĞİNDE arama yapar (grep gibi) — hangi dosyada/satırda geçtiğini bulmak için list_files+read_file'ı tek tek denemek yerine BUNU kullan.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Aranacak metin/kod parçası" },
+          extension: { type: "string", description: "Yalnız bu uzantıdaki dosyalarla sınırla (opsiyonel, ör. 'ts')" },
+        },
+        required: ["query"],
+      },
+    },
+  },
 ];
 
 export const READONLY_TOOL_NAMES = new Set(READONLY_TOOLS.map((t) => t.function.name));
@@ -136,11 +151,47 @@ async function readFile(ctx: RepoReadCtx, path: string): Promise<string> {
   return withLineNumbers(content).slice(0, 16_000);
 }
 
+async function searchCode(ctx: RepoReadCtx, query: string, extension?: string): Promise<string> {
+  if (!query) return "Hata: query boş";
+  if (ctx.provider === "local") {
+    try {
+      const glob = extension ? `**/*.${extension}` : undefined;
+      const data = await bridgeCall(ctx, "/fs/grep", { pattern: query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), glob });
+      if (typeof data.error === "string") return `Hata: ${data.error}`;
+      const matches = Array.isArray(data.matches) ? data.matches as string[] : [];
+      return matches.length ? matches.slice(0, 30).join("\n") : "(eşleşme yok)";
+    } catch (e) { return `Hata: ${(e as Error).message}`; }
+  }
+  if (ctx.provider === "gitlab") {
+    const proj = encodeURIComponent(`${ctx.owner}/${ctx.repo}`);
+    const q = encodeURIComponent(query);
+    const res = await fetch(
+      `https://gitlab.com/api/v4/projects/${proj}/search?scope=blobs&search=${q}&ref=${encodeURIComponent(ctx.branch)}&per_page=20`,
+      { headers: glHeaders(ctx.token) },
+    );
+    if (!res.ok) return `Hata: ${res.status}`;
+    const data = await res.json() as { path: string; data: string; startline: number }[];
+    if (!Array.isArray(data) || !data.length) return "(eşleşme yok)";
+    return data
+      .filter((r) => !extension || r.path.endsWith(`.${extension}`))
+      .slice(0, 15)
+      .map((r) => `${r.path}:${r.startline}\n  ${r.data.trim().slice(0, 120)}`)
+      .join("\n\n") || "(eşleşme yok)";
+  }
+  const q = encodeURIComponent(`${query} repo:${ctx.owner}/${ctx.repo}${extension ? ` extension:${extension}` : ""}`);
+  const res = await fetch(`https://api.github.com/search/code?q=${q}&per_page=15`, { headers: ghHeaders(ctx.token) });
+  if (!res.ok) return `Hata: ${res.status}`;
+  const data = await res.json() as { items?: { path: string }[] };
+  const items = data.items ?? [];
+  return items.length ? items.map((it) => it.path).join("\n") : "(eşleşme yok)";
+}
+
 /** Salt-okunur araç çağrısını yürütür. Bilinmeyen/yazma araçları reddedilir. */
 export async function executeReadTool(name: string, args: Record<string, unknown>, ctx: RepoReadCtx): Promise<string> {
   try {
     if (name === "list_files") return await listFiles(ctx, typeof args.filter === "string" ? args.filter : undefined);
     if (name === "read_file") return await readFile(ctx, String(args.path ?? ""));
+    if (name === "search_code") return await searchCode(ctx, String(args.query ?? ""), typeof args.extension === "string" ? args.extension : undefined);
     return `Bu ajan yalnızca okuma yapabilir; '${name}' kullanılamaz.`;
   } catch (e) {
     return `Hata: ${(e as Error).message}`;

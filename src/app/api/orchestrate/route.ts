@@ -6,6 +6,8 @@ import { DEFAULT_SYSTEM_PROMPT } from "@/lib/constants";
 import { buildContextSections, type SkillLike } from "@/lib/prompt";
 import type { RepoReadCtx } from "@/lib/repoRead";
 import { runReadOnlyAgent } from "@/lib/subagent";
+import { anthropicUpstream, type OpenAIChatBody } from "@/lib/anthropic";
+import { detectModelCapabilities, EFFORT_TOKENS, THINKING_BUDGET } from "@/lib/modelCapabilities";
 import type { ChatMessage, MemoryItem, Provider, ResponseStyle } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -75,39 +77,93 @@ function buildHeaders(provider: Provider, apiKey: string, req: Request): Record<
 type Cfg = {
   baseUrl: string; model: string; provider: Provider;
   headers: Record<string, string>;
+  /** anthropicUpstream'i çağırabilmek için (J1) — headers'a zaten x-api-key
+      olarak gömülü ama anthropicUpstream'in kendi imzası ayrı bir apiKey
+      argümanı istiyor (bkz. lib/anthropic.ts). */
+  apiKey: string;
   effort?: "low" | "medium" | "high" | "max";
 };
 
-/* Efor → swarm çağrılarında da max_tokens + reasoning uygula (chat route ile aynı ölçek). */
-const EFFORT_TOKENS = { low: 4096, medium: 8192, high: 16384, max: 32768 } as const;
-function applyEffort(body: Record<string, unknown>, cfg: Cfg) {
-  if (!cfg.effort) return;
+/* Efor → swarm çağrılarında da max_tokens + reasoning uygula. EFFORT_TOKENS/
+   THINKING_BUDGET artık modelCapabilities.ts'ten (J1/J3: chat/route.ts ile
+   AYNI kaynak — iki yer sapmasın). */
+function applyEffort(body: Record<string, unknown>, cfg: Cfg): number {
+  if (!cfg.effort) return 0;
   body.max_tokens = EFFORT_TOKENS[cfg.effort];
+  const apiEffort = cfg.effort === "max" ? "high" : cfg.effort;
+  const caps = detectModelCapabilities(cfg.provider, cfg.model);
   if (cfg.provider === "openrouter") {
-    body.reasoning = { effort: cfg.effort === "max" ? "high" : cfg.effort };
+    body.reasoning = { effort: apiEffort };
+  } else if (caps.nativeReasoningEffort) {
+    /* Doğrudan OpenAI o-serisi/gpt-5 — önceden yalnız openrouter'da vardı,
+       bu uçta hiç gönderilmiyordu (I3'ün orchestrate karşılığı). */
+    body.reasoning_effort = apiEffort;
+  } else if (caps.extendedThinking) {
+    /* Claude 3.7+/4.x — thinking bütçesi body'ye DEĞİL, ayrıca
+       anthropicUpstream'in kendi parametresine gider (I2'nin orchestrate
+       karşılığı); burada yalnız değeri hesaplayıp döndürüyoruz. */
+    return THINKING_BUDGET[cfg.effort];
   }
+  return 0;
 }
 
-/* Tek, akışsız (non-streaming) model çağrısı → düz metin döndürür. */
+/* Tek bir upstream çağrısı — Anthropic'te NATIVE uca (anthropicUpstream),
+   diğerlerinde OpenAI-uyumlu `/chat/completions`'a gider. J1: önceden HER
+   ZAMAN `/chat/completions`'a OpenAI şekilli istek atılıyordu — Anthropic'te
+   böyle bir uç YOK (gerçek uç /v1/messages, apayrı gövde/yanıt şekli), yani
+   aktif/swarm modeli Claude olduğunda bu orkestrasyon ucu başarısız oluyordu
+   (kodun kendisi "Claude Code tarzı" diye adlandırılmasına rağmen). */
+async function openUpstream(
+  cfg: Cfg,
+  messages: { role: string; content: string }[],
+  signal: AbortSignal,
+): Promise<Response> {
+  const body: Record<string, unknown> = { model: cfg.model, messages, stream: true };
+  if (cfg.provider === "pollinations") body.referrer = "craft-coder";
+  const thinkingBudget = applyEffort(body, cfg);
+  const res = cfg.provider === "anthropic"
+    ? await anthropicUpstream(cfg.baseUrl, cfg.apiKey, body as unknown as OpenAIChatBody, signal, thinkingBudget)
+    : await fetch(`${cfg.baseUrl}/chat/completions`, { method: "POST", headers: cfg.headers, body: JSON.stringify(body), signal });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Model hatası ${res.status}: ${detail.slice(0, 200)}`);
+  }
+  return res;
+}
+
+/* Tek, akışsız (non-streaming) model çağrısı → düz metin döndürür. Alttan
+   hep SSE gelir (anthropicUpstream her zaman öyle döner) — burada yalnız
+   biriktirip tek metin olarak döndürüyoruz. */
 async function callModel(
   cfg: Cfg,
   messages: { role: string; content: string }[],
   signal: AbortSignal,
 ): Promise<string> {
-  const body: Record<string, unknown> = { model: cfg.model, messages, stream: false };
-  if (cfg.provider === "pollinations") body.referrer = "craft-coder";
-  applyEffort(body, cfg);
-  const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
-    method: "POST", headers: cfg.headers, body: JSON.stringify(body), signal,
-  });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(`Model hatası ${res.status}: ${detail.slice(0, 200)}`);
+  const res = await openUpstream(cfg, messages, signal);
+  if (!res.body) throw new Error("Boş yanıt gövdesi");
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "", full = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t.startsWith("data:")) continue;
+      const payload = t.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      try {
+        const json = JSON.parse(payload) as { choices?: { delta?: { content?: string } }[] };
+        const c = json.choices?.[0]?.delta?.content;
+        if (c) full += c;
+      } catch { /* parçalı JSON — atla */ }
+    }
   }
-  const data = await res.json() as { choices?: { message?: { content?: string } }[] };
-  return data.choices?.[0]?.message?.content?.trim() ?? "";
+  return full.trim();
 }
-
 
 /* Akışlı model çağrısı → her delta'yı `send` ile istemciye yolla. */
 async function streamModel(
@@ -116,18 +172,8 @@ async function streamModel(
   send: (content: string) => void,
   signal: AbortSignal,
 ): Promise<void> {
-  const body: Record<string, unknown> = { model: cfg.model, messages, stream: true };
-  if (cfg.provider === "pollinations") body.referrer = "craft-coder";
-  applyEffort(body, cfg);
-  const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
-    method: "POST", headers: cfg.headers, body: JSON.stringify(body), signal,
-  });
-  if (!res.ok || !res.body) {
-    /* Akış başlamadan hata → fırlat ki aday zinciri (withFallback) sıradaki
-       modeli denesin. Akış başladıktan sonra kesilirse olduğu yerde biter. */
-    const detail = await res.text().catch(() => "");
-    throw new Error(`Model hatası ${res.status}: ${detail.slice(0, 200)}`);
-  }
+  const res = await openUpstream(cfg, messages, signal);
+  if (!res.body) throw new Error("Boş yanıt gövdesi");
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -258,7 +304,7 @@ export async function POST(req: Request) {
   }
   const cfgs: Cfg[] = candList.map((c) => ({
     baseUrl: c.baseUrl, model: c.model, provider: c.provider,
-    headers: buildHeaders(c.provider, c.apiKey, req), effort: body.effort,
+    headers: buildHeaders(c.provider, c.apiKey, req), apiKey: c.apiKey, effort: body.effort,
   }));
   /* Kullanıcı bağlamı (stil + hafıza + skills + arama) /api/chat ile aynı kaynaktan
      → nihai cevap (birleştirici / tek-ajan) bu kurallara uyar. */
