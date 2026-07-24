@@ -64,6 +64,38 @@ export function slideImageSrc(slide: Slide, width = 1280, height = 720): string 
   return pollinationsImageUrl(p, { width, height, seed: stableSeed(p), model: "flux" });
 }
 
+/* ── Kalite denetimi (danışma niteliğinde) ────────────────────────────
+   studioCraft.ts'teki lintArtifact() ile AYNI konsept (üretimi engellemez,
+   yalnız kullanıcıya "şunu kontrol et" notu düşer) — ama HTML'e özgü
+   kontroller (hex renk sayısı, viewport meta) yerine deste ŞEMASINA özgü
+   kontroller: DECK_SCHEMA'nın kendi kurallarına (ilk slayt cover/son end,
+   madde ≤12 kelime, her slaytta konuşmacı notu) ne kadar uyulduğu. */
+const MAX_BULLET_WORDS = 14; // şema "≤12 kelime" ister, biraz pay bırakılır
+const MAX_BULLETS_COMFORTABLE = 6; // normalizeSlide zaten 8'de kesiyor; 6+ zaten kalabalık
+
+export function lintDeck(deck: SlideDeck): string[] {
+  const warnings: string[] = [];
+  const n = deck.slides.length;
+  if (n === 0) return warnings;
+
+  if (deck.slides[0]?.layout !== "cover") warnings.push("ilk slayt kapak (cover) değil");
+  if (deck.slides[n - 1]?.layout !== "end") warnings.push("son slayt kapanış (end) değil");
+
+  const missingNotes = deck.slides.filter((s) => !s.notes?.trim()).length;
+  if (missingNotes > 0) warnings.push(`${missingNotes} slaytta konuşmacı notu eksik`);
+
+  const longBullets = deck.slides.some((s) => (s.bullets ?? []).some((b) => b.split(/\s+/).filter(Boolean).length > MAX_BULLET_WORDS));
+  if (longBullets) warnings.push("bazı maddeler çok uzun — slaytta okunması zor olabilir");
+
+  const crowded = deck.slides.filter((s) => (s.bullets?.length ?? 0) > MAX_BULLETS_COMFORTABLE).length;
+  if (crowded > 0) warnings.push(`${crowded} slaytta çok fazla madde var`);
+
+  const allText = deck.slides.map((s) => `${s.title ?? ""} ${s.body ?? ""}`).join(" ");
+  if (/lorem ipsum/i.test(allText)) warnings.push("Lorem ipsum kalmış — gerçek içerik bekleniyordu");
+
+  return warnings;
+}
+
 /* ── LLM çıktısını güvenli desteye çevirme ──────────────────────────── */
 
 const VALID_LAYOUTS: SlideLayout[] = ["cover", "section", "bullets", "two-col", "image", "quote", "end"];
