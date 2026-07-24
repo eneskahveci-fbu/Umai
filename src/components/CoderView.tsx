@@ -107,6 +107,7 @@ import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/
 import { calcBudgetStatus, type BudgetStatus } from "@/lib/budget";
 import { buildContextSections, selectRelevantSkills } from "@/lib/prompt";
 import { detectSensitive } from "@/lib/pii";
+import { isOfficeFile } from "@/lib/office";
 import { friendlyError } from "@/lib/friendlyError";
 import { autoEffort, autoSwarm, decidePilotAsync, type PilotDecision } from "@/lib/autoPilot";
 import { pickDraftModels, buildBoostInstruction, generateDrafts, fillSelfConsistency, judgeDrafts } from "@/lib/boost";
@@ -1596,6 +1597,25 @@ export function CoderView() {
       })();
       return;
     }
+    /* L3 — Office (OOXML): .docx/.xlsx/.pptx istemcide açılıp düz metne
+       çevrilir (lib/office.ts, bağımlılıksız ZIP+XML okuyucu). PDF akışıyla
+       birebir aynı mantık: veri sunucuya gitmez. */
+    if (isOfficeFile(f.name)) {
+      if (f.size > 20_000_000) { addToast("Dosya 20MB'den büyük.", "error"); return; }
+      addToast(`${f.name} okunuyor…`, "info");
+      void (async () => {
+        try {
+          const { extractOfficeText } = await import("@/lib/office");
+          const text = await extractOfficeText(f);
+          if (!text.trim()) { addToast(`${f.name} içinde metin bulunamadı.`, "info"); return; }
+          setAttachedFiles((prev) => [...prev, { path: f.name, content: text }]);
+          addToast(`${f.name} eklendi (metin çıkarıldı).`, "success");
+        } catch (e) {
+          addToast(`${f.name} okunamadı: ${(e as Error).message}`, "error");
+        }
+      })();
+      return;
+    }
     /* .ipynb → hücre-bazlı okunur biçim (markdown + kod + çıktı). */
     if (f.name.toLowerCase().endsWith(".ipynb")) {
       if (f.size > 2_000_000) { addToast("Notebook 2MB'den büyük.", "error"); return; }
@@ -1608,9 +1628,10 @@ export function CoderView() {
       return;
     }
     if (f.size > 512_000) { addToast("Dosya 512KB'den büyük.", "error"); return; }
-    /* Office dosyaları (zip-tabanlı) düz metin olarak okunamaz → net yönlendirme. */
-    if (/\.(docx?|pptx?|xlsx?)$/i.test(f.name)) {
-      addToast("Word/PowerPoint/Excel doğrudan okunamıyor — PDF'e çevirip sürükle.", "info");
+    /* ESKİ ikili Office biçimleri (.doc/.ppt/.xls) OOXML değil, zip de değil —
+       yukarıdaki OOXML okuyucu bunları açamaz; net yönlendirme ver. */
+    if (/\.(doc|ppt|xls)$/i.test(f.name)) {
+      addToast("Eski Word/PowerPoint/Excel biçimi — .docx/.xlsx/.pptx olarak kaydet ya da PDF'e çevir.", "info");
       return;
     }
     const reader = new FileReader();
@@ -3686,7 +3707,7 @@ export function CoderView() {
                 </div>
               )}
 
-              <input ref={fileRef} type="file" multiple accept=".txt,.md,.markdown,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.json,.jsonl,.yaml,.yml,.toml,.html,.htm,.css,.scss,.sql,.sh,.bash,.go,.rs,.java,.kt,.swift,.dart,.c,.cpp,.h,.hpp,.rb,.php,.pdf,.ipynb,.csv,.tsv,.xml,.svg,.log,.ini,.conf,.env,.tex,.srt,.vtt,.vue,.svelte,.lua,.pl,.r,.scala,.gradle,.properties,.bat,.ps1,text/plain" className="hidden"
+              <input ref={fileRef} type="file" multiple accept=".txt,.md,.markdown,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.json,.jsonl,.yaml,.yml,.toml,.html,.htm,.css,.scss,.sql,.sh,.bash,.go,.rs,.java,.kt,.swift,.dart,.c,.cpp,.h,.hpp,.rb,.php,.pdf,.docx,.xlsx,.pptx,.ipynb,.csv,.tsv,.xml,.svg,.log,.ini,.conf,.env,.tex,.srt,.vtt,.vue,.svelte,.lua,.pl,.r,.scala,.gradle,.properties,.bat,.ps1,text/plain" className="hidden"
                 onChange={(e) => { for (const f of Array.from(e.target.files ?? [])) readFileIntoInput(f); e.target.value = ""; }} />
               <input ref={imgRef} type="file" multiple accept="image/*" className="hidden"
                 onChange={(e) => { for (const f of Array.from(e.target.files ?? [])) readFileIntoInput(f); e.target.value = ""; }} />
