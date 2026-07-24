@@ -26,7 +26,7 @@ import { autoStudioSkill } from "@/lib/autoPilot";
 import type { Artifact, SlideDeck, StudioProject } from "@/lib/types";
 import { designSystemById, designSystemPromptText } from "@/lib/designSystems";
 import { type StudioTemplate } from "@/lib/studioTemplates";
-import { generateDeck, generateDeckFusion } from "@/lib/slidesGen";
+import { generateDeck, generateDeckFusion, rewriteSlide } from "@/lib/slidesGen";
 import { deckToHtml, SLIDE_THEMES } from "@/lib/slides";
 import { StudioHomeScreen, EmptyChatHint } from "./studio/StudioHomeScreen";
 import { DesignSystemPicker, ModelPicker, TemplatePicker, ImagePreviewStrip } from "./studio/ComposerExtras";
@@ -77,6 +77,7 @@ function ChatPanel({
   messages, busy, phase, onFollowup, onStop, prefill,
   designSystemId, onDesignSystemChange, fusionEnabled, onFusionChange,
   pendingImages, onAddImages, onRemoveImage, onPickTemplate,
+  editingSlide, onCancelSlideEdit,
 }: {
   messages: DesignMsg[];
   busy: boolean;
@@ -94,6 +95,10 @@ function ChatPanel({
   onAddImages: (files: FileList) => void;
   onRemoveImage: (i: number) => void;
   onPickTemplate: (t: StudioTemplate) => void;
+  /** Sunum modunda tekil slayt düzenleme seçiliyken (bkz. DesignStudio'daki
+      slayt seçici) composer bunun yerine yalnız o slaytı hedefler. */
+  editingSlide?: { index: number; title: string } | null;
+  onCancelSlideEdit?: () => void;
 }) {
   const [input, setInput] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -153,6 +158,17 @@ function ChatPanel({
           Alt kontrol satırı Claude Design'ın prompt kutusundaki seçeneklerle
           eşleşir: ataç, tasarım sistemi, model (çoklu). */}
       <div className="shrink-0 p-2.5">
+        {editingSlide && (
+          <div className="flex items-center gap-2 mb-2 px-1">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-brand/10 border border-brand/30 text-brand text-xs">
+              <span className="font-semibold">{editingSlide.index + 1}. slaytı düzenle</span>
+              <span className="text-brand/70 truncate max-w-[160px]">{editingSlide.title}</span>
+              <button onClick={onCancelSlideEdit} title="Tüm sunumu hedefle" className="hover:text-red transition-colors ml-1">
+                <X size={10} />
+              </button>
+            </div>
+          </div>
+        )}
         <ImagePreviewStrip images={pendingImages} onRemove={onRemoveImage} />
         <div className="composer-glow flex flex-col gap-1.5 bg-surface/85 backdrop-blur-xl border border-line rounded-[20px] px-3 pt-3 pb-2">
           <textarea
@@ -162,7 +178,7 @@ function ChatPanel({
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
             }}
             rows={1}
-            placeholder="Değişiklik iste — 'başlığı büyüt'…"
+            placeholder={editingSlide ? `${editingSlide.index + 1}. slayta yönelik değişiklik iste — 'daha kısa yap'…` : "Değişiklik iste — 'başlığı büyüt'…"}
             className="w-full bg-transparent resize-none outline-none text-[15px] leading-relaxed py-1 max-h-28 placeholder:text-muted/45"
           />
           <div className="flex items-center gap-2">
@@ -278,6 +294,12 @@ export function DesignStudio() {
   const [mobileView, setMobileView] = useState<"chat" | "canvas">("chat");
   /* İşaretle & Değiştir seçimi → ChatPanel composer'ına ek (bkz. ChatPanel.prefill). */
   const [annotatePrefill, setAnnotatePrefill] = useState<{ text: string; nonce: number } | null>(null);
+  /* Sunum modunda "yalnız bu slaytı düzenle" seçimi — null iken takip isteği
+     eskisi gibi TÜM desteyi yeniden üretir; bir slayt seçiliyken yalnız o
+     slayt rewriteSlide() ile güncellenir (bkz. runSlideEdit). Her başarılı
+     tekil düzenlemeden sonra null'a döner (kullanıcı tekrar seçmeden yanlışlıkla
+     hep aynı slaytı düzenlemeye devam etmesin). */
+  const [editSlideIndex, setEditSlideIndex] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   /* Henüz hiç mesaj VE tasarım yoksa Claude'un anasayfasına paralel tam-ekran
@@ -469,6 +491,46 @@ export function DesignStudio() {
 
   const stop = useCallback(() => { abortRef.current?.abort(); }, []);
 
+  /* Tekil slayt düzenleme: rewriteSlide() TEK slaytı yeniden yazar, deste
+     şeması/teması/diğer slaytlar AYNEN korunur. TÜM desteyi yeniden üreten
+     genel takip yoluna göre hem daha hızlı hem daha güvenilir (küçük tek
+     slayt JSON'u, F1/F2/F3'ün token/JSON riskine çok daha az maruz) hem de
+     iyi giden slaytları riske atmaz. Daha önce yazılmış ama HİÇBİR yerden
+     çağrılmayan bir fonksiyondu — burada gerçek UI akışına bağlanıyor. */
+  const runSlideEdit = useCallback(async (instruction: string, slideIndex: number) => {
+    if (busy || !project.deckData) return;
+    const deck = project.deckData;
+    const slide = deck.slides[slideIndex];
+    if (!slide) return;
+    setBusy(true);
+    setPhase("generating");
+    setMessages((m) => [...m, { role: "user", text: instruction }, { role: "assistant", text: "" }]);
+    const ac = new AbortController();
+    abortRef.current = ac;
+    try {
+      const newSlide = await rewriteSlide({ deck, index: slideIndex, instruction, signal: ac.signal });
+      const nextSlides = deck.slides.map((s, i) => (i === slideIndex ? newSlide : s));
+      const nextDeck: SlideDeck = { ...deck, slides: nextSlides, updatedAt: Date.now() };
+      const html = deckToHtml(nextDeck);
+      const nextVersions = [...(project.versions ?? []), html].slice(-MAX_VERSIONS);
+      setProject((p) => ({ ...p, html, deckData: nextDeck, versions: nextVersions, updatedAt: Date.now() }));
+      setVersionIndex(nextVersions.length - 1);
+      setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: `${slideIndex + 1}. slaytı güncelledim.` }; return c; });
+      setEditSlideIndex(null);
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") {
+        setMessages((m) => m.slice(0, -1));
+      } else {
+        const msg = friendlyError(e instanceof Error ? e.message : "bilinmeyen hata");
+        setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: `Hata: ${msg}` }; return c; });
+      }
+    } finally {
+      setBusy(false);
+      setPhase(null);
+      abortRef.current = null;
+    }
+  }, [busy, project]);
+
   /* ── Composer eki: referans görsel(ler) ───────────────────────────
      CoderView'daki readFileIntoInput'un (görsel kısmının) sadeleştirilmiş
      karşılığı — Stüdyo'da yalnız görsel referans anlamlı (kod/metin dosyası
@@ -609,15 +671,33 @@ export function DesignStudio() {
   const actionButtons = (
     <>
       {project.deckData && (
-        <select
-          value={project.deckData.themeId}
-          onChange={(e) => changeDeckTheme(e.target.value)}
-          title="Sunum teması"
-          aria-label="Sunum teması"
-          className="text-xs bg-bgsoft border border-line rounded-lg px-2 py-2 sm:py-1.5 outline-none focus:border-brand/50 cursor-pointer shrink-0"
-        >
-          {SLIDE_THEMES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
+        <>
+          <select
+            value={project.deckData.themeId}
+            onChange={(e) => changeDeckTheme(e.target.value)}
+            title="Sunum teması"
+            aria-label="Sunum teması"
+            className="text-xs bg-bgsoft border border-line rounded-lg px-2 py-2 sm:py-1.5 outline-none focus:border-brand/50 cursor-pointer shrink-0"
+          >
+            {SLIDE_THEMES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+          {/* Tekil slayt düzenleme hedefi — "Tüm sunum" (varsayılan) takip
+              isteğini eskisi gibi tüm desteyi yeniden üretir; belirli bir
+              slayt seçilince yalnız o slayt rewriteSlide() ile güncellenir
+              (bkz. runSlideEdit), diğer slaytlar/tema korunur. */}
+          <select
+            value={editSlideIndex === null ? "" : String(editSlideIndex)}
+            onChange={(e) => setEditSlideIndex(e.target.value === "" ? null : Number(e.target.value))}
+            title="Takip isteği hangi slaytı hedeflesin?"
+            aria-label="Slayt düzenleme hedefi"
+            className="text-xs bg-bgsoft border border-line rounded-lg px-2 py-2 sm:py-1.5 outline-none focus:border-brand/50 cursor-pointer shrink-0 max-w-[140px]"
+          >
+            <option value="">Tüm sunum</option>
+            {project.deckData.slides.map((s, i) => (
+              <option key={s.id} value={i}>{i + 1}. {s.title || "Slayt"}</option>
+            ))}
+          </select>
+        </>
       )}
       <button onClick={saveProject} title="Kaydet" aria-label="Kaydet" className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
       <button onClick={() => setSavedOpen(true)} title="Projelerim" aria-label="Projelerim" className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
@@ -676,7 +756,7 @@ export function DesignStudio() {
               messages={messages}
               busy={busy}
               phase={phase}
-              onFollowup={(t) => runGenerate(t, true)}
+              onFollowup={(t) => (editSlideIndex !== null ? runSlideEdit(t, editSlideIndex) : runGenerate(t, true))}
               onStop={stop}
               prefill={annotatePrefill}
               onPickTemplate={(t) => runGenerate(t.brief, true, t)}
@@ -687,6 +767,12 @@ export function DesignStudio() {
               pendingImages={pendingImages}
               onAddImages={addImageFiles}
               onRemoveImage={removeImage}
+              editingSlide={
+                project.deckData && editSlideIndex !== null
+                  ? { index: editSlideIndex, title: project.deckData.slides[editSlideIndex]?.title || `Slayt ${editSlideIndex + 1}` }
+                  : null
+              }
+              onCancelSlideEdit={() => setEditSlideIndex(null)}
             />
           </div>
 
