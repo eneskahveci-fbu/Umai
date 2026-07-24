@@ -495,7 +495,7 @@ interface StoreState {
   setFusionModelsOnLast: (models: string[]) => void;
   setPlanOnLast: (plan: string) => void;
   setSwarmOnLast: (swarm: import("./types").SwarmState) => void;
-  addCommandRun: (command: string) => void;
+  addCommandRun: (command: string, kind?: "shell" | "code") => void;
   setCommandOutput: (command: string, output: string, status: "done" | "error") => void;
   setCheckpointsOnLast: (checkpoints: FileCheckpoint[]) => void;
   setFinishReasonOnLast: (finishReason: string | undefined) => void;
@@ -1388,7 +1388,7 @@ export const useStore = create<StoreState>()((set, get) => ({
       }),
     })),
   /* Terminal komutu kutusu: son asistan mesajına "çalışıyor" satırı ekle. */
-  addCommandRun: (command) =>
+  addCommandRun: (command, kind) =>
     set((s) => ({
       chats: s.chats.map((c) => {
         if (c.id !== s.currentId) return c;
@@ -1400,7 +1400,7 @@ export const useStore = create<StoreState>()((set, get) => ({
         if (idx < 0) idx = messages.length - 1;
         if (idx < 0) return c;
         const existing = messages[idx].commands ?? [];
-        messages[idx] = { ...messages[idx], commands: [...existing, { command, status: "running" as const }] };
+        messages[idx] = { ...messages[idx], commands: [...existing, { command, status: "running" as const, ...(kind ? { kind } : {}) }] };
         return { ...c, messages };
       }),
     })),
