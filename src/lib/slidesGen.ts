@@ -10,9 +10,10 @@ import type { FallbackCandidate } from "./fallback";
 import type { Slide, SlideDeck } from "./types";
 
 const DECK_SCHEMA =
-  '{"title": "sunum başlığı", "slides": [{"layout": "cover|section|bullets|two-col|image|quote|end", ' +
-  '"title": "≤8 kelime", "subtitle": "opsiyonel kısa alt başlık", "bullets": ["en fazla 5 madde, her biri ≤12 kelime"], ' +
-  '"body": "opsiyonel kısa paragraf", "imagePrompt": "opsiyonel — İngilizce görsel sahne betimi", ' +
+  '{"title": "sunum başlığı", "slides": [{"layout": "cover|section|bullets|two-col|image|quote|stats|end", ' +
+  '"title": "≤8 kelime", "subtitle": "opsiyonel kısa alt başlık", "bullets": ["en fazla 5 madde, her biri ≤12 kelime, başında ilgili TEK bir emoji"], ' +
+  '"body": "opsiyonel kısa paragraf", "stats": "[{value,label} — en fazla 4 öğe, yalnız layout=stats iken]", ' +
+  '"imagePrompt": "HER slayta ekle — İngilizce görsel sahne betimi", ' +
   '"notes": "konuşmacı notu 1-3 cümle (Türkçe)"}]}';
 
 /* Token/karakter bütçesi — sunucu tarafı varsayılanı (8192 token) VE
@@ -45,9 +46,13 @@ function deckSystem(slideCount: number): string {
     DECK_SCHEMA + "\n" +
     "Kurallar: ilk slayt layout=cover (etkileyici başlık + subtitle), son slayt layout=end (kapanış/CTA). " +
     "Aralarda bölüm geçişi için section, içerik için bullets/two-col, güçlü tek fikir için quote, " +
-    "görsel anlatım için image kullan ve düzenleri ÇEŞİTLENDİR. " +
-    "İçerik Türkçe; imagePrompt alanları İngilizce ve fotoğrafik/illüstratif sahne betimi olsun " +
-    "(cover ve image slaytlarına mutlaka imagePrompt ekle). " +
+    "görsel anlatım için image, brief'te sayısal veri/karşılaştırma varsa EN AZ bir slaytta stats " +
+    "(2-4 {value,label} öğesi; value kısa olsun, ör. '%42', '3x', '10 bin') kullan ve düzenleri ÇEŞİTLENDİR. " +
+    "İçerik Türkçe; imagePrompt alanları İngilizce ve fotoğrafik/illüstratif sahne betimi olsun. " +
+    "HER slayta (layout türü fark etmeksizin) bir imagePrompt ekle — sunum yalnız metin değil, " +
+    "her slaytta görsel bir unsur içermeli. " +
+    "bullets/two-col slaytlarındaki HER maddenin başına konuyla ilgili TEK bir emoji ekle " +
+    "(ör. '🚀 Hızlı büyüme'), ardından madde metni gelsin. " +
     "Her slayta 1-3 cümlelik Türkçe konuşmacı notu (notes) yaz. Bilgi uydurma; brief'te olmayan " +
     "sayısal iddia ekleme, genel ifade kullan." +
     /* Aynı Gamma/Google Slides kalite ilkeleri (studioCraft.ts) — daha önce
@@ -59,8 +64,10 @@ function deckSystem(slideCount: number): string {
 }
 
 const SLIDE_SCHEMA =
-  '{"layout": "cover|section|bullets|two-col|image|quote|end", "title": "...", "subtitle": "...", ' +
-  '"bullets": ["..."], "body": "...", "imagePrompt": "İngilizce", "notes": "Türkçe"}';
+  '{"layout": "cover|section|bullets|two-col|image|quote|stats|end", "title": "...", "subtitle": "...", ' +
+  '"bullets": ["madde metinleri, başında ilgili TEK bir emoji"], "body": "...", ' +
+  '"stats": "[{value,label}] — yalnız layout=stats iken", ' +
+  '"imagePrompt": "İngilizce, her slayta ekle", "notes": "Türkçe"}';
 
 export interface DeckGenOptions {
   brief: string;

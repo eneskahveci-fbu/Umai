@@ -193,3 +193,143 @@ describe("lintDeck — kalite denetimi (danışma niteliğinde)", () => {
     expect(lintDeck(deck)).toContain("Lorem ipsum kalmış — gerçek içerik bekleniyordu");
   });
 });
+
+describe("G1 — her slaytta görsel garantisi (section/quote/bullets/two-col)", () => {
+  function deckWithLayout(layout: SlideDeck["slides"][number]["layout"], extra: Partial<SlideDeck["slides"][number]> = {}): SlideDeck {
+    return {
+      id: "d", title: "T", themeId: "gece", createdAt: 0, updatedAt: 0,
+      slides: [{ id: "s1", layout, title: "Başlık", imagePrompt: "a photo of a forest", ...extra }],
+    };
+  }
+
+  it("section düzeninde arka plan görseli (coverimg) render eder", () => {
+    const html = deckToHtml(deckWithLayout("section"));
+    expect(html).toContain(`class="coverimg" src=`);
+  });
+
+  it("quote düzeninde arka plan görseli render eder", () => {
+    const html = deckToHtml(deckWithLayout("quote", { body: "güçlü bir söz" }));
+    expect(html).toContain(`class="coverimg" src=`);
+  });
+
+  it("bullets düzeninde görsel varsa iki-sütun (cols) düzenine geçer", () => {
+    const html = deckToHtml(deckWithLayout("bullets", { bullets: ["madde"] }));
+    expect(html).toContain(`class="cols"`);
+    expect(html).toContain(`class="colbody"`);
+  });
+
+  it("bullets düzeninde görsel yoksa eski düz listeyi korur", () => {
+    const deck = deckWithLayout("bullets", { bullets: ["madde"], imagePrompt: undefined });
+    const html = deckToHtml(deck);
+    expect(html).not.toContain(`class="cols"`);
+  });
+
+  it("two-col düzeninde hem gövde metni hem görsel birlikte render edilir", () => {
+    const html = deckToHtml(deckWithLayout("two-col", { bullets: ["madde"], body: "gövde metni" }));
+    expect(html).toContain("gövde metni");
+    expect(html).toContain(`class="colbody"><img`);
+  });
+});
+
+describe("G2 — daha zengin/çeşitli temalar", () => {
+  it("en az 4 yeni gradyanlı tema içerir", () => {
+    const gradientThemes = SLIDE_THEMES.filter((t) => t.bgGradient);
+    expect(gradientThemes.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("eski (gradyansız) temalar geriye dönük uyumlu kalır — düz --bg kullanılır", () => {
+    const deck: SlideDeck = {
+      id: "d", title: "T", themeId: "gece", createdAt: 0, updatedAt: 0,
+      slides: [{ id: "s1", layout: "cover", title: "Kapak" }],
+    };
+    const html = deckToHtml(deck);
+    expect(html).toContain(".slide { position: absolute; inset: 0; display: none; flex-direction: column; justify-content: center;\n           padding: 6vmin 9vmin; background: var(--bg); }");
+  });
+
+  it("gradyanlı bir tema seçilince .slide arka planı gradyanı kullanır", () => {
+    const gradientTheme = SLIDE_THEMES.find((t) => t.bgGradient)!;
+    const deck: SlideDeck = {
+      id: "d", title: "T", themeId: gradientTheme.id, createdAt: 0, updatedAt: 0,
+      slides: [{ id: "s1", layout: "cover", title: "Kapak" }],
+    };
+    const html = deckToHtml(deck);
+    expect(html).toContain(gradientTheme.bgGradient!);
+  });
+});
+
+describe("G3 — grafik/istatistik slaytı desteği", () => {
+  it("normalizeDeck: stats alanını value/label çiftlerine ayrıştırır, en fazla 4 öğe", () => {
+    const raw = {
+      title: "İstatistik", slides: [{
+        layout: "stats", title: "Rakamlar",
+        stats: [
+          { value: "%42", label: "Büyüme" }, { value: "3x", label: "Hız" },
+          { value: "10 bin", label: "Kullanıcı" }, { value: "5", label: "Ülke" },
+          { value: "fazla", label: "atılır" }, { value: "", label: "geçersiz" },
+        ],
+      }],
+    };
+    const deck = normalizeDeck(raw)!;
+    expect(deck.slides[0].layout).toBe("stats");
+    expect(deck.slides[0].stats).toHaveLength(4);
+    expect(deck.slides[0].stats?.[0]).toEqual({ value: "%42", label: "Büyüme" });
+  });
+
+  it("yalnız stats alanı dolu olan bir slaytı da geçerli sayar (title/bullets/body olmasa da)", () => {
+    const raw = { title: "T", slides: [{ layout: "stats", stats: [{ value: "1", label: "a" }] }] };
+    const deck = normalizeDeck(raw);
+    expect(deck?.slides).toHaveLength(1);
+  });
+
+  it("deckToHtml: stats kartlarını render eder", () => {
+    const deck: SlideDeck = {
+      id: "d", title: "T", themeId: "gece", createdAt: 0, updatedAt: 0,
+      slides: [{ id: "s1", layout: "stats", title: "Rakamlar", stats: [{ value: "%99", label: "Memnuniyet" }] }],
+    };
+    const html = deckToHtml(deck);
+    expect(html).toContain(`class="statgrid"`);
+    expect(html).toContain(`class="statval">%99<`);
+    expect(html).toContain(`class="statlabel">Memnuniyet<`);
+  });
+
+  it("XSS: stats değer/etiketleri kaçırılır", () => {
+    const deck: SlideDeck = {
+      id: "d", title: "T", themeId: "gece", createdAt: 0, updatedAt: 0,
+      slides: [{ id: "s1", layout: "stats", stats: [{ value: "<script>1</script>", label: "x" }] }],
+    };
+    const html = deckToHtml(deck);
+    expect(html).not.toContain("<script>1</script>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+});
+
+describe("G4 — madde başına ikon (emoji-prefix)", () => {
+  it("maddenin başındaki emoji ayrı bir rozete (.bicon) taşınır, nokta işaretleyici kaldırılır", () => {
+    const deck: SlideDeck = {
+      id: "d", title: "T", themeId: "gece", createdAt: 0, updatedAt: 0,
+      slides: [{ id: "s1", layout: "bullets", title: "Başlık", bullets: ["🚀 Hızlı büyüme"] }],
+    };
+    const html = deckToHtml(deck);
+    expect(html).toContain(`<li class="hasicon"><span class="bicon">🚀</span>Hızlı büyüme</li>`);
+  });
+
+  it("emoji içermeyen maddeler eski düz <li> ile render edilir", () => {
+    const deck: SlideDeck = {
+      id: "d", title: "T", themeId: "gece", createdAt: 0, updatedAt: 0,
+      slides: [{ id: "s1", layout: "bullets", title: "Başlık", bullets: ["Emojisiz madde"] }],
+    };
+    const html = deckToHtml(deck);
+    expect(html).toContain("<li>Emojisiz madde</li>");
+    expect(html).not.toContain('<li class="hasicon">');
+  });
+
+  it("emojili maddenin geri kalan metni yine de HTML-kaçırılır (XSS)", () => {
+    const deck: SlideDeck = {
+      id: "d", title: "T", themeId: "gece", createdAt: 0, updatedAt: 0,
+      slides: [{ id: "s1", layout: "bullets", title: "Başlık", bullets: ["✅ <script>alert(1)</script>"] }],
+    };
+    const html = deckToHtml(deck);
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+});
