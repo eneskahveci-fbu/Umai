@@ -389,7 +389,7 @@ export function DesignStudio() {
           deck = await generateDeck({
             brief: deckBrief,
             slideCount: DEFAULT_SLIDE_COUNT,
-            onDelta: (txt) => setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: `🎬 Sunum tasarlanıyor… (${txt.length} karakter)` }; return c; }),
+            onDelta: () => setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: "🎬 Sunum tasarlanıyor…" }; return c; }),
             signal: ac.signal,
           });
         }
@@ -397,11 +397,19 @@ export function DesignStudio() {
         if (followup && project.deckData?.themeId) deck.themeId = project.deckData.themeId;
         deckData = deck;
         setPhase("rendering");
+        /* Şeffaflık: normalizeDeck (slides.ts) başlığı/madde/gövdesi olmayan
+           slaytları SESSİZCE düşürür — hem ilk üretimde hem takip güncellemesinde
+           (ikisi de slideCount=DEFAULT_SLIDE_COUNT ister) istenenden az slayt
+           gelebilir. Kullanıcı "8 slayt istedim ama neden 5 tane var" diye
+           düşünmesin. */
+        const shortfall = deck.slides.length < DEFAULT_SLIDE_COUNT
+          ? ` (${DEFAULT_SLIDE_COUNT} istendi, ${deck.slides.length} üretilebildi — bazı slaytlar geçerli içerik içermediği için düşürüldü)`
+          : "";
         result = {
           artifact: { type: "html", content: deckToHtml(deck), title: deck.title },
           text: followup
-            ? `Sunumu güncelledim (${deck.slides.length} slayt).`
-            : `"${deck.title}" sunumunu ${deck.slides.length} slaytla oluşturdum.`,
+            ? `Sunumu güncelledim (${deck.slides.length} slayt).${shortfall}`
+            : `"${deck.title}" sunumunu ${deck.slides.length} slaytla oluşturdum.${shortfall}`,
         };
       } else {
         let boostInstruction: string | undefined;
