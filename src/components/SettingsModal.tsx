@@ -42,8 +42,11 @@ import {
   Info,
   X,
   Zap,
+  Eye,
+  Braces,
 } from "lucide-react";
 import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
+import { detectModelCapabilities } from "@/lib/modelCapabilities";
 import { isAdminEmail } from "@/lib/admin";
 import { readErrors, clearErrors } from "@/lib/errorLog";
 import { AccountSettings } from "@/components/AccountSettings";
@@ -1001,6 +1004,19 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 {config.models.map((m) => {
                   const active = config.activeModelId === m.id;
                   const ed = editId === m.id;
+                  /* Yetenek rozetleri (I4) — "hangi modeli eklersem ekleyeyim, o
+                     modelin TÜM özelliklerinden faydalanmak istiyorum" isteğinin
+                     görünür karşılığı: kullanıcı hangi özelliklerin ONUN eklediği
+                     modelde otomatik algılanıp GERÇEKTEN kullanıldığını (bkz.
+                     api/chat/route.ts + anthropic.ts) burada görür — tahmin
+                     etmek zorunda kalmaz. */
+                  const caps = detectModelCapabilities(m.provider, m.model);
+                  const badges: { Icon: typeof Eye; label: string }[] = [];
+                  if (caps.vision) badges.push({ Icon: Eye, label: "Görsel girdi" });
+                  if (caps.extendedThinking) badges.push({ Icon: Brain, label: "Genişletilmiş muhakeme" });
+                  else if (caps.nativeReasoningEffort) badges.push({ Icon: Brain, label: "Muhakeme efor kontrolü" });
+                  if (caps.tools) badges.push({ Icon: Wrench, label: "Araç çağırma" });
+                  if (caps.jsonMode) badges.push({ Icon: Braces, label: "JSON modu" });
                   return (
                     <div key={m.id} className={`flex flex-col gap-2 px-3 py-2.5 rounded-xl border ${active ? "border-branddim bg-brand/10" : "border-line bg-bgsoft"}`}>
                       <div className="flex items-center gap-2">
@@ -1008,7 +1024,19 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                           {active && <Check size={11} />}
                         </button>
                         <div className="flex-1 min-w-0">
-                          {ed ? <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} className="input-mono !py-1 text-sm" /> : <><div className="text-sm font-semibold truncate">{m.label}</div><div className="text-xs text-muted font-mono truncate">{m.model}</div></>}
+                          {ed ? <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} className="input-mono !py-1 text-sm" /> : <>
+                            <div className="text-sm font-semibold truncate">{m.label}</div>
+                            <div className="text-xs text-muted font-mono truncate">{m.model}</div>
+                            {badges.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {badges.map((b) => (
+                                  <span key={b.label} title={b.label} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-bg/60 border border-line text-[10px] text-muted">
+                                    <b.Icon size={10} />{b.label}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </>}
                         </div>
                         <div className="flex items-center gap-1">
                           {ed ? <button onClick={() => { updateModel(editId!, { label: editLabel.trim() || cleanLabel(m.provider), apiKey: editKey.trim() }); addToast("Güncellendi.", "success"); setEditId(null); }} className="text-muted hover:text-green p-1"><Check size={14} /></button>
