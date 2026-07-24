@@ -18,6 +18,8 @@ const mockedGenerateDrafts = vi.mocked(generateDrafts);
 const mockedJudgeDrafts = vi.mocked(judgeDrafts);
 
 describe("generateDeck", () => {
+  beforeEach(() => mockedStreamChat.mockReset());
+
   it("streamChat yanıtını SlideDeck'e çevirir ve brief'i ekler", async () => {
     mockedStreamChat.mockResolvedValueOnce(JSON.stringify({
       title: "Test Sunumu",
@@ -45,6 +47,33 @@ describe("generateDeck", () => {
     const call = mockedStreamChat.mock.calls.at(-1)![0];
     expect(call.maxTokens).toBe(deckMaxTokens(8));
     expect(call.maxTokens).toBeGreaterThan(8192);
+  });
+
+  it("ilk yanıt geçersiz JSON'sa daha katı bir talimatla BİR KEZ daha dener ve başarılı olursa deste döner", async () => {
+    mockedStreamChat
+      .mockResolvedValueOnce("Tabii, işte sunumun: burada JSON yok, sadece düz metin.")
+      .mockResolvedValueOnce(JSON.stringify({ title: "İkinci Deneme", slides: [{ layout: "cover", title: "Kapak" }] }));
+    const deck = await generateDeck({ brief: "x", slideCount: 4 });
+    expect(deck.title).toBe("İkinci Deneme");
+    expect(mockedStreamChat).toHaveBeenCalledTimes(2);
+    const retryCall = mockedStreamChat.mock.calls[1]![0];
+    expect(retryCall.system).toContain("ÖNEMLİ");
+  });
+
+  it("hem ilk hem yeniden deneme geçersiz JSON döndürürse hata fırlatır (yalnız BİR kez dener)", async () => {
+    mockedStreamChat
+      .mockResolvedValueOnce("bozuk 1")
+      .mockResolvedValueOnce("bozuk 2");
+    await expect(generateDeck({ brief: "x", slideCount: 4 })).rejects.toThrow();
+    expect(mockedStreamChat).toHaveBeenCalledTimes(2);
+  });
+
+  it("AbortError'da yeniden denemez (kullanıcı iptal ettiyse tekrar istek atma)", async () => {
+    const abortErr = new Error("aborted");
+    abortErr.name = "AbortError";
+    mockedStreamChat.mockRejectedValueOnce(abortErr);
+    await expect(generateDeck({ brief: "x", slideCount: 4 })).rejects.toThrow();
+    expect(mockedStreamChat).toHaveBeenCalledTimes(1);
   });
 });
 
