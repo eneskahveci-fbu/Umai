@@ -91,6 +91,12 @@ interface ChatRequest {
   temperature?: number;
   maxTokens?: number;
   effort?: "low" | "medium" | "high" | "max";
+  /** İstemci SADECE geçerli JSON bekliyor (ör. çok-slaytlı sunum motoru) —
+      destekleyen sağlayıcılarda native "JSON modu" istenir (bkz. openCandidate),
+      böylece geçersiz/yarım JSON riski prompt talimatına değil sağlayıcının
+      kendi garantisine dayanır. Desteklemeyen sağlayıcılarda sessizce yok
+      sayılır (yalnız prompt talimatına güvenilir, davranış eskisi gibi). */
+  jsonMode?: boolean;
   style?: ResponseStyle;
   memories?: MemoryItem[];
   skills?: SkillPayload[];
@@ -131,6 +137,19 @@ interface Candidate {
 }
 
 const KEYLESS_CHAT_PROVIDERS = new Set<string>(["pollinations", "ovh", "ollama", "local", "custom"]);
+
+/* `jsonMode` (bkz. ChatRequest) istendiğinde OpenAI-uyumlu native "JSON modu"
+   (response_format: json_object) yalnız bunu İYİ BELGELENMİŞ ve GÜVENİLİR
+   şekilde desteklediği bilinen ticari sağlayıcılarda gönderilir. Anahtarsız/
+   ücretsiz toplayıcılar (pollinations/ovh/hf/ollama/agnes/custom) bilinçli
+   olarak DIŞARIDA bırakıldı — bazıları bilinmeyen alanlarda 400 ile
+   reddedebilir, bu da (JSON bazen bozuk gelmesi yerine) İSTEĞİN TAMAMEN
+   BAŞARISIZ olmasına yol açar; bu, çözmeye çalıştığımız sorundan daha kötü
+   bir regresyon olurdu. Bu sağlayıcılarda yalnızca prompt talimatına (+
+   F3'teki otomatik yeniden deneme) güvenilir — davranış eskisi gibi. */
+const JSON_MODE_PROVIDERS = new Set<string>([
+  "openai", "groq", "together", "mistral", "deepseek", "xai", "openrouter", "github", "nvidia", "cerebras",
+]);
 
 /** Sağlayıcıya göre upstream istek başlıklarını kurar. */
 function buildCandidateHeaders(c: Candidate, req: Request): Record<string, string> {
@@ -1265,6 +1284,7 @@ export async function POST(req: Request) {
      Pollinations anonim istekleri için `referrer` ekler. */
   const openCandidate = async (c: Candidate, messages: unknown, extra: Record<string, unknown> = {}): Promise<Response> => {
     const b: Record<string, unknown> = { model: c.model, messages, stream: true, ...sampling, ...extra };
+    if (body.jsonMode && JSON_MODE_PROVIDERS.has(c.provider)) b.response_format = { type: "json_object" };
     if (c.provider === "pollinations") b.referrer = "craft-coder";
     if (c.provider === "anthropic") return anthropicUpstream(c.baseUrl, c.apiKey, b as unknown as OpenAIChatBody);
     const res = await fetch(candidateUrl(c), { method: "POST", headers: buildCandidateHeaders(c, req), body: JSON.stringify(b) });

@@ -15,6 +15,28 @@ const DECK_SCHEMA =
   '"body": "opsiyonel kısa paragraf", "imagePrompt": "opsiyonel — İngilizce görsel sahne betimi", ' +
   '"notes": "konuşmacı notu 1-3 cümle (Türkçe)"}]}';
 
+/* Token/karakter bütçesi — sunucu tarafı varsayılanı (8192 token) VE
+   boost.ts'in taslak akışındaki genel 6000 karakter erken-durdurma sınırı,
+   HER İKİSİ DE serbest metin taslakları için düşünülmüştü; şemalı, çok
+   alanlı (title+subtitle+bullets+body+imagePrompt+notes) bir slayt JSON'u
+   bunlara kolayca sığmıyor ve yanıt ortada kesilip JSON'un dengesi hiç
+   kapanmıyor — "sunum bazen hiç üretilemiyor" şikayetinin doğrulanmış kök
+   nedeni. Slayt başına cömert bir pay + sabit taban ile ölçekle, MAX tavanı
+   altına sınırla (ana sohbetin "efor: max" tavanıyla aynı, 32768). */
+const TOKENS_PER_SLIDE = 900;
+const TOKENS_BASE = 2500;
+const TOKENS_CAP = 32_000;
+
+export function deckMaxTokens(slideCount: number): number {
+  return Math.min(TOKENS_BASE + slideCount * TOKENS_PER_SLIDE, TOKENS_CAP);
+}
+
+/* Yaklaşık 3.2 karakter/token (TR+EN karışık JSON metni) — boost.ts'in
+   karakter-tabanlı erken-durdurmasını AYNI bütçeye getirmek için. */
+function deckMaxChars(slideCount: number): number {
+  return Math.round(deckMaxTokens(slideCount) * 3.2);
+}
+
 function deckSystem(slideCount: number): string {
   return (
     "Sen kıdemli bir sunum tasarımcısı ve hikâye anlatıcısısın. Kullanıcının brief'inden " +
@@ -53,6 +75,8 @@ export async function generateDeck(opts: DeckGenOptions): Promise<SlideDeck> {
     system: deckSystem(opts.slideCount),
     messages: [{ role: "user", content: opts.brief }],
     onDelta: opts.onDelta, signal: opts.signal, temperature: 0.7,
+    maxTokens: deckMaxTokens(opts.slideCount),
+    jsonMode: true,
   });
   const deck = parseDeckJson(full, opts.brief.slice(0, 48));
   deck.brief = opts.brief;
@@ -84,6 +108,8 @@ export async function generateDeckFusion(opts: DeckFusionOptions): Promise<Slide
   const userText = `${deckSystem(opts.slideCount)}\n\nBRIEF:\n${opts.brief}`;
   const rawDrafts = (await generateDrafts({
     userText, models: opts.drafts, fallbacks: opts.fallbacks, signal: opts.signal,
+    maxTokens: deckMaxTokens(opts.slideCount), maxChars: deckMaxChars(opts.slideCount),
+    timeoutMs: 90_000, jsonMode: true,
   })).map((d) => d.text);
 
   const validRaw: string[] = [];

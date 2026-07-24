@@ -138,12 +138,17 @@ export function parseJudge(raw: string, draftCount: number): DraftJudge | null {
   } catch { return null; }
 }
 
-/* Tek taslak: /api/chat SSE akışını toplar; ~6000 karakterde erken durur
-   (taslak için yeterli — gecikmeyi sınırlar). */
+/* Tek taslak: /api/chat SSE akışını toplar; varsayılan ~6000 karakterde erken
+   durur (serbest metin taslağı için yeterli — gecikmeyi sınırlar). Yapılandırılmış
+   JSON taslakları (ör. çok-slaytlı sunum) TAM ve dengeli parantezli bitmek
+   ZORUNDA — 6000 karakter orta boy bir desteyi bile ortasında keser ve
+   ardından JSON ayrıştırma HER taslakta başarısız olur. Böyle çağıranlar
+   `maxChars`/`maxTokens` ile daha geniş bir bütçe geçebilir. */
 async function draftOnce(
   m: { baseUrl: string; model: string; provider: string; apiKey: string; temperature?: number },
   userText: string,
   signal: AbortSignal,
+  opts?: { maxChars?: number; maxTokens?: number; systemPrompt?: string; jsonMode?: boolean },
 ): Promise<string> {
   const res = await fetch("/api/chat", {
     method: "POST",
@@ -152,13 +157,16 @@ async function draftOnce(
     body: JSON.stringify({
       messages: [{ role: "user", content: userText }],
       baseUrl: m.baseUrl, model: m.model, apiKey: m.apiKey, provider: m.provider,
-      systemPrompt: "Soruya doğrudan, eksiksiz ve yüksek kaliteli bir yanıt yaz. Bu bir iç taslaktır; kısa tutma ama gereksiz giriş/kapanış cümlesi de ekleme.",
+      systemPrompt: opts?.systemPrompt ?? "Soruya doğrudan, eksiksiz ve yüksek kaliteli bir yanıt yaz. Bu bir iç taslaktır; kısa tutma ama gereksiz giriş/kapanış cümlesi de ekleme.",
       tools: false, webSearch: false, temperature: m.temperature ?? 0.8,
+      ...(opts?.maxTokens ? { maxTokens: opts.maxTokens } : {}),
+      ...(opts?.jsonMode ? { jsonMode: true } : {}),
     }),
   });
   if (!res.ok || !res.body) throw new Error(`taslak ${res.status}`);
   const reader = res.body.getReader();
   const dec = new TextDecoder();
+  const maxChars = opts?.maxChars ?? 6000;
   let buf = ""; let full = "";
   for (;;) {
     const { done, value } = await reader.read();
@@ -175,7 +183,7 @@ async function draftOnce(
         full += j.choices?.[0]?.delta?.content ?? "";
       } catch { /* parça — yoksay */ }
     }
-    if (full.length > 6000) { await reader.cancel().catch(() => { /* yok */ }); break; }
+    if (full.length > maxChars) { await reader.cancel().catch(() => { /* yok */ }); break; }
   }
   return full.trim();
 }
@@ -205,13 +213,22 @@ export async function generateDrafts(opts: {
   /** Bir taslak modeli başarısız olursa denenecek yedek aday havuzu. */
   fallbacks?: FallbackCandidate[];
   signal?: AbortSignal;
+  /** Yapılandırılmış (JSON) taslaklar için: varsayılan 6000 karakter/45sn
+      sınırını gevşetir — bkz. draftOnce üstündeki not. */
+  maxChars?: number;
+  maxTokens?: number;
+  timeoutMs?: number;
+  systemPrompt?: string;
+  jsonMode?: boolean;
 }): Promise<DraftResult[]> {
   const attempt = async (m: (typeof opts.models)[number]) => {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 45_000);
+    const t = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 45_000);
     opts.signal?.addEventListener("abort", () => ctrl.abort(), { once: true });
     try {
-      return await draftOnce(m, opts.userText, ctrl.signal);
+      return await draftOnce(m, opts.userText, ctrl.signal, {
+        maxChars: opts.maxChars, maxTokens: opts.maxTokens, systemPrompt: opts.systemPrompt, jsonMode: opts.jsonMode,
+      });
     } finally {
       clearTimeout(t);
     }

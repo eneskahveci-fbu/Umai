@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
-import { generateDeck, generateDeckFusion, rewriteSlide } from "../slidesGen";
+import { generateDeck, generateDeckFusion, rewriteSlide, deckMaxTokens } from "../slidesGen";
 import type { SlideDeck } from "../types";
 
 vi.mock("../genChat", async (importOriginal) => {
@@ -37,6 +37,23 @@ describe("generateDeck", () => {
     await generateDeck({ brief: "x", slideCount: 6 });
     const call = mockedStreamChat.mock.calls.at(-1)![0];
     expect(call.system).toContain("6 slaytlık");
+  });
+
+  it("slayt sayısına göre ölçekli maxTokens gönderir (varsayılan 8192 sunucu tavanına GÜVENMEZ)", async () => {
+    mockedStreamChat.mockResolvedValueOnce(JSON.stringify({ title: "t", slides: [{ layout: "cover", title: "Kapak" }] }));
+    await generateDeck({ brief: "x", slideCount: 8 });
+    const call = mockedStreamChat.mock.calls.at(-1)![0];
+    expect(call.maxTokens).toBe(deckMaxTokens(8));
+    expect(call.maxTokens).toBeGreaterThan(8192);
+  });
+});
+
+describe("deckMaxTokens", () => {
+  it("slayt sayısıyla ölçeklenir ve bir tavanla sınırlıdır", () => {
+    expect(deckMaxTokens(8)).toBeGreaterThan(deckMaxTokens(2));
+    expect(deckMaxTokens(24)).toBeLessThanOrEqual(32_000);
+    expect(deckMaxTokens(1000)).toBe(deckMaxTokens(1000)); // taşma yok, tavanda sabitlenir
+    expect(deckMaxTokens(1000)).toBeLessThanOrEqual(32_000);
   });
 });
 
@@ -108,6 +125,15 @@ describe("generateDeckFusion", () => {
     const call = mockedGenerateDrafts.mock.calls.at(-1)![0];
     expect(call.userText).toContain("5 slaytlık");
     expect(call.userText).toContain("ÖZEL-BRIEF-123");
+  });
+
+  it("genel taslak metninin 6000 karakter erken-durdurmasına DÜŞMEZ — slayt sayısına göre genişletilmiş bütçe geçer", async () => {
+    mockedGenerateDrafts.mockResolvedValueOnce([dr(deckJson("A")), dr(deckJson("B"))]);
+    mockedJudgeDrafts.mockResolvedValueOnce({ best: 1, guidance: "x" });
+    await generateDeckFusion({ brief: "b", slideCount: 10, drafts: [fakeModel, fakeModel], judgeModel: fakeModel });
+    const call = mockedGenerateDrafts.mock.calls.at(-1)![0];
+    expect(call.maxChars).toBeGreaterThan(6000);
+    expect(call.maxTokens).toBeGreaterThan(8192);
   });
 });
 

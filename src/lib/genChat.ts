@@ -12,6 +12,12 @@ export interface GenChatOptions {
   /** Tek kullanıcı mesajı yerine tam geçmiş vermek için (Defter sohbeti). */
   messages: { role: "user" | "assistant"; content: string }[];
   temperature?: number;
+  /** Sunucunun varsayılan 8192 token tavanını aşmak için (ör. çok slaytlı
+      sunum gibi büyük yapılandırılmış çıktılarda yanıt ortada kesilmesin). */
+  maxTokens?: number;
+  /** Yalnız geçerli JSON bekleniyorsa (ör. sunum motoru) — destekleyen
+      sağlayıcılarda native JSON modu istenir (bkz. api/chat/route.ts). */
+  jsonMode?: boolean;
   onDelta?: (fullText: string) => void;
   signal?: AbortSignal;
 }
@@ -37,6 +43,8 @@ export async function streamChat(opts: GenChatOptions): Promise<string> {
       systemPrompt: system,
       fallbacks: buildFallbackChain(cfg.models, cfg.activeModelId),
       tools: false, webSearch: false, temperature: opts.temperature ?? 0.7,
+      ...(opts.maxTokens ? { maxTokens: opts.maxTokens } : {}),
+      ...(opts.jsonMode ? { jsonMode: true } : {}),
     }),
   });
   if (!res.ok || !res.body) {
