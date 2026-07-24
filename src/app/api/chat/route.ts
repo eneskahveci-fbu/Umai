@@ -10,7 +10,7 @@ import { filterByGlob } from "@/lib/glob";
 import { ipynbToReadable, isNotebook } from "@/lib/notebook";
 import { pruneMessages } from "@/lib/contextWindow";
 import { detectFrameworks, extractDeps, parseGitignore } from "@/lib/projectContext";
-import { ASK_USER_TOOL, CODER_TOOLS, GENERATE_IMAGE_TOOL } from "@/lib/tools";
+import { ASK_USER_TOOL, CODER_TOOLS, GENERATE_IMAGE_TOOL, RUN_CODE_TOOL } from "@/lib/tools";
 import { EXTENSION_TOOLS } from "@/lib/extensions/registry";
 import { searchWeb, formatResults, fetchUrl } from "@/lib/webSearch";
 import { pollinationsImageUrl, stableSeed } from "@/lib/pollinations";
@@ -122,6 +122,11 @@ interface ChatRequest {
   /** İstemcide terminal (uzak WS veya WebContainer) mevcutsa true → run_command
       aracı ajana sunulur. Aksi halde araç gizlenir (çıktısız komut = takılma). */
   terminalAvailable?: boolean;
+  /** L1 — istemcide kod çalıştırıcı (Pyodide/Web Worker) kullanılabilirse true
+      → run_code ("analiz aracı") ajana sunulur. Tarayıcıdan gelen her istek
+      bunu true yollar; tarayıcı dışı çağrılarda (test/entegrasyon) araç
+      gizlenir, çünkü çıktıyı geri besleyecek bir istemci yoktur. */
+  codeExec?: boolean;
   repoCtx?: RepoCtx;
   mcpServers?: McpServerConfig[];
   /** Çok-sağlayıcılı otomatik fallback: birincil model hata verirse sırayla
@@ -1326,6 +1331,32 @@ export async function POST(req: Request) {
     `"düşünme"/"analiz" adımlarını, kendi kendine notları ("we need…", "user wants…", ` +
     `"provide answer", "no code", "ok") veya sahte konuşma dökümlerini (User:/Assistant:) ` +
     `ASLA yanıt metnine yazma. Doğrudan sonucu ver.`;
+  /* Araç kapıları — sysPrompt rehberi de bunlara göre yazıldığı için allTools'tan
+     ÖNCE hesaplanır (ikisi de aynı üç sabiti kullanır, sapma olmaz).
+     askUserCapable: anahtarsız ücretsiz uçlar (Pollinations/OVH…) function-calling
+     desteklemeyip `tools` alanına 400 verebilir → onlarda hiç araç eklenmez ve
+     A1'in zero-copy hızlı yolu korunur.
+     L2 — organik web arama: web_search/read_url önceden YALNIZ istemcideki autoWeb()
+     regex'i body.webSearch'ü açtığında sunuluyordu; yani "aramam lazım" kararını
+     regex veriyordu, model değil (Claude'da modelin kendisi karar verir; regex'in
+     kaçırdığı güncel-bilgi sorularında Umai sessizce eski bilgiyle cevaplıyordu).
+     Artık tool-yetenekli sağlayıcılarda HER ZAMAN sunulur. body.webSearch hâlâ
+     onurlandırılır (kullanıcı açıkça açtıysa anahtarsız uçta bile denenir).
+     L1 — analiz aracı: aynı kapı + istemcinin kod çalıştırıcı desteğini bildirmesi
+     (codeExec) şart, çünkü kod sunucuda değil kullanıcının tarayıcısında çalışır. */
+  const askUserCapable = !KEYLESS_CHAT_PROVIDERS.has(provider);
+  const webToolsOn = !body.blockNetworkTools && (askUserCapable || !!body.webSearch);
+  const codeToolOn = !!body.codeExec && askUserCapable;
+  /* L1 — düz sohbette de analiz aracını tanıt: repo-ajanı rehberi (aşağıda,
+     yalnız tools+repoCtx varken) bu turda hiç eklenmiyor olabilir. */
+  if (codeToolOn) {
+    sysPrompt +=
+      `\n\n[Analiz aracı] Hesap, veri/metin analizi, tarih hesabı, bir formülün ya da ` +
+      `algoritmanın doğrulanması veya yazdığın kodun gerçekten çalıştığını göstermen ` +
+      `gerektiğinde run_code aracını ÇAĞIR (Python veya JavaScript) — sonucu kafadan ` +
+      `tahmin etme, çalıştır ve gerçek çıktıyı gör. Sonucu print()/console.log() ile ` +
+      `yazdırmayı unutma; çıktı sana ayrı bir mesaj olarak döner.`;
+  }
   /* Açıklayıcı diyalog (Claude Code'un plan-onay döngüsü gibi): belirsiz
      isteklerde rastgele varsayımla ilerlemek yerine tıklanabilir bir seçenek
      listesi sun ve kullanıcının kararını bekle. ask_user aracı artık HER
@@ -1421,8 +1452,10 @@ export async function POST(req: Request) {
       `• generate_image(prompt, aspect_ratio?) — kullanıcı görsel/resim isteyince ÇAĞIR (doğal dilde, komut gerekmez); sonucu '![açıklama](url)' olarak yanıtına göm\n` +
       `• deep_research(topic) — kullanıcı derinlemesine/kaynaklı bir araştırma/rapor isteyince ÇAĞIR; dönen atıflı raporu ÖZETLEMEDEN aynen ilet\n` +
       `• update_plan(plan) — çok adımlı görevde canlı yapılacaklar listesi\n` +
-      (body.webSearch ? `• web_search(query) — internette ara\n• read_url(url) — web sayfası oku\n` : "") +
+      (webToolsOn ? `• web_search(query) — internette ara\n• read_url(url) — web sayfası oku\n` : "") +
+      (codeToolOn ? `• run_code(language, code) — Python/JS kodu ÇALIŞTIR ve gerçek çıktısını al\n` : "") +
       `\nÇalışma pratiği:\n` +
+      (codeToolOn ? `— Hesap, veri analizi, formül/algoritma doğrulama veya yazdığın kodun çalıştığını kanıtlama gerektiğinde run_code'u ÇAĞIR — sonucu kafadan tahmin etme, çalıştır ve gör.\n` : "") +
       `— ARAÇLARI GERÇEKTEN ÇAĞIR — anlatma/simüle etme. Komutu veya kodu kullanıcıya "şunu çalıştır / şunu yapıştır" diye METİN olarak VERME; uygun araç varsa (run_command, str_replace, write_file) KENDİN çağır ve sonucu göster. Kullanıcı senin yapmanı bekliyor, tarif etmeni değil.\n` +
       `— Çok adımlı (2+) görevlerde MUTLAKA önce update_plan ile yapılacaklar listesini yaz (kullanıcı ilerlemeyi canlı "todo" kutusunda görür), her adım bitince planı güncelleyip [x] işaretle — bunu atlama.\n` +
       `— Görev BAĞIMSIZ paralel parçalara bölünebiliyorsa (ör. birden çok modülü ayrı ayrı incelemek) dispatch_agents ile alt-ajanlara dağıt; basitse kendin yap.\n` +
@@ -1568,12 +1601,12 @@ export async function POST(req: Request) {
      en yaygın ücretsiz sohbet yolunu kırardı (regresyon). Anahtarsızda araç eklenmez;
      allTools boş kalırsa aşağıda zero-copy passthrough'a düşülür (hız + 400 riski yok),
      netleştirme GFM-checkbox ikincil yoluyla yine interaktif kalır. */
-  const askUserCapable = !KEYLESS_CHAT_PROVIDERS.has(provider);
   let allTools = [
     ...(body.tools && body.repoCtx
       ? coderTools
       : [...(askUserCapable ? [ASK_USER_TOOL] : []), ...(body.imageGen ? [GENERATE_IMAGE_TOOL] : [])]),
-    ...(body.webSearch && !body.blockNetworkTools ? WEB_TOOLS : []),
+    ...(codeToolOn ? [RUN_CODE_TOOL] : []),
+    ...(webToolsOn ? WEB_TOOLS : []),
     ...mcpToolDefs.map((t) => ({
       type: "function" as const,
       function: { name: t.name, description: t.description, parameters: t.parameters },
@@ -1927,6 +1960,27 @@ export async function POST(req: Request) {
             const command = String(args.command ?? "").trim();
             safe.enqueue(encoder.encode(`data: ${JSON.stringify({ run_command_event: { command } })}\n\n`));
             const note = `⏳ '${command}' komutu terminale gönderildi. Çıktısı ayrı bir mesaj olarak gelecek; ona göre devam et.`;
+            safe.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: note } })}\n\n`),
+            );
+            resultById.set(tc.id, note);
+            return;
+          }
+          /* run_code (L1 — analiz aracı): kod SUNUCUDA çalıştırılmaz (LLM'in
+             ürettiği kodu kendi sunucumuzda çalıştırmak env/iç ağ erişimi
+             demek olurdu). run_command ile AYNI desen: kodu istemciye olay
+             olarak yolla, o tarayıcıda izole çalıştırıp çıktıyı ayrı bir
+             mesaj olarak geri beslesin. Bu turda placeholder sonuç döner. */
+          if (tc.name === "run_code") {
+            const language = String(args.language ?? "").toLowerCase().startsWith("py") ? "python" : "javascript";
+            const code = String(args.code ?? "");
+            const fail = (m: string) => {
+              safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: m } })}\n\n`));
+              resultById.set(tc.id, m);
+            };
+            if (!code.trim()) { fail("Hata: code gerekli"); return; }
+            safe.enqueue(encoder.encode(`data: ${JSON.stringify({ run_code_event: { language, code } })}\n\n`));
+            const note = `⏳ ${language} kodu kullanıcının tarayıcısında çalıştırılıyor. Çıktısı ayrı bir mesaj olarak gelecek; ona göre devam et.`;
             safe.enqueue(
               encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: note } })}\n\n`),
             );

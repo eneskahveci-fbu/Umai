@@ -90,6 +90,10 @@ export interface CommandRun {
   command: string;
   output?: string;
   status: "running" | "done" | "error";
+  /** "code" — run_code (analiz aracı) ile çalıştırılan Python/JS parçası;
+      tanımsız/"shell" = terminal komutu. Panel başlığı/ikonu buna göre
+      değişir (kod çalıştırmayı "Terminal" diye etiketlemek yanıltıcıydı). */
+  kind?: "shell" | "code";
 }
 
 export interface McpServer {

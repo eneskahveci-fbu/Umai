@@ -37,6 +37,30 @@ export const GENERATE_IMAGE_TOOL: ToolDefinition = {
   },
 };
 
+/* L1 — "analiz aracı" (Claude'un analysis tool'unun karşılığı). Kod
+   KULLANICININ TARAYICISINDA çalışır (Pyodide/Web Worker, bkz. lib/python.ts
+   ve lib/jsRunner.ts) — sunucuda ASLA değil: LLM'in ürettiği kodu kendi
+   sunucumuzda çalıştırmak env değişkenlerine/iç ağa erişim demek olurdu,
+   gerçek bir güvenlik regresyonu. Bu yüzden run_command ile AYNI deseni
+   izler: sunucu bir olay yayınlar, istemci çalıştırır, çıktıyı ayrı bir
+   mesaj olarak geri besler (bkz. api/chat/route.ts + CoderView.tsx). */
+export const RUN_CODE_TOOL: ToolDefinition = {
+  type: "function",
+  function: {
+    name: "run_code",
+    description:
+      "Python veya JavaScript kodunu GERÇEKTEN çalıştırır ve çıktısını döndürür. Hesap yapman, veri/metin analiz etmen, bir formülü veya algoritmayı DOĞRULAMAN ya da yazdığın kodu test etmen gerektiğinde kullan — sonucu kafadan tahmin etme, çalıştır ve gör. Aritmetik/istatistik, tarih hesabı, metin/CSV ayrıştırma, kod doğrulama gibi işlerde bilhassa değerlidir. Kod kullanıcının tarayıcısında yalıtılmış çalışır: ağ ve dosya sistemi erişimi YOKTUR, 5 sn sınırı vardır. Sonucu MUTLAKA yazdır (Python'da print(), JS'te console.log()) — yazdırmazsan çıktı boş gelir. Çıktı ayrı bir mesaj olarak sana ulaşır; ona göre devam et.",
+    parameters: {
+      type: "object",
+      properties: {
+        language: { type: "string", description: "Kodun dili", enum: ["python", "javascript"] },
+        code: { type: "string", description: "Çalıştırılacak kod. Sonucu print()/console.log() ile yazdır." },
+      },
+      required: ["language", "code"],
+    },
+  },
+};
+
 /* Ayrı export: repo bağlı olmayan düz sohbette de (Faz 6 — yalnız bu araç
    için) tek başına sunulabilsin diye CODER_TOOLS listesinden bağımsız
    referans edilebilir tutulur — bkz. api/chat/route.ts. Repo/dosya erişimi

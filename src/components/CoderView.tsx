@@ -1236,6 +1236,24 @@ export function CoderView() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* L1 — analiz aracı çıktısı: terminal çıktısıyla BİREBİR aynı desen. Sonuç
+     gizli bir kullanıcı mesajı olarak bağlama eklenir (sohbette render
+     EDİLMEZ — çıktı zaten "Kod çalıştırma" kutusunda görünür) ve ajan
+     kaldığı yerden devam eder. */
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { language, code, output } = (e as CustomEvent<{ language: string; code: string; output: string }>).detail ?? {};
+      if (!output) return;
+      const msg = `**Kod çıktısı** (${language}):\n\`\`\`${language}\n${code}\n\`\`\`\nÇıktı:\n\`\`\`\n${output}\n\`\`\``;
+      useStore.getState().pushMessage({ role: "user", content: msg });
+      void callApi();
+    };
+    window.addEventListener("craftai:code-output", handler);
+    return () => window.removeEventListener("craftai:code-output", handler);
+  // callApi is stable (useCallback with no deps that change), safe to omit from deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const attachRepoFile = async (file: TreeFile) => {
     if (attachedFiles.find((f) => f.path === file.path)) {
       setAttachedFiles((prev) => prev.filter((f) => f.path !== file.path));
@@ -2172,6 +2190,10 @@ export function CoderView() {
           blockNetworkTools: store.config.blockNetworkTools,
           /* Terminal varsa ajana run_command aracı sunulur (uzak WS veya WebContainer). */
           terminalAvailable: localActive || !!(store.config.terminalWsUrl?.trim()) || terminalSupported,
+          /* L1 — analiz aracı: kod kullanıcının tarayıcısında (Pyodide/Web Worker)
+             çalıştığı için bu istemci her zaman destekler; sunucu bunu görünce
+             run_code aracını ajana sunar. */
+          codeExec: true,
           temperature: activeProjectCfg?.temperature,
           maxTokens: activeProjectCfg?.maxTokens,
           effort: thinkingMode,
@@ -2413,6 +2435,32 @@ export function CoderView() {
                    sohbetteki "Terminal" todo kutusunda görünür, çıktı AI'ya döner. */
                 runInTerminal(String(parsed.run_command_event.command ?? ""));
               }
+              continue;
+            }
+            /* run_code (L1 — analiz aracı): kod SUNUCUDA çalıştırılmaz; burada,
+               kullanıcının tarayıcısında izole çalışır (Pyodide / DOM'suz Web
+               Worker). Çıktı "Kod çalıştırma" kutusunda canlı görünür ve
+               craftai:code-output ile ajana geri beslenir (run_command ile
+               birebir aynı desen). */
+            if (parsed.run_code_event) {
+              const language = String(parsed.run_code_event.language ?? "javascript");
+              const code = String(parsed.run_code_event.code ?? "");
+              if (!code.trim()) continue;
+              const label = `${language === "python" ? "Python" : "JavaScript"} kodu çalıştırılıyor`;
+              useStore.getState().addCommandRun(label, "code");
+              void (async () => {
+                let res: { output: string; error?: string };
+                try {
+                  res = language === "python"
+                    ? await (await import("@/lib/python")).runPython(code)
+                    : await (await import("@/lib/jsRunner")).runJs(code);
+                } catch (err) {
+                  res = { output: "", error: (err as Error).message || "Çalıştırıcı başlatılamadı." };
+                }
+                const shown = [res.output, res.error ? `HATA: ${res.error}` : ""].filter(Boolean).join("\n") || "(çıktı yok)";
+                useStore.getState().setCommandOutput(label, shown, res.error ? "error" : "done");
+                window.dispatchEvent(new CustomEvent("craftai:code-output", { detail: { language, code, output: shown } }));
+              })();
               continue;
             }
             /* bitiş nedeni: "length" ⇒ token sınırında kesildi → şerit + oto-devam */

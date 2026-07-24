@@ -496,11 +496,15 @@ function CommandPanel({ commands }: { commands: NonNullable<ChatMessage["command
   if (!commands.length) return null;
   const running = commands.some((c) => c.status === "running");
   const done = commands.filter((c) => c.status !== "running").length;
+  /* L1: aynı panel hem terminal komutlarını hem run_code (analiz aracı)
+     çalıştırmalarını gösterir — tümü kod ise başlığı buna göre değiştir
+     (Python/JS çalıştırmayı "Terminal" diye etiketlemek yanıltıcıydı). */
+  const allCode = commands.every((c) => c.kind === "code");
   return (
     <div className="mb-3 border border-line/50 rounded-xl overflow-hidden bg-bgsoft/30">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-line/30 text-xs">
         <TerminalIcon size={12} className={running ? "text-brand animate-pulse" : "text-green"} />
-        <span className="font-semibold">Terminal</span>
+        <span className="font-semibold">{allCode ? "Kod çalıştırma" : "Terminal"}</span>
         <span className="text-muted/50 font-mono ml-auto tabular-nums">{done}/{commands.length}</span>
       </div>
       <div className="px-3 py-2.5 space-y-1.5">
@@ -869,6 +873,9 @@ function MessageBubbleImpl({
     /* Terminal çıktısı kullanıcı mesajları sohbette gösterilmez — çıktı zaten
        asistan mesajındaki "Terminal" todo kutusunda görünür (AI bağlamında kalır). */
     if (message.content.startsWith("**Terminal çıktısı**")) return null;
+    /* L1 — analiz aracı çıktısı da aynı şekilde gizlenir: kod ve sonucu zaten
+       asistan mesajındaki "Kod çalıştırma" kutusunda görünür (AI bağlamında kalır). */
+    if (message.content.startsWith("**Kod çıktısı**")) return null;
     return (
       <div className="group/msg flex justify-end py-3 animate-fade-in">
         {/* Klasik sohbet balonu — kullanıcı sağda, avatarsız (asistan solda
