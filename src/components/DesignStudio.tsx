@@ -27,7 +27,7 @@ import type { Artifact, SlideDeck, StudioProject } from "@/lib/types";
 import { designSystemById, designSystemPromptText } from "@/lib/designSystems";
 import { type StudioTemplate } from "@/lib/studioTemplates";
 import { generateDeck, generateDeckFusion, rewriteSlide } from "@/lib/slidesGen";
-import { deckToHtml, SLIDE_THEMES } from "@/lib/slides";
+import { deckToHtml, lintDeck, SLIDE_THEMES } from "@/lib/slides";
 import { StudioHomeScreen, EmptyChatHint } from "./studio/StudioHomeScreen";
 import { DesignSystemPicker, ModelPicker, TemplatePicker, ImagePreviewStrip } from "./studio/ComposerExtras";
 import { VoiceButton } from "./VoiceButton";
@@ -405,11 +405,20 @@ export function DesignStudio() {
         const shortfall = deck.slides.length < DEFAULT_SLIDE_COUNT
           ? ` (${DEFAULT_SLIDE_COUNT} istendi, ${deck.slides.length} üretilebildi — bazı slaytlar geçerli içerik içermediği için düşürüldü)`
           : "";
+        /* Kalite denetimi (danışma niteliğinde) — genel HTML üretim yolundaki
+           lintArtifact/CRAFT_RULES notunun (studioGen.ts) deste eşleniği;
+           daha önce sunum motorunda hiç yoktu. F5'teki tekil slayt düzenleme
+           seçicisine işaret eder — kullanıcı doğrudan hangi slaytı
+           düzeltmesi gerektiğini bilir. */
+        const lintWarnings = lintDeck(deck);
+        const lintNote = lintWarnings.length
+          ? `\n\n🧹 Kalite notu: ${lintWarnings.join(" · ")}. İstersen üstteki slayt seçiciden ilgili slaytı seçip düzeltme iste.`
+          : "";
         result = {
           artifact: { type: "html", content: deckToHtml(deck), title: deck.title },
-          text: followup
+          text: (followup
             ? `Sunumu güncelledim (${deck.slides.length} slayt).${shortfall}`
-            : `"${deck.title}" sunumunu ${deck.slides.length} slaytla oluşturdum.${shortfall}`,
+            : `"${deck.title}" sunumunu ${deck.slides.length} slaytla oluşturdum.${shortfall}`) + lintNote,
         };
       } else {
         let boostInstruction: string | undefined;

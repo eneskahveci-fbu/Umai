@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   extractJson, parseDeckJson, normalizeDeck, deckToHtml, newSlide,
-  slideNarration, slideThemeById, MAX_SLIDES, SLIDE_THEMES,
+  slideNarration, slideThemeById, MAX_SLIDES, SLIDE_THEMES, lintDeck,
 } from "../slides";
 import type { SlideDeck } from "../types";
 
@@ -132,5 +132,55 @@ describe("yardımcılar", () => {
 
   it("slideThemeById: bilinmeyen id ilk temaya düşer", () => {
     expect(slideThemeById("yok-böyle-tema").id).toBe(SLIDE_THEMES[0].id);
+  });
+});
+
+describe("lintDeck — kalite denetimi (danışma niteliğinde)", () => {
+  const goodDeck: SlideDeck = {
+    id: "d1", title: "İyi Sunum", themeId: "gece", createdAt: 0, updatedAt: 0,
+    slides: [
+      { id: "s1", layout: "cover", title: "Kapak", notes: "Bir not." },
+      { id: "s2", layout: "bullets", title: "İçerik", bullets: ["kısa madde", "bir tane daha"], notes: "İkinci not." },
+      { id: "s3", layout: "end", title: "Bitiş", notes: "Son not." },
+    ],
+  };
+
+  it("boş desteyi uyarısız geçer", () => {
+    expect(lintDeck({ ...goodDeck, slides: [] })).toEqual([]);
+  });
+
+  it("şemaya uyan iyi bir deste hiç uyarı üretmez", () => {
+    expect(lintDeck(goodDeck)).toEqual([]);
+  });
+
+  it("ilk slayt cover değilse uyarır", () => {
+    const deck = { ...goodDeck, slides: [{ ...goodDeck.slides[0]!, layout: "bullets" as const }, ...goodDeck.slides.slice(1)] };
+    expect(lintDeck(deck)).toContain("ilk slayt kapak (cover) değil");
+  });
+
+  it("son slayt end değilse uyarır", () => {
+    const deck = { ...goodDeck, slides: [...goodDeck.slides.slice(0, -1), { ...goodDeck.slides.at(-1)!, layout: "bullets" as const }] };
+    expect(lintDeck(deck)).toContain("son slayt kapanış (end) değil");
+  });
+
+  it("konuşmacı notu eksik slaytları sayar", () => {
+    const deck = { ...goodDeck, slides: goodDeck.slides.map((s, i) => (i === 1 ? { ...s, notes: undefined } : s)) };
+    expect(lintDeck(deck)).toContain("1 slaytta konuşmacı notu eksik");
+  });
+
+  it("çok uzun maddeleri (>14 kelime) yakalar", () => {
+    const longBullet = Array.from({ length: 20 }, (_, i) => `kelime${i}`).join(" ");
+    const deck = { ...goodDeck, slides: goodDeck.slides.map((s, i) => (i === 1 ? { ...s, bullets: [longBullet] } : s)) };
+    expect(lintDeck(deck)).toContain("bazı maddeler çok uzun — slaytta okunması zor olabilir");
+  });
+
+  it("kalabalık madde listelerini (>6) yakalar", () => {
+    const deck = { ...goodDeck, slides: goodDeck.slides.map((s, i) => (i === 1 ? { ...s, bullets: Array.from({ length: 7 }, (_, j) => `madde ${j}`) } : s)) };
+    expect(lintDeck(deck)).toContain("1 slaytta çok fazla madde var");
+  });
+
+  it("Lorem ipsum kalıntısını yakalar", () => {
+    const deck = { ...goodDeck, slides: goodDeck.slides.map((s, i) => (i === 1 ? { ...s, body: "Lorem ipsum dolor sit amet" } : s)) };
+    expect(lintDeck(deck)).toContain("Lorem ipsum kalmış — gerçek içerik bekleniyordu");
   });
 });
