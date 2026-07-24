@@ -20,6 +20,27 @@ export interface ContextSectionsInput {
   searchContext?: string;
 }
 
+/** K1 — Etkin skill sayısı `max`'ı aşarsa, mesaj metniyle anahtar-kelime
+    örtüşmesine göre en alakalı olanları seçer (basit ama GERÇEK bir tetikleme/
+    seçim mantığı — önceden CoderView.tsx'in ana sohbet yolunda vardı ama
+    genChat.ts'in Stüdyo motorları (Doküman/Anket/Defter/Sunum) kendi
+    `.slice(0, 5)`'iyle dizideki İLK 5'i alaka gözetmeden alıyordu; artık
+    TEK kaynak, her yerde tutarlı). ≤max ise hepsi döner (küçük listede
+    seçim maliyeti yok). Saf fonksiyon → testli. */
+export function selectRelevantSkills<T extends { title: string; content: string; tags?: string[] }>(
+  all: T[], queryText: string, max = 5,
+): T[] {
+  if (all.length <= max) return all;
+  const queryWords = new Set((queryText || "").toLowerCase().split(/\W+/).filter((w) => w.length > 3));
+  if (queryWords.size === 0) return all.slice(0, max);
+  const scored = all.map((s) => {
+    const haystack = (s.title + " " + s.content + " " + (s.tags ?? []).join(" ")).toLowerCase().split(/\W+/);
+    const hits = haystack.filter((w) => queryWords.has(w)).length;
+    return { skill: s, hits };
+  });
+  return scored.sort((a, b) => b.hits - a.hits).slice(0, max).map((x) => x.skill);
+}
+
 /** Stil + hafıza + eğitim seti (skills) + web arama bağlamını tutarlı,
     etiketli bloklar halinde döndürür. Boş girdiler atlanır. */
 export function buildContextSections(input: ContextSectionsInput): string {

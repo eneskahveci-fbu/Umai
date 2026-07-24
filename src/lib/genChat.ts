@@ -5,7 +5,7 @@
 import { useStore } from "./store";
 import { buildFallbackChain } from "./fallback";
 import { resolveKey } from "./studioGen";
-import { buildContextSections } from "./prompt";
+import { buildContextSections, selectRelevantSkills } from "./prompt";
 
 export interface GenChatOptions {
   system: string;
@@ -28,10 +28,14 @@ export async function streamChat(opts: GenChatOptions): Promise<string> {
   if (!resolved) throw new Error("Önce Ayarlar → Modeller'den bir model seç.");
   const cfg = useStore.getState().config;
   /* Kullanıcının etkin eğitim setleri (Skills) yalnız sohbette değil, tüm
-     stüdyo üretimlerinde (Doküman/Anket/Defter/Sunum) de uygulansın —
-     bu ortak çekirdek üzerinden tek noktadan enjekte edilir. En fazla 5
-     (sohbetteki aynı üst sınır) — prompt şişmesin. */
-  const enabledSkills = (cfg.skills ?? []).filter((s) => s.enabled).slice(0, 5);
+     stüdyo üretimlerinde (Doküman/Anket/Defter/Sunum) de uygulansın — bu
+     ortak çekirdek üzerinden tek noktadan enjekte edilir. K1: önceden
+     dizideki İLK 5'i alaka gözetmeden alıyordu (CoderView'daki ana sohbet
+     yolunun aksine); artık AYNI anahtar-kelime örtüşme seçimini kullanıyor
+     (selectRelevantSkills, prompt.ts) — brief/son kullanıcı mesajıyla en
+     alakalı 5 seçilir, prompt yine şişmez. */
+  const lastUserText = [...opts.messages].reverse().find((m) => m.role === "user")?.content ?? "";
+  const enabledSkills = selectRelevantSkills((cfg.skills ?? []).filter((s) => s.enabled), lastUserText);
   const system = enabledSkills.length ? opts.system + buildContextSections({ skills: enabledSkills }) : opts.system;
   const res = await fetch("/api/chat", {
     method: "POST",

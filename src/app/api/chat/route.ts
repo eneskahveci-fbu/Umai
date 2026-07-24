@@ -18,7 +18,7 @@ import { runDeepResearch } from "@/lib/researchPipeline";
 import { cached, repoCacheKey } from "@/lib/repoContextCache";
 import { isSafeRemoteUrl } from "@/lib/urlSafety";
 import { markProviderDown, markProviderUp, prioritizeHealthyCandidates } from "@/lib/providerHealth";
-import { detectModelCapabilities, JSON_MODE_PROVIDERS } from "@/lib/modelCapabilities";
+import { detectModelCapabilities, JSON_MODE_PROVIDERS, EFFORT_TOKENS, THINKING_BUDGET } from "@/lib/modelCapabilities";
 import { isBuiltinMcpServerId } from "@/lib/mcpBuiltins";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -1216,7 +1216,6 @@ export async function POST(req: Request) {
        2) Destekleyen sağlayıcıda reasoning/effort parametresini ilet → model
           gerçekten daha fazla düşünme bütçesi harcar.
      Kullanıcı projede açıkça max_tokens belirlediyse onun değeri korunur. */
-  const EFFORT_TOKENS = { low: 4096, medium: 8192, high: 16384, max: 32768 } as const;
   const userMaxTokens = typeof body.maxTokens === "number" && body.maxTokens > 0 ? body.maxTokens : 0;
   sampling.max_tokens = userMaxTokens || (body.effort ? EFFORT_TOKENS[body.effort] : 8192);
   /* Claude'un genişletilmiş muhakeme (extended thinking) bütçesi — her zaman
@@ -1227,8 +1226,9 @@ export async function POST(req: Request) {
      `sampling` objesine yazılıp TÜM adaylara (farklı sağlayıcılar dahil)
      spread ediliyordu — openrouter için ayarlanan `reasoning` alanı fallback
      bir groq/xai adayına da sızabiliyordu; artık her adayın KENDİ
-     provider/model'ine göre karar veriliyor). */
-  const THINKING_BUDGET = { low: 2048, medium: 6000, high: 12000, max: 24000 } as const;
+     provider/model'ine göre karar veriliyor). EFFORT_TOKENS/THINKING_BUDGET
+     artık modelCapabilities.ts'ten (J1/J3: orchestrate/route.ts da AYNI
+     kaynağı kullanıyor — iki yer sapmasın). */
 
   /* Aday zinciri: birincil model + istemcinin yolladığı ücretsiz fallback'ler.
      Birincil bir hata verirse (kota/erişim/5xx/bağlantı) sıradaki aday denenir →
@@ -1805,9 +1805,11 @@ export async function POST(req: Request) {
             };
             if (!repoCtx) { fail("Hata: repo bağlı değil"); return; }
             if (tasks.length === 0) { fail("Hata: en az 1 alt görev (tasks) gerekli"); return; }
-            /* Alt-ajanlar seçili adayın (fallback'e geçilmişse onun) ucunu kullanır. */
+            /* Alt-ajanlar seçili adayın (fallback'e geçilmişse onun) ucunu kullanır.
+               apiKey de veriliyor (J1) — provider "anthropic" ise runReadOnlyAgent
+               bunu anthropicUpstream'e (native uç) geçirmek için kullanır. */
             const sc = chosen ?? primary;
-            const subCfg = { baseUrl: sc.baseUrl, model: sc.model, provider: sc.provider as Provider, headers: buildCandidateHeaders(sc, req) };
+            const subCfg = { baseUrl: sc.baseUrl, model: sc.model, provider: sc.provider as Provider, headers: buildCandidateHeaders(sc, req), apiKey: sc.apiKey };
             const results = await Promise.all(tasks.map(async (t) => {
               try {
                 return await runReadOnlyAgent(subCfg, [
