@@ -1351,11 +1351,19 @@ export async function POST(req: Request) {
      yalnız tools+repoCtx varken) bu turda hiç eklenmiyor olabilir. */
   if (codeToolOn) {
     sysPrompt +=
-      `\n\n[Analiz aracı] Hesap, veri/metin analizi, tarih hesabı, bir formülün ya da ` +
-      `algoritmanın doğrulanması veya yazdığın kodun gerçekten çalıştığını göstermen ` +
-      `gerektiğinde run_code aracını ÇAĞIR (Python veya JavaScript) — sonucu kafadan ` +
-      `tahmin etme, çalıştır ve gerçek çıktıyı gör. Sonucu print()/console.log() ile ` +
-      `yazdırmayı unutma; çıktı sana ayrı bir mesaj olarak döner.`;
+      `\n\n[Analiz aracı] Hesap, veri/metin analizi, tarih hesabı veya bir formülün/` +
+      `algoritmanın doğrulanması gerektiğinde run_code aracını ÇAĞIR (Python veya ` +
+      `JavaScript) — sonucu kafadan tahmin etme, çalıştır ve gerçek çıktıyı gör. ` +
+      `Sonucu print()/console.log() ile yazdırmayı unutma; çıktı sana ayrı bir mesaj ` +
+      `olarak döner.\n` +
+      /* M2 — üretilen kodu doğrulama. "Her kod parçasını çalıştır" DEMİYORUZ:
+         bu her yanıta gereksiz bir tur eklerdi. Ölçüt, doğruluğun gerçekten
+         önemli ve kodun kendi kendine çalışabilir olması. */
+      `Kendi başına çalışabilen bir Python/JS parçası ürettiğinde ve doğruluğu önemliyse ` +
+      `(algoritma, dönüşüm, hesap, ayrıştırma), SUNMADAN ÖNCE run_code ile çalıştırıp ` +
+      `doğrula; hata çıkarsa düzelt ve tekrar dene, sonra çalışan sürümü ver. Çalıştırmadıysan ` +
+      `"test ettim/çalışıyor" deme. Dış bağımlılık, ağ, dosya ya da kullanıcı girdisi gerektiren ` +
+      `kodu çalıştırmaya çalışma — orada doğrulama beklenmiyor.`;
   }
   /* Açıklayıcı diyalog (Claude Code'un plan-onay döngüsü gibi): belirsiz
      isteklerde rastgele varsayımla ilerlemek yerine tıklanabilir bir seçenek

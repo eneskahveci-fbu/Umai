@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useStore } from "@/lib/store";
 import type { Artifact } from "@/lib/types";
 import { buildArtifactSrcDoc, withAnnotationScript, artifactDownload, buildStandaloneSandboxDoc } from "@/lib/artifactDoc";
+import { lintArtifact } from "@/lib/studioCraft";
 import { ExportMenu } from "./studio/ExportMenu";
 
 /* Paylaşılan Artifact görüntüleyici — sohbetin ArtifactPanel'i ile Tasarım
@@ -120,6 +121,14 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
   const iconBtn = "text-muted hover:text-ink p-1 rounded hover:bg-bgsoft transition-colors";
   const showVersionNav = (versionTotal ?? 0) > 1;
 
+  /* M3 — kalite denetimi artık Tasarım Stüdyosu'na özel değil: aynı kural
+     tabanlı lintArtifact (studioCraft.ts) sohbette üretilen HTML
+     artifact'larına da uygulanır. Bilinçli olarak YALNIZ kural tabanlı olan
+     yarısı taşındı; Stüdyo'daki ek LLM eleştirisi (critiqueArtifact) sohbete
+     alınmadı — her artifact'ta fazladan bir model çağrısı sohbete gecikme ve
+     maliyet bindirirdi. Saf türetme: state yok, render'da hesaplanır. */
+  const qualityNotes = artifact.type === "html" ? lintArtifact(artifact.content) : [];
+
   return (
     <div
       role="region"
@@ -199,6 +208,16 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
           <MousePointerClick size={12} className="shrink-0" />
           <span className="min-w-0 flex-1 truncate">Değiştirmek istediğin öğeye önizlemede tıkla — seçim sohbete taşınır.</span>
           <button onClick={() => setAnnotating(false)} className="shrink-0 text-muted hover:text-ink font-semibold transition-colors">Vazgeç</button>
+        </div>
+      )}
+
+      {qualityNotes.length > 0 && (
+        <div className="shrink-0 flex items-start gap-2 px-3 py-1.5 border-b border-line bg-yellow/5 text-[11px] text-muted">
+          <span className="shrink-0 pt-px" aria-hidden>🧹</span>
+          <span className="min-w-0 flex-1">
+            <span className="font-semibold text-ink/80">Kalite notu: </span>
+            {qualityNotes.join(" · ")}
+          </span>
         </div>
       )}
 
