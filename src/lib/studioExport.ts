@@ -70,3 +70,28 @@ export function printPdf(html: string): boolean {
   w.document.close();
   return true;
 }
+
+/** Sunum (deck) PDF dışa aktarımı — printPdf()'ten KASITLI olarak farklı bir
+    yol izler. deckToHtml() çıktısı (slides.ts) LLM'in serbest HTML'i DEĞİL,
+    kendi ürettiğimiz deterministik şablondur: tüm kullanıcı metni escapeHtml
+    ile kaçırılmış, tek script bloğu bizim yazdığımız slayt-gezinme koduzdur
+    — LLM script'i hiç yok. Bu yüzden printPdf()'in allow-same-origin'siz
+    sandbox iframe'ine ihtiyacı yok.
+
+    Bunun tek "iyi niyet" fedakârlığı değil: ampirik olarak doğrulandı
+    (Playwright + gerçek Chromium, page.pdf) — deste HTML'i nested sandbox
+    iframe İÇİNDEYKEN "@media print" sayfa-sonu (page-break-after) kuralları
+    PDF çıktısında ÇALIŞMIYOR, tüm slaytlar TEK sayfaya sıkışıyor; belge
+    DOĞRUDAN üst seviye yazılınca (bu fonksiyon) tarayıcının normal çok-sayfa
+    yazdırma motoru sorunsuz devreye giriyor. */
+export function printDeckPdf(deckHtml: string): boolean {
+  const w = window.open("", "_blank");
+  if (!w) return false;
+  const withAutoPrint = deckHtml.includes("</body>")
+    ? deckHtml.replace("</body>", `<script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script></body>`)
+    : `${deckHtml}<script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script>`;
+  w.document.open();
+  w.document.write(withAutoPrint);
+  w.document.close();
+  return true;
+}

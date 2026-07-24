@@ -280,7 +280,9 @@ export function deckToHtml(deck: SlideDeck): string {
   #hint { position: fixed; right: 2vmin; bottom: 2vmin; color: var(--muted); font-size: 1.7vmin; opacity: .6; z-index: 3; }
   @media print {
     body { overflow: visible; }
-    .slide { position: relative; display: flex !important; height: 100vh; page-break-after: always; }
+    .slide { position: relative; display: flex !important; height: 100vh; }
+    /* Son slaytta sayfa-sonu YOK — aksi halde PDF'in sonunda fazladan boş bir sayfa kalır. */
+    .slide:not(:last-child) { page-break-after: always; }
     #bar, #dots, #hint, .notes { display: none !important; }
   }
 </style>
