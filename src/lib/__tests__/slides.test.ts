@@ -99,6 +99,15 @@ describe("deckToHtml — bağımsız dışa aktarma", () => {
     expect(html).toContain("@media print");
   });
 
+  it("son slaytta page-break-after uygulanmaz (PDF'in sonunda fazladan boş sayfa kalmasın)", () => {
+    const html = deckToHtml(sampleDeck());
+    expect(html).toContain(".slide:not(:last-child) { page-break-after: always; }");
+    // Genel .slide kuralı page-break-after İÇERMESİN (yalnız :not(:last-child) versiyonunda olsun).
+    const printBlock = html.slice(html.indexOf("@media print"), html.indexOf("</style>"));
+    const bareSlideRule = printBlock.match(/\.slide \{[^}]*\}/);
+    expect(bareSlideRule?.[0]).not.toContain("page-break-after");
+  });
+
   it("görselli slaytlarda kırık-resim ikonu yerine CSS yer tutucuya düşen onerror fallback'i içerir", () => {
     const deck: SlideDeck = {
       id: "d2", title: "Görselli Sunum", themeId: "gece", createdAt: 0, updatedAt: 0,

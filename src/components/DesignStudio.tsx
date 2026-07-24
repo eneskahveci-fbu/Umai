@@ -34,7 +34,7 @@ import { VoiceButton } from "./VoiceButton";
 import { ArtifactCanvas } from "./ArtifactCanvas";
 import { StudioTopBar } from "./studio/StudioTopBar";
 import { SavedItemsModal } from "./studio/SavedItemsModal";
-import { printPdf } from "@/lib/studioExport";
+import { printPdf, printDeckPdf } from "@/lib/studioExport";
 import { artifactDownload, buildArtifactSrcDoc } from "@/lib/artifactDoc";
 import { pickDraftModels, fillSelfConsistency, generateDrafts, judgeDrafts, buildBoostInstruction, type DraftJudge } from "@/lib/boost";
 import { buildFallbackChain } from "@/lib/fallback";
@@ -659,8 +659,18 @@ export function DesignStudio() {
     label: "PDF (yazdır)",
     icon: <FileText size={14} />,
     onSelect: () => {
-      const doc = buildArtifactSrcDoc(shownArtifact.type, shownArtifact.content, shownArtifact.language);
-      if (!printPdf(doc)) addToast("Yazdırma penceresi açılamadı — pop-up engelleyiciyi kontrol et.", "error");
+      /* Sunum (deck) — printDeckPdf(): shownArtifact.content zaten deckToHtml()
+         çıktısı (bkz. studioExport.ts'teki yorum — LLM script'i yok, tüm
+         kullanıcı metni escapeHtml'li), sandboxed-iframe sarmalayıcıya
+         GEREK yok; nested iframe'de sayfa-sonu (page-break-after) PDF'te
+         çalışmıyordu (ampirik doğrulandı) — doğrudan üst seviye yazınca
+         tarayıcının normal çok-sayfa yazdırma motoru sorunsuz çalışıyor.
+         Diğer artifact türleri (serbest LLM HTML/React) hâlâ printPdf()'in
+         sandbox'lı yoluna gider — o içerik gerçekten güvenilmez. */
+      const ok = project.deckData
+        ? printDeckPdf(shownArtifact.content)
+        : printPdf(buildArtifactSrcDoc(shownArtifact.type, shownArtifact.content, shownArtifact.language));
+      if (!ok) addToast("Yazdırma penceresi açılamadı — pop-up engelleyiciyi kontrol et.", "error");
     },
   };
 
