@@ -1,38 +1,23 @@
 "use client";
 
-import { useState } from "react";
 import { useStore } from "@/lib/store";
-import type { Artifact } from "@/lib/types";
 import { ArtifactCanvas } from "./ArtifactCanvas";
 
-/* Sohbetin Artifact paneli — global store'daki TEK aktif artifact yuvasına
-   bağlı. Sürüm geçmişi burada (son 5, çağırana özel semantik) türetilir;
-   görüntüleme/dışa-aktarma ArtifactCanvas'ta (Tasarım Stüdyosu ile paylaşılan). */
+/* Sohbetin Artifact paneli — global store'daki aktif artifact yuvasına bağlı.
+   Sürüm geçmişi de STORE'da tutulur (L4): panel iki ayrı ağaç konumunda
+   render edildiği ve dış sarmalayıcı `key={effectiveActive}` taşıdığı için
+   (bkz. RightPanel.tsx) bölünmüş↔tek görünüm ya da sekme değişiminde bu
+   bileşen remount oluyor; geçmiş yerel useState'te tutulduğunda SESSİZCE
+   sıfırlanıyordu. Görüntüleme/dışa-aktarma ArtifactCanvas'ta (Tasarım
+   Stüdyosu ile paylaşılan). */
 export function ArtifactPanel() {
   const artifact = useStore((s) => s.artifact);
   const setArtifact = useStore((s) => s.setArtifact);
-
-  /* Sürüm geçmişi — aynı panel güncellendikçe son 5 sürümü tut, ‹ › ile gezin.
-     Render-anı türetme (effect yok): içerik değişince geçmişe ekle, son sürümü göster. */
-  const [versions, setVersions] = useState<Artifact[]>([]);
-  const [vIndexRaw, setVIndex] = useState(999);
-  const [prevKey, setPrevKey] = useState("");
-  const curKey = artifact ? `${artifact.type}|${artifact.content}` : "";
-  if (curKey !== prevKey) {
-    setPrevKey(curKey);
-    if (!artifact) { setVersions([]); }
-    else {
-      setVersions((prev) => {
-        const top = prev[prev.length - 1];
-        if (top && top.content === artifact.content && top.type === artifact.type) return prev;
-        return [...prev, artifact].slice(-5);
-      });
-      setVIndex(999); // yeni sürüm gelince en sona git
-    }
-  }
+  const versions = useStore((s) => s.artifactVersions);
+  const vIndex = useStore((s) => s.artifactVersionIndex);
+  const setVIndex = useStore((s) => s.setArtifactVersionIndex);
 
   if (!artifact) return null;
-  const vIndex = Math.min(vIndexRaw, Math.max(0, versions.length - 1));
   const shown = versions[vIndex] ?? artifact;
 
   return (
@@ -40,8 +25,8 @@ export function ArtifactPanel() {
       artifact={shown}
       versionIndex={vIndex}
       versionTotal={versions.length}
-      onPrevVersion={() => setVIndex((i) => Math.max(0, i - 1))}
-      onNextVersion={() => setVIndex((i) => Math.min(versions.length - 1, i + 1))}
+      onPrevVersion={() => setVIndex(vIndex - 1)}
+      onNextVersion={() => setVIndex(vIndex + 1)}
       onClose={() => setArtifact(null)}
       onAnnotate={(descriptor) => {
         /* İşaretlenen öğeyi ana composer'a taşı — CoderView'ın zaten dinlediği

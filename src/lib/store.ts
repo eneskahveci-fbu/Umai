@@ -523,6 +523,15 @@ interface StoreState {
 
   // artifact
   artifact: Artifact | null;
+  /** L4 — sohbet artifact'ının sürüm geçmişi. Önceden ArtifactPanel'in YEREL
+      useState'indeydi; panel iki ayrı ağaç konumunda render edildiği ve dış
+      sarmalayıcı `key={effectiveActive}` taşıdığı için (bkz. RightPanel.tsx)
+      bölünmüş↔tek görünüm ya da sekme değişiminde bileşen remount oluyor ve
+      geçmiş SESSİZCE sıfırlanıyordu. Store'a taşındı → düzen değişse de kalıcı.
+      Sohbet değişince sıfırlanır (A sohbetinin sürümleri B'de görünmemeli). */
+  artifactVersions: Artifact[];
+  artifactVersionIndex: number;
+  setArtifactVersionIndex: (i: number) => void;
   setArtifact: (a: Artifact | null) => void;
 
   // toast
@@ -1202,11 +1211,16 @@ export const useStore = create<StoreState>()((set, get) => ({
       currentId: chat.id,
       incognito,
       view: "chat",
+      /* Yeni sohbet → önceki sohbetin artifact sürüm geçmişi taşınmaz (L4). */
+      artifactVersions: [],
+      artifactVersionIndex: 0,
     }));
   },
 
+  /* Sohbet değişince artifact sürüm geçmişi sıfırlanır — A sohbetinin
+     sürümleri B sohbetinde gezinilebilir kalmamalı (L4). */
   selectChat: (id) =>
-    set({ currentId: id, incognito: false, view: "chat" }),
+    set({ currentId: id, incognito: false, view: "chat", artifactVersions: [], artifactVersionIndex: 0 }),
 
   deleteChat: async (id) => {
     const { userId } = get();
@@ -1611,7 +1625,23 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
 
   artifact: null,
-  setArtifact: (a) => set({ artifact: a }),
+  artifactVersions: [],
+  artifactVersionIndex: 0,
+  setArtifactVersionIndex: (i) =>
+    set((s) => ({ artifactVersionIndex: Math.max(0, Math.min(i, s.artifactVersions.length - 1)) })),
+  /* Sürüm geçmişini de yönetir: aynı içerik tekrar gelirse yeni sürüm açmaz
+     (yeniden render/aynı yanıtın tekrarı geçmişi şişirmesin), yeni içerik
+     gelirse sona ekleyip oraya konumlanır. Üst sınır 20 (eskiden 5 idi). */
+  setArtifact: (a) =>
+    set((s) => {
+      if (!a) return { artifact: null, artifactVersions: [], artifactVersionIndex: 0 };
+      const top = s.artifactVersions[s.artifactVersions.length - 1];
+      if (top && top.content === a.content && top.type === a.type) {
+        return { artifact: a, artifactVersionIndex: s.artifactVersions.length - 1 };
+      }
+      const versions = [...s.artifactVersions, a].slice(-20);
+      return { artifact: a, artifactVersions: versions, artifactVersionIndex: versions.length - 1 };
+    }),
 
   toasts: [],
   addToast: (message, type = "info", opts) => {
