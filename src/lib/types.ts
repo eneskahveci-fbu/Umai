@@ -320,7 +320,13 @@ export interface StudioProject {
 }
 
 /** Sunum Stüdyosu — slayt düzenleri (Google Slides'tan ilhamla, craft yorumu). */
-export type SlideLayout = "cover" | "section" | "bullets" | "two-col" | "image" | "quote" | "end";
+export type SlideLayout = "cover" | "section" | "bullets" | "two-col" | "image" | "quote" | "stats" | "end";
+
+/** Bir istatistik/rakam kartı (layout="stats"). */
+export interface SlideStat {
+  value: string;
+  label: string;
+}
 
 export interface Slide {
   id: string;
@@ -330,6 +336,8 @@ export interface Slide {
   bullets?: string[];
   /** Serbest gövde metni (two-col ikinci sütunu, quote sözü, image alt yazısı). */
   body?: string;
+  /** layout="stats" için büyük rakam/etiket kartları (en fazla 4). */
+  stats?: SlideStat[];
   /** Pollinations görseli için İngilizce sahne betimi (image/cover düzenleri). */
   imagePrompt?: string;
   /** Sabitlenmiş görsel URL'i — imagePrompt + deterministik seed'den üretilir. */

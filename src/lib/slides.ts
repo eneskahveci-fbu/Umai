@@ -3,7 +3,7 @@
    temalarla render eder. Böylece her slayt düzenlenebilir veri olarak kalır
    (serbest HTML değil): tema değiştirmek, slayt eklemek, tek slaytı yeniden
    yazdırmak ve bağımsız HTML/PDF dışa aktarmak kayıpsızdır. */
-import type { Slide, SlideDeck, SlideLayout } from "./types";
+import type { Slide, SlideDeck, SlideLayout, SlideStat } from "./types";
 import { pollinationsImageUrl, stableSeed } from "./pollinations";
 
 export interface SlideTheme {
@@ -16,6 +16,9 @@ export interface SlideTheme {
   accent: string;
   headingFont: string;
   bodyFont: string;
+  /** Opsiyonel — verilirse slayt arka planı düz `bg` yerine bu CSS gradyanını
+      kullanır (eski temalar bunu ayarlamaz → davranışları değişmez). */
+  bgGradient?: string;
 }
 
 const SANS = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
@@ -26,6 +29,10 @@ export const SLIDE_THEMES: SlideTheme[] = [
   { id: "kagit", name: "Kâğıt", bg: "#faf8f2", surface: "#ffffff", ink: "#1f1e1b", muted: "#6b675e", accent: "#b45309", headingFont: SANS, bodyFont: SANS },
   { id: "okyanus", name: "Okyanus", bg: "#0b1220", surface: "#131c30", ink: "#eef2ff", muted: "#93a0bd", accent: "#38bdf8", headingFont: SANS, bodyFont: SANS },
   { id: "akademi", name: "Akademi", bg: "#fffdf7", surface: "#ffffff", ink: "#232019", muted: "#6f6a5d", accent: "#166534", headingFont: SERIF, bodyFont: SANS },
+  { id: "gunbatimi", name: "Gün Batımı", bg: "#1a0f1f", surface: "#2b1830", ink: "#fdf2f8", muted: "#d8b4d0", accent: "#fb7185", headingFont: SANS, bodyFont: SANS, bgGradient: "linear-gradient(135deg, #1a0f1f 0%, #3b1d4a 50%, #7c2d4a 100%)" },
+  { id: "orman", name: "Orman", bg: "#0d1f17", surface: "#16291f", ink: "#eef7f0", muted: "#9cbfa9", accent: "#34d399", headingFont: SERIF, bodyFont: SANS, bgGradient: "linear-gradient(160deg, #0d1f17 0%, #123524 60%, #1d4a34 100%)" },
+  { id: "neon", name: "Neon", bg: "#0a0a12", surface: "#151521", ink: "#f5f3ff", muted: "#a5a3c7", accent: "#a855f7", headingFont: SANS, bodyFont: SANS, bgGradient: "linear-gradient(135deg, #0a0a12 0%, #1b1030 45%, #2d1b4e 100%)" },
+  { id: "mercan", name: "Mercan", bg: "#fff5f0", surface: "#ffffff", ink: "#2a1810", muted: "#8a6a56", accent: "#ea580c", headingFont: SERIF, bodyFont: SANS, bgGradient: "linear-gradient(135deg, #fff5f0 0%, #ffe8d9 100%)" },
 ];
 
 export function slideThemeById(id: string | null | undefined): SlideTheme {
@@ -39,6 +46,7 @@ export const SLIDE_LAYOUTS: { id: SlideLayout; name: string }[] = [
   { id: "two-col", name: "İki sütun" },
   { id: "image", name: "Görsel odaklı" },
   { id: "quote", name: "Alıntı" },
+  { id: "stats", name: "İstatistik" },
   { id: "end", name: "Kapanış" },
 ];
 
@@ -51,6 +59,7 @@ export function newSlideId(): string {
 export function newSlide(layout: SlideLayout = "bullets"): Slide {
   const base: Slide = { id: newSlideId(), layout };
   if (layout === "bullets" || layout === "two-col") base.bullets = ["Yeni madde"];
+  if (layout === "stats") base.stats = [{ value: "0", label: "Etiket" }];
   base.title = "Yeni slayt";
   return base;
 }
@@ -98,10 +107,25 @@ export function lintDeck(deck: SlideDeck): string[] {
 
 /* ── LLM çıktısını güvenli desteye çevirme ──────────────────────────── */
 
-const VALID_LAYOUTS: SlideLayout[] = ["cover", "section", "bullets", "two-col", "image", "quote", "end"];
+const VALID_LAYOUTS: SlideLayout[] = ["cover", "section", "bullets", "two-col", "image", "quote", "stats", "end"];
 
 function asString(v: unknown): string | undefined {
   return typeof v === "string" && v.trim() ? v.trim() : undefined;
+}
+
+function normalizeStats(v: unknown): SlideStat[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const stats = v
+    .map((item): SlideStat | null => {
+      if (!item || typeof item !== "object") return null;
+      const r = item as Record<string, unknown>;
+      const value = asString(r.value);
+      const label = asString(r.label);
+      return value && label ? { value, label } : null;
+    })
+    .filter((s): s is SlideStat => s !== null)
+    .slice(0, 4);
+  return stats.length ? stats : undefined;
 }
 
 function normalizeSlide(raw: unknown): Slide | null {
@@ -111,6 +135,7 @@ function normalizeSlide(raw: unknown): Slide | null {
   const bullets = Array.isArray(r.bullets)
     ? r.bullets.filter((b): b is string => typeof b === "string" && !!b.trim()).map((b) => b.trim()).slice(0, 8)
     : undefined;
+  const stats = normalizeStats(r.stats);
   const s: Slide = {
     id: newSlideId(),
     layout,
@@ -118,10 +143,11 @@ function normalizeSlide(raw: unknown): Slide | null {
     subtitle: asString(r.subtitle),
     bullets: bullets?.length ? bullets : undefined,
     body: asString(r.body),
+    stats,
     imagePrompt: asString(r.imagePrompt),
     notes: asString(r.notes),
   };
-  if (!s.title && !s.bullets && !s.body) return null;
+  if (!s.title && !s.bullets && !s.body && !s.stats) return null;
   return s;
 }
 
@@ -195,12 +221,28 @@ export function escapeHtml(s: string): string {
 const IMG_HIDE_ONERROR = `onerror="this.style.display='none'"`;
 const IMG_FALLBACK_ONERROR = `onerror="this.style.display='none'; this.nextElementSibling.style.display='block'"`;
 
+/* Madde başına ikon (G4): fragile bir icon-adı→SVG eşlemesi yerine, LLM'e
+   maddenin başına ilgili TEK bir emoji eklettiriyoruz (deckSystem, slidesGen.ts)
+   — burada o baştaki emoji tespit edilip ayrı bir <span> rozetine taşınır,
+   geri kalan metin normal escapeHtml'den geçer. Emoji yoksa eski nokta
+   işaretleyici (li::before) değişmeden kalır. */
+const EMOJI_LEAD_RE = /^(\p{Extended_Pictographic}️?)\s*/u;
+
+function bulletItemHtml(b: string): string {
+  const m = b.match(EMOJI_LEAD_RE);
+  if (m) {
+    const rest = b.slice(m[0].length);
+    return `<li class="hasicon"><span class="bicon">${m[1]}</span>${escapeHtml(rest)}</li>`;
+  }
+  return `<li>${escapeHtml(b)}</li>`;
+}
+
 function slideInnerHtml(s: Slide, t: SlideTheme): string {
   const img = slideImageSrc(s, 1280, 720);
   const title = s.title ? escapeHtml(s.title) : "";
   const subtitle = s.subtitle ? escapeHtml(s.subtitle) : "";
   const body = s.body ? escapeHtml(s.body) : "";
-  const bullets = (s.bullets ?? []).map((b) => `<li>${escapeHtml(b)}</li>`).join("");
+  const bullets = (s.bullets ?? []).map(bulletItemHtml).join("");
   switch (s.layout) {
     case "cover":
     case "end":
@@ -210,18 +252,34 @@ function slideInnerHtml(s: Slide, t: SlideTheme): string {
         ${subtitle ? `<p class="sub">${subtitle}</p>` : ""}
       </div>`;
     case "section":
-      return `<div class="center"><p class="kicker">— ${escapeHtml(t.name)} —</p><h1>${title}</h1>${subtitle ? `<p class="sub">${subtitle}</p>` : ""}</div>`;
+      return `<div class="center">
+        ${img ? `<img class="coverimg" src="${escapeHtml(img)}" alt="" ${IMG_HIDE_ONERROR}>` : ""}
+        <p class="kicker">— ${escapeHtml(t.name)} —</p><h1>${title}</h1>${subtitle ? `<p class="sub">${subtitle}</p>` : ""}
+      </div>`;
     case "quote":
-      return `<div class="center"><blockquote>“${body || title}”</blockquote>${subtitle ? `<p class="sub">${subtitle}</p>` : ""}</div>`;
+      return `<div class="center">
+        ${img ? `<img class="coverimg" src="${escapeHtml(img)}" alt="" ${IMG_HIDE_ONERROR}>` : ""}
+        <blockquote>“${body || title}”</blockquote>${subtitle ? `<p class="sub">${subtitle}</p>` : ""}
+      </div>`;
     case "image":
       return `<div class="imgwrap">${img
         ? `<img src="${escapeHtml(img)}" alt="" ${IMG_FALLBACK_ONERROR}><div class="imgph" style="display:none"></div>`
         : `<div class="imgph"></div>`}</div>
         <div class="imgcap"><h2>${title}</h2>${body ? `<p>${body}</p>` : ""}</div>`;
     case "two-col":
-      return `<h2>${title}</h2><div class="cols"><ul>${bullets}</ul><div class="colbody">${body ? `<p>${body}</p>` : (img ? `<img src="${escapeHtml(img)}" alt="" ${IMG_HIDE_ONERROR}>` : "")}</div></div>`;
+      return `<h2>${title}</h2><div class="cols"><ul>${bullets}</ul><div class="colbody">${img ? `<img src="${escapeHtml(img)}" alt="" ${IMG_HIDE_ONERROR}>` : ""}${body ? `<p>${body}</p>` : ""}</div></div>`;
+    case "stats": {
+      const cards = (s.stats ?? []).map((it) => `<div class="statcard"><div class="statval">${escapeHtml(it.value)}</div><div class="statlabel">${escapeHtml(it.label)}</div></div>`).join("");
+      return `<h2>${title}</h2>${subtitle ? `<p class="sub">${subtitle}</p>` : ""}<div class="statgrid">${cards}</div>${body ? `<p>${body}</p>` : ""}`;
+    }
     case "bullets":
     default:
+      /* Madde slaytı görsele sahipse iki-sütun benzeri bir düzene geçer
+         (G1: her slaytta görsel garantisi) — düz metin listesi yerine
+         daha zengin/dolu bir görünüm. */
+      if (img) {
+        return `<div class="cols"><div><h2>${title}</h2>${subtitle ? `<p class="sub">${subtitle}</p>` : ""}<ul>${bullets}</ul>${body ? `<p>${body}</p>` : ""}</div><div class="colbody"><img src="${escapeHtml(img)}" alt="" ${IMG_HIDE_ONERROR}></div></div>`;
+      }
       return `<h2>${title}</h2>${subtitle ? `<p class="sub">${subtitle}</p>` : ""}<ul>${bullets}</ul>${body ? `<p>${body}</p>` : ""}`;
   }
 }
@@ -248,7 +306,7 @@ export function deckToHtml(deck: SlideDeck): string {
   html, body { height: 100%; }
   body { background: var(--bg); color: var(--ink); font-family: ${t.bodyFont}; overflow: hidden; }
   .slide { position: absolute; inset: 0; display: none; flex-direction: column; justify-content: center;
-           padding: 6vmin 9vmin; background: var(--bg); }
+           padding: 6vmin 9vmin; background: ${t.bgGradient ? t.bgGradient : "var(--bg)"}; }
   .slide.on { display: flex; }
   h1 { font-family: ${t.headingFont}; font-size: 7vmin; line-height: 1.1; letter-spacing: -0.02em; }
   h2 { font-family: ${t.headingFont}; font-size: 5vmin; line-height: 1.15; margin-bottom: 3vmin; }
@@ -258,6 +316,9 @@ export function deckToHtml(deck: SlideDeck): string {
   ul { list-style: none; display: grid; gap: 2.2vmin; font-size: 3.2vmin; max-width: 75ch; }
   li { padding-left: 3.6vmin; position: relative; line-height: 1.35; }
   li::before { content: ""; position: absolute; left: 0; top: 1.1vmin; width: 1.6vmin; height: 1.6vmin; border-radius: 50%; background: var(--accent); }
+  li.hasicon { padding-left: 4.6vmin; }
+  li.hasicon::before { content: none; }
+  .bicon { position: absolute; left: 0; top: -0.1vmin; font-size: 3.4vmin; line-height: 1; }
   p { font-size: 2.9vmin; line-height: 1.5; max-width: 70ch; margin-top: 2vmin; }
   blockquote { font-family: ${t.headingFont}; font-size: 5vmin; line-height: 1.3; max-width: 30ch; }
   .center { display: grid; justify-items: start; align-content: center; height: 100%; }
@@ -267,8 +328,12 @@ export function deckToHtml(deck: SlideDeck): string {
   .imgph { width: 100%; height: 100%; background: linear-gradient(135deg, var(--surface), var(--bg)); }
   .imgcap { padding-top: 2.5vmin; }
   .imgcap h2 { font-size: 3.6vmin; margin-bottom: 0; } .imgcap h2::after { display: none; }
-  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 5vmin; align-items: start; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 5vmin; align-items: center; }
   .colbody img { width: 100%; border-radius: 1.5vmin; }
+  .statgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18vmin, 1fr)); gap: 3vmin; margin-top: 2vmin; }
+  .statcard { background: var(--surface); border-radius: 1.5vmin; padding: 3vmin 2vmin; text-align: center; }
+  .statval { font-family: ${t.headingFont}; font-size: 6vmin; font-weight: 700; color: var(--accent); line-height: 1; }
+  .statlabel { color: var(--muted); font-size: 2.2vmin; margin-top: 1.2vmin; }
   .notes { display: none; position: absolute; left: 3vmin; right: 3vmin; bottom: 8vmin; background: var(--surface);
            color: var(--muted); border-left: 4px solid var(--accent); padding: 2vmin 2.5vmin; font-size: 2vmin;
            border-radius: 1vmin; box-shadow: 0 1vmin 4vmin rgb(0 0 0 / .3); }
