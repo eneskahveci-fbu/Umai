@@ -7,7 +7,9 @@
    Kazanç (yalnızca provider === "anthropic" için):
    • prompt caching: system prompt + tools blokları cache_control ile önbelleğe
      alınır → her turda tekrar faturalanmaz (uzun ajan oturumlarında maliyet↓ hız↑).
-   • native thinking (thinking_delta) ve native tool_use desteği.
+   • native thinking (extended thinking — desteklenen modelde GERÇEKTEN
+     istenir, bkz. anthropicUpstream'in thinkingBudget parametresi) ve
+     native tool_use desteği.
    Diğer sağlayıcılar bu dosyaya hiç uğramaz (OpenAI yolu aynen korunur).
    ════════════════════════════════════════════════════════════════════════ */
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -208,6 +210,7 @@ export async function anthropicUpstream(
   apiKey: string,
   body: OpenAIChatBody,
   signal?: AbortSignal,
+  thinkingBudget?: number,
 ): Promise<Response> {
   const { system, messages } = convertMessages(body.messages);
   const tools = convertTools(body.tools);
@@ -224,7 +227,19 @@ export async function anthropicUpstream(
     const tc = convertToolChoice(body.tool_choice);
     if (tc) reqBody.tool_choice = tc;
   }
-  if (typeof body.temperature === "number") reqBody.temperature = body.temperature;
+  /* Genişletilmiş muhakeme (extended thinking, yalnız Claude 3.7+/4.x'te var —
+     bkz. modelCapabilities.ts CLAUDE_THINKING_RE, çağıran route.ts orada
+     karar verir): açıkken Anthropic `temperature`/`top_p` YASAKLAR (yalnız
+     varsayılan temperature=1 geçerli, aksi 400 döner) — bu yüzden thinking
+     açıksa body.temperature BİLEREK atlanır. thinking_delta zaten
+     translateStream'de işleniyordu (bkz. üstteki yorum) ama bu alan hiç
+     GÖNDERİLMİYORDU — model bu güne kadar hiç genişletilmiş muhakeme
+     yapmıyordu, yalnız normal (kısa) düşünme ile yanıt veriyordu. */
+  if (thinkingBudget && thinkingBudget > 0) {
+    reqBody.thinking = { type: "enabled", budget_tokens: thinkingBudget };
+  } else if (typeof body.temperature === "number") {
+    reqBody.temperature = body.temperature;
+  }
 
   let res: Response;
   try {

@@ -18,6 +18,7 @@ import { runDeepResearch } from "@/lib/researchPipeline";
 import { cached, repoCacheKey } from "@/lib/repoContextCache";
 import { isSafeRemoteUrl } from "@/lib/urlSafety";
 import { markProviderDown, markProviderUp, prioritizeHealthyCandidates } from "@/lib/providerHealth";
+import { detectModelCapabilities, JSON_MODE_PROVIDERS } from "@/lib/modelCapabilities";
 import { isBuiltinMcpServerId } from "@/lib/mcpBuiltins";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -138,18 +139,10 @@ interface Candidate {
 
 const KEYLESS_CHAT_PROVIDERS = new Set<string>(["pollinations", "ovh", "ollama", "local", "custom"]);
 
-/* `jsonMode` (bkz. ChatRequest) istendiğinde OpenAI-uyumlu native "JSON modu"
-   (response_format: json_object) yalnız bunu İYİ BELGELENMİŞ ve GÜVENİLİR
-   şekilde desteklediği bilinen ticari sağlayıcılarda gönderilir. Anahtarsız/
-   ücretsiz toplayıcılar (pollinations/ovh/hf/ollama/agnes/custom) bilinçli
-   olarak DIŞARIDA bırakıldı — bazıları bilinmeyen alanlarda 400 ile
-   reddedebilir, bu da (JSON bazen bozuk gelmesi yerine) İSTEĞİN TAMAMEN
-   BAŞARISIZ olmasına yol açar; bu, çözmeye çalıştığımız sorundan daha kötü
-   bir regresyon olurdu. Bu sağlayıcılarda yalnızca prompt talimatına (+
-   F3'teki otomatik yeniden deneme) güvenilir — davranış eskisi gibi. */
-const JSON_MODE_PROVIDERS = new Set<string>([
-  "openai", "groq", "together", "mistral", "deepseek", "xai", "openrouter", "github", "nvidia", "cerebras",
-]);
+/* JSON_MODE_PROVIDERS artık @/lib/modelCapabilities'ten geliyor (I1) — Ayarlar'daki
+   yetenek rozetleriyle (SettingsModal.tsx) AYNI kaynak, iki yer asla sapmaz.
+   Bilinçli hariç tutma gerekçesi (anahtarsız/ücretsiz toplayıcılar 400 riski)
+   orada belgeleniyor. */
 
 /** Sağlayıcıya göre upstream istek başlıklarını kurar. */
 function buildCandidateHeaders(c: Candidate, req: Request): Record<string, string> {
@@ -1226,19 +1219,16 @@ export async function POST(req: Request) {
   const EFFORT_TOKENS = { low: 4096, medium: 8192, high: 16384, max: 32768 } as const;
   const userMaxTokens = typeof body.maxTokens === "number" && body.maxTokens > 0 ? body.maxTokens : 0;
   sampling.max_tokens = userMaxTokens || (body.effort ? EFFORT_TOKENS[body.effort] : 8192);
-  if (body.effort) {
-    /* OpenAI-uyumlu reasoning effort ölçeği low|medium|high (max → high). */
-    const apiEffort = body.effort === "max" ? "high" : body.effort;
-    if (provider === "openrouter") {
-      /* OpenRouter reasoning'i normalize eder; desteklemeyen modelde sessizce
-         yok sayar → 400 riski yok. Reasoning token'ları akışta döner ve UI'da
-         "Düşünce süreci" olarak gösterilir. */
-      sampling.reasoning = { effort: apiEffort };
-    }
-    /* deepseek/groq/xai gibi sağlayıcılarda reasoning modelleri zaten
-       reasoning_content yayar; bilinmeyen alanla 400 riskine girmeyiz —
-       max_tokens ölçeklemesi + sistem-prompt efor yönergesi yeterli etki sağlar. */
-  }
+  /* Claude'un genişletilmiş muhakeme (extended thinking) bütçesi — her zaman
+     ilgili EFFORT_TOKENS tavanının ALTINDA (thinking + son yanıt için birlikte
+     max_tokens'ı aşamaz). Yalnız modelCapabilities.ts'in extendedThinking=true
+     dediği (Claude 3.7+/4.x) modellerde, aşağıdaki openCandidate içinde
+     PER-CANDIDATE kullanılır (bkz. not: eskiden bu karar tek bir global
+     `sampling` objesine yazılıp TÜM adaylara (farklı sağlayıcılar dahil)
+     spread ediliyordu — openrouter için ayarlanan `reasoning` alanı fallback
+     bir groq/xai adayına da sızabiliyordu; artık her adayın KENDİ
+     provider/model'ine göre karar veriliyor). */
+  const THINKING_BUDGET = { low: 2048, medium: 6000, high: 12000, max: 24000 } as const;
 
   /* Aday zinciri: birincil model + istemcinin yolladığı ücretsiz fallback'ler.
      Birincil bir hata verirse (kota/erişim/5xx/bağlantı) sıradaki aday denenir →
@@ -1286,7 +1276,33 @@ export async function POST(req: Request) {
     const b: Record<string, unknown> = { model: c.model, messages, stream: true, ...sampling, ...extra };
     if (body.jsonMode && JSON_MODE_PROVIDERS.has(c.provider)) b.response_format = { type: "json_object" };
     if (c.provider === "pollinations") b.referrer = "craft-coder";
-    if (c.provider === "anthropic") return anthropicUpstream(c.baseUrl, c.apiKey, b as unknown as OpenAIChatBody);
+    /* Efor→gerçek API etkisi (I2/I3): HER adayın KENDİ provider/model'ine göre
+       — bir önceki sürümde bu karar tek bir global `sampling` objesine yazılıp
+       tüm adaylara (farklı sağlayıcılar dahil) spread ediliyordu, bu yüzden
+       birincil openrouter ise ayarlanan `reasoning` alanı groq/xai gibi bambaşka
+       bir fallback adayına da sızabiliyordu. */
+    let thinkingBudget = 0;
+    if (body.effort) {
+      const apiEffort = body.effort === "max" ? "high" : body.effort;
+      const caps = detectModelCapabilities(c.provider, c.model);
+      if (c.provider === "openrouter") {
+        /* OpenRouter reasoning'i normalize eder; desteklemeyen modelde sessizce
+           yok sayar → 400 riski yok. */
+        b.reasoning = { effort: apiEffort };
+      } else if (caps.nativeReasoningEffort) {
+        /* Doğrudan OpenAI o-serisi/gpt-5 — kendi native reasoning_effort alanı
+           (önceden yalnız openrouter'da gönderiliyordu, doğrudan anahtarla
+           eklenen bu modellerde efor kaydırıcısı max_tokens dışında HİÇBİR
+           etki yapmıyordu). */
+        b.reasoning_effort = apiEffort;
+      } else if (caps.extendedThinking) {
+        thinkingBudget = THINKING_BUDGET[body.effort];
+      }
+      /* deepseek/groq/xai gibi sağlayıcılarda reasoning modelleri zaten
+         reasoning_content yayar; bilinmeyen alanla 400 riskine girmeyiz —
+         max_tokens ölçeklemesi + sistem-prompt efor yönergesi yeterli etki sağlar. */
+    }
+    if (c.provider === "anthropic") return anthropicUpstream(c.baseUrl, c.apiKey, b as unknown as OpenAIChatBody, undefined, thinkingBudget);
     const res = await fetch(candidateUrl(c), { method: "POST", headers: buildCandidateHeaders(c, req), body: JSON.stringify(b) });
     /* Kendi kendine kurtarma: anahtarsız da çalışabilen bir sağlayıcıda (ör. OVH)
        saklı/bayat bir anahtar 401/403 alırsa AYNI adayı anonim (anahtarsız) bir
