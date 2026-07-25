@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { newHighlight, pushHighlight } from "./cards";
+import { chatToMarkdown } from "./chatExport";
+import { ALL_AGENTS } from "./agents";
 import type {
   Artifact,
   Chat,
@@ -38,6 +40,12 @@ let saveSeq = 0;
    arada başka çağrı başladıysa (sıra ilerlediyse), o an bilinen EN GÜNCEL
    sohbet durumu bir kez daha yazılır. */
 let persistSeq = 0;
+/* Dışa aktarımda asistan turuna iliştirilen ajan etiketi (chatExport.ts
+   agents.ts'e bağımlı olmasın diye çözüm burada yapılır). */
+function agentLabelById(id: string): string | undefined {
+  return ALL_AGENTS.find((a) => a.id === id)?.label;
+}
+
 const CONFIG_KEY = "craftai_config";
 const CHATS_KEY = "craftai_chats";
 const SNIPPETS_KEY = "craftai_snippets";
@@ -1599,23 +1607,19 @@ export const useStore = create<StoreState>()((set, get) => ({
     }
   },
 
+  /* Biçimin TEK kaynağı chatExport.ts (O1) — indirme ve panoya kopyalama
+     aynı çıktıyı üretsin diye; önceden mantık burada iki kez kopyalanmıştı. */
   exportChat: (id) => {
     const chat = get().chats.find((c) => c.id === id);
     if (!chat) return;
-    let md = `# ${chat.title}\n\n`;
-    for (const m of chat.messages) {
-      md += `**${m.role === "user" ? "Kullanıcı" : "Asistan"}:**\n\n${m.content}\n\n---\n\n`;
-    }
+    const md = chatToMarkdown(chat, { agentLabel: agentLabelById });
     download(md, `${safeName(chat.title)}.md`, "text/markdown");
   },
 
   copyChatMarkdown: async (id: string) => {
     const chat = get().chats.find((c) => c.id === id);
     if (!chat) return;
-    let md = `# ${chat.title}\n\n`;
-    for (const m of chat.messages) {
-      md += `**${m.role === "user" ? "Kullanıcı" : "Asistan"}:**\n\n${m.content}\n\n---\n\n`;
-    }
+    const md = chatToMarkdown(chat, { agentLabel: agentLabelById });
     try {
       await navigator.clipboard.writeText(md);
       get().addToast("Markdown panoya kopyalandı", "success");
