@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, Eye, Link2, Maximize2, Minimize2, MousePointerClick, RotateCw, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, Eye, Link2, Maximize2, Minimize2, MousePointerClick, RotateCw, Wand2, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useStore } from "@/lib/store";
 import type { Artifact } from "@/lib/types";
@@ -28,9 +28,14 @@ export interface ArtifactCanvasProps {
       Composer'a taşımak ÇAĞIRANIN işi (DesignStudio → kendi sohbeti,
       ArtifactPanel → craftai:composer-prefill). */
   onAnnotate?: (descriptor: string) => void;
+  /** N1 — sohbet panelinde "Stüdyo'da aç": artifact'ı bir StudioProject'e
+      çevirip Tasarım Stüdyosu'nda devam ettirir. Yalnız ÇAĞIRAN verirse düğme
+      çıkar — Stüdyo kendi içinde bunu geçmez (kendine yönlendiren anlamsız
+      bir düğme olurdu). */
+  onOpenInStudio?: () => void;
 }
 
-export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVersion, onNextVersion, onClose, extraExportOptions, onAnnotate }: ArtifactCanvasProps) {
+export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVersion, onNextVersion, onClose, extraExportOptions, onAnnotate, onOpenInStudio }: ArtifactCanvasProps) {
   const addToast = useStore((s) => s.addToast);
   const [expanded, setExpanded] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -163,6 +168,14 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
               aria-label="İşaretle & Değiştir"
               aria-pressed={annotating}
             ><MousePointerClick size={15} /></button>
+          )}
+          {onOpenInStudio && (
+            <button
+              onClick={onOpenInStudio}
+              className={iconBtn}
+              title="Stüdyo'da aç — tema, sürüm geçmişi ve gelişmiş düzenlemeyle devam et"
+              aria-label="Stüdyo'da aç"
+            ><Wand2 size={15} /></button>
           )}
           <button onClick={copySource} className={iconBtn} title="Kaynağı kopyala">{copied ? <Check size={15} className="text-brand" /> : <Copy size={15} />}</button>
           <ExportMenu
