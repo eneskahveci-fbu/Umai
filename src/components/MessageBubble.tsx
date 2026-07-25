@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, memo, useContext, useEffect, useRef, useState } from "react";
+import { createContext, memo, useContext, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -748,7 +748,8 @@ function MessageBubbleImpl({
   index: number;
   chatId?: string;
   showRegenerate?: boolean;
-  onRegenerate?: () => void;
+  /** modelId verilirse yanıt O modelle yeniden üretilir (N2). */
+  onRegenerate?: (modelId?: string) => void;
   onContinue?: () => void;
   onEdit?: (index: number, content: string) => void;
   onSwitchVersion?: (branchIndex: number) => void;
@@ -774,6 +775,19 @@ function MessageBubbleImpl({
   const addToast = useStore((s) => s.addToast);
   const [speakingTts, setSpeakingTts] = useState(false);
   const speakingRef = useRef(false);
+  /* N2 — "farklı modelle yeniden dene": aktif model DIŞINDAKİ eklenmiş modeller.
+     Boşsa (tek model) yeniden üret düğmesi eskisi gibi doğrudan çalışır. */
+  const [regenOpen, setRegenOpen] = useState(false);
+  /* DİKKAT: selector içinde .filter() KULLANMA — her okumada yeni bir dizi
+     referansı döner, Zustand'ın Object.is karşılaştırması bunu "değişti" sanar
+     ve sonsuz render döngüsüne ("Maximum update depth exceeded") girer. Kararlı
+     referansları seç, türetmeyi useMemo ile yap. */
+  const allModels = useStore((s) => s.config.models);
+  const activeModelId = useStore((s) => s.config.activeModelId);
+  const otherModels = useMemo(
+    () => allModels.filter((m) => m.id !== activeModelId),
+    [allModels, activeModelId],
+  );
   const [skillSaveOpen, setSkillSaveOpen] = useState(false);
   const [skillTitle, setSkillTitle] = useState("");
   const [skillContent, setSkillContent] = useState("");
@@ -1148,7 +1162,9 @@ function MessageBubbleImpl({
             </div>
             {message.isError && showRegenerate && onRegenerate && (
               <button
-                onClick={onRegenerate}
+                /* Sarmalayıcı şart: onRegenerate artık opsiyonel modelId alıyor,
+                   doğrudan bağlanırsa MouseEvent modelId sanılırdı (N2). */
+                onClick={() => onRegenerate()}
                 className="mt-2 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red/10 text-red hover:bg-red/20 font-semibold text-xs transition-colors"
               >
                 <RefreshCw size={11} /> Tekrar dene
@@ -1200,9 +1216,44 @@ function MessageBubbleImpl({
               {speakingTts ? <VolumeX size={12} /> : <Volume2 size={12} />}
             </button>
             {showRegenerate && onRegenerate && (
-              <button onClick={onRegenerate} aria-label="Yeniden oluştur" title="Yeniden oluştur" className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-2.5 rounded-lg hover:bg-bgsoft transition-colors">
-                <RefreshCw size={12} />
-              </button>
+              /* N2 — tek model varsa doğrudan yeniden üretir (eski davranış);
+                 birden çok model eklenmişse tıklayınca model listesi açılır ve
+                 kullanıcı "aynı modelle" ya da başka bir modelle deneyebilir. */
+              <div className="relative">
+                <button
+                  onClick={() => { if (otherModels.length === 0) onRegenerate(); else setRegenOpen((o) => !o); }}
+                  aria-label="Yeniden oluştur"
+                  aria-haspopup={otherModels.length > 0 ? "menu" : undefined}
+                  aria-expanded={otherModels.length > 0 ? regenOpen : undefined}
+                  title={otherModels.length > 0 ? "Yeniden oluştur — model seç" : "Yeniden oluştur"}
+                  className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-2.5 rounded-lg hover:bg-bgsoft transition-colors"
+                >
+                  <RefreshCw size={12} />
+                </button>
+                {regenOpen && otherModels.length > 0 && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setRegenOpen(false)} aria-hidden />
+                    <div role="menu" className="absolute left-0 bottom-full mb-1 z-50 min-w-[190px] max-w-[260px] max-h-64 overflow-auto rounded-xl border border-line bg-surface shadow-xl py-1">
+                      <button
+                        role="menuitem"
+                        onClick={() => { setRegenOpen(false); onRegenerate(); }}
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-bgsoft transition-colors"
+                      >Aynı modelle</button>
+                      <div className="my-1 border-t border-line/60" />
+                      <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted/60">Başka modelle</div>
+                      {otherModels.map((m) => (
+                        <button
+                          key={m.id}
+                          role="menuitem"
+                          onClick={() => { setRegenOpen(false); onRegenerate(m.id); }}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-bgsoft transition-colors truncate"
+                          title={m.model}
+                        >{m.label}</button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             )}
             {onPostToPr && (
               <button onClick={onPostToPr} aria-label="PR/MR'a yorum olarak gönder" title="PR/MR'a yorum olarak gönder" className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-2.5 rounded-lg hover:bg-bgsoft transition-colors">

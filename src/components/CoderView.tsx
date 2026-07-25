@@ -1805,7 +1805,7 @@ export function CoderView() {
 
   const callApi = useCallback(async (
     overrideAgent?: Agent | null,
-    opts?: { continuation?: boolean; depth?: number; noStrongest?: boolean },
+    opts?: { continuation?: boolean; depth?: number; noStrongest?: boolean; modelId?: string },
   ) => {
     const store = useStore.getState();
     let active = store.activeModel();
@@ -1873,6 +1873,13 @@ export function CoderView() {
     if (activeProjectCfg?.modelId) {
       const override = store.config.models.find((m) => m.id === activeProjectCfg.modelId);
       if (override) active = override;
+    }
+    /* N2 — "farklı modelle yeniden dene": kullanıcının bu tur için AÇIKÇA
+       seçtiği model her şeyi (aktif model, proje ayarı, strongest yükseltmesi)
+       geçersiz kılar — en son uygulanır çünkü en açık niyet budur. */
+    if (opts?.modelId) {
+      const picked = store.config.models.find((m) => m.id === opts.modelId);
+      if (picked) { active = picked; usedStrongest = false; }
     }
 
     /* API anahtarını ŞİMDİ çöz (active artık kesin) → sağlayıcıya asla şifreli
@@ -2869,7 +2876,9 @@ export function CoderView() {
 
   const stop = () => { coderAbort?.abort(); coderAbort = null; };
 
-  const regenerate = async () => {
+  /* modelId verilirse bu tur O modelle üretilir (N2) — verilmezse eskisi gibi
+     aktif model kullanılır. */
+  const regenerate = async (modelId?: string) => {
     if (streaming) return;
     const store = useStore.getState();
     const chat = store.current();
@@ -2884,7 +2893,7 @@ export function CoderView() {
       pendingBranches = stashAsPendingBranches(last);
       store.popLastMessage();
     }
-    await callApi();
+    await callApi(undefined, modelId ? { modelId } : undefined);
     if (pendingBranches) useStore.getState().mergeRegenerateBranches(pendingBranches);
   };
 
