@@ -19,6 +19,7 @@ import { cached, repoCacheKey } from "@/lib/repoContextCache";
 import { isSafeRemoteUrl } from "@/lib/urlSafety";
 import { markProviderDown, markProviderUp, prioritizeHealthyCandidates } from "@/lib/providerHealth";
 import { detectModelCapabilities, JSON_MODE_PROVIDERS, EFFORT_TOKENS, THINKING_BUDGET } from "@/lib/modelCapabilities";
+import { downgradeRequest, isOpenAiReasoningModel, adaptForOpenAiReasoning } from "@/lib/requestDowngrade";
 import { isBuiltinMcpServerId } from "@/lib/mcpBuiltins";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -163,6 +164,16 @@ function buildCandidateHeaders(c: Candidate, req: Request): Record<string, strin
     h["X-Title"] = "UMAI";
   }
   return h;
+}
+
+/* P3 — sağlayıcı sağlığı yalnız SAĞLAYICI kaynaklı hatalarda işaretlenmeli.
+   Eskiden her !ok yanıtta markProviderDown çağrılıyordu; 400 (bizim gönderdiğimiz
+   alan), 401 (kullanıcının anahtarı) ve 404 (model adı) İSTEK hatalarıdır —
+   sağlayıcı gayet ayakta. Bunlarda "down" işaretlemek sağlıklı bir sağlayıcıyı
+   sonraki isteklerde geri plana atıyor ve gereksiz model değişimlerini
+   çoğaltıyordu. Yalnız 5xx/429 ve bağlantı hataları gerçek sağlık sinyalidir. */
+function isProviderFault(status: number): boolean {
+  return status >= 500 || status === 429 || status === 408;
 }
 
 /** Aday için chat/completions URL'i (Pollinations anahtarı varsa query-param token). */
@@ -1308,7 +1319,14 @@ export async function POST(req: Request) {
          max_tokens ölçeklemesi + sistem-prompt efor yönergesi yeterli etki sağlar. */
     }
     if (c.provider === "anthropic") return anthropicUpstream(c.baseUrl, c.apiKey, b as unknown as OpenAIChatBody, undefined, thinkingBudget);
-    const res = await fetch(candidateUrl(c), { method: "POST", headers: buildCandidateHeaders(c, req), body: JSON.stringify(b) });
+    /* P2 — OpenAI o-serisi/gpt-5: max_tokens'ı reddedip max_completion_tokens
+       ister, varsayılan dışı temperature kabul etmez. Baştan doğru gönder
+       (aşağıdaki düşürme mekanizması bunu zaten kurtarırdı ama bir tur boşa
+       giderdi). */
+    const sendBody = isOpenAiReasoningModel(c.provider, c.model) ? adaptForOpenAiReasoning(b) : b;
+    const post = (payload: Record<string, unknown>, cand: Candidate = c) =>
+      fetch(candidateUrl(cand), { method: "POST", headers: buildCandidateHeaders(cand, req), body: JSON.stringify(payload) });
+    let res = await post(sendBody);
     /* Kendi kendine kurtarma: anahtarsız da çalışabilen bir sağlayıcıda (ör. OVH)
        saklı/bayat bir anahtar 401/403 alırsa AYNI adayı anonim (anahtarsız) bir
        kez daha dene. Eski bir hatadan (bkz. KEYLESS_CHAT_PROVIDERS senkron
@@ -1316,7 +1334,22 @@ export async function POST(req: Request) {
        hiçbir şey yapmadan kendi kendine düzelsin. */
     if (!res.ok && (res.status === 401 || res.status === 403) && c.apiKey && KEYLESS_CHAT_PROVIDERS.has(c.provider)) {
       const anon = { ...c, apiKey: "" };
-      return fetch(candidateUrl(anon), { method: "POST", headers: buildCandidateHeaders(anon, req), body: JSON.stringify(b) });
+      return post(sendBody, anon);
+    }
+    /* P1 — uyumluluk düşürme: 400/422, "bu model bozuk" demek DEĞİLDİR; çoğu
+       zaman gönderdiğimiz opsiyonel bir alanı (tools/response_format/reasoning/
+       max_tokens/temperature) o modelin desteklememesidir. Eskiden bu durumda
+       istek DOĞRUDAN sıradaki modele düşüyor ve kullanıcı "istediğim model
+       cevap vermiyor" uyarısını görüyordu. Artık hatayı okuyup ilgili alanı
+       düşürerek AYNI modelle tekrar deniyoruz; en fazla 2 kademe, sonra
+       fallback zinciri devreye girer. */
+    let payload = sendBody;
+    for (let i = 0; i < 2 && !res.ok && (res.status === 400 || res.status === 422); i++) {
+      const errText = await res.clone().text().catch(() => "");
+      const down = downgradeRequest(payload, errText);
+      if (!down) break;
+      payload = down.body;
+      res = await post(payload);
     }
     return res;
   };
@@ -1670,8 +1703,8 @@ export async function POST(req: Request) {
         });
         return new Response(combined, { headers });
       }
-      markProviderDown(c.provider, c.baseUrl);
       lastStatus = upstream.status || 500;
+      if (isProviderFault(lastStatus)) markProviderDown(c.provider, c.baseUrl);
       lastDetail = await upstream.text().catch(() => "");
       lastCand = c;
     }
@@ -1767,8 +1800,9 @@ export async function POST(req: Request) {
               lastStatus = 502; lastDetail = (err as Error).message; lastCand = c; continue;
             }
             if (r.ok && r.body) { markProviderUp(c.provider, c.baseUrl); chosen = c; upstream = r; break; }
-            markProviderDown(c.provider, c.baseUrl);
-            lastStatus = r.status || 500; lastDetail = await r.text().catch(() => ""); lastCand = c;
+            lastStatus = r.status || 500;
+            if (isProviderFault(lastStatus)) markProviderDown(c.provider, c.baseUrl);
+            lastDetail = await r.text().catch(() => ""); lastCand = c;
           }
           if (!upstream) {
             safe.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**${friendlyApiError(lastStatus, lastDetail, { model: lastCand.model, provider: lastCand.provider as Provider })}**` } }] })}\n\n`));
