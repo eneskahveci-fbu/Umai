@@ -63,3 +63,79 @@ export function lintArtifact(html: string): string[] {
   if (h.includes("<html") && !/meta[^>]+viewport/i.test(h)) warnings.push("viewport meta eksik (mobil ölçekleme bozulur)");
   return warnings;
 }
+
+/* N3 — kalite denetimi artık YALNIZ html'e özgü değil. lintArtifact'ın
+   kontrolleri (hex sayısı, viewport meta) doğal olarak HTML'e bakıyordu;
+   sohbette ve Stüdyo'da üretilen React/JSX, SVG ve mermaid çıktıları hiç
+   denetlenmiyordu. Aşağıdakiler de aynı sözleşmeyi izler: üretimi ASLA
+   engellemez, yalnız "şuna bir bak" notu düşer; saf fonksiyon → testli. */
+
+function lintReact(code: string): string[] {
+  const w: string[] = [];
+  /* Liste render'ında key eksikliği React'te en yaygın gerçek hatadır. */
+  if (/\.map\(/.test(code) && !/\bkey=/.test(code)) {
+    w.push("liste render'ında key prop'u yok — React uyarı verir, yeniden sıralamada durum karışır");
+  }
+  /* Bağımlılık dizisi olmayan useEffect her render'da çalışır (sonsuz döngü riski). */
+  if (/useEffect\(\s*\(\)\s*=>\s*\{[\s\S]*?\}\s*\)\s*;/.test(code) && !/useEffect\([\s\S]*?\},\s*\[/.test(code)) {
+    w.push("useEffect'te bağımlılık dizisi yok — her render'da çalışır");
+  }
+  if (/lorem ipsum/i.test(code)) w.push("Lorem ipsum kalmış — gerçek içerik bekleniyordu");
+  /* Erişilebilirlik: alt metinsiz görsel + etiketsiz form alanı. */
+  if (/<img\b(?![^>]*\balt=)/i.test(code)) w.push("alt metni olmayan görsel var (erişilebilirlik)");
+  return w;
+}
+
+function lintSvg(code: string): string[] {
+  const w: string[] = [];
+  /* Henüz <svg> yoksa (boş/yarım içerik) denetlenecek bir şey de yok —
+     aksi halde boş metin "erişilebilirlik" uyarısı üretirdi. */
+  if (!/<svg\b/i.test(code)) return w;
+  /* viewBox olmadan SVG ölçeklenmez — kapsayıcıda taşar/kırpılır. */
+  if (!/\bviewBox=/i.test(code)) {
+    w.push("viewBox yok — SVG ölçeklenemez, farklı boyutlarda kırpılır");
+  }
+  /* Sabit piksel genişlik + viewBox yoksa duyarlılık tamamen kaybolur. */
+  if (/<svg\b[^>]*\bwidth="\d+(px)?"/i.test(code) && !/\bviewBox=/i.test(code)) {
+    w.push("sabit piksel genişliği kullanılmış — duyarlı ölçekleme için viewBox tercih edilmeli");
+  }
+  if (!/<title\b/i.test(code) && !/aria-label=/i.test(code)) {
+    w.push("başlık/aria-label yok — ekran okuyucular SVG'yi tanımlayamaz");
+  }
+  return w;
+}
+
+function lintMermaid(code: string): string[] {
+  const w: string[] = [];
+  const lines = code.split("\n").map((l) => l.trim()).filter(Boolean);
+  /* İlk anlamlı satır diyagram türünü bildirmeli; yoksa mermaid render etmez. */
+  const DIAGRAM = /^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram(-v2)?|erDiagram|journey|gantt|pie|mindmap|timeline|gitGraph|quadrantChart)\b/;
+  if (lines.length && !lines.some((l) => DIAGRAM.test(l))) {
+    w.push("diyagram türü belirtilmemiş (graph/flowchart/sequenceDiagram… ile başlamalı) — render edilmez");
+  }
+  if (lines.length > 60) w.push(`${lines.length} satırlık diyagram — okunması zor, parçalara bölmeyi düşün`);
+  return w;
+}
+
+/* React/JSX çıktıları AYRI bir artifact türü DEĞİLDİR: preview.ts onları
+   reactDoc() ile tam bir HTML belgesine sarıp type:"html" olarak döndürür
+   (bkz. buildPreview). Bu yüzden React lint'ini "type === react" ile aramak
+   ölü kod olurdu; kullanıcının asıl kaynağı, reactDoc'un kendi işaretli
+   script etiketinin içinde durur ve oradan güvenle çıkarılabilir. */
+const REACT_SRC_RE = /<script type="text\/plain" id="__src">([\s\S]*?)<\/script>/;
+
+/** Artifact türüne uygun kalite denetimi. Tanımadığı türde boş dizi döner
+    (markdown/code gibi türlerde "kalite" öznel — yanlış uyarı vermemek için
+    bilinçli olarak sessiz kalınır). */
+export function lintArtifactByType(type: string, content: string): string[] {
+  const c = content || "";
+  if (type === "svg") return lintSvg(c);
+  if (type === "mermaid") return lintMermaid(c);
+  if (type === "html") {
+    const m = REACT_SRC_RE.exec(c);
+    /* React önizlemesinde HER İKİSİ de anlamlı: sarmalayıcı belge üzerinde
+       renk/lorem denetimi + kullanıcının JSX'i üzerinde React denetimi. */
+    return m ? [...lintArtifact(c), ...lintReact(m[1])] : lintArtifact(c);
+  }
+  return [];
+}
