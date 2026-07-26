@@ -38,6 +38,10 @@ function useEverOpened(open: boolean) {
 }
 
 export default function AppPage() {
+  /* S7 — animasyon yoğunluğu. Tema/yazı boyutu tek seferlik bir effect'te
+     uygulanıyor (değişince yeniden yükleme gerekiyor); animasyon ayarının
+     etkisi ANINDA görülmeli, bu yüzden reaktif olarak seçilir. */
+  const animations = useStore((s) => s.config.animations);
   const sidebarOpen = useStore((s) => s.sidebarOpen);
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
   const setUser = useStore((s) => s.setUser);
@@ -213,6 +217,10 @@ export default function AppPage() {
     cl.remove("font-sm", "font-base", "font-lg");
     cl.add(`font-${fontScale ?? "base"}`);
   }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-anim", animations ?? "full");
+  }, [animations]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
