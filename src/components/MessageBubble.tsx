@@ -743,6 +743,7 @@ function MessageBubbleImpl({
   onChecklistToggle,
   onPickCompare,
   onPostToPr,
+  animateIn,
 }: {
   message: ChatMessage;
   index: number;
@@ -759,8 +760,14 @@ function MessageBubbleImpl({
   /** Bu yanıtı GitHub/GitLab'da bağlı bir PR/MR'a yorum olarak gönder — yalnız
       asistan mesajlarında ve bir repo bağlıyken sunulur (bkz. CoderView.tsx). */
   onPostToPr?: () => void;
+  /** S2 — giriş animasyonu YALNIZCA bu turda gelen mesajlara verilir. Eskiden
+      her baloncukta koşulsuz `animate-fade-in` vardı; CSS animasyonu mount'ta
+      çalıştığı için sohbet her açıldığında tüm geçmiş yeniden animasyonlanıyordu.
+      Kaynak: CoderView'daki `enterFrom` eşiği. */
+  animateIn?: boolean;
 }) {
   const isUser = message.role === "user";
+  const enterCls = animateIn ? (message.role === "user" ? " msg-enter msg-enter-user" : " msg-enter msg-enter-ai") : "";
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState("");
@@ -891,7 +898,7 @@ function MessageBubbleImpl({
        asistan mesajındaki "Kod çalıştırma" kutusunda görünür (AI bağlamında kalır). */
     if (message.content.startsWith("**Kod çıktısı**")) return null;
     return (
-      <div className="group/msg flex justify-end py-3 animate-fade-in">
+      <div className={`group/msg flex justify-end py-3${enterCls}`}>
         {/* Klasik sohbet balonu — kullanıcı sağda, avatarsız (asistan solda
             avatarlı düz-metin akışı olarak kalır, bkz. aşağıdaki blok). */}
         <div className="max-w-[75%] min-w-0 flex flex-col items-end">
@@ -978,7 +985,7 @@ function MessageBubbleImpl({
 
   /* ── ASSISTANT BUBBLE ────────────────────────────────────────────── */
   return (
-    <div className="group/msg flex gap-3 py-3 animate-fade-in">
+    <div className={`group/msg flex gap-3 py-3${enterCls}`}>
       {/* Avatar — bu mesaj akarken hafif bir halka parıltısı alır (transient). */}
       <div className={`shrink-0 w-7 h-7 rounded-full bg-bgsoft border border-brand/20 grid place-items-center text-brand mt-0.5 shadow-sm${streamingNow ? " animate-stream-glow" : ""}`}>
         <Sparkles size={14} />
@@ -1172,22 +1179,24 @@ function MessageBubbleImpl({
             )}
           </div>
         ) : streamingNow && !message.toolCalls?.length ? (
-          message.thinking ? (
-            /* İçerik henüz gelmedi ama "•••" panosunda bir şeyler birikiyor
-               (Füzyon durumu / gerçek reasoning) — sessiz bir imleç yerine
-               bunun GERÇEKTEN çalıştığını gösteren bir etiket (aksi halde
-               Füzyon/hakem aşaması boyunca akış "takılmış" gibi görünüyordu). */
-            <span className="inline-flex items-center gap-1.5 py-1 text-brand/70 text-[12.5px]">
-              <Brain size={13} className="animate-pulse" />
-              <span>Düşünüyor…</span>
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 py-1 text-muted/50" aria-label="Yazıyor">
-              <span className="typing-dot" />
-              <span className="typing-dot delay-1" />
-              <span className="typing-dot delay-2" />
-            </span>
-          )
+          /* S3 — "Yazıyor" göstergesi. Eskiden içerik yokken ya üç sönük nokta
+             ya da düz bir "Düşünüyor…" vardı; hangi aşamada olunduğu
+             görünmediği için bekleme ölü zaman gibi hissettiriyordu. Artık
+             marka renginde akan bir parıltı şeridi + aşama metni. Aşama
+             gerçekten bilinen sinyalden türetilir, uydurulmaz: "•••" panosunda
+             içerik varsa (Füzyon durumu / gerçek reasoning) düşünme, yoksa
+             yanıt bekleniyor demektir. */
+          <span
+            className="inline-flex items-center gap-2 py-1 text-[12.5px] text-muted/60"
+            aria-live="polite"
+            aria-label={message.thinking ? "Düşünüyor" : "Yanıt bekleniyor"}
+          >
+            {message.thinking
+              ? <Brain size={13} className="text-brand/70 animate-breathe" />
+              : <Sparkles size={12} className="text-brand/60 animate-breathe" />}
+            <span>{message.thinking ? "Düşünüyor…" : "Yanıt hazırlanıyor…"}</span>
+            <span className="typing-shimmer" aria-hidden />
+          </span>
         ) : (
           <span className="caret" />
         )}

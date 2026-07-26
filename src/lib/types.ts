@@ -599,6 +599,11 @@ export interface Config {
   blockNetworkTools?: boolean;
   rulesFile: string;
   fontScale: "sm" | "base" | "lg";
+  /** Animasyon yoğunluğu (S7). Tanımsız = "full" (varsayılan davranış).
+      "reduced": yalnız kısa geçişler, sürekli/dekoratif animasyonlar kapalı.
+      "off": tüm animasyonlar kapalı. Sistemin "hareketi azalt" tercihi bundan
+      bağımsız olarak her zaman saygı görür — bu ayar onu ezmez, ekler. */
+  animations?: "full" | "reduced" | "off";
   soundEnabled: boolean;
   accentColor: "pine" | "green" | "orange";
   maxContext: number;

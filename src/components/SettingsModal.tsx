@@ -1521,6 +1521,37 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               </div>
             </div>
 
+            {/* Animasyon yoğunluğu (S7) */}
+            <div className="premium-card rounded-xl p-4">
+              <h4 className="text-sm font-bold mb-1">Animasyonlar</h4>
+              <p className="text-xs text-muted/70 mb-2.5">
+                Sohbet akışı, mesaj girişleri ve göstergelerin hareket miktarı.
+              </p>
+              <div className="flex gap-2">
+                {([
+                  { v: "full", label: "Tam" },
+                  { v: "reduced", label: "Sade" },
+                  { v: "off", label: "Kapalı" },
+                ] as const).map(({ v, label }) => (
+                  <button
+                    key={v}
+                    /* Ayar <html data-anim> ile uygulanır (bkz. app/page.tsx);
+                       oradaki effect reaktif olduğu için etkisi ANINDA görülür,
+                       yeniden yükleme gerekmez. */
+                    onClick={() => saveConfig({ ...config, animations: v })}
+                    className={`flex-1 py-2 rounded-lg border text-sm transition-colors ${
+                      (config.animations ?? "full") === v ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted/50 mt-2">
+                Cihazının &quot;hareketi azalt&quot; tercihi bu ayardan bağımsız olarak her zaman geçerlidir.
+              </p>
+            </div>
+
             {/* Bildirimler */}
             <div className="premium-card rounded-xl p-4">
               <h4 className="text-sm font-bold mb-2">Bildirimler</h4>

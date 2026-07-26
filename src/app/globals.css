@@ -136,6 +136,31 @@ body {
   }
 }
 
+/* S7 — Animasyon yoğunluğu (Ayarlar → Temel → Görünüm). İşletim sistemi
+   tercihini EZMEZ, ona ekler: yukarıdaki medya sorgusu her hâlükârda geçerli.
+   • full    (varsayılan) — hiçbir kısıt yok.
+   • reduced — sürekli/dekoratif animasyonlar (nefes, parıltı, imleç, shimmer)
+               kapanır; kısa giriş geçişleri hızlanarak korunur, çünkü onlar
+               "ne oldu"yu anlatan işlevsel geri bildirimdir.
+   • off     — hepsi kapalı. */
+:root[data-anim="reduced"] .animate-breathe,
+:root[data-anim="reduced"] .animate-stream-glow,
+:root[data-anim="reduced"] .typing-shimmer::after,
+:root[data-anim="reduced"] .caret {
+  animation: none !important;
+}
+:root[data-anim="reduced"] .msg-enter {
+  animation-duration: 90ms !important;
+}
+:root[data-anim="off"] *,
+:root[data-anim="off"] *::before,
+:root[data-anim="off"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
 /* ─── iOS / dynamic viewport helpers ─────────────────────────────────────
    iOS Safari's URL bar steals viewport height with `100vh`. `100dvh` is
    the dynamic viewport that resizes as the bar shows/hides. We override
@@ -425,22 +450,58 @@ html { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--color-mu
 /* Kaydırma zincirini kes: panel içi kaydırma sayfayı sürüklemesin → app hissi. */
 .overflow-y-auto, .overflow-auto, .overflow-y-scroll { overscroll-behavior: contain; }
 
-/* ─── Yanıp sönen cursor ─── */
-@keyframes blink {
-  50% {
-    opacity: 0;
-  }
+/* ─── Yazma imleci ───
+   S4: eskiden `steps(1)` ile sert açılıp kapanıyordu (eski terminal hissi,
+   akan metnin yanında rahatsız edici). Artık yumuşak nabız + hafif parıltı:
+   metne ait, canlı ama sakin bir uç. */
+@keyframes caret-pulse {
+  0%, 100% { opacity: 1;   transform: scaleY(1); }
+  50%      { opacity: .35; transform: scaleY(.86); }
 }
 .caret {
   display: inline-block;
-  width: 8px;
-  height: 1em;
+  width: 3px;
+  height: 1.05em;
+  margin-left: 1px;
+  border-radius: 2px;
   background: var(--color-brand);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--color-brand) 55%, transparent);
   vertical-align: text-bottom;
-  animation: blink 1s steps(1) infinite;
+  animation: caret-pulse 1.1s ease-in-out infinite;
 }
 
-/* ─── Typing indicator ─── */
+/* ─── "Yazıyor" göstergesi (S3) ───
+   Eskiden yalnız üç sönük nokta vardı: bekleme ölü zaman gibi hissettiriyor,
+   hangi aşamada olunduğu da görünmüyordu. Artık marka renginde akan bir
+   parıltı şeridi + aşama metni ("Bağlanıyor / Düşünüyor / Yazıyor"). */
+@keyframes typing-sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+.typing-shimmer {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 3px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-brand) 16%, transparent);
+}
+.typing-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--color-brand) 85%, transparent),
+    transparent
+  );
+  animation: typing-sweep 1.25s ease-in-out infinite;
+}
+
+/* ─── Typing indicator (eski üç nokta — hâlâ başka yerlerde kullanılıyor) ─── */
 .typing-dot {
   display: inline-block;
   width: 7px;
@@ -544,6 +605,45 @@ html.light .user-bubble {
 .animate-fade-in {
   animation: fade-in 0.25s ease-out;
 }
+
+/* ─── Mesaj giriş animasyonu (S2) ───
+   Eskiden her baloncukta `animate-fade-in` vardı. CSS animasyonu mount'ta
+   çalıştığı için sohbeti her AÇIŞTA tüm eski mesajlar yeniden animasyonlanıyor,
+   liste "dalgalanarak" geliyordu — kullanıcının "hareketsiz ve kötü duruyor"
+   dediği izlenimin bir kaynağı buydu. Artık bu sınıf yalnızca O TURDA GELEN
+   mesaja veriliyor (bkz. CoderView `enterFrom`), yön de role göre değişiyor:
+   kullanıcı sağdan, asistan soldan. Yumuşama eğrisi hafif "overshoot" içerir
+   ki baloncuk yerine oturuyormuş gibi hissettirsin. */
+@keyframes msg-enter-user {
+  from { opacity: 0; transform: translate3d(14px, 6px, 0) scale(.985); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes msg-enter-ai {
+  from { opacity: 0; transform: translate3d(-10px, 8px, 0) scale(.99); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+.msg-enter { animation-duration: 260ms; animation-fill-mode: both; animation-timing-function: cubic-bezier(.22, 1.1, .36, 1); }
+.msg-enter-user { animation-name: msg-enter-user; }
+.msg-enter-ai { animation-name: msg-enter-ai; }
+
+/* ─── Blok belirme (S4) ───
+   Kod blokları, artifact/araç kartları akış sırasında aniden "patlayarak"
+   beliriyordu. Kısa bir açılma, gözün yeni bloğu takip etmesini kolaylaştırır. */
+@keyframes block-reveal {
+  from { opacity: 0; transform: translate3d(0, 4px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.block-reveal { animation: block-reveal 220ms cubic-bezier(.22, 1, .36, 1) both; }
+
+/* ─── Basma geri bildirimi (S5) ───
+   Gönder düğmesinde girdinin kaydedildiği anında hissedilsin. */
+.press-fx { transition: transform 120ms cubic-bezier(.22, 1, .36, 1), box-shadow 160ms ease-out; }
+.press-fx:active:not(:disabled) { transform: scale(.92); }
+@keyframes send-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-brand) 55%, transparent); }
+  100% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--color-brand) 0%, transparent); }
+}
+.send-pulse { animation: send-pulse 420ms ease-out; }
 
 /* ─── Modal backdrop ─── */
 @keyframes modal-bg {
@@ -686,14 +786,23 @@ html.light body {
 .animate-breathe { animation: breathe 2.8s ease-in-out infinite; }
 
 /* 9) Akış parıltısı — asistan avatarı YALNIZCA o mesaj akarken hafif bir
-   halka parıltısı alır; akış bitince anında durur (transient, kalıcı değil). */
+   halka parıltısı alır; akış bitince anında durur (transient, kalıcı değil).
+   S4: halka tek kademeliydi ve zar zor fark ediliyordu; artık dışarı doğru
+   yayılan iki kademeli bir dalga + hafif renk canlanması — model yazarken
+   avatar gerçekten "canlı" görünür, akış bitince anında durur. */
 @keyframes stream-glow {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-brand) 35%, transparent); }
-  50%      { box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 18%, transparent); }
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-brand) 45%, transparent); }
+  70%  { box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-brand) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-brand) 0%, transparent); }
 }
-.animate-stream-glow { animation: stream-glow 1.6s ease-in-out infinite; }
+.animate-stream-glow {
+  animation: stream-glow 1.8s cubic-bezier(.22, 1, .36, 1) infinite;
+  border-color: color-mix(in srgb, var(--color-brand) 45%, var(--color-line)) !important;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .animate-breathe { animation: none; }
   .animate-stream-glow { animation: none; }
+  .typing-shimmer::after { animation: none; }
+  .caret { animation: none; }
 }

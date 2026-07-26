@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import { buildFallbackChain } from "@/lib/fallback";
+import { createReveal, type RevealController } from "@/lib/streamReveal";
 import { filterMcpServersForModel } from "@/lib/mcpScope";
 import {
   ArrowDown,
@@ -956,6 +957,9 @@ export function CoderView() {
      mesaj geldi" rozetini hesaplamak için. */
   const lastSeenCountRef = useRef(0);
   const [showScrollDown, setShowScrollDown] = useState(false);
+  /** S5 — gönder düğmesinin tek seferlik dalga animasyonu (onAnimationEnd ile
+      kendini sıfırlar; zamanlayıcı yok, temizlenecek bir şey kalmaz). */
+  const [sendPulse, setSendPulse] = useState(false);
   const onMessagesScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
@@ -976,6 +980,25 @@ export function CoderView() {
 
   const current = chats.find((c) => c.id === currentId) || null;
   const messages = current?.messages ?? [];
+
+  /* S2 — giriş animasyonu eşiği. Baloncuklardaki `animate-fade-in` mount'ta
+     çalıştığı için sohbet her AÇILDIĞINDA tüm geçmiş yeniden animasyonlanıyor,
+     liste dalgalanarak geliyordu. Bu eşik, sohbete girildiği andaki mesaj
+     sayısını tutar: yalnız BUNDAN SONRA eklenen mesajlar animasyonlanır.
+     (Render sırasında state ayarlama — React'in "türetilmiş state" için
+     önerdiği desen; sohbet değişiminde tek fazladan render ile biter.) */
+  const [enterState, setEnterState] = useState({ chatId: currentId, from: messages.length });
+  if (enterState.chatId !== currentId) {
+    /* Sohbet DEĞİŞTİ. İki hâli ayırmak gerekiyor (canlı testte yakalandı: ilk
+       kural yalnız `messages.length` kullanıyordu ve YENİ sohbetin ilk mesajı
+       hiç animasyonlanmıyordu — çünkü sohbet id'si ile ilk kullanıcı mesajı
+       aynı güncellemede geliyor, yani id ilk görüldüğünde mesaj çoktan orada):
+         • Geçmişten AÇILAN sohbet (dolu) → hiçbir eski mesaj animasyonlanmaz.
+         • O anda OLUŞTURULAN sohbet (henüz 1-2 mesaj) → baştan animasyonlanır;
+           boş ekrandan sohbete geçiş zaten görsel bir başlangıçtır. */
+    setEnterState({ chatId: currentId, from: messages.length <= 2 ? 0 : messages.length });
+  }
+  const enterFrom = enterState.chatId === currentId ? enterState.from : messages.length;
   const activeRepoStr = config.activeRepo || "";
   const repoIsGitLab = isGitLabRepo(activeRepoStr);
 
@@ -1020,10 +1043,21 @@ export function CoderView() {
     const grew = messages.length > prevLenRef.current;
     prevLenRef.current = messages.length;
     if (grew) stickRef.current = true;
-    if (stickRef.current) {
-      lastSeenCountRef.current = messages.length;
-      endRef.current?.scrollIntoView({ behavior: grew ? "smooth" : "auto" });
+    if (!stickRef.current) return;
+    lastSeenCountRef.current = messages.length;
+    if (grew) {
+      /* Yeni mesaj eklendi — gözün takip edebilmesi için yumuşak kaydır. */
+      endRef.current?.scrollIntoView({ behavior: "smooth" });
+      return;
     }
+    /* S6 — akış sırasında takip. Eskiden her içerik değişiminde
+       scrollIntoView({behavior:"auto"}) çağrılıyordu; token başına birkaç kez
+       tetiklendiği için kaydırma zıplıyordu. Artık çizim zaten kare hızına
+       bağlı (createReveal) ve kaydırma doğrudan kapsayıcının scrollTop'una
+       yazılıyor: scrollIntoView'ın yerleşim işi ve kaydırma-çıpası
+       çakışmaları olmadan, kare başına tek ve pürüzsüz bir takip. */
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length, lastMessageContent]);
 
   /* Sohbet değişince en alta yapış + scroll (yeni sohbet hep dipten başlasın). */
@@ -2142,6 +2176,11 @@ export function CoderView() {
     /* Devam modunda full mevcut içerikten başlar → akış aynı baloncuğa eklenir. */
     const priorLen = isContinuation ? (lastMsg?.content.length ?? 0) : 0;
     let full = isContinuation ? (lastMsg?.content ?? "") : ""; // try/catch ortak erişimi
+    /* R2/S1 — akıcı yazma. Eskiden her token'da updateLastContent(full)
+       çağrılıyor, ReactMarkdown mesajın tamamını baştan ayrıştırıyordu (uzun
+       yanıtta ~1.000 ayrıştırma) ve metin blok blok zıplayarak beliriyordu.
+       Artık token'lar tampona yazılır, çizim kare hızına bağlanır. */
+    let reveal: RevealController | null = null;
     let cutAtLength = false; // finish_event: "length" ⇒ otomatik devam tetiklenebilir
     let realUsage: { prompt: number; completion: number } | null = null; // sağlayıcı gerçek token
     /* reasoning delta'ları birikir. Boştan BAŞLAMAZ: Füzyon/Hakem bloğu bu
@@ -2380,6 +2419,7 @@ export function CoderView() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      reveal = createReveal((visible) => useStore.getState().updateLastContent(visible));
 
       while (true) {
         const { done, value } = await reader.read();
@@ -2547,10 +2587,14 @@ export function CoderView() {
             const delta = parsed.choices?.[0]?.delta?.content ?? "";
             const reasoning = (parsed.choices?.[0]?.delta as Record<string, unknown>)?.reasoning as string | undefined;
             if (reasoning) { thinkingFull += reasoning; useStore.getState().updateLastThinking(thinkingFull); }
-            if (delta) { full += delta; useStore.getState().updateLastContent(full); }
+            if (delta) { full += delta; reveal.push(full); }
           } catch { /* parçalı satır */ }
         }
       }
+      /* Akış bitti: animasyonun geri kalanı için kullanıcıyı bekletme, kalan
+         metni tek seferde yaz. Bundan sonraki updateLastContent çağrıları
+         (muhakeme ayıklama vb.) doğrudan store'a gider. */
+      reveal.finish();
       if (!full) useStore.getState().updateLastContent("_(Model boş yanıt döndürdü.)_");
 
       /* Muhakeme sızıntısını ayır: <think>/<thinking>/<reasoning> etiketleri +
@@ -2639,6 +2683,9 @@ export function CoderView() {
         void runHooks(false, "error");
       }
     } finally {
+      /* Hata/abort yolunda bekleyen kare kalmasın: iptal edilen bir turun
+         animasyonu, hata mesajını yazdıktan SONRA üstüne yazamamalı. */
+      reveal?.cancel();
       coderAbort = null;
       useStore.getState().setStreaming(false);
       await useStore.getState().persistCurrent();
@@ -3440,6 +3487,7 @@ export function CoderView() {
                         onRegenerate={regenerate}
                         onContinue={isLastAssistant && m.content ? continueLast : undefined}
                         streamingNow={isLastAssistant && streaming}
+                        animateIn={i >= enterFrom}
                         onEdit={m.role === "user" ? editAndResend : undefined}
                         onSwitchVersion={
                           m.branches && m.branches.length > 1
@@ -3819,9 +3867,13 @@ export function CoderView() {
                   </button>
                 ) : (
                   <button
-                    onClick={send}
+                    /* S5 — gönderme geri bildirimi: basma anında küçülme +
+                       gönderildiğinde marka renginde tek bir dalga. Girdinin
+                       kaydedildiği an gözle de hissedilsin. */
+                    onClick={() => { setSendPulse(true); send(); }}
+                    onAnimationEnd={() => setSendPulse(false)}
                     disabled={!input.trim() && pendingImages.length === 0 && attachedFiles.length === 0}
-                    className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-brand hover:bg-branddim active:bg-branddim text-[#111110] grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95"
+                    className={`shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-brand hover:bg-branddim active:bg-branddim text-[#111110] grid place-items-center disabled:opacity-30 disabled:cursor-not-allowed transition-all hover:scale-105 press-fx${sendPulse ? " send-pulse" : ""}`}
                   >
                     <ArrowUp size={17} />
                   </button>
