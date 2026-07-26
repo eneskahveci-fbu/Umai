@@ -1,15 +1,63 @@
 /**
  * Platform bilgi dosyası.
  *
- * Bu metin, eklenen HER modele (hangi sağlayıcı/model olursa olsun) sistem
- * prompt'una otomatik eklenir. Amaç: modelin, içinde çalıştığı UMAI
- * platformunun tüm özelliklerinin ve butonlarının farkında olması; kullanıcı
- * arayüzle ilgili soru sorduğunda doğru yönlendirme yapabilmesi.
+ * Bu metin, modelin içinde çalıştığı UMAI platformunun özelliklerini ve
+ * butonlarını bilmesi için sistem prompt'una eklenir; kullanıcı arayüzle
+ * ilgili soru sorduğunda doğru yönlendirme yapabilsin.
  *
  * Yeni bir özellik/buton eklendiğinde bu dosyayı güncelle.
+ *
+ * R3 — İKİ KADEMELİ. Tam rehber 11 KB ≈ 3.150 token ve eskiden HER isteğe
+ * koşulsuz ekleniyordu: "merhaba" yazana bile ~3.000 token'lık arayüz
+ * dokümantasyonu gidiyordu → ilk token gecikmesi (TTFT) ve maliyet her turda
+ * gereksiz yere artıyordu. Artık her isteğe yalnızca kısa DİZİN
+ * (PLATFORM_KNOWLEDGE_BRIEF, ~350 token) eklenir; tam rehber yalnızca soru
+ * gerçekten arayüz/platform hakkındaysa (needsPlatformKnowledge) eklenir.
+ * Dizin her yüzeyin adını ve adresini içerdiği için tespit ıskalasa bile
+ * model kullanıcıyı doğru yere yönlendirebilir.
  */
+
+/** Her isteğe eklenen kısa dizin — "ne nerede" sorusuna cevap verecek kadar. */
+export const PLATFORM_KNOWLEDGE_BRIEF = `[UMAI — içinde çalıştığın uygulama]
+Tarayıcıda çalışan Türkçe yapay zekâ kodlama/tasarım platformu. API anahtarları yalnızca kullanıcının tarayıcısında saklanır, sunucuda tutulmaz.
+Yüzeyler: Sohbet · Coder (dosya ağacı + editör + terminal, GitHub/GitLab) · Karşılaştırma · Stüdyo (/studio — sohbet + canlı artifact tuvali) · Anket (/studio/anket) · Defter (/studio/defter) · Kroki (/studio/kroki) · Kartlar (/studio/kartlar) · Doküman (/studio/dokuman) · Kütüphane (/library) · Dönüştürücü (/tools/converter) · Projeler (/projects) · Sohbetler (/chats).
+Yan panel: Ara (⌘K), Sohbetler, Stüdyo, Kütüphane, Projeler, Eklentiler, Araçlar; altta hesap avatarı ve "+" yeni sohbet.
+Ayarlar (⚙️) sekmeleri: Hesap, Model (sağlayıcı + API anahtarı ekleme), Git, Eklentiler (MCP), Temel (tema, davranış, sistem promptu, kısayollar), Kullanım, Plan, Hakkında.
+Sohbet komutları: "/" ile ajanlar (/explain /refactor /test /fix /review /docs /explore /plan /build /migrate /research /gorsel), "⚡" ile Skills.
+Yanıtların Türkçe ve markdown olmalı; kod bloklarını dilini belirterek yaz. Dosya içeriği yazarken code-fence'i \`dil:dosya/yolu\` biçiminde başlat (örn. \`\`\`ts:src/lib/utils.ts) ki editörde otomatik açılabilsin.
+Arayüzle ilgili AYRINTILI bir soru gelirse ve elinde tam rehber yoksa yukarıdaki adrese yönlendir; uydurma buton/menü adı verme.
+[/UMAI]`;
+
+/* Tam rehberi tetikleyen sinyaller: arayüz/özellik/konum soruları. Geniş
+   tutuldu — yanlış pozitifin bedeli birkaç bin token, yanlış negatifin bedeli
+   kullanıcıyı yanlış yönlendirmek. */
+const PLATFORM_HINT_RE = new RegExp(
+  [
+    "umai",
+    "aray[üu]z", "arabirim",
+    "buton", "d[üu][ğg]me", "sekme", "men[üu]", "panel", "sidebar", "yan panel", "[üu]st bar",
+    "ayarlar", "settings",
+    "st[üu]dyo", "studio", "k[üu]t[üu]phane", "library", "d[öo]n[üu][şs]t[üu]r[üu]c[üu]",
+    "eklenti", "mcp", "skill", "ajan", "agent", "otomatik pilot", "autopilot",
+    "anket", "defter", "kroki", "kartlar", "artifact",
+    "nerede", "nas[ıi]l (yapar[ıi]m|a[çc][ıi]l[ıi]r|eklenir|kullan|de[ğg]i[şs]tir)",
+    "hangi sekme", "nereden", "nereye",
+    "tema", "k[ıi]sayol", "shortcut",
+    "d[ıi][şs]a aktar", "export", "payla[şs]",
+    "api anahtar", "api key", "model ekle", "sa[ğg]lay[ıi]c[ıi]",
+    "gizli sohbet", "incognito", "misafir",
+    "fusion", "kalite modu", "efor",
+    "yerel k[öo]pr[üu]", "local bridge", "webcontainer",
+  ].join("|"),
+  "i",
+);
+
+/** Sorunun tam platform rehberine ihtiyacı var mı? */
+export function needsPlatformKnowledge(text: string): boolean {
+  return PLATFORM_HINT_RE.test(text || "");
+}
 export const PLATFORM_KNOWLEDGE = `[UMAI platform rehberi — içinde çalıştığın uygulamayı bil]
-Sen "UMAI" adlı, tarayıcıda çalışan Türkçe bir yapay zekâ kodlama asistanısın. Kullanıcı arayüzle ilgili bir şey sorarsa aşağıdaki bilgiye göre net yönlendir. Tüm API anahtarları yalnızca kullanıcının tarayıcısında saklanır, sunucuda tutulmaz.
+UMAI, tarayıcıda çalışan Türkçe bir yapay zekâ kodlama/tasarım platformudur; sen bu platformun içinde çalışan asistansın (hangi model olduğun için bkz. [MODEL KİMLİĞİ]). Kullanıcı arayüzle ilgili bir şey sorarsa aşağıdaki bilgiye göre net yönlendir. Tüm API anahtarları yalnızca kullanıcının tarayıcısında saklanır, sunucuda tutulmaz.
 
 GÖRÜNÜMLER
 - Sohbet (Chat): Normal ve "gizli sohbet" (incognito — hiçbir yere kaydedilmez).

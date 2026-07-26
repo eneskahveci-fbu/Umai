@@ -3,7 +3,7 @@ import { resolveModelAccess } from "@/lib/plan";
 import { isProRequest } from "@/lib/serverPlan";
 import { anthropicUpstream, type OpenAIChatBody } from "@/lib/anthropic";
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/constants";
-import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
+import { PLATFORM_KNOWLEDGE, PLATFORM_KNOWLEDGE_BRIEF, needsPlatformKnowledge } from "@/lib/platform-knowledge";
 import { buildContextSections } from "@/lib/prompt";
 import { runReadOnlyAgent } from "@/lib/subagent";
 import { filterByGlob } from "@/lib/glob";
@@ -20,6 +20,7 @@ import { isSafeRemoteUrl } from "@/lib/urlSafety";
 import { markProviderDown, markProviderUp, prioritizeHealthyCandidates } from "@/lib/providerHealth";
 import { detectModelCapabilities, JSON_MODE_PROVIDERS, EFFORT_TOKENS, THINKING_BUDGET } from "@/lib/modelCapabilities";
 import { downgradeRequest, isOpenAiReasoningModel, adaptForOpenAiReasoning } from "@/lib/requestDowngrade";
+import { buildIdentityPrompt } from "@/lib/modelIdentity";
 import { isBuiltinMcpServerId } from "@/lib/mcpBuiltins";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -1413,8 +1414,18 @@ export async function POST(req: Request) {
     `biçiminde yaz, ör. "- [ ] Seçenek A"). Kullanıcı yanıtlayınca seçimine göre ilerle; hâlâ ` +
     `netlik gerekiyorsa aynı yolla yeni bir kısa soru daha sorarak bu turu birkaç kez ` +
     `tekrarlayabilirsin — ama gereksiz yere sorma, istek zaten netse doğrudan işe koyul.`;
-  /* Eklenen her model, içinde çalıştığı platformun tüm özelliklerini bilsin. */
-  sysPrompt += `\n\n${PLATFORM_KNOWLEDGE}`;
+  /* R1 — Kimlik: model kendi kimliğini TAHMİN ETMESİN diye gerçeği veriyoruz.
+     ÇÖZÜMLENMİŞ provider/model kullanılır: anahtarsız istek Pollinations'a
+     düştüyse kimlik de onu söyler, kullanıcıya yanlış model adı verilmez. */
+  sysPrompt += `\n\n${buildIdentityPrompt(provider, model)}`;
+  /* R3 — Platform bilgisi iki kademeli: kısa dizin her zaman, 11 KB'lik tam
+     rehber yalnız soru gerçekten arayüz/platform hakkındaysa. Her isteğe
+     ~3.150 token dokümantasyon eklemek ilk token gecikmesini büyütüyordu. */
+  const lastUserContent = [...body.messages].reverse().find((m) => m.role === "user")?.content;
+  sysPrompt += `\n\n${PLATFORM_KNOWLEDGE_BRIEF}`;
+  if (needsPlatformKnowledge(typeof lastUserContent === "string" ? lastUserContent : "")) {
+    sysPrompt += `\n\n${PLATFORM_KNOWLEDGE}`;
+  }
   if (body.projectPrompt) sysPrompt += `\n\n[Proje talimatları]: ${body.projectPrompt}`;
   /* Stil + hafıza + skills — istemci ile ortak tek kaynak. searchContext
      BİLİNÇLİ OLARAK burada DEĞİL (bkz. aşağıdaki volatileTail): bu turdan
