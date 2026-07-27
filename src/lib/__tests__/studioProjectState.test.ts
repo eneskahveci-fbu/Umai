@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasUnsavedWork, recentProjects } from "../studioProjectState";
+import { hasUnsavedWork, recentProjects, relativeTime } from "../studioProjectState";
 
 /* U2/U3 — "+ Yeni" kaydedilmemiş bir tasarımı sessizce siliyordu ve galeriye
    dönmenin yıkıcı olmayan bir yolu yoktu. */
@@ -66,5 +66,26 @@ describe("recentProjects", () => {
 
   it("boş listede boş döner", () => {
     expect(recentProjects([])).toEqual([]);
+  });
+});
+
+describe("relativeTime", () => {
+  const NOW = 1_800_000_000_000;
+  const min = 60_000, hr = 60 * min, day = 24 * hr;
+
+  it("bir dakikadan yeniyse 'az önce'", () => {
+    expect(relativeTime(NOW, NOW)).toBe("az önce");
+    expect(relativeTime(NOW - 20_000, NOW)).toBe("az önce");
+  });
+
+  it("dakika / saat / gün eşiklerini doğru geçer", () => {
+    expect(relativeTime(NOW - 3 * min, NOW)).toBe("3 dk önce");
+    expect(relativeTime(NOW - 59 * min, NOW)).toBe("59 dk önce");
+    expect(relativeTime(NOW - 2 * hr, NOW)).toBe("2 sa önce");
+    expect(relativeTime(NOW - 3 * day, NOW)).toBe("3 gün önce");
+  });
+
+  it("saf: aynı girdiyle her zaman aynı çıktı (render'da Date.now yok)", () => {
+    expect(relativeTime(NOW - 5 * min, NOW)).toBe(relativeTime(NOW - 5 * min, NOW));
   });
 });

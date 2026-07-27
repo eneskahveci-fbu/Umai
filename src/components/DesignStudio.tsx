@@ -839,6 +839,8 @@ export function DesignStudio() {
           pendingImages={pendingImages}
           onAddImages={addImageFiles}
           onRemoveImage={removeImage}
+          savedProjects={savedProjects}
+          onOpenProject={openSavedProject}
         />
       ) : (
         <div className="flex-1 min-h-0 flex">
