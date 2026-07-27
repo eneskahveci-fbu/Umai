@@ -1,7 +1,8 @@
 import { useStore } from "./store";
 import { buildFallbackChain } from "./fallback";
 import { decryptField, isEncrypted } from "./secureKeys";
-import { buildSingleBlockPreview, parseBlocks } from "./preview";
+import { buildSingleBlockPreview } from "./preview";
+import { extractBlocks, pickBlock, classifyFailure, failureMessage, STRICT_FORMAT_REMINDER } from "./studioExtract";
 import { CATEGORY_CRAFT, CRAFT_RULES, lintArtifact } from "./studioCraft";
 import { skillById, directionById } from "./studioConstants";
 import { extractJson } from "./slides";
@@ -234,51 +235,70 @@ export async function generateArtifact(opts: GenerateOptions): Promise<GenerateR
   const userContent: unknown = opts.images?.length
     ? [...opts.images.map((img) => ({ type: "image_url", image_url: { url: img } })), { type: "text", text: opts.brief }]
     : opts.brief;
-  const res = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    signal: opts.signal,
-    body: JSON.stringify({
-      messages: [{ role: "user", content: userContent }],
-      baseUrl: resolved.baseUrl, model: resolved.model, apiKey: resolved.apiKey, provider: resolved.provider,
-      systemPrompt: sys,
-      fallbacks: buildFallbackChain(cfg.models, cfg.activeModelId),
-      tools: false, webSearch: false, temperature: 0.6,
-    }),
-  });
-  if (!res.ok || !res.body) {
-    /* /api/chat, tüm adaylar tükendiğinde gövdeye OKUNABİLİR bir hata metni
-       (friendlyApiError) yazar — bunu okumadan ham "LLM 500" göstermek
-       kullanıcıya hiçbir şey anlatmıyordu (bkz. CoderView.tsx'in ana send()'i,
-       aynı deseni zaten kullanıyor). */
-    const detail = await res.text().catch(() => "");
-    throw new Error(detail || `Sağlayıcı hatası (${res.status})`);
-  }
 
-  const reader = res.body.getReader();
-  const dec = new TextDecoder();
-  let buf = ""; let full = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += dec.decode(value, { stream: true });
-    const lines = buf.split("\n"); buf = lines.pop() || "";
-    for (const ln of lines) {
-      const t = ln.trim();
-      if (!t.startsWith("data:")) continue;
-      const p = t.slice(5).trim();
-      if (!p || p === "[DONE]") continue;
-      try {
-        const j = JSON.parse(p) as { choices?: { delta?: { content?: string } }[] };
-        const d = j.choices?.[0]?.delta?.content ?? "";
-        if (d) { full += d; opts.onDelta?.(stripCode(full)); }
-      } catch { /* parçalı satır */ }
+  /* Tek bir üretim turu — akışı okur, ham metni döndürür. Yeniden deneme
+     (aşağıda) sistem promptuna katı biçim hatırlatması ekleyip bunu TEKRAR
+     çağırır; istek kurulumunu iki kez yazmamak için ayrıldı. */
+  const runOnce = async (systemPrompt: string): Promise<string> => {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: opts.signal,
+      body: JSON.stringify({
+        messages: [{ role: "user", content: userContent }],
+        baseUrl: resolved.baseUrl, model: resolved.model, apiKey: resolved.apiKey, provider: resolved.provider,
+        systemPrompt,
+        fallbacks: buildFallbackChain(cfg.models, cfg.activeModelId),
+        tools: false, webSearch: false, temperature: 0.6,
+      }),
+    });
+    if (!res.ok || !res.body) {
+      /* /api/chat, tüm adaylar tükendiğinde gövdeye OKUNABİLİR bir hata metni
+         (friendlyApiError) yazar — bunu okumadan ham "LLM 500" göstermek
+         kullanıcıya hiçbir şey anlatmıyordu (bkz. CoderView.tsx'in ana send()'i,
+         aynı deseni zaten kullanıyor). */
+      const detail = await res.text().catch(() => "");
+      throw new Error(detail || `Sağlayıcı hatası (${res.status})`);
     }
-  }
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = ""; let out = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n"); buf = lines.pop() || "";
+      for (const ln of lines) {
+        const t = ln.trim();
+        if (!t.startsWith("data:")) continue;
+        const p = t.slice(5).trim();
+        if (!p || p === "[DONE]") continue;
+        try {
+          const j = JSON.parse(p) as { choices?: { delta?: { content?: string } }[] };
+          const d = j.choices?.[0]?.delta?.content ?? "";
+          if (d) { out += d; opts.onDelta?.(stripCode(out)); }
+        } catch { /* parçalı satır */ }
+      }
+    }
+    return out;
+  };
+
+  let full = await runOnce(sys);
 
   opts.onPhase?.("rendering");
-  const blocks = parseBlocks(full);
-  const block = blocks.find((b) => ["html", "htm", "jsx", "tsx", "react", "js", "javascript", "svg"].includes(b.lang)) || blocks[0];
+  /* Kullanıcı hata raporu (Tem 2026): "cv şablonu yap" / "odyssey hakkında
+     slayt yap" isteklerinin ikisi de "Üretim ayrıştırılamadı — brief'i biraz
+     daha açık yaz." veriyordu. Eski akış yalnız KAPANMIŞ ``` bloklarını
+     tanıyordu; model token sınırında kesilince (uzun CV/sunum HTML'inde çok
+     olası) kapanış çiti gelmiyor ve hiçbir şey kurtarılamıyordu. extractBlocks
+     kapanmamış son bloğu da kurtarır. Blok GERÇEKTEN yoksa bir kez daha,
+     katı biçim hatırlatmasıyla denenir. */
+  let block = pickBlock(extractBlocks(full));
+  if (!block && !/<[a-z]/i.test(full)) {
+    const retry = await runOnce(sys + STRICT_FORMAT_REMINDER);
+    if (retry.trim()) { full = retry; block = pickBlock(extractBlocks(retry)); }
+  }
   let artifact: Artifact | null = null;
   if (block) artifact = buildSingleBlockPreview(block.lang || "html", block.code);
   /* Claude Artifacts paritesi: html/react/svg/mermaid dışında kalan bloklar da
@@ -290,7 +310,14 @@ export async function generateArtifact(opts: GenerateOptions): Promise<GenerateR
       : { type: "code", content: block.code, title: `${block.lang} kodu`, language: block.lang };
   }
   if (!artifact && /<[a-z]/i.test(full)) artifact = buildSingleBlockPreview("html", full);
-  if (!artifact) { opts.onPhase?.("error"); throw new Error("Üretim ayrıştırılamadı — brief'i biraz daha açık yaz."); }
+  if (!artifact) {
+    /* DÜRÜST hata: eski mesaj her durumda brief'i suçluyordu ("brief'i biraz
+       daha açık yaz") — oysa neden ya boş yanıt ya da modelin kod bloğu yerine
+       düz metin döndürmesiydi; ikisinin de brief'le ilgisi yok. Artık neden
+       ayrıştırılıyor ve modelin GERÇEKTE ne döndürdüğü gösteriliyor. */
+    opts.onPhase?.("error");
+    throw new Error(failureMessage(classifyFailure(full), full));
+  }
 
   /* H3: marka fontu varsa <head>'e GARANTİ et (yalnız html artifact'larda). */
   if (artifact.type === "html" && opts.fontLink) {
