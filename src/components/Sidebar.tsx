@@ -18,6 +18,7 @@ import {
   Sparkles,
   Wrench,
   X,
+  Zap,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import type { Chat } from "@/lib/types";
@@ -48,6 +49,11 @@ function SidebarToolsButton({ variant, onNavigate }: { variant: "rail" | "nav"; 
   }, [open]);
 
   const items = [
+    /* Skills — sağ üst ⋯ menüsünden buraya taşındı (Tem 2026 kullanıcı
+       kararı): global bir eylem (setSkillsOpen), composer/oturum durumuna
+       bağlı değil, aynen Kütüphane/Etkinlik Günlüğü/Kısayollar gibi — bu
+       yüzden en sık kullanılan öğe olarak listenin başına eklendi. */
+    { icon: <Zap size={14} />, label: "Skills", onClick: () => useStore.getState().setSkillsOpen(true) },
     { icon: <BookOpen size={14} />, label: "Snippet'ler", onClick: () => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); } },
     { icon: <Activity size={14} />, label: "Etkinlik Günlüğü", onClick: () => useStore.getState().setActivityOpen(true) },
     { icon: <Keyboard size={14} />, label: "Kısayollar", onClick: () => useStore.getState().setShortcutsOpen(true) },
