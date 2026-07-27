@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, Eye, Link2, Maximize2, Minimize2, MousePointerClick, Monitor, RotateCw, Smartphone, Wand2, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, Eye, Link2, Maximize2, Minimize2, MousePointerClick, Monitor, Presentation, RotateCw, Smartphone, Wand2, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useStore } from "@/lib/store";
 import type { Artifact } from "@/lib/types";
@@ -39,12 +39,23 @@ export interface ArtifactCanvasProps {
       geniş tuvalinde anlamlı; sohbetin dar panelinde telefon çerçevesi zaten
       sığmayacağı için çağıran açıkça istemedikçe gösterilmez. */
   showDevicePicker?: boolean;
+  /** W1 — belirli bir sürüme ATLA. Verilmezse yalnız ‹ › okları kalır
+      (sohbet panelinde sürüm listesi açacak yer yok). */
+  onSelectVersion?: (index: number) => void;
+  /** W2 — kalite notlarını modele geri gönderip düzelttirme. Verilmezse not
+      şeridi eskisi gibi salt-bilgi kalır. */
+  onFixQuality?: (notes: string[]) => void;
+  /** W3 — kromsuz tam ekran sunum modu. Yalnız görsel türlerde anlamlı. */
+  enablePresent?: boolean;
 }
 
-export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVersion, onNextVersion, onClose, extraExportOptions, onAnnotate, onOpenInStudio, showDevicePicker }: ArtifactCanvasProps) {
+export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVersion, onNextVersion, onClose, extraExportOptions, onAnnotate, onOpenInStudio, showDevicePicker, onSelectVersion, onFixQuality, enablePresent }: ArtifactCanvasProps) {
   const addToast = useStore((s) => s.addToast);
   const [expanded, setExpanded] = useState(false);
   const [deviceId, setDeviceId] = useState<DeviceId>("web");
+  const [versionListOpen, setVersionListOpen] = useState(false);
+  const [presenting, setPresenting] = useState(false);
+  const versionRef = useRef<HTMLDivElement>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [view, setView] = useState<"preview" | "code">("preview");
   const [copied, setCopied] = useState(false);
@@ -141,6 +152,27 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
      maliyet bindirirdi. Saf türetme: state yok, render'da hesaplanır. */
   const qualityNotes = lintArtifactByType(artifact.type, artifact.content);
 
+  /* W1 — sürüm listesi: dışarı tıklama / Escape ile kapan (uygulamadaki
+     diğer popover'larla aynı desen). */
+  useEffect(() => {
+    if (!versionListOpen) return;
+    const onDown = (e: MouseEvent) => { if (!versionRef.current?.contains(e.target as Node)) setVersionListOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setVersionListOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [versionListOpen]);
+
+  /* W3 — sunum modu: Escape ile çık. Ok tuşları iframe'in İÇİNDE çalışır
+     (sandbox'lı belge kendi kaydırmasını yönetir); burada yalnız çıkış
+     yakalanır — üst pencereden sandbox'a tuş enjekte etmek mümkün değil. */
+  useEffect(() => {
+    if (!presenting) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPresenting(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [presenting]);
+
   /* U5 — cihaz çerçevesi. iframe TEK bir yerde kurulur ve ister çıplak ister
      DeviceFrame içinde render edilir; böylece ref (İşaretle & Değiştir
      postMessage doğrulaması) ve key (sürüm/yeniden yükleme) tek kaynakta
@@ -173,10 +205,43 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-sm font-semibold truncate min-w-0">{artifact.title || "Önizleme"}</span>
           {showVersionNav && (
-            <div className="flex items-center gap-0.5 shrink-0 text-[10px] font-mono text-muted/70 bg-bgsoft border border-line/60 rounded-lg px-1 py-0.5">
+            <div ref={versionRef} className="relative flex items-center gap-0.5 shrink-0 text-[10px] font-mono text-muted/70 bg-bgsoft border border-line/60 rounded-lg px-1 py-0.5">
               <button onClick={onPrevVersion} disabled={versionIndex === 0} className="disabled:opacity-30 hover:text-ink transition-colors" title="Önceki sürüm"><ChevronLeft size={13} /></button>
-              <span>v{(versionIndex ?? 0) + 1}/{versionTotal}</span>
+              {/* W1 — sürüm göstergesi artık TIKLANABİLİR. Eskiden yalnız ‹ ›
+                 okları vardı: 5. sürümdeyken 1.'ye dönmek 4 tıklıyordu ve
+                 hangi sürümde ne olduğunu görmenin yolu yoktu. */}
+              {onSelectVersion ? (
+                <button
+                  onClick={() => setVersionListOpen((v) => !v)}
+                  aria-expanded={versionListOpen}
+                  title="Sürüm listesi"
+                  className="px-0.5 hover:text-ink transition-colors"
+                >
+                  v{(versionIndex ?? 0) + 1}/{versionTotal}
+                </button>
+              ) : (
+                <span>v{(versionIndex ?? 0) + 1}/{versionTotal}</span>
+              )}
               <button onClick={onNextVersion} disabled={versionIndex === (versionTotal ?? 1) - 1} className="disabled:opacity-30 hover:text-ink transition-colors" title="Sonraki sürüm"><ChevronRight size={13} /></button>
+              {versionListOpen && onSelectVersion && (
+                <div className="absolute left-0 top-[calc(100%+6px)] z-30 w-44 max-h-64 overflow-y-auto rounded-xl border border-line bg-surface elev-2 py-1 font-sans">
+                  {Array.from({ length: versionTotal ?? 0 }, (_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => { onSelectVersion(i); setVersionListOpen(false); }}
+                      aria-current={i === versionIndex ? "true" : undefined}
+                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors ${
+                        i === versionIndex ? "bg-brand/10 text-brand font-semibold" : "text-ink/85 hover:bg-bgsoft/70"
+                      }`}
+                    >
+                      <span className="font-mono text-[11px] shrink-0">v{i + 1}</span>
+                      <span className="truncate text-muted/70">
+                        {i === (versionTotal ?? 1) - 1 ? "en son" : i === 0 ? "ilk üretim" : "revizyon"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -248,6 +313,13 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
               ...(extraExportOptions ?? []),
             ]}
           />
+          {/* W3 — sunum modu. "Büyüt" uygulama kromunu (araç çubuğu, notlar)
+             KORUYOR; sunum/tasarım göstermek için kromsuz bir görünüm gerekli. */}
+          {enablePresent && view === "preview" && (artifact.type === "html" || artifact.type === "svg") && (
+            <button onClick={() => setPresenting(true)} className={iconBtn} title="Sunum modu (tam ekran, kromsuz — Esc ile çık)" aria-label="Sunum modu">
+              <Presentation size={15} />
+            </button>
+          )}
           <button onClick={() => setExpanded(!expanded)} className={iconBtn} title={expanded ? "Küçült" : "Büyüt"}>{expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
           {onClose && <button onClick={() => { onClose(); setExpanded(false); }} className={iconBtn} title="Kapat"><X size={15} /></button>}
         </div>
@@ -276,9 +348,23 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
         <div className="shrink-0 flex items-start gap-2 px-3 py-1.5 border-b border-line bg-yellow/5 text-[11px] text-muted">
           <span className="shrink-0 pt-px" aria-hidden>🧹</span>
           <span className="min-w-0 flex-1">
-            <span className="font-semibold text-ink/80">Kalite notu: </span>
+            <span className="font-semibold text-ink/80">
+              {qualityNotes.length === 1 ? "Kalite notu: " : `${qualityNotes.length} kalite notu: `}
+            </span>
             {qualityNotes.join(" · ")}
           </span>
+          {/* W2 — not artık salt-bilgi değil: tek tıkla modele geri gönderilip
+             düzelttirilebiliyor. Lint zaten çalışıyordu ama kullanıcıya
+             "şimdi ne yapayım?" sorusunu bırakıyordu. */}
+          {onFixQuality && (
+            <button
+              onClick={() => onFixQuality(qualityNotes)}
+              className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-lg bg-brand/15 text-brand font-semibold hover:bg-brand/25 transition-colors"
+              title="Bu notları modele gönder ve düzelttir"
+            >
+              <Wand2 size={11} /> Düzelt
+            </button>
+          )}
         </div>
       )}
 
@@ -292,6 +378,31 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
           <pre className="w-full h-full overflow-auto m-0 p-4 text-[12px] leading-relaxed font-mono bg-codebg text-[#d6d6d6]"><code>{artifact.content}</code></pre>
         )}
       </div>
+
+      {/* W3 — Sunum modu katmanı. Kendi iframe'ini kurar (ana önizlemeyi
+         söküp takmadan) — burada annotation/ref gerekmiyor, salt görüntüleme.
+         Çıkış düğmesi yalnız fare hareketinde belirir (hover), böylece
+         sunum sırasında ekranda hiçbir krom durmaz. */}
+      {presenting && (
+        <div className="fixed inset-0 z-[100] bg-black">
+          <iframe
+            srcDoc={baseSrcdoc}
+            sandbox="allow-scripts allow-modals"
+            allow=""
+            referrerPolicy="no-referrer"
+            className="w-full h-full border-0 bg-white"
+            title="Sunum"
+          />
+          <button
+            onClick={() => setPresenting(false)}
+            title="Sunumdan çık (Esc)"
+            aria-label="Sunumdan çık"
+            className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/45 text-white/80 backdrop-blur-sm grid place-items-center opacity-0 hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+          >
+            <X size={17} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

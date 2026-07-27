@@ -889,6 +889,16 @@ export function DesignStudio() {
                   onNextVersion={() => setVersionIndex((i) => Math.min(versions.length - 1, i + 1))}
                   extraExportOptions={[printPdfOption, openInEditorOption]}
                   showDevicePicker
+                  enablePresent
+                  onSelectVersion={(i) => setVersionIndex(i)}
+                  /* W2 — kalite notlarını takip isteği olarak modele gönder.
+                     Sunumda tekil slayt hedefi seçiliyse ona, değilse tüm
+                     çıktıya uygulanır (mevcut takip akışının aynısı). */
+                  onFixQuality={(notes) => {
+                    const t = `Aşağıdaki kalite sorunlarını düzelt, başka hiçbir şeyi değiştirme:\n${notes.map((n) => `• ${n}`).join("\n")}`;
+                    if (editSlideIndex !== null) runSlideEdit(t, editSlideIndex);
+                    else runGenerate(t, true);
+                  }}
                   onAnnotate={(descriptor) => {
                     /* Seçim sohbet composer'ına eklenir; mobilde tuval tam ekran
                        olduğundan sohbete de geçilir ki kullanıcı sonucu görsün. */
