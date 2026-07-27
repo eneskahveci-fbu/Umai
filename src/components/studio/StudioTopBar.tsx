@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { X } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import { StudioSwitcher } from "./StudioSwitcher";
 import type { Surface } from "@/lib/surfaceNav";
 
@@ -20,6 +20,8 @@ export function StudioTopBar({
   showWorkActions,
   onNew,
   newLabel = "+ Yeni",
+  onBack,
+  backLabel = "Galeri",
   title,
   actions,
   onClose,
@@ -29,6 +31,10 @@ export function StudioTopBar({
   showWorkActions: boolean;
   onNew?: () => void;
   newLabel?: string;
+  /** U2 — çalışmayı KAYBETMEDEN giriş ekranına dön. Verilmezse hiç
+      render edilmez (giriş ekranında zaten dönülecek bir yer yok). */
+  onBack?: () => void;
+  backLabel?: string;
   title?: { value: string; onChange: (value: string) => void; placeholder?: string };
   actions?: ReactNode;
   onClose: () => void;
@@ -36,6 +42,22 @@ export function StudioTopBar({
   return (
     <div aria-label={`${label} başlık çubuğu`} className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line">
       <StudioSwitcher active={activeSurface} />
+      {/* U1 — Kimlik. StudioSwitcher tek yüzey kaldığından null döndürüyor
+         (bkz. StudioSwitcher.tsx); bu yüzden çubuğun SOL tarafı tamamen boş
+         kalıyordu: yeni bir kullanıcı 48px'lik bir şeritte yalnız bir "X"
+         görüyordu. Yüzeyin adı artık her zaman burada. */}
+      {onBack ? (
+        <button
+          onClick={onBack}
+          title={`${backLabel} — çalışman kaydedilir`}
+          className="flex items-center gap-1.5 shrink-0 -ml-1 pl-1.5 pr-2.5 py-2 sm:py-1 rounded-lg text-muted hover:text-ink hover:bg-bgsoft transition-colors"
+        >
+          <ArrowLeft size={15} />
+          <span className="text-xs font-semibold">{backLabel}</span>
+        </button>
+      ) : (
+        <span className="shrink-0 text-sm font-semibold text-ink">{label}</span>
+      )}
       {showWorkActions && (
         <>
           {onNew && (
