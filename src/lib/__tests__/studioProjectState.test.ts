@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasUnsavedWork, recentProjects, relativeTime } from "../studioProjectState";
+import { hasUnsavedWork, hasUnsavedItem, recentProjects, relativeTime } from "../studioProjectState";
 
 /* U2/U3 — "+ Yeni" kaydedilmemiş bir tasarımı sessizce siliyordu ve galeriye
    dönmenin yıkıcı olmayan bir yolu yoktu. */
@@ -87,5 +87,28 @@ describe("relativeTime", () => {
 
   it("saf: aynı girdiyle her zaman aynı çıktı (render'da Date.now yok)", () => {
     expect(relativeTime(NOW - 5 * min, NOW)).toBe(relativeTime(NOW - 5 * min, NOW));
+  });
+});
+
+describe("hasUnsavedItem — çıktı-tipi bağımsız kural (5 yüzey)", () => {
+  it("ortada öğe yoksa kayıp yok", () => {
+    expect(hasUnsavedItem(null, [])).toBe(false);
+    expect(hasUnsavedItem(undefined, [{ id: "a" }])).toBe(false);
+  });
+
+  it("hiç kaydedilmemiş öğe kaydedilmemiş sayılır", () => {
+    expect(hasUnsavedItem({ id: "a" }, [])).toBe(true);
+    expect(hasUnsavedItem({ id: "a" }, [{ id: "b" }])).toBe(true);
+  });
+
+  it("kaydedildikten sonra değişmişse kaydedilmemiş sayılır", () => {
+    expect(hasUnsavedItem({ id: "a", updatedAt: 200 }, [{ id: "a", updatedAt: 100 }])).toBe(true);
+    expect(hasUnsavedItem({ id: "a", updatedAt: 100 }, [{ id: "a", updatedAt: 100 }])).toBe(false);
+  });
+
+  it("hasUnsavedWork ile aynı kuralı paylaşır (html varken)", () => {
+    const saved = [{ id: "a", updatedAt: 100 }];
+    expect(hasUnsavedWork({ id: "a", html: "<p/>", updatedAt: 200 }, saved))
+      .toBe(hasUnsavedItem({ id: "a", updatedAt: 200 }, saved));
   });
 });
