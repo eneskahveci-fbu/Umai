@@ -112,6 +112,15 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   → tek HTML artifact, `/api/chat` üzerinden); "sunum" ayrı bir yüzey DEĞİL,
   yalnızca kendi kendine gezinen tek-HTML-sayfa üreten bir şablon kategorisi
   (`STUDIO_SKILLS`'teki `deck`). Kayıtlı projeler `config.studioProjects`'te.
+  **Model yanıtı → artifact ayrıştırma** `lib/studioExtract.ts`'tedir ve
+  `lib/preview.ts`'in `parseBlocks`'undan AYRI tutulur: `parseBlocks` kapanış
+  ``` çitini ZORUNLU tutar, oysa model token sınırında kesildiğinde o çit hiç
+  gelmez. `extractBlocks` kapanmamış son bloğu da kurtarır (`truncated: true`)
+  — yarım çıktı hiç çıktıdan iyidir. Blok gerçekten yoksa `STRICT_FORMAT_
+  REMINDER` ile BİR kez yeniden denenir; yine olmazsa hata `classifyFailure`/
+  `failureMessage` ile AYRIŞTIRILIR (boş yanıt mı, düz metin mi) ve modelin ne
+  döndürdüğü kullanıcıya gösterilir — genel "brief'i açık yaz" mesajı vermek
+  gerçek nedeni gizlediği için bilinçli olarak kaldırıldı.
 - **Görüntü üretimi** — artık ayrı bir Stüdyo yüzeyi DEĞİL: genel sohbette
   `/gorsel <brief>` slash komutuyla üretilir (`lib/agents.ts`'teki `image-gen`
   girdisi + `CoderView.tsx`'in `send()`'inde özel-durum intercept — LLM'e
@@ -175,6 +184,25 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   öneri çipleri (Kodumu daha iyi yap/Yeni özellik/Hata çöz/Açıkla) ve
   "Stüdyo'ya geç" bağlantısı kaldırıldı, Claude'un kendi sade boş-sohbet
   ekranına paralel.
+- **İçerik araçlarının GERÇEK barındırma yapısı** (birden çok dosya okumadan
+  görülmez, yanlış varsayıma çok açık): Doküman/Anket/Defter/Kroki/Kartlar'ın
+  her biri KENDİ sayfası DEĞİLDİR. Beşi de tek rotada — `/studio/araclar` —
+  `studio/StudioHub.tsx` kabuğu içinde yaşar; aşağıda anılan `/studio/dokuman`,
+  `/studio/anket`, `/studio/defter`, `/studio/kroki`, `/studio/kartlar`
+  rotalarının hepsi `/studio/araclar?tab=...`'a YÖNLENDİREN eski bağlantılardır
+  (Tem 2026: "özellik kaybetmeden birleştir"). Sonuçları:
+  • Üst çubuğu (5 aracın sekme anahtarı + kapat düğmesi) **StudioHub çizer** —
+    yüzeylerin kendi `slimActionsRow`'u bunun ALTINDA ikinci bir satırdır. Bir
+    yüzeyin "başlığı/kapatması yok" sanıp `StudioTopBar` eklemek YİNELENEN bir
+    kimlik satırı üretir (`StudioTopBar` yalnız `DesignStudio` tarafından
+    kullanılır, kabuk paylaşımı yoktur).
+  • Sekme değişimi `surfaceNav.go()`'nun "aynı sayfadaysa yalnız store bayrağını
+    değiştir" dalıyla çalışır — tam sayfa remount OLMAZ; bu yüzden `SurfacePage`
+    unmount'ta yalnız kendi bayrağını değil HEPSİNİ kapatır.
+  • Ortak kaydet/sil/liste + kaydedilmemiş-iş koruması `lib/useStudioProject.ts`
+    (`save/remove/confirmDiscard/saveQuiet/recent`, altında
+    `lib/studioProjectState.ts`) üzerindendir; yeni bir yüzey eklerken "+ Yeni"yi
+    doğrudan `setX(null)` yapma — `confirmDiscard` kullan.
 - **Doküman Stüdyosu** (`studio/DocsStudio.tsx`, `/studio/dokuman`): Notion'dan
   ilhamla blok tabanlı doküman (`lib/docs.ts`) — AI taslak + "devam et",
   Markdown/bağımsız HTML dışa aktarma, `config.craftDocs`. **Yazım Asistanı**
@@ -296,6 +324,46 @@ npm run cap:sync   # Capacitor iOS/Android senkron
 Birim testler `src/lib/__tests__/*.test.ts` altında (vitest, `environment:
 node`, `@` → `src` alias — bkz. `vitest.config.ts`). E2E `e2e/` altında
 Playwright ile.
+
+## Doğrulama ve Tekrar Eden Tuzaklar
+
+> Bunların hepsi gerçekten ısırdı; `tsc` + `vitest` yeşilken bile canlıda
+> kırılan sınıflar burada.
+
+- **`tsc` ve testler yeşil olması YETMEZ.** Zustand selector'ı her render'da
+  YENİ bir dizi/nesne döndürürse (`s.config.models.filter(...)`,
+  `s.config.highlights ?? []`) `Object.is` her seferinde "değişti" der →
+  *"Maximum update depth exceeded"* ve o ekran hiç açılmaz. tsc ve tüm birim
+  testler bunu geçirir. Kararlı referans seç (`s.config.models`), türetmeyi
+  `useMemo`'ya al; sabit boş dizi için modül seviyesinde tek bir sabit kullan
+  (`CardsStudio.tsx`'teki `EMPTY_HIGHLIGHTS`). UI değiştiren her işten sonra
+  gerçekten tarayıcıda aç.
+- **eslint `react-hooks/purity` gerçek hataları yakalar, sadece stil değil.**
+  Render sırasında `Date.now()` çağırmak hata verir; ama asıl mesele şu ki
+  genelde ALTINDA bir mantık hatası vardır (ör. "kaydedilmemiş mi?" kontrolünü
+  `Date.now()` ile kurmak, kaydettikten hemen sonra bile "kaydedilmemiş" der).
+  Referans anı `useState(() => Date.now())` ile bir kez al ya da saf bir
+  fonksiyona parametre olarak geçir (`studioProjectState.relativeTime(ts, now)`).
+- **Vitest `environment: "node"` — jsdom YOK.** `window`/`document`/
+  `sessionStorage` tanımsızdır; ihtiyaç varsa `vi.stubGlobal` ile elle kur.
+  Saf mantığı bileşenden `lib/`'e çıkarıp orada test etmek tercih edilen yol.
+- **Playwright ile canlı doğrulama** (`npm run build && npm run start`, sonra
+  `/opt/pw-browsers/chromium`):
+  • Misafir modda config **`sessionStorage`**'tadır (`localStorage` değil —
+    bkz. `store.ts` `isGuestMode`/`getStore`); tohumlarken `craftai_guest="1"`
+    + `craftai_onboarded="1"` ver.
+  • Sağlayıcıyı taklit ederken `page.route(...).fulfill` gövdeyi TEK parça
+    verir — gerçek akış (kare kare çizim) simüle edilmez; zamana yayılmış SSE
+    için `addInitScript` içinde `window.fetch`'i sarıp `ReadableStream` döndür.
+  • O init script sandbox'lı artifact iframe'inde de çalışır; `if (window.top
+    !== window) return;` ile koru, yoksa yanıltıcı `PAGEERROR` üretir.
+  • Misafir modda varsayılan ücretsiz model TARAYICIDAN doğrudan çağrılır
+    (`text.pollinations.ai`), `/api/chat`'ten geçmez — yalnız `/api/chat`'i
+    taklit etmek yetmez.
+- **Ortam uyarısı:** Bu çalışma kopyası oturum içinde kendiliğinden eski bir
+  commit'e dönebiliyor. Düzenlemeden ÖNCE `git log --oneline -1` + `git status`
+  bak; şüphelenirsen `git fetch origin main && git merge --ff-only origin/main`
+  ile senkronla. Gönderilmiş iş uzakta güvendedir — bitirdiğin işi bekletme.
 
 ## Mimari (Büyük Resim)
 
@@ -423,9 +491,16 @@ Playwright ile.
 
 ## Dağıtım
 
-Canlı site **GitLab** `main`'den (Vercel) dağıtılır; `origin` GitHub'dır ve iki
-repo bazı dosyalarda (özellikle `chat/route.ts`) ıraksamıştır. Değişiklikler
-GitLab `main`'e cherry-pick ile taşınır — toptan branch push'tan kaçın.
+Canlı site **GitLab** `main`'den (Vercel) dağıtılır ve `origin` ARTIK GitLab'ın
+kendisidir (`gitlab.com/eneskahveci.bs/craft-coder`) — doğrudan
+`git push -u origin main` yeterli. (Eskiden `origin` GitHub'dı ve değişiklikler
+GitLab'a cherry-pick ediliyordu; o kurul artık geçerli DEĞİL.)
+
+Vercel'de kırmızı bir build görürsen ÖNCE hangi commit'ten derlendiğine bak
+(deployment → Source). Eski bir commit'ten tetiklenmiş redeploy'lar, çoktan
+düzeltilmiş hataları gösterebilir; `git log -S "<hata metni>" --all -- <dosya>`
+ile o kodun ne zaman kaldırıldığını, `git merge-base --is-ancestor <fix>
+origin/main` ile düzeltmenin main'de olduğunu doğrula.
 
 ## Kod Konvansiyonları
 
