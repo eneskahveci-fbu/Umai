@@ -44,3 +44,15 @@ export function recentProjects<T extends SavedLike>(saved: readonly T[], limit =
     .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
     .slice(0, Math.max(0, limit));
 }
+
+/** "3 dk önce" gibi kısa göreli zaman. `now` DIŞARIDAN verilir: render
+    sırasında Date.now() çağırmak saf olmayan bir işlem (React kuralı) ve
+    testte de sabitlenemezdi. */
+export function relativeTime(ts: number, now: number): string {
+  const mins = Math.round((now - ts) / 60_000);
+  if (mins < 1) return "az önce";
+  if (mins < 60) return `${mins} dk önce`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs} sa önce`;
+  return `${Math.round(hrs / 24)} gün önce`;
+}
