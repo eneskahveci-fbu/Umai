@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import { buildFallbackChain } from "@/lib/fallback";
 import { createReveal, type RevealController } from "@/lib/streamReveal";
+import { toggleLeftPanel, switchLeftPanel, type LeftPanel } from "@/lib/leftPanel";
 import { filterMcpServersForModel } from "@/lib/mcpScope";
 import {
   ArrowDown,
@@ -719,9 +720,16 @@ export function CoderView() {
   const localActive = !!(config.localMode && config.localBridgeUrl?.trim());
   const toolsEnabled = toolsEnabledStore && (!!repo || localActive);
 
-  const [filesOpen, setFilesOpen] = useState(false);
-  /* Sunucu (Hibrit köprü) workspace gezgini — ajanların çalıştığı gerçek dizin. */
-  const [wsOpen, setWsOpen] = useState(false);
+  /* "Alan" paneli — Tem 2026 kullanıcı kararı: Dosyalar (depo) ve Sunucu
+     (workspace) paneli AYNI konumda (sol, w-64/56, z-30) render ediliyordu
+     ama bağımsız boolean'lardı — ikisi de teorik olarak aynı anda açık
+     kalabilir, üst üste binerdi. Artık TEK bir kaynak-doğruluk (leftPanel):
+     en fazla biri açık, geçiş saf bir fonksiyonla yapılır (bkz.
+     lib/leftPanel.ts). filesOpen/wsOpen türetilmiş sabitler olarak kalıyor
+     ki aşağıdaki render blokları değişmesin. */
+  const [leftPanel, setLeftPanel] = useState<LeftPanel>(null);
+  const filesOpen = leftPanel === "files";
+  const wsOpen = leftPanel === "workspace";
   const [wsTree, setWsTree] = useState<TreeNode | null>(null);
   const [wsPaths, setWsPaths] = useState<string[]>([]);
   const [wsLoading, setWsLoading] = useState(false);
@@ -3083,7 +3091,9 @@ export function CoderView() {
               active={editorOpen}
               onClick={() => setEditorOpen(!editorOpen)}
             />
-            <MoreItem icon={<Zap size={14} />} label="Skills" onClick={() => useStore.getState().setSkillsOpen(true)} />
+            {/* Skills → Sidebar'ın "Araçlar" popover'ına taşındı (Tem 2026
+               kullanıcı kararı) — Kütüphane/Etkinlik Günlüğü/Kısayollar gibi
+               global bir eylem, composer state'ine bağlı değil. */}
             <MoreItem icon={<VenetianMask size={14} />} label="Gizli sohbet" onClick={() => useStore.getState().newChat(true)} />
             {/* Composer'daki taslak metni işlediği için (bkz. improvePrompt)
                burada, oturuma özgü hızlı eylemlerin yanında kalıyor — Sidebar'ın
@@ -3125,13 +3135,17 @@ export function CoderView() {
                   />
                 )}
                 <MoreItem icon={<GitBranch size={14} />} label="Git & PR" desc="dal, PR/MR, incele" active={gitPanelOpen} onClick={() => setGitPanelOpen((v) => !v)} />
-                <MoreItem icon={<FolderOpen size={14} />} label="Dosyalar (depo)" active={filesOpen} onClick={() => setFilesOpen((v) => !v)} />
+                <MoreItem icon={<FolderOpen size={14} />} label="Dosyalar (depo)" active={filesOpen} onClick={() => setLeftPanel((p) => toggleLeftPanel(p, "files"))} />
                 {localActive && (
                   <MoreItem
                     icon={<Server size={14} />}
                     label="Sunucu (workspace)"
                     active={wsOpen}
-                    onClick={() => setWsOpen((v) => { const nv = !v; if (nv && !wsTree && !wsLoading) loadWorkspace(); return nv; })}
+                    onClick={() => {
+                      const willOpen = leftPanel !== "workspace";
+                      setLeftPanel((p) => toggleLeftPanel(p, "workspace"));
+                      if (willOpen && !wsTree && !wsLoading) loadWorkspace();
+                    }}
                   />
                 )}
               </>
@@ -3212,7 +3226,18 @@ export function CoderView() {
                     <RefreshCw size={10} className={connecting ? "animate-spin" : ""} />
                   </button>
                 )}
-                <button onClick={() => setFilesOpen(false)} className="text-muted/40 hover:text-muted transition-colors">
+                {/* Alan paneli — tek tık sekme: her iki kaynak da varsa panelı
+                   kapatıp menüden tekrar açmaya gerek kalmadan diğerine geç. */}
+                {localActive && (
+                  <button
+                    onClick={() => { setLeftPanel(switchLeftPanel("workspace")); if (!wsTree && !wsLoading) loadWorkspace(); }}
+                    title="Sunucu (workspace)'a geç"
+                    className="text-muted/40 hover:text-brand transition-colors"
+                  >
+                    <Server size={10} />
+                  </button>
+                )}
+                <button onClick={() => setLeftPanel(null)} className="text-muted/40 hover:text-muted transition-colors">
                   <X size={11} />
                 </button>
               </div>
@@ -3373,7 +3398,16 @@ export function CoderView() {
                 <button onClick={loadWorkspace} disabled={wsLoading} title="Yenile" className="text-muted/40 hover:text-brand transition-colors disabled:opacity-30">
                   <RefreshCw size={10} className={wsLoading ? "animate-spin" : ""} />
                 </button>
-                <button onClick={() => setWsOpen(false)} className="text-muted/40 hover:text-muted transition-colors">
+                {repo && (
+                  <button
+                    onClick={() => setLeftPanel(switchLeftPanel("files"))}
+                    title="Dosyalar (depo)'a geç"
+                    className="text-muted/40 hover:text-brand transition-colors"
+                  >
+                    <FolderOpen size={10} />
+                  </button>
+                )}
+                <button onClick={() => setLeftPanel(null)} className="text-muted/40 hover:text-muted transition-colors">
                   <X size={11} />
                 </button>
               </div>
