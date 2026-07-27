@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  ArrowLeft, Download, FolderOpen, GitBranch, Loader2, Network, Plus, Save, Sparkles, Trash2,
+  ArrowLeft, Download, FolderOpen, GitBranch, Loader2, Network, Plus, Presentation, Save, Sparkles, Trash2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { friendlyError } from "@/lib/friendlyError";
@@ -11,6 +11,7 @@ import { SavedItemsModal } from "./SavedItemsModal";
 import { ExportMenu } from "./ExportMenu";
 import { GenSkeleton } from "./GenSkeleton";
 import { RecentWorksStrip } from "./RecentWorksStrip";
+import { PresentOverlay } from "./PresentOverlay";
 import { safeFileName } from "./DocsStudio";
 import type { CraftMap } from "@/lib/types";
 import {
@@ -32,6 +33,61 @@ const SUGGESTIONS = [
   "Aile bütçesi kalemleri: gelirler, sabit giderler, tasarruf hedefleri",
 ];
 
+/* X4 — kroki çizimi tek bileşende. Hem düzenlenebilir tuval hem de kromsuz
+   sunum katmanı bunu kullanır: iki ayrı kopya (biri innerHTML'li SVG dizesi)
+   tutmak yerine AYNI JSX, yalnız etkileşim opsiyonel. `onSelect` verilmezse
+   düğümler tıklanamaz ve seçim vurgusu çizilmez — sunumda "seçili düğüm"
+   diye bir kavram yok. */
+function MapSvg({
+  layout, title, selectedId, onSelect,
+}: {
+  layout: NonNullable<ReturnType<typeof layoutMap>>;
+  title: string;
+  selectedId?: string | null;
+  onSelect?: (id: string) => void;
+}) {
+  return (
+    <svg
+      viewBox={`0 0 ${layout.width} ${layout.height}`}
+      width={layout.width}
+      height={layout.height}
+      className="block mx-auto my-4 font-sans max-w-full h-auto"
+      role="img"
+      aria-label={`Kroki: ${title}`}
+    >
+      {layout.edges.map((e) => (
+        <path key={`${e.from}-${e.to}`} d={e.path} fill="none" className="stroke-line" strokeWidth={1.5} />
+      ))}
+      {layout.nodes.map((n) => {
+        const isRoot = n.depth === 0;
+        const isSel = !!onSelect && n.id === selectedId;
+        return (
+          <g
+            key={n.id}
+            onClick={onSelect ? () => onSelect(n.id) : undefined}
+            className={onSelect ? "cursor-pointer" : undefined}
+            role={onSelect ? "button" : undefined}
+            aria-label={n.text}
+            tabIndex={-1}
+          >
+            <rect
+              x={n.x} y={n.y} width={n.w} height={n.h} rx={8}
+              className={isRoot ? "fill-brand" : n.depth === 1 ? "fill-brand/10" : "fill-surface"}
+              stroke={isSel ? "var(--brand, #5c9478)" : "var(--line, #d9d3c4)"}
+              strokeWidth={isSel ? 2 : 1}
+            />
+            <text
+              x={n.x + n.w / 2} y={n.y + n.h / 2 + 4}
+              textAnchor="middle" fontSize={12.5} fontWeight={isRoot ? 700 : 500}
+              className={isRoot ? "fill-[#111110]" : "fill-ink"}
+            >{n.displayText}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 export function MapStudio() {
   const open = useStore((s) => s.mapStudioOpen);
   const addToast = useStore((s) => s.addToast);
@@ -42,6 +98,7 @@ export function MapStudio() {
   const [map, setMap] = useState<CraftMap | null>(null);
   const [busy, setBusy] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
+  const [presenting, setPresenting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expanding, setExpanding] = useState(false);
 
@@ -150,6 +207,7 @@ export function MapStudio() {
       />
       <div className="ml-auto flex items-center gap-1 shrink-0">
         <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-9 h-9 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
+        <button onClick={() => setPresenting(true)} title="Sunum modu (tam ekran, kromsuz — Esc ile çık)" aria-label="Sunum modu" className="w-9 h-9 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Presentation size={15} /></button>
         <button onClick={saveMap} title="Kaydet" className="w-9 h-9 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
         <ExportMenu
           options={[
@@ -244,40 +302,15 @@ export function MapStudio() {
 
           {/* Kroki tuvali — dışa aktarılan SVG ile aynı yerleşim (layoutMap). */}
           <div className="flex-1 min-h-0 overflow-auto bg-bgsoft/30">
-            <svg
-              viewBox={`0 0 ${layout.width} ${layout.height}`}
-              width={layout.width}
-              height={layout.height}
-              className="block mx-auto my-4 font-sans"
-              role="img"
-              aria-label={`Kroki: ${map.title}`}
-            >
-              {layout.edges.map((e) => (
-                <path key={`${e.from}-${e.to}`} d={e.path} fill="none" className="stroke-line" strokeWidth={1.5} />
-              ))}
-              {layout.nodes.map((n) => {
-                const isRoot = n.depth === 0;
-                const isSel = n.id === selectedId;
-                return (
-                  <g key={n.id} onClick={() => setSelectedId(n.id)} className="cursor-pointer" role="button" aria-label={n.text} tabIndex={-1}>
-                    <rect
-                      x={n.x} y={n.y} width={n.w} height={n.h} rx={8}
-                      className={isRoot ? "fill-brand" : n.depth === 1 ? "fill-brand/10" : "fill-surface"}
-                      stroke={isSel ? "var(--brand, #5c9478)" : "var(--line, #d9d3c4)"}
-                      strokeWidth={isSel ? 2 : 1}
-                    />
-                    <text
-                      x={n.x + n.w / 2} y={n.y + n.h / 2 + 4}
-                      textAnchor="middle" fontSize={12.5} fontWeight={isRoot ? 700 : 500}
-                      className={isRoot ? "fill-[#111110]" : "fill-ink"}
-                    >{n.displayText}</text>
-                  </g>
-                );
-              })}
-            </svg>
+            <MapSvg layout={layout} title={map.title} selectedId={selectedId} onSelect={setSelectedId} />
           </div>
         </div>
       ) : null}
+
+      {/* X4 — kromsuz tam ekran sunum. Aynı MapSvg, etkileşim olmadan. */}
+      <PresentOverlay open={presenting && !!layout} onClose={() => setPresenting(false)} label={map?.title || "Kroki"}>
+        {layout && <MapSvg layout={layout} title={map?.title || "Kroki"} />}
+      </PresentOverlay>
 
       <SavedItemsModal
         open={savedOpen}

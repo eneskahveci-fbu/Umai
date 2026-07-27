@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   ArrowLeft, ArrowDown, ArrowUp, Check, Download, FileCode, FileText, FolderOpen, Lightbulb, Loader2,
+  Presentation,
   Plus, Save, SpellCheck, Sparkles, Trash2, Wand2, X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -13,6 +14,7 @@ import { ExportMenu } from "./ExportMenu";
 import { CrossTypeRelated } from "./CrossTypeRelated";
 import { GenSkeleton } from "./GenSkeleton";
 import { RecentWorksStrip } from "./RecentWorksStrip";
+import { PresentOverlay } from "./PresentOverlay";
 import type { CraftDoc, DocBlock, DocBlockType } from "@/lib/types";
 import {
   continueDoc, DOC_BLOCK_TYPES, docToHtml, docToMarkdown, generateDoc,
@@ -46,6 +48,43 @@ export function safeFileName(s: string, fallback: string): string {
   return (s || "").replace(/[^\wğüşöçıİĞÜŞÖÇ -]/g, "").trim() || fallback;
 }
 
+/* X4 — dikkat dağıtmayan okuma görünümü (sunum modu).
+   Blokları React öğeleri olarak çizer; docToHtml'in dizesini innerHTML ile
+   basmak yerine JSX kullanılır — React zaten kaçış yapar, ekstra bir güven
+   varsayımına gerek kalmaz. Salt okunur: düzenleme denetimleri yok. */
+function DocReadView({ doc }: { doc: CraftDoc }) {
+  return (
+    <article className="max-w-2xl mx-auto px-6 py-14 sm:py-20">
+      <h1 className="font-serif text-3xl sm:text-4xl font-medium tracking-tight mb-8">{doc.title}</h1>
+      <div className="space-y-4 text-[15.5px] leading-relaxed">
+        {doc.blocks.map((b) => {
+          switch (b.type) {
+            case "h1": return <h2 key={b.id} className="font-serif text-2xl font-medium mt-8 mb-1">{b.text}</h2>;
+            case "h2": return <h3 key={b.id} className="font-serif text-xl font-medium mt-6 mb-1">{b.text}</h3>;
+            case "h3": return <h4 key={b.id} className="text-base font-bold mt-5 mb-1">{b.text}</h4>;
+            case "bullet": return <li key={b.id} className="ml-5 list-disc">{b.text}</li>;
+            case "todo": return (
+              <p key={b.id} className="flex items-start gap-2">
+                <input type="checkbox" checked={!!b.checked} disabled readOnly className="mt-1.5 accent-brand" />
+                <span className={b.checked ? "line-through text-muted/60" : ""}>{b.text}</span>
+              </p>
+            );
+            case "quote": return <blockquote key={b.id} className="border-l-2 border-brand/40 pl-4 italic text-muted">{b.text}</blockquote>;
+            case "callout": return <div key={b.id} className="rounded-xl border border-brand/25 bg-brand/5 px-4 py-3">{b.text}</div>;
+            case "code": return <pre key={b.id} className="rounded-xl bg-codebg text-[#d6d6d6] p-4 overflow-x-auto text-[13px]"><code>{b.text}</code></pre>;
+            case "image": return /^https?:\/\//i.test(b.text)
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img key={b.id} src={b.text} alt="" loading="lazy" className="rounded-xl max-w-full" />
+              : null;
+            case "divider": return <hr key={b.id} className="border-line my-8" />;
+            default: return <p key={b.id}>{b.text}</p>;
+          }
+        })}
+      </div>
+    </article>
+  );
+}
+
 export function DocsStudio() {
   const open = useStore((s) => s.docsStudioOpen);
   const addToast = useStore((s) => s.addToast);
@@ -58,6 +97,7 @@ export function DocsStudio() {
   const [contBusy, setContBusy] = useState(false);
   const [contText, setContText] = useState("");
   const [savedOpen, setSavedOpen] = useState(false);
+  const [presenting, setPresenting] = useState(false);
   /* Yazım Asistanı: doğrulanmış öneriler + uygulanacakları blok id'leri. */
   const [proofBusy, setProofBusy] = useState(false);
   const [proofRows, setProofRows] = useState<{ issue: ProofIssue; blockId: string }[] | null>(null);
@@ -272,6 +312,7 @@ export function DocsStudio() {
       <button onClick={newDocAction} className="text-xs px-2.5 py-2 sm:py-1 rounded-lg border border-line text-muted hover:text-ink hover:bg-bgsoft shrink-0 transition-colors">+ Yeni</button>
       <div className="ml-auto flex items-center gap-1 shrink-0">
         <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-9 h-9 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
+        <button onClick={() => setPresenting(true)} title="Okuma/sunum modu (tam ekran — Esc ile çık)" aria-label="Sunum modu" className="w-9 h-9 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Presentation size={15} /></button>
         <button onClick={saveDoc} title="Kaydet" className="w-9 h-9 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
         <button onClick={() => void runProofread()} title="Yazım denetimi (AI)" className="w-9 h-9 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors disabled:opacity-40" disabled={proofBusy}>
           {proofBusy ? <Loader2 size={15} className="animate-spin" /> : <SpellCheck size={15} />}
@@ -441,6 +482,11 @@ export function DocsStudio() {
       ) : null}
 
       {/* Kayıtlı dokümanlar */}
+      {/* X4 — dikkat dağıtmayan okuma/sunum modu. */}
+      <PresentOverlay open={presenting && !!doc} onClose={() => setPresenting(false)} label={doc?.title || "Doküman"}>
+        {doc && <DocReadView doc={doc} />}
+      </PresentOverlay>
+
       <SavedItemsModal
         open={savedOpen}
         onClose={() => setSavedOpen(false)}
