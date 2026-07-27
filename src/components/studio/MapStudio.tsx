@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  Download, FolderOpen, GitBranch, Loader2, Network, Plus, Save, Sparkles, Trash2,
+  ArrowLeft, Download, FolderOpen, GitBranch, Loader2, Network, Plus, Save, Sparkles, Trash2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { friendlyError } from "@/lib/friendlyError";
@@ -10,6 +10,7 @@ import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav"
 import { SavedItemsModal } from "./SavedItemsModal";
 import { ExportMenu } from "./ExportMenu";
 import { GenSkeleton } from "./GenSkeleton";
+import { RecentWorksStrip } from "./RecentWorksStrip";
 import { safeFileName } from "./DocsStudio";
 import type { CraftMap } from "@/lib/types";
 import {
@@ -34,7 +35,7 @@ const SUGGESTIONS = [
 export function MapStudio() {
   const open = useStore((s) => s.mapStudioOpen);
   const addToast = useStore((s) => s.addToast);
-  const { saved, save, remove } = useStudioProject<CraftMap>("craftMaps", 40);
+  const { saved, save, remove, confirmDiscard, saveQuiet, recent } = useStudioProject<CraftMap>("craftMaps", 40);
 
   const [view, setView] = useState<"home" | "work">("home");
   const [brief, setBrief] = useState("");
@@ -126,11 +127,20 @@ export function MapStudio() {
 
   const openMap = (m: CraftMap) => { setMap(m); setView("work"); setSavedOpen(false); setSelectedId(null); };
 
+  /* X — giriş ekranına dönüş. `toHome` yalnız durumu sıfırlar; iki çağıran
+     farklı sözleşmeyle kullanır: "+ Yeni" ÖNCE onay ister (kaydedilmemiş iş
+     silinmesin), "← Galeri" ise ÖNCE sessizce kaydeder (iş korunur). Eskiden
+     yalnız yıkıcı olan tek bir yol vardı. */
+  const toHome = () => { setMap(null); setView("home"); setBrief(""); setSelectedId(null); };
+  const newMapAction = () => { if (confirmDiscard(map, "Bu kroki")) toHome(); };
+  const backToGallery = () => { saveQuiet(map); toHome(); };
+
   const layout = map ? layoutMap(map.root) : null;
 
   const slimActionsRow = view === "work" && map && (
     <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
-      <button onClick={() => { setMap(null); setView("home"); setBrief(""); setSelectedId(null); }} className="text-xs px-2.5 py-2 sm:py-1 rounded-lg border border-line text-muted hover:text-ink hover:bg-bgsoft shrink-0 transition-colors">+ Yeni</button>
+      <button onClick={backToGallery} title="Galeri — çalışman kaydedilir" className="flex items-center gap-1.5 text-xs px-2 py-2 sm:py-1 rounded-lg text-muted hover:text-ink hover:bg-bgsoft shrink-0 transition-colors"><ArrowLeft size={14} /> <span className="hidden sm:inline font-semibold">Galeri</span></button>
+      <button onClick={newMapAction} className="text-xs px-2.5 py-2 sm:py-1 rounded-lg border border-line text-muted hover:text-ink hover:bg-bgsoft shrink-0 transition-colors">+ Yeni</button>
       <input
         value={map.title}
         onChange={(e) => setMap({ ...map, title: e.target.value })}
@@ -187,6 +197,11 @@ export function MapStudio() {
                 <p className="text-center text-xs text-muted/60">Dallar kurgulanıyor…</p>
               </div>
             )}
+            {/* X3 — son çalışmalar. Aşağıdaki "Kayıtlı krokiler (n)" bağlantısı
+               yalnız modalı açıyordu: belirli bir krokiye dönmek iki tıktı.
+               Şerit doğrudan açıyor; bağlantı TAM liste (sil/dışa aktar) için
+               kalıyor. */}
+            <RecentWorksStrip items={recent()} onOpen={openMap} emptyTitle="Adsız kroki" />
             <div className="grid sm:grid-cols-2 gap-2">
               {SUGGESTIONS.map((s) => (
                 <button key={s} onClick={() => setBrief(s)} className="text-left text-[12.5px] leading-snug px-3 py-2.5 rounded-xl border border-line/60 hover:border-brand/50 hover:bg-bgsoft/60 text-muted hover:text-ink transition-colors">{s}</button>
@@ -195,7 +210,7 @@ export function MapStudio() {
             {saved.length > 0 && (
               <div className="flex items-center justify-center text-xs text-muted/80">
                 <button onClick={() => setSavedOpen(true)} className="inline-flex items-center gap-1.5 hover:text-ink transition-colors">
-                  <FolderOpen size={13} className="text-brand" /> Kayıtlı krokiler ({saved.length})
+                  <FolderOpen size={13} className="text-brand" /> Tüm krokiler ({saved.length})
                 </button>
               </div>
             )}

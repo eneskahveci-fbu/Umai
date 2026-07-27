@@ -1,6 +1,7 @@
 "use client";
 
 import { useStore } from "./store";
+import { hasUnsavedItem, recentProjects } from "./studioProjectState";
 import type { Config, StudioProjectBase } from "./types";
 
 type StudioListKey = "craftDocs" | "craftForms" | "craftNotebooks" | "craftMaps" | "craftDecks";
@@ -32,5 +33,22 @@ export function useStudioProject<T extends StudioProjectBase>(configKey: StudioL
     saveConfig({ ...config, [configKey]: saved.filter((x) => x.id !== id) } as Config);
   };
 
-  return { saved, save, saveAll, remove };
+  /* X2 — kaydedilmemiş işi koruma. Beş içerik yüzeyinin de "+ Yeni" düğmesi
+     mevcut öğeyi ONAYSIZ siliyordu (ör. DocsStudio `setDoc(null)`): kullanıcı
+     bir doküman/anket/kroki üretip kaydetmeyi unuttuysa tek tıkla
+     kaybediyordu. Kural Tasarım stüdyosundakiyle aynı (hasUnsavedItem), tek
+     kaynaktan geliyor. */
+  const isUnsaved = (item: T | null | undefined) => hasUnsavedItem(item, saved);
+
+  /** Yıkıcı bir eylemden önce çağır; devam edilebilirse true döner. */
+  const confirmDiscard = (item: T | null | undefined, what = "Bu çalışma") =>
+    !isUnsaved(item) || confirm(`${what} kaydedilmedi. Devam edilirse kaybolacak. Devam edilsin mi?`);
+
+  /** Galeriye dönerken sessiz kayıt — kullanıcıya "önce kaydet" yükü bindirmez. */
+  const saveQuiet = (item: T | null | undefined) => { if (item) save(item); };
+
+  /** X3 — giriş ekranındaki "Son çalışmalar" şeridi için. */
+  const recent = (limit = 6) => recentProjects(saved, limit);
+
+  return { saved, save, saveAll, remove, isUnsaved, confirmDiscard, saveQuiet, recent };
 }

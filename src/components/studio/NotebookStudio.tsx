@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  BookOpen, FileText, FolderOpen, Globe, GraduationCap, HelpCircle, Link2, Loader2, Plus, Save, Send,
+  ArrowLeft, BookOpen, FileText, FolderOpen, Globe, GraduationCap, HelpCircle, Link2, Loader2, Plus, Save, Send,
   Sparkles, Trash2, Users, Volume2, VolumeX,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -15,6 +15,7 @@ import { parsePodcastScript } from "@/lib/podcast";
 import { useStudioProject } from "@/lib/useStudioProject";
 import { consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { CrossTypeRelated } from "./CrossTypeRelated";
+import { RecentWorksStrip } from "./RecentWorksStrip";
 import { parseCitations } from "@/lib/citations";
 
 /* Defter — NotebookLM'den İLHAM alan craft yorumu (klonu değil): metin/URL
@@ -59,7 +60,7 @@ export function NotebookStudio() {
   const config = useStore((s) => s.config);
   const saveConfig = useStore((s) => s.saveConfig);
   const addToast = useStore((s) => s.addToast);
-  const { saved, save: saveNbItem, remove: removeNb } = useStudioProject<CraftNotebook>("craftNotebooks", 20);
+  const { saved, save: saveNbItem, remove: removeNb, recent } = useStudioProject<CraftNotebook>("craftNotebooks", 20);
 
   const [nbId, setNbId] = useState<string>(() => `nb_${Date.now().toString(36)}`);
   const [title, setTitle] = useState("Yeni defter");
@@ -320,13 +321,33 @@ export function NotebookStudio() {
     setNbId(n.id); setTitle(n.title); setSources(n.sources); setMsgs([]); setSavedOpen(false);
   };
 
-  const newNb = () => {
+  /* X2 — "+ Yeni" eskiden kaynakları ve sohbeti ONAYSIZ siliyordu.
+     Defter, diğer dört yüzeyden farklı olarak elinde hazır bir "öğe" tutmuyor
+     (nbId/title/sources ayrı state'ler, öğe yalnız saveNb'de kuruluyor), bu
+     yüzden hasUnsavedItem'ın zaman damgası karşılaştırması burada
+     KULLANILAMAZ: render'da Date.now() çağırmak hem saf olmayan bir işlem
+     (eslint react-hooks/purity) hem de kaydettikten hemen SONRA bile
+     "kaydedilmemiş" derdi. Onun yerine ucuz bir içerik imzası: kaynak
+     kimlikleri + uzunluk + etkinlik + başlık. */
+  const savedNb = saved.find((n) => n.id === nbId);
+  const nbSignature = (t: string, list: NotebookSource[]) =>
+    `${t.trim()}∷${list.map((s) => `${s.id}:${s.text.length}:${s.enabled ? 1 : 0}`).join("|")}`;
+  const nbUnsaved = sources.length > 0
+    && (!savedNb || nbSignature(savedNb.title, savedNb.sources) !== nbSignature(title, sources));
+
+  const resetNb = () => {
     stopPodcast(); setSpeaking(false); setPlayingPodcast(false);
     setNbId(`nb_${Date.now().toString(36)}`); setTitle("Yeni defter"); setSources([]); setMsgs([]);
   };
+  const newNb = () => {
+    if (nbUnsaved && !confirm("Bu defter kaydedilmedi. Devam edilirse kaybolacak. Devam edilsin mi?")) return;
+    resetNb();
+  };
+  const backToGallery = () => { if (sources.length) saveNb(); resetNb(); };
 
   const slimActionsRow = (
     <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
+      <button onClick={backToGallery} title="Galeri — çalışman kaydedilir" className="flex items-center gap-1.5 text-xs px-2 py-2 sm:py-1 rounded-lg text-muted hover:text-ink hover:bg-bgsoft shrink-0 transition-colors"><ArrowLeft size={14} /> <span className="hidden sm:inline font-semibold">Galeri</span></button>
       <button onClick={newNb} className="text-xs px-2.5 py-2 sm:py-1 rounded-lg border border-line text-muted hover:text-ink hover:bg-bgsoft shrink-0 transition-colors">+ Yeni</button>
       <input
         value={title}
@@ -347,6 +368,12 @@ export function NotebookStudio() {
         {/* Kaynak paneli */}
         <div className={`shrink-0 lg:w-80 border-b lg:border-b-0 lg:border-r border-line/60 overflow-y-auto ${srcPanel ? "" : "hidden lg:block"}`}>
           <div className="p-3 space-y-3">
+            {/* X3 — son çalışmalar. Defterin ayrı bir giriş ekranı yok (kaynak
+               paneli hep açık), bu yüzden şerit YALNIZ boş defterde gösterilir:
+               kaynak eklemeye başlayınca kaybolur, panelin işini bölmez. */}
+            {sources.length === 0 && (
+              <RecentWorksStrip items={recent(4)} onOpen={openNb} emptyTitle="Adsız defter" />
+            )}
             <div className="text-[11px] font-bold text-muted/70 uppercase tracking-wide">Kaynaklar ({sources.length}/{MAX_SOURCES})</div>
             {sources.map((s) => {
               /* Panelde gösterilen numara, sohbetteki atıf numarasıyla (yalnız

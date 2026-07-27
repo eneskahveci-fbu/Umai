@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  ArrowDown, ArrowUp, Check, Download, FileCode, FileText, FolderOpen, Lightbulb, Loader2,
+  ArrowLeft, ArrowDown, ArrowUp, Check, Download, FileCode, FileText, FolderOpen, Lightbulb, Loader2,
   Plus, Save, SpellCheck, Sparkles, Trash2, Wand2, X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -12,6 +12,7 @@ import { SavedItemsModal } from "./SavedItemsModal";
 import { ExportMenu } from "./ExportMenu";
 import { CrossTypeRelated } from "./CrossTypeRelated";
 import { GenSkeleton } from "./GenSkeleton";
+import { RecentWorksStrip } from "./RecentWorksStrip";
 import type { CraftDoc, DocBlock, DocBlockType } from "@/lib/types";
 import {
   continueDoc, DOC_BLOCK_TYPES, docToHtml, docToMarkdown, generateDoc,
@@ -48,7 +49,7 @@ export function safeFileName(s: string, fallback: string): string {
 export function DocsStudio() {
   const open = useStore((s) => s.docsStudioOpen);
   const addToast = useStore((s) => s.addToast);
-  const { saved, save, remove } = useStudioProject<CraftDoc>("craftDocs", 40);
+  const { saved, save, remove, confirmDiscard, saveQuiet, recent } = useStudioProject<CraftDoc>("craftDocs", 40);
 
   const [view, setView] = useState<"home" | "work">("home");
   const [brief, setBrief] = useState("");
@@ -196,6 +197,13 @@ export function DocsStudio() {
   };
 
   const openDoc = (d: CraftDoc) => { setDoc(d); setView("work"); setSavedOpen(false); };
+
+  /* X — giriş ekranına dönüş. "+ Yeni" ÖNCE onay ister (kaydedilmemiş iş
+     silinmesin), "← Galeri" ÖNCE sessizce kaydeder. Eskiden yalnız yıkıcı
+     olan tek bir yol vardı (setDoc(null)). */
+  const toHome = () => { setDoc(null); setView("home"); setBrief(""); };
+  const newDocAction = () => { if (confirmDiscard(doc, "Bu doküman")) toHome(); };
+  const backToGallery = () => { saveQuiet(doc); toHome(); };
   const removeDoc = remove;
 
   const blockInput = (b: DocBlock) => {
@@ -260,7 +268,8 @@ export function DocsStudio() {
 
   const slimActionsRow = view === "work" && doc && (
     <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
-      <button onClick={() => { setDoc(null); setView("home"); setBrief(""); }} className="text-xs px-2.5 py-2 sm:py-1 rounded-lg border border-line text-muted hover:text-ink hover:bg-bgsoft shrink-0 transition-colors">+ Yeni</button>
+      <button onClick={backToGallery} title="Galeri — çalışman kaydedilir" className="flex items-center gap-1.5 text-xs px-2 py-2 sm:py-1 rounded-lg text-muted hover:text-ink hover:bg-bgsoft shrink-0 transition-colors"><ArrowLeft size={14} /> <span className="hidden sm:inline font-semibold">Galeri</span></button>
+      <button onClick={newDocAction} className="text-xs px-2.5 py-2 sm:py-1 rounded-lg border border-line text-muted hover:text-ink hover:bg-bgsoft shrink-0 transition-colors">+ Yeni</button>
       <div className="ml-auto flex items-center gap-1 shrink-0">
         <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-9 h-9 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
         <button onClick={saveDoc} title="Kaydet" className="w-9 h-9 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
@@ -318,6 +327,9 @@ export function DocsStudio() {
                 <p className="text-center text-xs text-muted/60">Doküman kurgulanıyor…</p>
               </div>
             )}
+            {/* X3 — son çalışmalar: aşağıdaki bağlantı yalnız modalı açıyordu
+               (belirli bir işe dönmek iki tık). Şerit doğrudan açar. */}
+            <RecentWorksStrip items={recent()} onOpen={openDoc} emptyTitle="Adsız doküman" />
             <div className="grid sm:grid-cols-2 gap-2">
               {SUGGESTIONS.map((s) => (
                 <button key={s} onClick={() => setBrief(s)} className="text-left text-[12.5px] leading-snug px-3 py-2.5 rounded-xl border border-line/60 hover:border-brand/50 hover:bg-bgsoft/60 text-muted hover:text-ink transition-colors">{s}</button>
@@ -326,7 +338,7 @@ export function DocsStudio() {
             <div className="flex items-center justify-center gap-4 text-xs text-muted/80">
               {saved.length > 0 && (
                 <button onClick={() => setSavedOpen(true)} className="inline-flex items-center gap-1.5 hover:text-ink transition-colors">
-                  <FolderOpen size={13} className="text-brand" /> Kayıtlı dokümanlar ({saved.length})
+                  <FolderOpen size={13} className="text-brand" /> Tüm dokümanlar ({saved.length})
                 </button>
               )}
               <button

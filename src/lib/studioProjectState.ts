@@ -31,10 +31,27 @@ export interface ProjectLike {
  *   SONRA değişmiş demektir.
  */
 export function hasUnsavedWork(project: ProjectLike, saved: readonly SavedLike[]): boolean {
+  /* Tasarım stüdyosunda "iş var mı" ölçütü üretilmiş çıktıdır (html). */
   if (!project.html) return false;
-  const copy = saved.find((p) => p.id === project.id);
+  return hasUnsavedItem(project, saved);
+}
+
+/**
+ * Aynı kural, çıktı-tipi bağımsız hâli (X2).
+ *
+ * Doküman/Anket/Defter/Kroki/Kartlar yüzeylerinde "iş" bir html dizesi değil,
+ * doğrudan öğenin kendisidir (null = ortada bir şey yok). Beş yüzeyin de
+ * "+ Yeni" düğmesi kaydedilmemiş öğeyi onaysız siliyordu (ör. DocsStudio
+ * `setDoc(null)`) — hepsi artık bu tek kurala bakıyor.
+ */
+export function hasUnsavedItem(
+  current: SavedLike | null | undefined,
+  saved: readonly SavedLike[],
+): boolean {
+  if (!current) return false;
+  const copy = saved.find((p) => p.id === current.id);
   if (!copy) return true;
-  return (project.updatedAt ?? 0) > (copy.updatedAt ?? 0);
+  return (current.updatedAt ?? 0) > (copy.updatedAt ?? 0);
 }
 
 /** Kaydedilmiş projeleri en son güncellenen başta olacak şekilde sıralayıp

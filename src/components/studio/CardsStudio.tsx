@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  Download, FolderOpen, Highlighter, Layers, Loader2, Plus, RotateCcw, Save, Sparkles, Trash2, Upload,
+  ArrowLeft, Download, FolderOpen, Highlighter, Layers, Loader2, Plus, RotateCcw, Save, Sparkles, Trash2, Upload,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { friendlyError } from "@/lib/friendlyError";
@@ -10,6 +10,7 @@ import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav"
 import { SavedItemsModal } from "./SavedItemsModal";
 import { safeFileName } from "./DocsStudio";
 import { GenSkeleton } from "./GenSkeleton";
+import { RecentWorksStrip } from "./RecentWorksStrip";
 import type { CraftDeck, FlashCard, Highlight } from "@/lib/types";
 import {
   cardsFromHighlights, deckToTsv, dueCards, generateDeck, gradeCard,
@@ -44,7 +45,7 @@ export function CardsStudio() {
   const addToast = useStore((s) => s.addToast);
   const highlights = useStore((s) => s.config.highlights ?? EMPTY_HIGHLIGHTS);
   const removeHighlight = useStore((s) => s.removeHighlight);
-  const { saved, save, remove } = useStudioProject<CraftDeck>("craftDecks", 40);
+  const { saved, save, remove, confirmDiscard, saveQuiet, recent } = useStudioProject<CraftDeck>("craftDecks", 40);
 
   const [view, setView] = useState<"home" | "work">("home");
   const [tab, setTab] = useState<Tab>("study");
@@ -87,6 +88,12 @@ export function CardsStudio() {
     setDeck(d); setView("work"); setSavedOpen(false); setTab("study");
     setRevealed(false); startStudy(d);
   };
+
+  /* X — giriş ekranına dönüş. "+ Yeni" ÖNCE onay ister, "← Galeri" ÖNCE
+     sessizce kaydeder; eskiden yalnız yıkıcı setDeck(null) vardı. */
+  const toHome = () => { setDeck(null); setView("home"); setBrief(""); setQueue([]); };
+  const newDeckAction = () => { if (confirmDiscard(deck, "Bu kart destesi")) toHome(); };
+  const backToGallery = () => { saveQuiet(deck); toHome(); };
 
   const generate = async () => {
     const b = brief.trim();
@@ -269,7 +276,8 @@ export function CardsStudio() {
 
   const slimActionsRow = view === "work" && deck && (
     <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
-      <button onClick={() => { setDeck(null); setView("home"); setBrief(""); setQueue([]); }} className="text-xs px-2.5 py-2 sm:py-1 rounded-lg border border-line text-muted hover:text-ink hover:bg-bgsoft shrink-0 transition-colors">+ Yeni</button>
+      <button onClick={backToGallery} title="Galeri — çalışman kaydedilir" className="flex items-center gap-1.5 text-xs px-2 py-2 sm:py-1 rounded-lg text-muted hover:text-ink hover:bg-bgsoft shrink-0 transition-colors"><ArrowLeft size={14} /> <span className="hidden sm:inline font-semibold">Galeri</span></button>
+      <button onClick={newDeckAction} className="text-xs px-2.5 py-2 sm:py-1 rounded-lg border border-line text-muted hover:text-ink hover:bg-bgsoft shrink-0 transition-colors">+ Yeni</button>
       <input
         value={deck.title}
         onChange={(e) => setDeck({ ...deck, title: e.target.value })}
@@ -331,6 +339,9 @@ export function CardsStudio() {
                 <p className="text-center text-xs text-muted/60">Kartlar kurgulanıyor…</p>
               </div>
             )}
+            {/* X3 — son çalışmalar: aşağıdaki bağlantı yalnız modalı açıyordu
+               (belirli bir işe dönmek iki tık). Şerit doğrudan açar. */}
+            <RecentWorksStrip items={recent()} onOpen={openDeck} emptyTitle="Adsız deste" />
             <div className="grid sm:grid-cols-2 gap-2">
               {SUGGESTIONS.map((s) => (
                 <button key={s} onClick={() => setBrief(s)} className="text-left text-[12.5px] leading-snug px-3 py-2.5 rounded-xl border border-line/60 hover:border-brand/50 hover:bg-bgsoft/60 text-muted hover:text-ink transition-colors">{s}</button>
@@ -339,7 +350,7 @@ export function CardsStudio() {
             <div className="flex items-center justify-center gap-4 text-xs text-muted/80">
               {saved.length > 0 && (
                 <button onClick={() => setSavedOpen(true)} className="inline-flex items-center gap-1.5 hover:text-ink transition-colors">
-                  <FolderOpen size={13} className="text-brand" /> Kayıtlı desteler ({saved.length})
+                  <FolderOpen size={13} className="text-brand" /> Tüm desteler ({saved.length})
                 </button>
               )}
               {highlights.length > 0 && (

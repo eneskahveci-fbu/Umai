@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  ArrowDown, ArrowUp, BarChart3, Download, FolderOpen, GitBranch, Globe, ListChecks, Loader2,
+  ArrowLeft, ArrowDown, ArrowUp, BarChart3, Download, FolderOpen, GitBranch, Globe, ListChecks, Loader2,
   Plus, Save, Sparkles, Trash2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -10,6 +10,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import { createClient } from "@/lib/supabase/client";
 import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { GenSkeleton } from "./GenSkeleton";
+import { RecentWorksStrip } from "./RecentWorksStrip";
 import { SavedItemsModal } from "./SavedItemsModal";
 import { FormResponsesModal } from "./FormResponses";
 import { ExportMenu } from "./ExportMenu";
@@ -37,7 +38,7 @@ const SUGGESTIONS = [
 export function FormsStudio() {
   const open = useStore((s) => s.formsStudioOpen);
   const addToast = useStore((s) => s.addToast);
-  const { saved, save, remove } = useStudioProject<CraftForm>("craftForms", 40);
+  const { saved, save, remove, confirmDiscard, saveQuiet, recent } = useStudioProject<CraftForm>("craftForms", 40);
 
   const [view, setView] = useState<"home" | "work">("home");
   const [brief, setBrief] = useState("");
@@ -169,11 +170,18 @@ export function FormsStudio() {
   };
 
   const openForm = (f: CraftForm) => { setForm(f); setView("work"); setSavedOpen(false); setPreviewKey((k) => k + 1); };
+
+  /* X — giriş ekranına dönüş. "+ Yeni" ÖNCE onay ister, "← Galeri" ÖNCE
+     sessizce kaydeder; eskiden yalnız yıkıcı setForm(null) vardı. */
+  const toHome = () => { setForm(null); setView("home"); setBrief(""); };
+  const newFormAction = () => { if (confirmDiscard(form, "Bu anket")) toHome(); };
+  const backToGallery = () => { saveQuiet(form); toHome(); };
   const removeForm = remove;
 
   const slimActionsRow = view === "work" && form && (
     <div className="h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 border-b border-line/60">
-      <button onClick={() => { setForm(null); setView("home"); setBrief(""); }} className="text-xs px-2.5 py-2 sm:py-1 rounded-lg border border-line text-muted hover:text-ink hover:bg-bgsoft shrink-0 transition-colors">+ Yeni</button>
+      <button onClick={backToGallery} title="Galeri — çalışman kaydedilir" className="flex items-center gap-1.5 text-xs px-2 py-2 sm:py-1 rounded-lg text-muted hover:text-ink hover:bg-bgsoft shrink-0 transition-colors"><ArrowLeft size={14} /> <span className="hidden sm:inline font-semibold">Galeri</span></button>
+      <button onClick={newFormAction} className="text-xs px-2.5 py-2 sm:py-1 rounded-lg border border-line text-muted hover:text-ink hover:bg-bgsoft shrink-0 transition-colors">+ Yeni</button>
       <div className="ml-auto flex items-center gap-1 shrink-0">
         <button onClick={() => setSavedOpen(true)} title="Projelerim" className="w-9 h-9 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
         <button onClick={saveForm} title="Kaydet" className="w-9 h-9 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><Save size={15} /></button>
@@ -229,6 +237,9 @@ export function FormsStudio() {
                 <p className="text-center text-xs text-muted/60">Sorular kurgulanıyor…</p>
               </div>
             )}
+            {/* X3 — son çalışmalar: aşağıdaki bağlantı yalnız modalı açıyordu
+               (belirli bir işe dönmek iki tık). Şerit doğrudan açar. */}
+            <RecentWorksStrip items={recent()} onOpen={openForm} emptyTitle="Adsız anket" />
             <div className="grid sm:grid-cols-2 gap-2">
               {SUGGESTIONS.map((s) => (
                 <button key={s} onClick={() => setBrief(s)} className="text-left text-[12.5px] leading-snug px-3 py-2.5 rounded-xl border border-line/60 hover:border-brand/50 hover:bg-bgsoft/60 text-muted hover:text-ink transition-colors">{s}</button>
@@ -237,7 +248,7 @@ export function FormsStudio() {
             <div className="flex items-center justify-center gap-4 text-xs text-muted/80">
               {saved.length > 0 && (
                 <button onClick={() => setSavedOpen(true)} className="inline-flex items-center gap-1.5 hover:text-ink transition-colors">
-                  <FolderOpen size={13} className="text-brand" /> Kayıtlı anketler ({saved.length})
+                  <FolderOpen size={13} className="text-brand" /> Tüm anketler ({saved.length})
                 </button>
               )}
               <button
