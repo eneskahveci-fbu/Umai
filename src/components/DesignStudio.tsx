@@ -35,6 +35,7 @@ import { ArtifactCanvas } from "./ArtifactCanvas";
 import { StudioTopBar } from "./studio/StudioTopBar";
 import { SavedItemsModal } from "./studio/SavedItemsModal";
 import { printPdf, printDeckPdf } from "@/lib/studioExport";
+import { hasUnsavedWork } from "@/lib/studioProjectState";
 import { artifactDownload, buildArtifactSrcDoc } from "@/lib/artifactDoc";
 import { pickDraftModels, fillSelfConsistency, generateDrafts, judgeDrafts, buildBoostInstruction, type DraftJudge } from "@/lib/boost";
 import { buildFallbackChain } from "@/lib/fallback";
@@ -256,6 +257,41 @@ function EmptyCanvas({ busy, phase }: { busy: boolean; phase: StudioPhase | null
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+/* U4 — Mobil sohbet↔tuval anahtarı.
+   Eskiden geçiş İKİ FARKLI ve tutarsız denetimle yapılıyordu: sohbet
+   tarafında "Tuvale git →" metin bağlantısı, tuval tarafında ise bir "X"
+   (kapat gibi görünüyordu ama aslında sohbete dönüyordu). Artık her iki
+   ekranda AYNI segment kontrolü: hangi tarafta olduğun her an belli.
+   Tuval henüz üretilmediyse "Tuval" devre dışı — tıklanınca boş ekrana
+   götürmesin. */
+function MobileViewSwitch({
+  value, onChange, canvasReady,
+}: {
+  value: "chat" | "canvas";
+  onChange: (v: "chat" | "canvas") => void;
+  canvasReady: boolean;
+}) {
+  const tab = (id: "chat" | "canvas", label: string, disabled = false) => (
+    <button
+      key={id}
+      onClick={() => { if (!disabled) onChange(id); }}
+      disabled={disabled}
+      aria-current={value === id ? "page" : undefined}
+      className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-colors disabled:opacity-35 disabled:cursor-not-allowed ${
+        value === id ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"
+      }`}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div className="flex items-center bg-bgsoft border border-line/60 rounded-lg p-0.5 shrink-0">
+      {tab("chat", "Sohbet")}
+      {tab("canvas", "Tuval", !canvasReady)}
     </div>
   );
 }
@@ -618,14 +654,46 @@ export function DesignStudio() {
     }
   }, [openSavedProject]);
 
-  const newProjectAction = useCallback(() => {
+  /** Mevcut projeyi kayıtlılara yazar (saveProject ile aynı kural, ama sessiz
+      ve çağırana yeni listeyi bildirir). U2'de galeriye dönerken kullanılır. */
+  const persistProject = useCallback(() => {
+    if (!project.html) return;
+    const existing = config.studioProjects ?? [];
+    saveConfig({
+      ...config,
+      studioProjects: [{ ...project, updatedAt: Date.now() }, ...existing.filter((p) => p.id !== project.id)].slice(0, 40),
+    });
+  }, [project, config, saveConfig]);
+
+  /* U3 — "+ Yeni" ARTIK sessizce silmiyor. Eskiden newDesignProject() doğrudan
+     çağrılıyordu: kullanıcı bir tasarım üretip kaydetmeyi unuttuysa tek tıkla
+     kaybediyordu. Kaybedilecek bir şey varsa (bkz. hasUnsavedWork) önce onay
+     istenir; yoksa eskisi gibi anında yeni projeye geçilir. */
+  const resetToNewProject = useCallback(() => {
     setProject(newDesignProject());
     setMessages([]);
     setVersionIndex(0);
     setMobileView("chat");
     setHomeBrief("");
+  }, []);
+
+  const newProjectAction = useCallback(() => {
+    if (hasUnsavedWork(project, config.studioProjects ?? [])
+      && !confirm("Bu tasarım kaydedilmedi. Yeni projeye geçilirse kaybolacak. Devam edilsin mi?")) return;
+    resetToNewProject();
     addToast("Yeni proje oluşturuldu.", "info");
-  }, [addToast]);
+  }, [project, config.studioProjects, resetToNewProject, addToast]);
+
+  /* U2 — Galeriye (giriş ekranına) YIKICI OLMAYAN dönüş. Eskiden giriş ekranına
+     dönmenin tek yolu "+ Yeni" (projeyi siler) ya da stüdyoyu tamamen kapatmaktı.
+     Artık çalışma önce kayıtlılara yazılır, sonra tuval boşaltılır — kullanıcı
+     ana ekrandaki "Son projeler"den (V1) veya Projelerim'den kaldığı yere döner. */
+  const backToGallery = useCallback(() => {
+    const willSave = !!project.html;
+    persistProject();
+    resetToNewProject();
+    if (willSave) addToast("Tasarım kaydedildi — Son projeler'den devam edebilirsin.", "success");
+  }, [project.html, persistProject, resetToNewProject, addToast]);
 
   /* Sunum teması: LLM'e gitmeden client-side restyle (Gamma'nın "yeniden
      üretmeden tema değiştir" hissi) — deckToHtml deterministik olduğundan
@@ -735,12 +803,13 @@ export function DesignStudio() {
   /* Anasayfada henüz kaydedilecek bir tasarım yok — yalnız Projelerim (eski
      bir işe dönmek için) anlamlı. Fusion/model seçimi artık composer'daki
      ModelPicker'da (bkz. ComposerExtras.tsx) — burada ayrı bir düğmeye gerek yok. */
+  /* U1 — Projelerim ARTIK koşulsuz görünür. Eskiden `savedProjects.length > 0`
+     ile gizleniyordu; StudioSwitcher de null döndüğü için yeni bir kullanıcı
+     48px'lik üst çubukta YALNIZ bir "X" görüyordu. Kayıt yoksa modal zaten
+     kendi boş-durum metnini gösteriyor (emptyLabel) — düğmenin varlığı
+     "burada bir yer var" bilgisini veriyor. */
   const homeActionButtons = (
-    <>
-      {savedProjects.length > 0 && (
-        <button onClick={() => setSavedOpen(true)} title="Projelerim" aria-label="Projelerim" className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
-      )}
-    </>
+    <button onClick={() => setSavedOpen(true)} title="Projelerim" aria-label="Projelerim" className="w-10 h-10 sm:w-8 sm:h-8 grid place-items-center rounded-lg text-muted hover:text-brand hover:bg-bgsoft transition-colors"><FolderOpen size={15} /></button>
   );
 
   return (
@@ -750,6 +819,7 @@ export function DesignStudio() {
         activeSurface="studio"
         showWorkActions
         onNew={showHome ? undefined : newProjectAction}
+        onBack={showHome ? undefined : backToGallery}
         title={showHome ? undefined : { value: project.name, onChange: (v) => setProject((p) => ({ ...p, name: v })), placeholder: "Tasarım adı" }}
         onClose={() => nav.close()}
         actions={showHome ? homeActionButtons : actionButtons}
@@ -774,11 +844,8 @@ export function DesignStudio() {
         <div className="flex-1 min-h-0 flex">
           {/* Sol: sohbet — masaüstünde sabit, mobilde tam-ekran (yalnız mobileView==="chat"). */}
           <div className={`${mobileView === "chat" ? "flex" : "hidden"} sm:flex flex-col min-h-0 w-full sm:w-[380px] sm:shrink-0 border-r border-line bg-bg sm:bg-transparent`}>
-            <div className="sm:hidden h-11 shrink-0 flex items-center gap-2 px-3 border-b border-line">
-              <span className="text-xs font-bold flex items-center gap-1.5"><Sparkles size={13} className="text-brand" /> Sohbet</span>
-              {project.html && (
-                <button onClick={() => setMobileView("canvas")} className="ml-auto text-[11px] font-semibold text-brand px-2 py-1 rounded-lg hover:bg-brand/10">Tuvale git →</button>
-              )}
+            <div className="sm:hidden h-11 shrink-0 flex items-center px-3 border-b border-line">
+              <MobileViewSwitch value={mobileView} onChange={setMobileView} canvasReady={!!project.html} />
             </div>
             <ChatPanel
               messages={messages}
@@ -807,8 +874,8 @@ export function DesignStudio() {
           {/* Sağ: tuval — masaüstünde her zaman görünür, mobilde yalnız mobileView==="canvas". */}
           <main className={`${mobileView === "canvas" ? "flex" : "hidden"} sm:flex flex-1 min-h-0 flex-col bg-bgsoft/30`}>
             <div className="sm:hidden h-11 shrink-0 flex items-center gap-2 px-3 border-b border-line">
-              <button onClick={() => setMobileView("chat")} aria-label="Sohbete dön" className="w-8 h-8 grid place-items-center rounded-lg text-muted hover:text-ink"><X size={16} /></button>
-              <span className="text-xs font-bold truncate">{project.name}</span>
+              <MobileViewSwitch value={mobileView} onChange={setMobileView} canvasReady={!!project.html} />
+              <span className="text-xs font-bold truncate text-muted/70 min-w-0">{project.name}</span>
             </div>
             <div className="flex-1 min-h-0">
               {project.html ? (
@@ -819,6 +886,7 @@ export function DesignStudio() {
                   onPrevVersion={() => setVersionIndex((i) => Math.max(0, i - 1))}
                   onNextVersion={() => setVersionIndex((i) => Math.min(versions.length - 1, i + 1))}
                   extraExportOptions={[printPdfOption, openInEditorOption]}
+                  showDevicePicker
                   onAnnotate={(descriptor) => {
                     /* Seçim sohbet composer'ına eklenir; mobilde tuval tam ekran
                        olduğundan sohbete de geçilir ki kullanıcı sonucu görsün. */

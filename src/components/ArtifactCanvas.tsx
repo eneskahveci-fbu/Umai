@@ -1,11 +1,13 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, Eye, Link2, Maximize2, Minimize2, MousePointerClick, RotateCw, Wand2, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, Eye, Link2, Maximize2, Minimize2, MousePointerClick, Monitor, RotateCw, Smartphone, Wand2, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useStore } from "@/lib/store";
 import type { Artifact } from "@/lib/types";
 import { buildArtifactSrcDoc, withAnnotationScript, artifactDownload, buildStandaloneSandboxDoc } from "@/lib/artifactDoc";
 import { lintArtifactByType } from "@/lib/studioCraft";
+import { STUDIO_DEVICES, deviceById, type DeviceId } from "@/lib/studioConstants";
+import { DeviceFrame } from "./studio/DeviceFrame";
 import { ExportMenu } from "./studio/ExportMenu";
 
 /* Paylaşılan Artifact görüntüleyici — sohbetin ArtifactPanel'i ile Tasarım
@@ -33,11 +35,16 @@ export interface ArtifactCanvasProps {
       çıkar — Stüdyo kendi içinde bunu geçmez (kendine yönlendiren anlamsız
       bir düğme olurdu). */
   onOpenInStudio?: () => void;
+  /** U5 — cihaz (responsive) önizleme anahtarı. Yalnız Tasarım Stüdyosu'nun
+      geniş tuvalinde anlamlı; sohbetin dar panelinde telefon çerçevesi zaten
+      sığmayacağı için çağıran açıkça istemedikçe gösterilmez. */
+  showDevicePicker?: boolean;
 }
 
-export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVersion, onNextVersion, onClose, extraExportOptions, onAnnotate, onOpenInStudio }: ArtifactCanvasProps) {
+export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVersion, onNextVersion, onClose, extraExportOptions, onAnnotate, onOpenInStudio, showDevicePicker }: ArtifactCanvasProps) {
   const addToast = useStore((s) => s.addToast);
   const [expanded, setExpanded] = useState(false);
+  const [deviceId, setDeviceId] = useState<DeviceId>("web");
   const [reloadKey, setReloadKey] = useState(0);
   const [view, setView] = useState<"preview" | "code">("preview");
   const [copied, setCopied] = useState(false);
@@ -134,6 +141,26 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
      maliyet bindirirdi. Saf türetme: state yok, render'da hesaplanır. */
   const qualityNotes = lintArtifactByType(artifact.type, artifact.content);
 
+  /* U5 — cihaz çerçevesi. iframe TEK bir yerde kurulur ve ister çıplak ister
+     DeviceFrame içinde render edilir; böylece ref (İşaretle & Değiştir
+     postMessage doğrulaması) ve key (sürüm/yeniden yükleme) tek kaynakta
+     kalır — iki ayrı iframe kurmak o mekanizmayı koparırdı. */
+  const device = deviceById(deviceId);
+  const framed = !!showDevicePicker && view === "preview" && deviceId !== "web"
+    && (artifact.type === "html" || artifact.type === "svg");
+  const previewFrame = (
+    <iframe
+      ref={frameRef}
+      key={`${reloadKey}-${versionIndex ?? 0}-${annotating && canAnnotate ? "a" : "n"}`}
+      srcDoc={srcdoc}
+      sandbox="allow-scripts allow-modals"
+      allow=""
+      referrerPolicy="no-referrer"
+      className="w-full h-full border-0 bg-white"
+      title="Artifact preview"
+    />
+  );
+
   return (
     <div
       role="region"
@@ -176,6 +203,27 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
               title="Stüdyo'da aç — tema, sürüm geçmişi ve gelişmiş düzenlemeyle devam et"
               aria-label="Stüdyo'da aç"
             ><Wand2 size={15} /></button>
+          )}
+          {/* U5 — cihaz önizlemesi. Yalnız görsel türlerde (html/svg) anlamlı:
+             markdown/kod zaten metin akışı, telefon çerçevesine sokmak bilgi
+             vermez. Önizleme sekmesi dışında da gizlenir. */}
+          {showDevicePicker && view === "preview" && (artifact.type === "html" || artifact.type === "svg") && (
+            <div className="hidden sm:flex items-center bg-bgsoft border border-line/60 rounded-lg p-0.5 mr-1 shrink-0">
+              {STUDIO_DEVICES.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => setDeviceId(d.id)}
+                  title={`${d.name} — ${d.width}px`}
+                  aria-label={`${d.name} önizlemesi`}
+                  aria-current={deviceId === d.id ? "true" : undefined}
+                  className={`px-2 py-1 rounded-md transition-colors ${
+                    deviceId === d.id ? "bg-brand/15 text-brand" : "text-muted hover:text-ink"
+                  }`}
+                >
+                  {d.phone ? <Smartphone size={13} /> : <Monitor size={13} />}
+                </button>
+              ))}
+            </div>
           )}
           <button onClick={copySource} className={iconBtn} title="Kaynağı kopyala">{copied ? <Check size={15} className="text-brand" /> : <Copy size={15} />}</button>
           <ExportMenu
@@ -234,18 +282,12 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
         </div>
       )}
 
-      <div className="flex-1 min-h-0 bg-white">
+      <div className={`flex-1 min-h-0 ${framed ? "" : "bg-white"}`}>
         {view === "preview" ? (
-          <iframe
-            ref={frameRef}
-            key={`${reloadKey}-${versionIndex ?? 0}-${annotating && canAnnotate ? "a" : "n"}`}
-            srcDoc={srcdoc}
-            sandbox="allow-scripts allow-modals"
-            allow=""
-            referrerPolicy="no-referrer"
-            className="w-full h-full border-0"
-            title="Artifact preview"
-          />
+          /* Cihaz çerçevesi seçiliyse iframe DeviceFrame'in içine sarılır —
+             iframe'in kendisi (ref/key/sandbox) burada kalır, çerçeve yalnız
+             genişliği ve kromu verir (bkz. DeviceFrame yorumu). */
+          framed ? <DeviceFrame device={device}>{previewFrame}</DeviceFrame> : previewFrame
         ) : (
           <pre className="w-full h-full overflow-auto m-0 p-4 text-[12px] leading-relaxed font-mono bg-codebg text-[#d6d6d6]"><code>{artifact.content}</code></pre>
         )}
