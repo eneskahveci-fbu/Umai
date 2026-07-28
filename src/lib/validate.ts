@@ -35,14 +35,16 @@ const REPO_RE = /^[A-Za-z0-9._-]{1,100}$/;
 const BRANCH_RE = /^[A-Za-z0-9._/-]{1,255}$/;
 /* GitHub token: gho_, ghp_, ghu_, ghs_, ghr_ prefixleri veya klasik 40 hex */
 const TOKEN_RE = /^(?:gh[opusr]_[A-Za-z0-9]{20,255}|[A-Fa-f0-9]{40})$/;
-/* GitLab token: "glpat-" + en az 20 karakter (klasik PAT 26 karakter toplam;
-   yeni nesil rotalanabilir token'lar ayrıca nokta-ayrılmış ek segmentler
-   taşıyabiliyor — bkz. docs.gitlab.com/user/profile/personal_access_tokens).
-   ÖNCEDEN gitlab/* rotaları yanlışlıkla GitHub'a özel TOKEN_RE kullanıyordu —
-   glpat- öneki hiçbir GitHub deseniyle eşleşmediğinden HER gerçek GitLab
-   token'ı "geçersiz format" ile reddediliyordu (GitLab yazma/silme/dal/MR
-   bütünüyle çalışmıyordu). */
-const GITLAB_TOKEN_RE = /^glpat-[A-Za-z0-9_.-]{20,255}$/;
+/* GitLab token — ÖNEK ŞARTI YOK, yalnız güvenli karakter kümesi + uzunluk.
+   Önceden "glpat-" zorunluydu; ama Ayarlar → Git'teki "GitLab ile bağlan"
+   (OAuth) akışı bir PAT değil OAuth erişim anahtarı verir ve o anahtarda
+   glpat- öneki YOKTUR. Sonuç: OAuth ile bağlanan kullanıcıda hesap başarıyla
+   eklenip "GitLab bağlandı ✓" görünüyor, ardından HER yazma/dal/MR isteği
+   "token: geçersiz format" ile reddediliyordu. Önek kontrolü zaten bir
+   güvenlik önlemi değildi (yanlış tür token'ı erken yakalayan bir kolaylıktı);
+   asıl koruma olan karakter kümesi korunuyor: boşluk/satır sonu/iki nokta
+   içeremediği için Authorization başlığına enjeksiyon mümkün değil. */
+const GITLAB_TOKEN_RE = /^[A-Za-z0-9_.-]{20,255}$/;
 
 export function asString(v: unknown, field: string, opts: { max?: number; min?: number } = {}): string {
   if (typeof v !== "string") throw new ValidationError(`${field}: metin olmalı`);
