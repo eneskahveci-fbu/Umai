@@ -49,3 +49,33 @@ export function pruneMessages(messages: readonly MsgLike[], opts?: PruneOptions)
 export function totalContentChars(messages: readonly MsgLike[]): number {
   return messages.reduce((sum, m) => sum + (typeof m.content === "string" ? m.content.length : 0), 0);
 }
+
+/* ── Bağlam ÖZETLEME önbelleği — saf karar (CoderView.tsx uygular) ──────
+   ÖNCEDEN 60+ mesajlık uzun sohbetlerde eşik her aşıldığında (ki KEEP=40
+   sabitken bu HER turda oluyordu, bir kerelik değil) `/api/compact` yanıtı
+   BEKLENİYORDU (await) — uzun sohbetlerde tekrar eden, fark edilir bir
+   duraklama. Artık bu tur HİÇBİR ZAMAN bloklanmaz: tam eşleşen bir özet
+   önbellekte varsa kullanılır; yoksa bu tur ham kırpmaya düşer VE (zaten
+   uçan bir istek yoksa) arka planda taze bir özet istenir — SONRAKİ tur
+   hazır bulur. */
+export interface CompactCacheState {
+  key: string;
+  summary: string;
+}
+
+export interface CompactPlan {
+  /** Doluysa bu turda kullan; boşsa ham kırpmaya (mevcut fallback) düş. */
+  summary: string;
+  /** true ise arka planda yeni bir özetleme isteği başlat (aynı anahtar için
+      zaten uçan bir istek yoksa). */
+  shouldRefresh: boolean;
+}
+
+export function compactPlan(
+  cacheKey: string,
+  cache: CompactCacheState | null,
+  pendingKey: string | null,
+): CompactPlan {
+  const summary = cache?.key === cacheKey ? cache.summary : "";
+  return { summary, shouldRefresh: !summary && pendingKey !== cacheKey };
+}

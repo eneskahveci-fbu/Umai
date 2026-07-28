@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pruneMessages, totalContentChars, type PrunableMessage } from "../contextWindow";
+import { pruneMessages, totalContentChars, compactPlan, type PrunableMessage } from "../contextWindow";
 
 const long = (n: number) => "x".repeat(n);
 
@@ -72,5 +72,32 @@ describe("totalContentChars", () => {
   });
   it("string olmayan içeriği yok sayar", () => {
     expect(totalContentChars([{ role: "user", content: 123 }, { role: "user", content: "ab" }])).toBe(2);
+  });
+});
+
+describe("compactPlan — özetleme önbelleği ASLA turu bloklamaz", () => {
+  it("tam eşleşen önbellek varsa onu kullanır, yenileme istemez", () => {
+    const p = compactPlan("chat1:20", { key: "chat1:20", summary: "özet" }, null);
+    expect(p).toEqual({ summary: "özet", shouldRefresh: false });
+  });
+
+  it("önbellek yoksa (ilk kez eşik aşıldı) bu tur özetsiz kalır ama yenileme istenir", () => {
+    const p = compactPlan("chat1:20", null, null);
+    expect(p).toEqual({ summary: "", shouldRefresh: true });
+  });
+
+  it("önbellek ESKİ anahtarlıysa (sohbet ilerledi) bu tur yine özetsiz kalır, taze yenileme istenir", () => {
+    const p = compactPlan("chat1:22", { key: "chat1:20", summary: "eski özet" }, null);
+    expect(p).toEqual({ summary: "", shouldRefresh: true });
+  });
+
+  it("aynı anahtar için ZATEN uçan bir istek varsa ikinci bir yenileme istemez (yarış önlenir)", () => {
+    const p = compactPlan("chat1:20", null, "chat1:20");
+    expect(p).toEqual({ summary: "", shouldRefresh: false });
+  });
+
+  it("uçan istek FARKLI bir anahtar içinse yine de bu anahtar için yenileme istenir", () => {
+    const p = compactPlan("chat1:20", null, "chat1:18");
+    expect(p).toEqual({ summary: "", shouldRefresh: true });
   });
 });

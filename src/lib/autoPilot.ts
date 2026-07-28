@@ -2,6 +2,7 @@
    uğraşmadan, mesajın kendisinden eforu, web aramayı, derin araştırmayı,
    kalite modunu ve ajan ekibini SEÇER. Saf fonksiyonlar → birim testli.
    (autoEffort/autoSwarm CoderView'dan buraya taşındı — tek kaynak.) */
+import { trackEvent } from "./analytics";
 
 export type Effort = "low" | "medium" | "high" | "max";
 
@@ -127,6 +128,115 @@ export function autoFusion(text: string): boolean {
   return FUSION_NOUN.test(t) && FUSION_VERB.test(t);
 }
 
+/* ── Alan-bazlı "regex'ten emin miyiz" değerlendirmesi ─────────────────────
+   ÖNCEDEN tek bir global "emin misin" kapısı vardı (yalnız effort'a bakardı):
+   effort belirsiz kaldığında quality/fusion GÜÇLÜ bir sinyalden geliyor olsa
+   bile mesaj LLM'e gidiyordu. Artık üç alan ayrı değerlendirilir; yalnız
+   GERÇEKTEN belirsiz kalan alan(lar) için LLM'e sorulur (bkz. decidePilotAsync
+   → route-plan'a yalnız eksik alanlar gönderilir), regex'in zaten emin olduğu
+   alanlar LLM'in olası yanlış okumasıyla ASLA ezilmez. */
+export interface PilotConfidence {
+  effort: boolean;
+  quality: boolean;
+  fusion: boolean;
+}
+
+function isEffortConfident(text: string): boolean {
+  const t = (text || "").trim();
+  if (t.length < 60) return true; // kısa selam/komut/soru
+  if (/```/.test(t)) return true; // kod bloğu → regex zaten "high" diyor
+  if (autoEffort(t) === "max") return true; // açık "kapsamlı" sinyali
+  return false;
+}
+
+/* autoQuality'nin kendi eşiği len>400 && anahtar-kelime. Sınırın hemen
+   çevresi (300-600 karakter bandı) gerçek bir yargı gerektirir; onun
+   DIŞINDAKİ iki uçta (kısa+sinyalsiz kesin hayır, uzun+sinyal kesin evet)
+   regex zaten güvenilir. */
+function isQualityConfident(text: string, effort: Effort): boolean {
+  if (effort === "max") return true;
+  const t = (text || "").trim();
+  const hasKeyword = /\b(rapor|makale|doküman|dokümantasyon|tasarla|planla|öneri|strateji)\b/i.test(t);
+  if (t.length <= 300 && !hasKeyword) return true;
+  if (t.length > 600 && hasKeyword) return true;
+  return false;
+}
+
+/* autoFusion İKİ bağımsız sinyalin (üretim ismi + üretim fiili) kesişimine
+   bakıyor. FİİL YOKSA autoFusion zaten kesin false'tur — isim ne olursa
+   olsun (FUSION_NOUN'un çıplak "kod" alternatifi kelime sınırı taşımaz,
+   "kodu incele/açıkla/düzelt" gibi her debug isteğinde eşleşir; üretim
+   fiili yoksa bunun ambiguous sayılması bir kodlama asistanında EN YAYGIN
+   isteği — kısa/kod-bloklu debug taleplerini — gereksiz yere ağa
+   çıkarırdı). Yalnız FİİL VARKEN hedef isim yoksa (ör. "bunu geliştir" —
+   neyi geliştireceği belirsiz) gerçek bir ara bölge var; orada LLM'e sorulur. */
+function isFusionConfident(text: string): boolean {
+  const t = (text || "").trim();
+  if (t.length < 24) return true;
+  if (!FUSION_VERB.test(t)) return true; // fiil yok → kesin hayır (isim önemsiz)
+  return FUSION_NOUN.test(t); // fiil var: isim de varsa kesin evet, yoksa belirsiz
+}
+
+/** Açık görsel/araştırma niyeti — bütün kararın (effort/quality/fusion) tek
+    parça net olduğu durumlar: bir "kedi çiz" isteğinde kalite/füzyon zaten
+    anlamsız, bir "kapsamlı araştır" isteğinde effort zaten üst sınırda. */
+function isFullyConfident(text: string): boolean {
+  return autoImageGen(text) || autoResearch(text);
+}
+
+/** Her alan için ayrı güven değerlendirmesi — decidePilotAsync yalnız
+    `false` dönen alanları LLM'e sorar. */
+export function pilotConfidence(text: string): PilotConfidence {
+  const full = isFullyConfident(text);
+  const effort = autoEffort(text);
+  return {
+    effort: full || isEffortConfident(text),
+    quality: full || isQualityConfident(text, effort),
+    fusion: full || isFusionConfident(text),
+  };
+}
+
+/** Geriye dönük uyum: ÜÇÜ BİRDEN emin olduğunda ağa hiç çıkılmaz. */
+export function isPilotConfident(text: string): boolean {
+  const c = pilotConfidence(text);
+  return c.effort && c.quality && c.fusion;
+}
+
+/** LLM'in regex'ten FARKLI karar verdiği alanları (yalnız LLM'e SORULMUŞ
+    alanlarda) sessizce loglar — HİÇBİR ZAMAN kullanıcı metni göndermez,
+    yalnız enum/boole değerleri. Zamanla hangi regex kuralının gerçek
+    kullanımda yanıldığını gösteren bir sinyal birikir (bkz. Umai anket
+    notu: "regex'i gerçek anlaşmazlıktan öğrensin"). trackEvent zaten
+    misafirde/hatada sessizce no-op olur; ana akışı asla etkilemez. */
+function logPilotMismatch(
+  fields: ("effort" | "quality" | "fusion")[],
+  local: PilotDecision,
+  llmData: { effort?: string; quality?: boolean; fusion?: boolean },
+): void {
+  if (fields.includes("effort") && llmData.effort && llmData.effort !== local.effort) {
+    trackEvent("pilot_mismatch", "chat", { field: "effort", regex: local.effort, llm: llmData.effort });
+  }
+  if (fields.includes("quality") && typeof llmData.quality === "boolean" && llmData.quality !== local.quality) {
+    trackEvent("pilot_mismatch", "chat", { field: "quality", regex: local.quality, llm: llmData.quality });
+  }
+  if (fields.includes("fusion") && typeof llmData.fusion === "boolean" && llmData.fusion !== local.fusion) {
+    trackEvent("pilot_mismatch", "chat", { field: "fusion", regex: local.fusion, llm: llmData.fusion });
+  }
+}
+
+function isUsableRoutePlanResponse(
+  data: { effort?: unknown; quality?: unknown; fusion?: unknown } | null | undefined,
+  fields: ("effort" | "quality" | "fusion")[],
+): boolean {
+  if (!data || typeof data !== "object") return false;
+  for (const f of fields) {
+    if (f === "effort" && !(["low", "medium", "high", "max"] as string[]).includes(data.effort as string)) return false;
+    if (f === "quality" && typeof data.quality !== "boolean") return false;
+    if (f === "fusion" && typeof data.fusion !== "boolean") return false;
+  }
+  return true;
+}
+
 function assemblePilotDecision(
   effort: Effort, quality: boolean, fusion: boolean, web: boolean, research: boolean, swarm: boolean, image: boolean,
 ): PilotDecision {
@@ -156,29 +266,16 @@ export function decidePilot(text: string, ctx: { hasRepo: boolean }): PilotDecis
   return assemblePilotDecision(effort, quality, fusion, web, research, swarm, image);
 }
 
-/* Regex'in GERÇEKTEN emin olduğu mesajlar: kısa selamlar/komutlar, açık
-   "kapsamlı" sinyali, kod bloklu istekler, açık görsel/araştırma niyeti.
-   Bunlarda LLM'e sormanın hiçbir kazancı yok — regex zaten doğru okuyor —
-   ama her sohbet turunda `/api/route-plan`'a bloklayan bir ağ isteği atmak
-   gerçek bir maliyet: fazladan tur + gecikme. Yalnız GERÇEKTEN belirsiz
-   (uzunca, sinyalsiz düz yazı) mesajlarda LLM'e sorulur — bkz. decidePilotAsync. */
-export function isPilotConfident(text: string): boolean {
-  const t = (text || "").trim();
-  if (t.length < 60) return true;
-  if (/```/.test(t)) return true;
-  if (autoEffort(t) === "max") return true;
-  if (autoImageGen(t) || autoResearch(t)) return true;
-  return false;
-}
-
 /** LLM-tabanlı yönlendirme kararı — sabit regex yerine `/api/route-plan`'a
-    hızlı bir sınıflandırma çağrısı yapar (yalnızca effort/quality/fusion;
-    web/research/swarm/image hâlâ regex'te kalır — bunlar artık organik araç
-    kararları, bkz. generate_image/deep_research/dispatch_agents araçları).
-    ÖNCEDEN her mesajda (kısa bir "selam" dahil) bloklayan bir ağ turu
-    atılıyordu — gecikme şikayetlerinin bir kaynağıydı. Artık regex GERÇEKTEN
-    emin olduğunda (bkz. isPilotConfident) ağa hiç çıkılmıyor; yalnız
-    belirsiz/uzun düz-yazı isteklerde LLM'e soruluyor.
+    hızlı bir sınıflandırma çağrısı yapar. ÖNCEDEN her mesajda (kısa bir
+    "selam" dahil) effort/quality/fusion'ın ÜÇÜ birden LLM'e soruluyordu —
+    bloklayan bir ağ turu, gecikme şikayetlerinin bir kaynağıydı. Artık yalnız
+    `pilotConfidence`'ın BELİRSİZ bulduğu alan(lar) gönderilir (`fields`):
+    regex'in üçü birden emin olduğu mesajlarda (kısa selam/komut, açık
+    "kapsamlı" sinyali, kod bloğu, açık görsel/araştırma niyeti) ağa hiç
+    çıkılmaz; regex'in zaten emin olduğu tekil alanlar da LLM'in olası yanlış
+    okumasıyla ASLA ezilmez. web/research/swarm/image hâlâ tamamen regex'te
+    kalır (bkz. generate_image/deep_research/dispatch_agents araçları).
     Ağ/format hatasında SESSİZCE senkron `decidePilot`'a düşer — sohbet akışı
     asla bloklanmaz/bozulmaz. */
 export async function decidePilotAsync(
@@ -186,28 +283,36 @@ export async function decidePilotAsync(
   ctx: { hasRepo: boolean },
   llm: { baseUrl: string; model: string; apiKey: string } | null,
 ): Promise<PilotDecision> {
-  if (isPilotConfident(text)) return decidePilot(text, ctx);
+  const local = decidePilot(text, ctx);
+  const conf = pilotConfidence(text);
+  if (conf.effort && conf.quality && conf.fusion) return local;
+
+  const fields: ("effort" | "quality" | "fusion")[] = [];
+  if (!conf.effort) fields.push("effort");
+  if (!conf.quality) fields.push("quality");
+  if (!conf.fusion) fields.push("fusion");
+
   if (llm?.baseUrl && llm?.model) {
     try {
       const res = await fetch("/api/route-plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, hasRepo: ctx.hasRepo, baseUrl: llm.baseUrl, model: llm.model, apiKey: llm.apiKey }),
-        signal: AbortSignal.timeout(6000),
+        body: JSON.stringify({ text, hasRepo: ctx.hasRepo, baseUrl: llm.baseUrl, model: llm.model, apiKey: llm.apiKey, fields }),
+        signal: AbortSignal.timeout(4000),
       });
       if (res.ok) {
         const data = await res.json() as { effort?: string; quality?: boolean; fusion?: boolean };
-        if (data && (["low", "medium", "high", "max"] as string[]).includes(data.effort ?? "")) {
-          const research = autoResearch(text);
-          const web = research || autoWeb(text);
-          const swarm = ctx.hasRepo && autoSwarm(text);
-          const image = autoImageGen(text);
-          return assemblePilotDecision(data.effort as Effort, !!data.quality, !!data.fusion, web, research, swarm, image);
+        if (isUsableRoutePlanResponse(data, fields)) {
+          logPilotMismatch(fields, local, data);
+          const effort = conf.effort ? local.effort : (data.effort as Effort);
+          const quality = conf.quality ? local.quality : !!data.quality;
+          const fusion = conf.fusion ? local.fusion : !!data.fusion;
+          return assemblePilotDecision(effort, quality, fusion, local.web, local.research, local.swarm, local.image);
         }
       }
     } catch { /* ağ/zaman aşımı hatası — senkron yedeğe düş */ }
   }
-  return decidePilot(text, ctx);
+  return local;
 }
 
 /* Stüdyo için otomatik çıktı türü (skill) seçimi — brief'ten. Open Design/

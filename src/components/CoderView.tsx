@@ -6,6 +6,7 @@ import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import { buildFallbackChain } from "@/lib/fallback";
 import { createReveal, type RevealController } from "@/lib/streamReveal";
 import { toggleLeftPanel, switchLeftPanel, type LeftPanel } from "@/lib/leftPanel";
+import { compactPlan } from "@/lib/contextWindow";
 import { filterMcpServersForModel } from "@/lib/mcpScope";
 import {
   ArrowDown,
@@ -856,6 +857,12 @@ export function CoderView() {
   /* Otomatik bağlam sıkıştırma önbelleği: aynı eşik için tekrar tekrar
      özetlemeyi önler (key = chatId:eskiMesajSayısı). */
   const compactCacheRef = useRef<{ key: string; summary: string } | null>(null);
+  /* Uzun sohbette (60+ mesaj) eşik HER turda kayıyor (KEEP sabit 40 iken
+     older.length her turda büyüyor) — bu yüzden özetleme isteği ASLA
+     await edilmez (bkz. compactPlan): bu tur hazır bir önbellek varsa
+     kullanır, yoksa ham kırpmaya düşer ve arka planda taze özet ister.
+     Bu ref aynı anahtar için birden fazla arka-plan isteği uçmasını önler. */
+  const compactPendingKeyRef = useRef<string | null>(null);
   const [editorFile, setEditorFile] = useState<EditorFile | null>(null);
   const [pendingCommit, setPendingCommit] = useState<EditorFile[] | null>(null);
   /* Ajanın bu turda yazdığı dosyaların ESKİ içeriği — "Geri al" için. */
@@ -1963,8 +1970,13 @@ export function CoderView() {
     }
     /* Bağlam penceresi + OTOMATİK SIKIŞTIRMA: eşik aşılınca eski mesajlar LLM ile
        tek özete damıtılır (Claude Code /compact gibi), son KEEP mesaj aynen
-       gönderilir. Stored sohbet DEĞİŞMEZ (yalnızca gönderilen kopya sıkışır);
-       özet çağrısı başarısızsa ham kırpmaya düşülür → akış asla bozulmaz. */
+       gönderilir. Stored sohbet DEĞİŞMEZ (yalnızca gönderilen kopya sıkışır).
+       ÖNCEDEN özetleme çağrısı bu turu BEKLETİYORDU (await) — KEEP sabit
+       kaldığından eşik neredeyse HER turda kayıyor, yani bu nadir değil,
+       uzun sohbette tekrar eden bir duraklamaydı. Artık HİÇBİR tur bloklanmaz
+       (bkz. compactPlan): hazır bir özet varsa kullanılır, yoksa bu tur ham
+       kırpmaya düşer ve arka planda taze bir özet istenir — sonraki tur
+       hazır bulur. */
     const MAX_CTX = 60;
     const KEEP = 40;
     let apiMessages: { role: string; content: string | unknown[] }[];
@@ -1972,28 +1984,29 @@ export function CoderView() {
       const older = rawMessages.slice(0, rawMessages.length - KEEP);
       const recent = rawMessages.slice(-KEEP);
       const cacheKey = `${chat?.id ?? "_"}:${older.length}`;
-      let summary = compactCacheRef.current?.key === cacheKey ? compactCacheRef.current.summary : "";
-      if (!summary) {
+      const { summary, shouldRefresh } = compactPlan(cacheKey, compactCacheRef.current, compactPendingKeyRef.current);
+      if (shouldRefresh) {
+        compactPendingKeyRef.current = cacheKey;
         const transcript = older
           .map((m) => `${m.role}: ${typeof m.content === "string" ? m.content : "[görsel]"}`)
           .join("\n\n");
-        try {
-          const cr = await fetch("/api/compact", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              transcript,
-              baseUrl: active.baseUrl,
-              model: active.model,
-              apiKey: reqKey,
-            }),
+        void fetch("/api/compact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ transcript, baseUrl: active.baseUrl, model: active.model, apiKey: reqKey }),
+        })
+          .then((cr) => cr.json())
+          .then((d) => {
+            const s = d?.summary || "";
+            if (s) {
+              compactCacheRef.current = { key: cacheKey, summary: s };
+              addToast("Bağlam otomatik özetlendi (uzun sohbet).", "info");
+            }
+          })
+          .catch(() => { /* arka plan özetleme başarısız — sonraki turda tekrar denenir */ })
+          .finally(() => {
+            if (compactPendingKeyRef.current === cacheKey) compactPendingKeyRef.current = null;
           });
-          summary = (await cr.json())?.summary || "";
-          if (summary) {
-            compactCacheRef.current = { key: cacheKey, summary };
-            addToast("Bağlam otomatik özetlendi (uzun sohbet).", "info");
-          }
-        } catch { /* özetleme başarısız → ham kırpmaya düş */ }
       }
       apiMessages = summary
         ? [{ role: "system" as const, content: `[Önceki konuşmanın özeti — bağlamı koru]\n${summary}` }, ...recent]
