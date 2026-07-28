@@ -811,8 +811,13 @@ export function CoderView() {
   const [improvingPrompt, setImprovingPrompt] = useState(false);
 
   /* Prompt geliştirici — composer'daki taslağı ücretsiz LLM ile daha net/etkili
-     bir isteme dönüştürür (akışı doğrudan input'a yazar). ⋯ menüsünün üst-seviye
-     hızlı eylemlerinden (Efor'un yanında) tetiklenir. */
+     bir isteme dönüştürür (akışı doğrudan input'a yazar). ÖNCEDEN /api/chat'i
+     (asıl sohbet/ajan uç noktası) çağırıyordu; o rota HER isteğe ask_user'ı
+     teşvik eden bir "[Açıklayıcı diyalog]" talimatı enjekte ettiğinden, kısa/
+     belirsiz taslaklar (tam da iyileştirilmek istenen türden) "belirsiz istek"
+     sayılıp bir soru listesiyle yanıtlanıyor, bu da composer'a yazılınca
+     taslağı bozuyordu. Artık dar amaçlı /api/improve-prompt kullanılıyor
+     (bkz. o dosyadaki açıklama) — ajan çerçevesi/araç teşviki yok. */
   const improvePrompt = async () => {
     const base = input.trim();
     if (improvingPrompt) return;
@@ -823,37 +828,15 @@ export function CoderView() {
       const active = store.activeModel();
       if (!active) throw new Error("Önce Ayarlar → Modeller'den bir model seç.");
       const apiKey = await usableApiKey(active);
-      const sys = "Sen bir prompt mühendisisin. Kullanıcının taslak istemini; amacını koruyarak daha NET, eksiksiz ve etkili bir isteme dönüştür. Gerekli bağlamı, beklenen çıktı biçimini ve kısıtları ekle. SADECE geliştirilmiş istemi döndür — açıklama, tırnak veya etiket yazma. Kullanıcının diliyle aynı dilde yaz.";
-      const res = await fetch("/api/chat", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [{ role: "user", content: base }],
-          baseUrl: active.baseUrl, model: active.model, apiKey, provider: active.provider,
-          systemPrompt: sys, fallbacks: buildFallbackChain(store.config.models, store.config.activeModelId),
-          tools: false, webSearch: false, temperature: 0.7,
-        }),
+      const res = await fetch("/api/improve-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: base, baseUrl: active.baseUrl, model: active.model, apiKey }),
       });
-      if (!res.ok || !res.body) throw new Error(`LLM ${res.status}`);
-      const reader = res.body.getReader(); const dec = new TextDecoder();
-      let buf = ""; let full = "";
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        const lines = buf.split("\n"); buf = lines.pop() || "";
-        for (const ln of lines) {
-          const t = ln.trim();
-          if (!t.startsWith("data:")) continue;
-          const p = t.slice(5).trim();
-          if (!p || p === "[DONE]") continue;
-          try {
-            const j = JSON.parse(p) as { choices?: { delta?: { content?: string } }[] };
-            const d = j.choices?.[0]?.delta?.content ?? "";
-            if (d) { full += d; setInput(full); }
-          } catch { /* yoksay */ }
-        }
-      }
-      if (!full.trim()) addToast("İstem geliştirilemedi — tekrar dene.", "error");
+      if (!res.ok) throw new Error(`LLM ${res.status}`);
+      const { improved } = await res.json() as { improved?: string };
+      if (improved?.trim()) setInput(improved.trim());
+      else addToast("İstem geliştirilemedi — tekrar dene.", "error");
     } catch (e) {
       addToast(`Geliştirme hatası: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
     } finally { setImprovingPrompt(false); }
