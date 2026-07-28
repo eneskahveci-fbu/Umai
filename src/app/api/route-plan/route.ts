@@ -23,26 +23,54 @@ export async function POST(req: NextRequest) {
 
   const __v = await parseBody(req, llmProxySchema);
   if (!__v.ok) return __v.res;
-  const { text, hasRepo, baseUrl, model, apiKey } = __v.data as {
-    text?: string; hasRepo?: boolean; baseUrl?: string; model?: string; apiKey?: string;
+  const { text, hasRepo, baseUrl, model, apiKey, fields: rawFields } = __v.data as {
+    text?: string; hasRepo?: boolean; baseUrl?: string; model?: string; apiKey?: string; fields?: unknown;
   };
   if (!baseUrl || !model || !text) return Response.json({});
+
+  /* Çağıran (autoPilot.ts) artık regex'in ZATEN emin olduğu alanları
+     istemiyor — yalnız belirsiz kalan(lar)ı `fields` ile bildiriyor. Küçük
+     bir istem + küçük bir tamamlama = daha hızlı bir sınıflandırma turu.
+     Geçersiz/eksik `fields` → geriye dönük uyum için üçü de sorulur. */
+  const ALL_FIELDS = ["effort", "quality", "fusion"] as const;
+  type Field = (typeof ALL_FIELDS)[number];
+  const fields: Field[] = Array.isArray(rawFields)
+    ? rawFields.filter((f): f is Field => ALL_FIELDS.includes(f as Field))
+    : [];
+  const wanted = fields.length ? fields : ALL_FIELDS;
+
+  const schemaParts: string[] = [];
+  const ruleParts: string[] = [];
+  if (wanted.includes("effort")) {
+    schemaParts.push('"effort":"low|medium|high|max"');
+    ruleParts.push(
+      "effort: mesaj kısa/basitse 'low', normalse 'medium', kod/mimari/güvenlik/refactor gibi ağır bir " +
+      "iş isteniyorsa 'high', kullanıcı açıkça 'kapsamlı/derinlemesine/baştan yaz' gibi çok kapsamlı bir " +
+      "şey istiyorsa 'max'.",
+    );
+  }
+  if (wanted.includes("quality")) {
+    schemaParts.push('"quality":true|false');
+    ruleParts.push("quality: kullanıcı özenli/uzun bir rapor, makale, doküman, tasarım ya da strateji istiyorsa true.");
+  }
+  if (wanted.includes("fusion")) {
+    schemaParts.push('"fusion":true|false');
+    ruleParts.push(
+      "fusion: kullanıcı YALNIZCA bir SİTE/UYGULAMA/ARAYÜZ/KOD ÜRETİLMESİNİ istiyorsa (ör. 'bir landing " +
+      "sayfası tasarla', 'bir React bileşeni yaz') true; sıradan sohbet/soru/hata ayıklamada false.",
+    );
+  }
 
   const messages = [
     {
       role: "system",
       content:
-        "Sen bir yönlendirme sınıflandırıcısısın. Kullanıcının mesajına bakarak 3 karar ver ve YALNIZCA " +
-        "şu JSON ile yanıt ver, başka hiçbir şey yazma:\n" +
-        '{"effort":"low|medium|high|max","quality":true|false,"fusion":true|false}\n\n' +
-        "effort: mesaj kısa/basitse 'low', normalse 'medium', kod/mimari/güvenlik/refactor gibi ağır bir " +
-        "iş isteniyorsa 'high', kullanıcı açıkça 'kapsamlı/derinlemesine/baştan yaz' gibi çok kapsamlı bir " +
-        "şey istiyorsa 'max'.\n" +
-        "quality: kullanıcı özenli/uzun bir rapor, makale, doküman, tasarım ya da strateji istiyorsa true.\n" +
-        "fusion: kullanıcı YALNIZCA bir SİTE/UYGULAMA/ARAYÜZ/KOD ÜRETİLMESİNİ istiyorsa (ör. 'bir landing " +
-        "sayfası tasarla', 'bir React bileşeni yaz') true; sıradan sohbet/soru/hata ayıklamada false.",
+        `Sen bir yönlendirme sınıflandırıcısısın. Kullanıcının mesajına bakarak ${wanted.length} karar ver ve ` +
+        `YALNIZCA şu JSON ile yanıt ver, başka hiçbir şey yazma:\n{${schemaParts.join(",")}}\n\n${ruleParts.join("\n")}`,
     },
-    { role: "user", content: `Repo bağlı: ${hasRepo ? "evet" : "hayır"}\nMesaj:\n${String(text).slice(0, 2000)}` },
+    /* Sınıflandırma için mesajın tamamı gerekmiyor — ilk ~900 karakter
+       niyet sinyalini taşımaya yetiyor, istem küçülüp tur hızlanıyor. */
+    { role: "user", content: `Repo bağlı: ${hasRepo ? "evet" : "hayır"}\nMesaj:\n${String(text).slice(0, 900)}` },
   ];
 
   try {
@@ -52,7 +80,7 @@ export async function POST(req: NextRequest) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey || ""}`,
       },
-      body: JSON.stringify({ model, messages, max_tokens: 60, stream: false }),
+      body: JSON.stringify({ model, messages, max_tokens: 20 * wanted.length, stream: false }),
     });
     if (!res.ok) return Response.json({});
     const ct = res.headers.get("content-type") || "";
@@ -63,11 +91,17 @@ export async function POST(req: NextRequest) {
     const end = raw.lastIndexOf("}");
     if (start === -1 || end <= start) return Response.json({});
     const parsed = JSON.parse(raw.slice(start, end + 1)) as { effort?: unknown; quality?: unknown; fusion?: unknown };
-    const effort = typeof parsed.effort === "string" && ["low", "medium", "high", "max"].includes(parsed.effort)
-      ? parsed.effort
-      : undefined;
-    if (!effort) return Response.json({});
-    return Response.json({ effort, quality: !!parsed.quality, fusion: !!parsed.fusion });
+    const out: { effort?: string; quality?: boolean; fusion?: boolean } = {};
+    if (wanted.includes("effort")) {
+      const effort = typeof parsed.effort === "string" && ["low", "medium", "high", "max"].includes(parsed.effort)
+        ? parsed.effort
+        : undefined;
+      if (!effort) return Response.json({});
+      out.effort = effort;
+    }
+    if (wanted.includes("quality")) out.quality = !!parsed.quality;
+    if (wanted.includes("fusion")) out.fusion = !!parsed.fusion;
+    return Response.json(out);
   } catch {
     return Response.json({});
   }

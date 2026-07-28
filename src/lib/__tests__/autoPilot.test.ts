@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { decidePilot, decidePilotAsync, isPilotConfident, autoEffort, autoWeb, autoResearch, autoFusion, autoImageGen } from "../autoPilot";
+import {
+  decidePilot, decidePilotAsync, pilotConfidence, isPilotConfident,
+  autoEffort, autoWeb, autoResearch, autoFusion, autoImageGen,
+} from "../autoPilot";
 
 const ctx = { hasRepo: true };
 
@@ -39,34 +42,62 @@ describe("decidePilot", () => {
   });
 });
 
-describe("isPilotConfident — regex ne zaman ağa hiç çıkmadan karar verir", () => {
-  it("kısa mesajlarda emin (selam, kısa komut, kısa soru)", () => {
-    expect(isPilotConfident("selam")).toBe(true);
-    expect(isPilotConfident("bunu düzelt")).toBe(true);
-    expect(isPilotConfident("peki ya bu?")).toBe(true);
+describe("pilotConfidence — alan-bazlı 'regex'ten emin miyiz' değerlendirmesi", () => {
+  it("kısa mesajlarda üçü de emin (selam, kısa komut, kısa soru)", () => {
+    expect(pilotConfidence("selam")).toEqual({ effort: true, quality: true, fusion: true });
+    expect(pilotConfidence("bunu düzelt")).toEqual({ effort: true, quality: true, fusion: true });
+    expect(pilotConfidence("peki ya bu?")).toEqual({ effort: true, quality: true, fusion: true });
   });
-  it("açık 'kapsamlı' sinyalinde emin", () => {
-    expect(isPilotConfident("Bu konuyu kapsamlı bir şekilde uzun uzun ele alan bir metin yazar mısın acaba")).toBe(true);
+
+  it("açık 'kapsamlı' sinyalinde üçü de emin (effort=max → quality de otomatik emin)", () => {
+    const t = "Bu konuyu kapsamlı ve derinlemesine ele alan, ayrıntılı bir açıklama rica ediyorum.";
+    expect(pilotConfidence(t)).toEqual({ effort: true, quality: true, fusion: true });
   });
-  it("kod bloklu istekte emin (uzun olsa bile)", () => {
+
+  it("kod bloklu debug isteğinde (üretim fiili YOK) üçü de emin — ağa hiç çıkılmaz", () => {
+    /* Bu, önceki (tek global kapılı) tasarımın da garanti ettiği en yaygın
+       durum: bir kodlama asistanında "şu kodu incele/düzelt" tipi istekler
+       çoğunluk. FUSION_NOUN'un çıplak "kod" alternatifi burada eşleşir ama
+       üretim FİİLİ yoksa (oluştur/yap/kodla/tasarla/geliştir vb.) autoFusion
+       zaten kesin false'tur — bu yüzden isFusionConfident fiil-öncelikli. */
     const t = "Şu kodu incele ve neden hatalı olduğunu açıkla, gerekirse düzelt:\n```ts\nconst x = 1;\n```";
-    expect(isPilotConfident(t)).toBe(true);
+    expect(pilotConfidence(t)).toEqual({ effort: true, quality: true, fusion: true });
   });
-  it("açık görsel/araştırma niyetinde emin", () => {
-    expect(isPilotConfident("bana gün batımında sisli bir dağ manzarası çiz, çok detaylı ve renkli olsun lütfen")).toBe(true);
-    expect(isPilotConfident("React ile Vue arasında kapsamlı bir karşılaştırmalı analiz raporu hazırla, kaynaklarıyla anlat")).toBe(true);
+
+  it("açık görsel/araştırma niyetinde üçü de emin", () => {
+    expect(pilotConfidence("bana gün batımında sisli bir dağ manzarası çiz, çok detaylı ve renkli olsun lütfen"))
+      .toEqual({ effort: true, quality: true, fusion: true });
+    expect(pilotConfidence("React ile Vue arasında kapsamlı bir karşılaştırmalı analiz raporu hazırla, kaynaklarıyla anlat"))
+      .toEqual({ effort: true, quality: true, fusion: true });
   });
-  it("uzunca, sinyalsiz düz yazıda EMİN DEĞİL — LLM'e sorulmalı", () => {
+
+  it("uzunca, sinyalsiz düz yazıda effort EMİN DEĞİL — LLM'e sorulmalı", () => {
     const t = "Yeni başlayan bir ürün için hem kullanıcıların hem de yatırımcıların ilgisini çekecek, biraz da rekabet analizine değinen bir sayfa hazırlar mısın";
-    expect(isPilotConfident(t)).toBe(false);
+    expect(pilotConfidence(t).effort).toBe(false);
+  });
+
+  it("üretim fiili VAR ama hedef isim YOK ise fusion belirsiz kalır", () => {
+    /* "geliştir" bir üretim fiili ama metinde site/uygulama/sayfa/vb. bir
+       hedef isim yok — gerçekten ara bölge (LLM'e sorulmaya değer). */
+    const t = "Bugünlerde kafamda dönüp duran dağınık bir fikrim var, bunu biraz geliştir, ben de daha iyi anlayayım istiyorum.";
+    expect(pilotConfidence(t).fusion).toBe(false);
+  });
+
+  it("isPilotConfident geriye dönük uyum: üçü BİRDEN emin olduğunda true", () => {
+    expect(isPilotConfident("selam")).toBe(true);
+    const ambiguous = "Yeni başlayan bir ürün için hem kullanıcıların hem de yatırımcıların ilgisini çekecek, biraz da rekabet analizine değinen bir sayfa hazırlar mısın";
+    expect(isPilotConfident(ambiguous)).toBe(false);
   });
 });
 
 describe("decidePilotAsync — LLM-tabanlı yönlendirme + senkron yedek", () => {
   const llm = { baseUrl: "https://x", model: "m", apiKey: "k" };
-  const ambiguousText = "Yeni başlayan bir ürün için hem kullanıcıların hem de yatırımcıların ilgisini çekecek, biraz da rekabet analizine değinen bir sayfa hazırlar mısın";
+  /* Bu metinde YALNIZ effort belirsiz (quality ve fusion regex'ten zaten
+     emin — bkz. pilotConfidence testleri: length<400 → quality kesin false;
+     "sayfa" + "hazırlar" ikisi de eşleşiyor → fusion kesin true). */
+  const effortOnlyAmbiguous = "Yeni başlayan bir ürün için hem kullanıcıların hem de yatırımcıların ilgisini çekecek, biraz da rekabet analizine değinen bir sayfa hazırlar mısın";
 
-  it("regex EMİN olduğunda (kısa mesaj) ağa hiç çıkmaz, doğrudan regex kararını döner", async () => {
+  it("regex ÜÇÜ BİRDEN emin olduğunda ağa hiç çıkmaz, doğrudan regex kararını döner", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const d = await decidePilotAsync("selam", ctx, llm);
@@ -75,38 +106,55 @@ describe("decidePilotAsync — LLM-tabanlı yönlendirme + senkron yedek", () =>
     vi.unstubAllGlobals();
   });
 
-  it("regex belirsiz kaldığında başarılı /api/route-plan yanıtı effort/quality/fusion'ı uygular (web/research/swarm hâlâ regex'ten)", async () => {
+  it("yalnız BELİRSİZ kalan alan(lar) route-plan'a `fields` ile bildirilir", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify({ effort: "max" }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await decidePilotAsync(effortOnlyAmbiguous, ctx, llm);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    expect(body.fields).toEqual(["effort"]);
+    vi.unstubAllGlobals();
+  });
+
+  it("regex'in ZATEN EMİN olduğu alanlar LLM'in FARKLI görüşüyle EZİLMEZ", async () => {
+    /* Sunucu quality/fusion için de bir görüş döndürse bile (istenmediği
+       hâlde bir sağlayıcı fazladan alan dönerse), yalnız `fields`'da
+       istenen (effort) uygulanır — regex'in emin olduğu quality/fusion
+       LOKAL kalır. Bu, önceki (tek global kapılı) tasarımın SAHİP OLMADIĞI
+       bir korumadır. */
     const fetchMock = vi.fn().mockResolvedValueOnce(
       new Response(JSON.stringify({ effort: "max", quality: true, fusion: false }), { status: 200 }),
     );
     vi.stubGlobal("fetch", fetchMock);
-    const d = await decidePilotAsync(ambiguousText, ctx, llm);
-    expect(fetchMock).toHaveBeenCalledOnce();
-    expect(d.effort).toBe("max");
-    expect(d.quality).toBe(true);
-    expect(d.fusion).toBe(false);
+    const d = await decidePilotAsync(effortOnlyAmbiguous, ctx, llm);
+    const local = decidePilot(effortOnlyAmbiguous, ctx);
+    expect(d.effort).toBe("max");        // LLM'den geldi (belirsizdi)
+    expect(d.quality).toBe(local.quality); // LOKAL korundu (emin), sunucunun "true"su YOK SAYILDI
+    expect(d.fusion).toBe(local.fusion);   // LOKAL korundu (emin), sunucunun "false"u YOK SAYILDI
     vi.unstubAllGlobals();
   });
 
   it("ağ hatasında senkron decidePilot'a düşer (asla fırlatmaz)", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("network down")));
-    const d = await decidePilotAsync(ambiguousText, ctx, llm);
-    expect(d).toEqual(decidePilot(ambiguousText, ctx));
+    const d = await decidePilotAsync(effortOnlyAmbiguous, ctx, llm);
+    expect(d).toEqual(decidePilot(effortOnlyAmbiguous, ctx));
     vi.unstubAllGlobals();
   });
 
-  it("geçersiz/eksik JSON yanıtında senkron decidePilot'a düşer", async () => {
+  it("geçersiz/eksik JSON yanıtında (istenen alan gelmemiş) senkron decidePilot'a düşer", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 })));
-    const d = await decidePilotAsync(ambiguousText, ctx, llm);
-    expect(d).toEqual(decidePilot(ambiguousText, ctx));
+    const d = await decidePilotAsync(effortOnlyAmbiguous, ctx, llm);
+    expect(d).toEqual(decidePilot(effortOnlyAmbiguous, ctx));
     vi.unstubAllGlobals();
   });
 
   it("llm bilgisi yoksa (baseUrl/model eksik) doğrudan senkron decidePilot'a düşer, ağ çağrısı yapmaz", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const d = await decidePilotAsync(ambiguousText, ctx, null);
-    expect(d).toEqual(decidePilot(ambiguousText, ctx));
+    const d = await decidePilotAsync(effortOnlyAmbiguous, ctx, null);
+    expect(d).toEqual(decidePilot(effortOnlyAmbiguous, ctx));
     expect(fetchMock).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
