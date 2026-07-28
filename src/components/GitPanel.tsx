@@ -19,8 +19,10 @@ export function GitPanel({ onClose, onReviewPr }: { onClose: () => void; onRevie
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
+  /* ÇÖZÜLMÜŞ token (depoda AES-GCM şifreli durur) — şifreli blob uca giderse
+     her Git işlemi 401 alır. Bkz. secureKeys.resolveGitToken. */
   const getToken = () =>
-    (repoIsGitLab ? useStore.getState().activeGitlab()?.token : useStore.getState().activeGithub()?.token) ?? "";
+    repoIsGitLab ? useStore.getState().activeGitlabToken() : useStore.getState().activeGithubToken();
 
   const createBranch = async () => {
     if (!repo || !branchName.trim()) return;
@@ -34,7 +36,7 @@ export function GitPanel({ onClose, onReviewPr }: { onClose: () => void; onRevie
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "create_branch",
-          ...idField, repo: repo.repo, token: getToken(),
+          ...idField, repo: repo.repo, token: await getToken(),
           branchName: branchName.trim(), fromBranch: repo.branch,
         }),
       });
@@ -56,13 +58,13 @@ export function GitPanel({ onClose, onReviewPr }: { onClose: () => void; onRevie
       const payload = repoIsGitLab
         ? {
             action: "create_mr",
-            namespace: repo.owner, repo: repo.repo, token: getToken(),
+            namespace: repo.owner, repo: repo.repo, token: await getToken(),
             title: prTitle.trim(), description: prBody.trim(),
             sourceBranch: prHead.trim(), targetBranch: repo.branch,
           }
         : {
             action: "create_pr",
-            owner: repo.owner, repo: repo.repo, token: getToken(),
+            owner: repo.owner, repo: repo.repo, token: await getToken(),
             title: prTitle.trim(), body: prBody.trim(),
             head: prHead.trim(), base: repo.branch,
           };

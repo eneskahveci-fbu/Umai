@@ -58,7 +58,7 @@ import { AdminAnalytics } from "@/components/AdminAnalytics";
 import { AdminUsers } from "@/components/AdminUsers";
 import { createClient } from "@/lib/supabase/client";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, ALL_TOOL_CATALOG } from "@/lib/constants";
-import { buildFallbackChain, buildQualityFallbackChain, KEYLESS_PROVIDERS } from "@/lib/fallback";
+import { buildChainFor, KEYLESS_PROVIDERS } from "@/lib/fallback";
 import { IMAGE_PROVIDERS, IMAGE_PROVIDER_LABEL } from "@/lib/imageGen";
 import { calculateCost, formatCost } from "@/lib/pricing";
 import { quickComplete } from "@/lib/quickComplete";
@@ -1065,7 +1065,9 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               const activeM = config.models.find((m) => m.id === config.activeModelId);
               if (!activeM) return null;
               const qualityMode = config.qualityFallbackChain ?? false;
-              const chain = (qualityMode ? buildQualityFallbackChain : buildFallbackChain)(config.models, config.activeModelId);
+              /* Önizleme, isteğin GERÇEKTEN kuracağı zincirle aynı fonksiyondan gelir
+                 (buildChainFor) → kullanıcı ne görüyorsa o denenir. */
+              const chain = buildChainFor(config);
               return (
                 <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50 mb-4">
                   <div className="flex items-center justify-between gap-2 mb-1.5">

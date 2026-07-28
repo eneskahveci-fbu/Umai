@@ -38,7 +38,7 @@ import { printPdf, printDeckPdf } from "@/lib/studioExport";
 import { hasUnsavedWork } from "@/lib/studioProjectState";
 import { artifactDownload, buildArtifactSrcDoc } from "@/lib/artifactDoc";
 import { pickDraftModels, fillSelfConsistency, generateDrafts, judgeDrafts, buildBoostInstruction, type DraftJudge } from "@/lib/boost";
-import { buildFallbackChain } from "@/lib/fallback";
+import { buildChainFor } from "@/lib/fallback";
 import { resolveModelApiKey } from "@/lib/secureKeys";
 import { fetchTextModels } from "@/lib/pollinations";
 
@@ -410,7 +410,7 @@ export function DesignStudio() {
               baseUrl: s.profile.baseUrl, model: s.profile.model, provider: s.profile.provider,
               apiKey: await resolveModelApiKey(s.profile, store.config.providerKeys), temperature: s.temperature,
             })));
-            const fusionFallbacks = buildFallbackChain(store.config.models, active.id);
+            const fusionFallbacks = buildChainFor(store.config, active.id);
             const activeKey = await resolveModelApiKey(active, store.config.providerKeys);
             deck = await generateDeckFusion({
               brief: deckBrief, slideCount: DEFAULT_SLIDE_COUNT,
@@ -472,7 +472,7 @@ export function DesignStudio() {
                 baseUrl: s.profile.baseUrl, model: s.profile.model, provider: s.profile.provider,
                 apiKey: await resolveModelApiKey(s.profile, store.config.providerKeys), temperature: s.temperature,
               })));
-              const fusionFallbacks = buildFallbackChain(store.config.models, active.id);
+              const fusionFallbacks = buildChainFor(store.config, active.id);
               const draftResults = await generateDrafts({ userText: brief, models: withKeys, fallbacks: fusionFallbacks, signal: ac.signal });
               const drafts = draftResults.map((d) => d.text);
               if (drafts.length) {

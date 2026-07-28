@@ -390,9 +390,9 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
               const treeItems = treeBlobs(store.tree);
               const activeRepo = store.config.activeRepo || "";
               if (isGitLabRepo(activeRepo)) {
-                return await fetchAllGitLabFiles(r.owner, r.repo, r.branch, treeItems, store.activeGitlab()?.token);
+                return await fetchAllGitLabFiles(r.owner, r.repo, r.branch, treeItems, await store.activeGitlabToken());
               }
-              return await fetchAllFiles(r.owner, r.repo, r.branch, treeItems, store.activeGithub()?.token);
+              return await fetchAllFiles(r.owner, r.repo, r.branch, treeItems, await store.activeGithubToken());
             },
           );
       cleanupRef.current = cleanup;

@@ -3,7 +3,7 @@
    akışlı istek atar, SSE delta'larını toplar. Anahtarsız kullanıcıda fallback
    zinciri ücretsiz Pollinations'a düşer → her zaman çalışır. */
 import { useStore } from "./store";
-import { buildFallbackChain } from "./fallback";
+import { buildChainFor } from "./fallback";
 import { resolveKey } from "./studioGen";
 import { buildContextSections, selectRelevantSkills } from "./prompt";
 
@@ -45,7 +45,7 @@ export async function streamChat(opts: GenChatOptions): Promise<string> {
       messages: opts.messages,
       baseUrl: resolved.baseUrl, model: resolved.model, apiKey: resolved.apiKey, provider: resolved.provider,
       systemPrompt: system,
-      fallbacks: buildFallbackChain(cfg.models, cfg.activeModelId),
+      fallbacks: buildChainFor(cfg),
       tools: false, webSearch: false, temperature: opts.temperature ?? 0.7,
       ...(opts.maxTokens ? { maxTokens: opts.maxTokens } : {}),
       ...(opts.jsonMode ? { jsonMode: true } : {}),

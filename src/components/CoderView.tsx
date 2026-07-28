@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
-import { buildFallbackChain, buildQualityFallbackChain } from "@/lib/fallback";
+import { buildChainFor } from "@/lib/fallback";
 import { createReveal, type RevealController } from "@/lib/streamReveal";
 import { switchLeftPanel, type LeftPanel } from "@/lib/leftPanel";
 import { compactPlan } from "@/lib/contextWindow";
@@ -1097,14 +1097,14 @@ export function CoderView() {
       if (isGitLabRepo(activeRepo)) {
         const parsed = parseGitLabRepo(activeRepo);
         if (!parsed) { addToast("Geçersiz GitLab deposu. Örnek: gitlab.com/namespace/repo", "error"); return; }
-        const token = store.activeGitlab()?.token;
+        const token = await store.activeGitlabToken();
         const { branch, items } = await fetchGitLabRepoTree(parsed.namespace, parsed.repo, token);
         setRepo({ owner: parsed.namespace, repo: parsed.repo, branch });
         setTree(buildGitLabTree(items));
       } else {
         const parsed = parseRepo(activeRepo);
         if (!parsed) { addToast("Ayarlar'dan bir GitHub veya GitLab deposu ekle.", "error"); return; }
-        const token = store.activeGithub()?.token;
+        const token = await store.activeGithubToken();
         try {
           const { branch, items } = await fetchRepoTree(parsed.owner, parsed.repo, token);
           setRepo({ ...parsed, branch });
@@ -1116,7 +1116,7 @@ export function CoderView() {
           const gl = parseGitLabRepo(activeRepo);
           if (!gl) throw ghErr;
           try {
-            const gtoken = store.activeGitlab()?.token;
+            const gtoken = await store.activeGitlabToken();
             const { branch, items } = await fetchGitLabRepoTree(gl.namespace, gl.repo, gtoken);
             setRepo({ owner: gl.namespace, repo: gl.repo, branch });
             setTree(buildGitLabTree(items));
@@ -1312,10 +1312,10 @@ export function CoderView() {
       const activeRepo = store.config.activeRepo || "";
       let content: string;
       if (isGitLabRepo(activeRepo)) {
-        const token = store.activeGitlab()?.token;
+        const token = await store.activeGitlabToken();
         content = await fetchGitLabFileContent(repo.owner, repo.repo, repo.branch, file.path, token);
       } else {
-        const token = store.activeGithub()?.token;
+        const token = await store.activeGithubToken();
         content = await fetchFileContent(repo.owner, repo.repo, repo.branch, file.path, token);
       }
       setAttachedFiles((prev) => [...prev, { path: file.path, content }]);
@@ -1378,8 +1378,8 @@ export function CoderView() {
       const store = useStore.getState();
       const activeRepo = store.config.activeRepo || "";
       const content = isGitLabRepo(activeRepo)
-        ? await fetchGitLabFileContent(repo.owner, repo.repo, repo.branch, file.path, store.activeGitlab()?.token)
-        : await fetchFileContent(repo.owner, repo.repo, repo.branch, file.path, store.activeGithub()?.token);
+        ? await fetchGitLabFileContent(repo.owner, repo.repo, repo.branch, file.path, await store.activeGitlabToken())
+        : await fetchFileContent(repo.owner, repo.repo, repo.branch, file.path, await store.activeGithubToken());
       openInEditor({ path: file.path, content, language: detectLanguage(file.path) });
     } catch (e) {
       addToast(`Dosya okunamadı: ${(e as Error).message}`, "error");
@@ -1399,9 +1399,9 @@ export function CoderView() {
       const activeRepo = store.config.activeRepo || "";
       let content: string;
       if (isGitLabRepo(activeRepo)) {
-        content = await fetchGitLabFileContent(r.owner, r.repo, r.branch, path, store.activeGitlab()?.token);
+        content = await fetchGitLabFileContent(r.owner, r.repo, r.branch, path, await store.activeGitlabToken());
       } else {
-        content = await fetchFileContent(r.owner, r.repo, r.branch, path, store.activeGithub()?.token);
+        content = await fetchFileContent(r.owner, r.repo, r.branch, path, await store.activeGithubToken());
       }
       openInEditor({ path, content, language: detectLanguage(path) });
     } catch { /* dosya henüz okunamadıysa sessiz geç */ }
@@ -1423,7 +1423,7 @@ export function CoderView() {
     const index = new SemanticIndex();
     const activeRepo = store.config.activeRepo || "";
     const gitlab = isGitLabRepo(activeRepo);
-    const token = gitlab ? store.activeGitlab()?.token : store.activeGithub()?.token;
+    const token = gitlab ? await store.activeGitlabToken() : await store.activeGithubToken();
 
     const files = getAllFiles(tree)
       .filter((f) => RAG_TEXT_EXT.test(f.path))
@@ -1548,7 +1548,7 @@ export function CoderView() {
     setUndoing(true);
     const store = useStore.getState();
     try {
-      const token = repoIsGitLab ? store.activeGitlab()?.token : store.activeGithub()?.token;
+      const token = repoIsGitLab ? await store.activeGitlabToken() : await store.activeGithubToken();
       const idField = repoIsGitLab ? { namespace: repo.owner } : { owner: repo.owner };
       const base = { ...idField, repo: repo.repo, branch: repo.branch, token };
       for (const cp of checkpoints) {
@@ -1589,7 +1589,7 @@ export function CoderView() {
     setResolvingAction(action.id);
     const store = useStore.getState();
     const isGL = repoIsGitLab;
-    const token = isGL ? store.activeGitlab()?.token : store.activeGithub()?.token;
+    const token = isGL ? await store.activeGitlabToken() : await store.activeGithubToken();
     const idField = isGL ? { namespace: repo.owner } : { owner: repo.owner };
     const jbody = (extra: Record<string, unknown>) => JSON.stringify({ ...idField, repo: repo.repo, branch: repo.branch, token, ...extra });
     const post = async (url: string, extra: Record<string, unknown>) => {
@@ -1804,8 +1804,8 @@ export function CoderView() {
       if (r) {
         const activeRepo = store.config.activeRepo || "";
         const pkgRaw = isGitLabRepo(activeRepo)
-          ? await fetchGitLabFileContent(r.owner, r.repo, r.branch, "package.json", store.activeGitlab()?.token)
-          : await fetchFileContent(r.owner, r.repo, r.branch, "package.json", store.activeGithub()?.token);
+          ? await fetchGitLabFileContent(r.owner, r.repo, r.branch, "package.json", await store.activeGitlabToken())
+          : await fetchFileContent(r.owner, r.repo, r.branch, "package.json", await store.activeGithubToken());
         const pkg = JSON.parse(pkgRaw) as { scripts?: Record<string, string>; devDependencies?: Record<string, string>; dependencies?: Record<string, string> };
         const scripts = pkg.scripts ?? {};
         const hasTs = !!(pkg.devDependencies?.typescript || pkg.dependencies?.typescript || scripts.typecheck);
@@ -2091,7 +2091,7 @@ export function CoderView() {
            otomatik bir sonraki uygun modele düşülür — bkz. generateDrafts.
            Ayarlar'daki "kalite öncelikli" seçeneği açıksa aynı kurallarla
            (anahtarsız son çare güvencesi dahil) ama en güçlüden en zayıfa. */
-        const fusionFallbacks = (store.config.qualityFallbackChain ? buildQualityFallbackChain : buildFallbackChain)(store.config.models, active.id);
+        const fusionFallbacks = buildChainFor(store.config, active.id);
         boostDrafts = await generateDrafts({ userText: _lastUserText, models: withKeys, fallbacks: fusionFallbacks, signal: coderAbort.signal });
         if (boostDrafts.length >= 2) {
           /* HAKEM: en iyi taslağı seç + diğerlerinden alınacakları not et —
@@ -2162,8 +2162,12 @@ export function CoderView() {
     }
 
     const repo = store.repo;
-    const activeGithub = store.activeGithub();
-    const activeGitlab = store.activeGitlab();
+    /* ÇÖZÜLMÜŞ token — depodaki 'enc:1:…' blob'u sunucuya gitmemeli, yoksa
+       ajanın TÜM repo araçları 401 alır ("repo bağlı ama model tanımıyor"). */
+    const [githubToken, gitlabToken] = await Promise.all([
+      store.activeGithubToken(),
+      store.activeGitlabToken(),
+    ]);
     /* Yerel Mod: köprü tanımlı ve açıksa, github/gitlab repo'ya gerek kalmadan
        araçlar gerçek dosya sistemine + kabuğa erişir. */
     const localActive = !!(store.config.localMode && store.config.localBridgeUrl?.trim());
@@ -2260,7 +2264,7 @@ export function CoderView() {
              sırayla bu adayları dener (kullanıcı duvara çarpmaz). Ayarlar'daki
              "kalite öncelikli" seçeneği açıksa ücretli/ücretsiz ayrımı yapmadan
              en güçlüden en zayıfa sıralanır. */
-          fallbacks: (store.config.qualityFallbackChain ? buildQualityFallbackChain : buildFallbackChain)(store.config.models, active.id),
+          fallbacks: buildChainFor(store.config, active.id),
           style: store.config.style,
           memories: store.config.memories,
           skills: activeSkills.map((s) => ({
@@ -2299,7 +2303,7 @@ export function CoderView() {
                       owner: repo.owner,
                       repo: repo.repo,
                       branch: repo.branch,
-                      token: repoIsGitLab ? activeGitlab?.token : activeGithub?.token,
+                      token: repoIsGitLab ? gitlabToken : githubToken,
                       provider: repoIsGitLab ? "gitlab" : "github",
                     }
                   : undefined)
@@ -3168,10 +3172,10 @@ export function CoderView() {
                         const treeItems = store.tree ? getTreeItems(store.tree) : [];
                         let allItems: { path: string; content: string }[] = [];
                         if (isGitLabRepo(activeRepo)) {
-                          const token = store.activeGitlab()?.token;
+                          const token = await store.activeGitlabToken();
                           allItems = await fetchAllGitLabFiles(repo.owner, repo.repo, repo.branch, treeItems, token);
                         } else {
-                          const token = store.activeGithub()?.token;
+                          const token = await store.activeGithubToken();
                           allItems = await fetchAllFiles(repo.owner, repo.repo, repo.branch, treeItems, token);
                         }
                         if (allItems.length > 0) {
@@ -4044,7 +4048,7 @@ export function CoderView() {
     setPrLoading(true);
     try {
       const store = useStore.getState();
-      const token = repoIsGitLab ? store.activeGitlab()?.token : store.activeGithub()?.token;
+      const token = repoIsGitLab ? await store.activeGitlabToken() : await store.activeGithubToken();
       const res = await fetch("/api/pr-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -4082,7 +4086,7 @@ export function CoderView() {
     setPostPrLoading(true);
     try {
       const store = useStore.getState();
-      const token = repoIsGitLab ? store.activeGitlab()?.token : store.activeGithub()?.token;
+      const token = repoIsGitLab ? await store.activeGitlabToken() : await store.activeGithubToken();
       if (!token) { store.addToast("Önce bir GitHub/GitLab hesabı bağla.", "error"); return; }
       const res = await fetch("/api/pr-review/comment", {
         method: "POST",

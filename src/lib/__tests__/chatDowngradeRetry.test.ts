@@ -68,7 +68,14 @@ describe("400'de AYNI modelde yetenek düşürerek yeniden dene (P1)", () => {
     expect(out).not.toContain("fallback_event");
   });
 
-  it("iki kademe düşürme sonrası hâlâ 400 ise fallback zincirine geçer", async () => {
+  it("G1 — düşürme tükenip hâlâ 400 ise BİRİNCİL modelde durur, sessizce yedeğe GEÇMEZ", async () => {
+    /* Davranış bilinçli olarak değişti (kullanıcı isteği): 400/422 bir
+       ULAŞILABİLİRLİK arızası değil YETENEK hatasıdır ("bu isteği bu biçimde
+       yapamam"). Eskiden bu durumda sessizce başka bir modele geçiliyordu →
+       yanıt kullanıcının seçtiğini sandığı modelden gelmiyor, üstelik modelin
+       bir şeyi yapamadığı hiç görünmüyordu. Artık zincir kırılır ve kullanıcı
+       ne olduğunu okur. Kota/yetki/sunucu/bağlantı hatalarında yedek zinciri
+       eskisi gibi devrede (aşağıdaki 500 testi bunu koruyor). */
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(err(400, "This model does not support tools"))
       .mockResolvedValueOnce(err(400, "response_format not supported"))
@@ -81,8 +88,24 @@ describe("400'de AYNI modelde yetenek düşürerek yeniden dene (P1)", () => {
       headers: { "Content-Type": "application/json", "x-forwarded-for": "9.9.9.61" },
       body: JSON.stringify({ messages: [{ role: "user", content: "selam" }], ...NVIDIA, jsonMode: true, fallbacks: FALLBACK }),
     });
+    const out = await readAll(await POST(req));
+    /* Groq'a HİÇ gidilmedi — tüm çağrılar birincil modelde kaldı. */
+    expect(fetchMock.mock.calls.every((c) => String(c[0]).includes("nvidia"))).toBe(true);
+    expect(out).not.toContain("fallback_event");
+  });
+
+  it("G1 — 429 (kota) YETENEK hatası değil: yedek zinciri eskisi gibi devreye girer", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(err(429, "rate limit exceeded"))
+      .mockImplementation(async () => sseText("yedekten cevap"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "9.9.9.66" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "selam" }], ...NVIDIA, fallbacks: FALLBACK }),
+    });
     await readAll(await POST(req));
-    /* Son çağrı groq'a gitmiş olmalı — düşürme tükendi, fallback devraldı. */
     expect(urlOf(fetchMock, fetchMock.mock.calls.length - 1)).toContain("api.groq.com");
   });
 
@@ -161,7 +184,10 @@ describe("sağlayıcı sağlığı yalnız SAĞLAYICI hatalarında işaretlenir 
 
   it("400 (bizim gönderdiğimiz alan) sağlayıcıyı 'down' işaretlemez", async () => {
     __resetProviderHealthForTests();
-    /* Düşürme de dahil hepsi 400 → fallback'e düşer; ama NVIDIA sağlıklı sayılmalı. */
+    /* Düşürme de dahil hepsi 400 → istek burada durur (G1); NVIDIA yine de
+       "down" sayılmamalı: 400 bizim gönderdiğimiz alanla ilgilidir, sağlayıcı
+       ayakta. Aksi hâlde sağlıklı bir sağlayıcı sonraki isteklerde haksız yere
+       geri plana atılırdı. */
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(err(400, "bad request"))
       .mockResolvedValueOnce(err(400, "bad request"))

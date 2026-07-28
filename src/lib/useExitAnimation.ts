@@ -13,6 +13,10 @@ import { useEffect, useRef, useState } from "react";
        <div className={closing ? "animate-modal-bg-out" : "animate-modal-bg"}>
          <div className={closing ? "animate-modal-content-out" : "animate-modal-content"}>...
 */
+/* DİKKAT: `exitMs` varsayılanı globals.css'teki `--dur-exit` ile EŞLEŞMELİ —
+   CSS "out" animasyonu o kadar sürer, burası da o kadar bekleyip unmount eder.
+   İkisi ayrışırsa modal ya animasyon bitmeden kaybolur ya da bittikten sonra
+   boş yere ekranda kalır. */
 export function useExitAnimation(open: boolean, exitMs = 150) {
   const [mounted, setMounted] = useState(open);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

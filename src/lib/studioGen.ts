@@ -1,5 +1,5 @@
 import { useStore } from "./store";
-import { buildFallbackChain } from "./fallback";
+import { buildChainFor } from "./fallback";
 import { decryptField, isEncrypted } from "./secureKeys";
 import { buildSingleBlockPreview } from "./preview";
 import { extractBlocks, pickBlock, classifyFailure, failureMessage, STRICT_FORMAT_REMINDER } from "./studioExtract";
@@ -152,7 +152,7 @@ async function critiqueArtifact(
       body: JSON.stringify({
         messages: [{ role: "user", content: `İSTEK: ${brief.slice(0, 500)}\n\nÜRETİLEN KOD:\n${html.slice(0, 6000)}` }],
         baseUrl: resolved.baseUrl, model: resolved.model, apiKey: resolved.apiKey, provider: resolved.provider,
-        systemPrompt: sys, fallbacks: buildFallbackChain(cfg.models, cfg.activeModelId),
+        systemPrompt: sys, fallbacks: buildChainFor(cfg),
         tools: false, webSearch: false, temperature: 0.2, jsonMode: true,
       }),
     });
@@ -248,7 +248,7 @@ export async function generateArtifact(opts: GenerateOptions): Promise<GenerateR
         messages: [{ role: "user", content: userContent }],
         baseUrl: resolved.baseUrl, model: resolved.model, apiKey: resolved.apiKey, provider: resolved.provider,
         systemPrompt,
-        fallbacks: buildFallbackChain(cfg.models, cfg.activeModelId),
+        fallbacks: buildChainFor(cfg),
         tools: false, webSearch: false, temperature: 0.6,
       }),
     });

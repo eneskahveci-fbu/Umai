@@ -76,7 +76,18 @@ function dedupeKey(c: FallbackCandidate): string {
 }
 
 export interface BuildChainOptions {
-  /** Zincire eklenecek azami fallback sayısı (gecikmeyi sınırlar). */
+  /**
+   * Zincire eklenecek azami fallback sayısı. VARSAYILAN: sınırsız — kullanıcının
+   * EKLEDİĞİ tüm kullanılabilir modeller sıraya girer.
+   *
+   * Önceden varsayılan 3'tü; anahtarsız son çarelere (Pollinations + OVH) HER
+   * ZAMAN yer ayrıldığı için kullanıcı adaylarına yalnız 1 yuva kalıyordu —
+   * kaç model eklenirse eklensin zincir "aktif → 1 model → pollinations → ovh"
+   * ile kapanıyor, geri kalan modeller hiç denenmiyordu. Sınırın amacı gecikmeyi
+   * kontrol etmekti; bunu artık aday BAŞINA bağlantı zaman aşımı yapıyor
+   * (bkz. api/chat/route.ts CONNECT_TIMEOUT_MS), yani zinciri kısaltmaya gerek
+   * yok: yanıt vermeyen aday saniyeler içinde elenip sıradakine geçilir.
+   */
   maxFallbacks?: number;
   /** Anahtarsız Pollinations tabanını her zaman ekle (varsayılan: true). */
   pollinationsBackstop?: boolean;
@@ -165,7 +176,7 @@ export function buildFallbackChain(
     .filter((m) => m.id !== activeId && isUsable(m))
     .map((m) => ({ provider: m.provider, baseUrl: m.baseUrl, model: m.model, apiKey: m.apiKey }))
     .sort((a, b) => rank(a.provider) - rank(b.provider));
-  return assembleChain(candidates, seen, opts.maxFallbacks ?? 3, opts.pollinationsBackstop ?? true);
+  return assembleChain(candidates, seen, opts.maxFallbacks ?? Number.POSITIVE_INFINITY, opts.pollinationsBackstop ?? true);
 }
 
 /**
@@ -186,5 +197,30 @@ export function buildQualityFallbackChain(
     .filter((m) => m.id !== activeId && isUsable(m))
     .sort((a, b) => modelQualityRank(a.model, a.label) - modelQualityRank(b.model, b.label))
     .map((m) => ({ provider: m.provider, baseUrl: m.baseUrl, model: m.model, apiKey: m.apiKey }));
-  return assembleChain(candidates, seen, opts.maxFallbacks ?? 3, opts.pollinationsBackstop ?? true);
+  return assembleChain(candidates, seen, opts.maxFallbacks ?? Number.POSITIVE_INFINITY, opts.pollinationsBackstop ?? true);
+}
+
+/**
+ * Config'e göre DOĞRU zinciri kurar — "kalite öncelikli" tercihi (Ayarlar →
+ * Model) TEK yerden okunur.
+ *
+ * Önceden bu seçim yalnız Coder'ın sohbet isteğinde yapılıyordu; Stüdyo,
+ * arka plan işleri, hızlı tamamlama ve Fusion taslakları hep ücretsiz-öncelikli
+ * zinciri kuruyordu. Yani kullanıcı seçeneği açsa bile uygulamanın yarısı onu
+ * yok sayıyordu. Tüm çağıranlar buradan geçince böyle bir sapma mümkün olmaz.
+ *
+ * `activeId` verilmezse config'in aktif modeli kullanılır (çağıran farklı bir
+ * "şu an konuşan" model biliyorsa — ör. Fusion taslakları — onu geçebilir).
+ */
+export function buildChainFor(
+  config: {
+    models: ModelProfile[];
+    activeModelId?: string | null;
+    qualityFallbackChain?: boolean;
+  },
+  activeId?: string | null,
+  opts: BuildChainOptions = {},
+): FallbackCandidate[] {
+  const build = config.qualityFallbackChain ? buildQualityFallbackChain : buildFallbackChain;
+  return build(config.models, activeId ?? config.activeModelId ?? null, opts);
 }
