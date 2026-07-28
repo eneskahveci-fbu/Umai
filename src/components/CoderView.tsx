@@ -15,7 +15,6 @@ import {
   Brain,
   Camera,
   ChevronDown,
-  GitBranch,
   ChevronRight,
   Code2,
   Copy,
@@ -35,7 +34,6 @@ import {
   PanelLeft,
   Paperclip,
   Check,
-  Columns,
   ListChecks,
   RefreshCw,
   RotateCcw,
@@ -273,20 +271,6 @@ function ModelSwitcher() {
       <div className="h-px bg-line/60 my-0.5" />
       <MoreItem icon={<Wrench size={13} />} label="Model ekle / yönet…" onClick={() => setSettingsOpen(true)} />
     </MoreMenu>
-  );
-}
-
-/* Mod geçişi — kompakt çip (Tools/Güvenli/Öğrenme/Kalite/Ekip tek satırda). */
-function ModeChip({ icon, label, active, onClick }: { icon: React.ReactNode; label: string; active?: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
-        active ? "border-brand/40 bg-brand/12 text-brand" : "border-line/60 text-muted hover:text-ink hover:border-brand/30"
-      }`}
-    >
-      {icon}{label}
-    </button>
   );
 }
 
@@ -884,7 +868,13 @@ export function CoderView() {
      ajanın kararına bağlı, bkz. send() içindeki useSwarm/useResearch. */
   /* Karşılaştırma modu: sohbet + tool-loop yerine aynı mesajı 2-3 modelle
      paralel çalıştırıp sonuçları yan yana gösterir (bkz. send() içindeki
-     erken intercept + MessageBubble'ın compareResults render dalı). */
+     erken intercept + MessageBubble'ın compareResults render dalı).
+     Ağu 2026 kullanıcı kararıyla ⋯ menüsü (tek tetikleyicisi) kaldırıldı;
+     `compareMode` hiçbir zaman `true` olamıyor ama state/mantık BİLEREK
+     duruyor — otomatikleştirilebilecek bir metin sinyali yok (kullanıcının
+     "bu mesajda modelleri karşılaştır" dediği kasıtlı bir eylem), yeniden
+     nasıl tetikleneceği netleşene kadar `setCompareMode` kullanılmıyor. */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [compareMode, setCompareMode] = useState(false);
   /* Son gönderimin Otomatik Pilot kararı — ✦ Oto rozeti tooltip'i. */
   const [lastPilot, setLastPilot] = useState<PilotDecision | null>(null);
@@ -2696,6 +2686,12 @@ export function CoderView() {
            hepsi sekme şeridinde görünsün. */
         for (const af of autoFiles) openInEditor(af);
         openInEditor(autoFiles[0]);
+        /* Git & PR artık ayrı bir buton değil (Ağu 2026 kullanıcı kararı:
+           "Claude'deki gibi otomatik olsun") — ajan dosya yazdığında git
+           bağlamı (diff/commit/PR) kendiliğinden görünür olur, kullanıcının
+           elle "aç" demesi gerekmez. Yalnız gerçek bir repo bağlıyken (yerel
+           köprüde git kavramı yok). */
+        if (repo) setGitPanelOpen(true);
       }
       setPendingCommit(autoFiles.length >= 2 ? autoFiles : null);
 
@@ -3147,12 +3143,15 @@ export function CoderView() {
              AgentModeButton'la aynı stilde her zaman görünen kendi pill'i
              oldu (tek tık, sekmesiz). */}
           <EffortHeaderButton />
-          {/* Terminal/Git & PR — Ağu 2026 kullanıcı kararı: ⋯ menüsünün
-             "Çalışma" sekmesinden çıkıp header'da sekmesiz ikon butonlarına
-             döndü (tek tıkla açılır/kapanır, ara menü yok). Dosyalar/Sunucu
-             (workspace) BİLEREK burada yok: kullanıcı bu ikisi için ayrı bir
-             erişim planı hazırlıyor — panel/state kodu (leftPanel) dokunulmadan
-             duruyor, yalnız bu üst-seviye giriş noktası kaldırıldı. */}
+          {/* Terminal — yalnız admin (Ağu 2026 kullanıcı kararı). Git & PR
+             BİLEREK burada yok: artık Claude Code'daki gibi otomatik —
+             ajan bir dosya yazdığında git bağlamı (bkz. aşağıdaki
+             `setGitPanelOpen(true)` çağrısı, "AI'nın yazdığı dosyayı..."
+             bloğunda) kendiliğinden açılıyor, elle "aç" denecek bir buton
+             yok. Dosyalar/Sunucu (workspace) da BİLEREK yok: kullanıcının
+             bu ikisi için ayrı bir erişim planı var — panel/state kodu
+             (leftPanel) dokunulmadan duruyor, yalnız üst-seviye giriş
+             noktası kaldırıldı. */}
           {isAdmin && (
             <button
               onClick={() => { setTerminalMounted(true); setTerminalOpen((v) => !v); }}
@@ -3164,40 +3163,22 @@ export function CoderView() {
               <Terminal size={15} />
             </button>
           )}
+          {/* Gizli sohbet — Ağu 2026 kullanıcı kararı: ⋯ menüsü tamamen
+             kalktığı için kendi ikonu oldu (herkese açık). Tools/Güvenli/
+             Karşılaştır de kalktı: Tools zaten repo bağlanınca kendiliğinden
+             açılıyordu (bkz. store.ts setRepo — "Claude Code tarzı otomatik
+             aç"; elle kapatma/açma artık Ayarlar → Genel'de), Güvenli zaten
+             yalnız Ayarlar'da yaşıyordu (bkz. önceki commit). Karşılaştır'ın
+             (compareMode) otomatikleştirilebilecek bir metin sinyali yok —
+             ⋯ ile birlikte tetikleyicisi kaldırıldı, state/mantık (send()
+             içindeki compareMode dalı) dokunulmadan duruyor. */}
           <button
-            onClick={() => setGitPanelOpen((v) => !v)}
-            title={gitPanelOpen ? "Git & PR'ı kapat" : "Git & PR — dal, PR/MR, incele"}
-            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors shrink-0 ${
-              gitPanelOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
-            }`}
+            onClick={() => useStore.getState().newChat(true)}
+            title="Gizli sohbet başlat"
+            className="w-8 h-8 rounded-lg grid place-items-center text-muted hover:text-ink hover:bg-bgsoft transition-colors shrink-0"
           >
-            <GitBranch size={15} />
+            <VenetianMask size={15} />
           </button>
-          {/* ⋯ menüsü artık yalnız "Gizli sohbet" taşıyor — Efor/Editör/
-             Prompt geliştir/Çalışma sekmesi header'a ya da composer'a taşındı
-             (Ağu 2026 kullanıcı kararı). "Güvenli" çipi kaldırıldı: Ayarlar'da
-             zaten aynı config.safeMode alanını değiştiren bir kopyası var,
-             burada tekrar etmenin bir kazancı yoktu (Öğrenme Modu gibi).
-             Tools/Karşılaştır için kullanıcıyla otomatikleştirme netleşene
-             kadar GEÇİCİ olarak burada kalıyor (bkz. konuşma). */}
-          <MoreMenu placement="bottom">
-            <MoreItem icon={<VenetianMask size={14} />} label="Gizli sohbet" onClick={() => useStore.getState().newChat(true)} />
-            <div className="h-px bg-line my-1" />
-            <div className="px-1.5 pb-1 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
-              {config.autoPilot !== false && (
-                <p className="w-full text-[10px] text-muted/55 mb-0.5">✦ Otomatik Pilot açık — bunlar elle geçersiz kılar.</p>
-              )}
-              <ModeChip
-                icon={<Wrench size={12} />} label="Tools" active={toolsEnabled}
-                onClick={() => {
-                  const store = useStore.getState();
-                  if (!store.repo) { addToast("Tool-use için önce bir GitHub deposu bağla", "error"); return; }
-                  store.setToolsEnabled(!store.toolsEnabled);
-                }}
-              />
-              <ModeChip icon={<Columns size={12} />} label="Karşılaştır" active={compareMode} onClick={() => setCompareMode((v) => !v)} />
-            </div>
-          </MoreMenu>
         </div>
       </div>
 
