@@ -503,7 +503,16 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     setOauthBusy(prov);
     try {
       const scopes = prov === "github" ? "repo read:user read:org" : "api read_user";
-      const redirectTo = `${window.location.origin}/app?gitlink=${prov}`;
+      /* Dönüşü /auth/callback üzerinden geçir (normal girişin kullandığı,
+         çalıştığı bilinen yol). ÖNCEDEN doğrudan /app?gitlink=… idi; bunun
+         iki sorunu vardı:
+         • PKCE akışında dönüşteki `?code=` parametresini oturuma çevirecek
+           kimse yoktu (bu işi /auth/callback yapıyor),
+         • Supabase panelindeki "Redirect URLs" izin listesinde genelde
+           /auth/callback bulunur, /app?gitlink=… bulunmaz → sağlayıcı isteği
+           hata ile geri çevirebiliyordu.
+         `next` site-içi yol olarak doğrulanıyor (bkz. auth/callback). */
+      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(`/app?gitlink=${prov}`)}`;
       const { error } = await sb.auth.linkIdentity({ provider: prov, options: { scopes, redirectTo } });
       if (error) {
         addToast(
