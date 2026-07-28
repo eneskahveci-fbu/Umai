@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import { buildFallbackChain } from "@/lib/fallback";
 import { createReveal, type RevealController } from "@/lib/streamReveal";
-import { toggleLeftPanel, switchLeftPanel, type LeftPanel } from "@/lib/leftPanel";
+import { switchLeftPanel, type LeftPanel } from "@/lib/leftPanel";
 import { compactPlan } from "@/lib/contextWindow";
 import { filterMcpServersForModel } from "@/lib/mcpScope";
 import {
@@ -390,33 +390,93 @@ const THINKING_LEVELS = [
 ] as const;
 
 
-/* ⋯ menüsü içinde kompakt düşünme-eforu seçici. Varsayılan "Oto": efor göreve
-   göre otomatik seçilir; kullanıcı isterse buradan elle geçersiz kılar. Menüyü
-   kapatmamak için tıklamalar stopPropagation ile durdurulur. */
-function EffortMenuControl() {
+/* Header'daki küçük açılır-panelli butonlar (Efor, Ajan modu) için ORTAK
+   konumlama. Header'ın `overflow-x-auto`'su CSS'e göre overflow-y'yi de
+   örtük "auto" yapar (bir eksen visible-dışı olunca öteki eksenin visible'ı
+   geçersiz kalır) — bu yüzden düz bir `absolute` açılır panel HEADER'IN ALT
+   SINIRINDA KIRPILIYORDU (tamamen görünmez oluyordu — Efor pill'i header'a
+   taşınırken canlı testte yakalandı). MoreMenu bunu zaten portal ile
+   çözüyordu; aynı teknik (portal + buton dikdörtgeninden hesaplanan sabit
+   konum) buraya da taşındı. */
+function useHeaderDropdown(open: boolean, onClose: () => void) {
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ right: number; top: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const update = () => {
+      const r = btnRef.current?.getBoundingClientRect();
+      if (r) setPos({ right: window.innerWidth - r.right, top: r.bottom + 6 });
+    };
+    update();
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!btnRef.current?.contains(t) && !menuRef.current?.contains(t)) onClose();
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [open, onClose]);
+
+  return { btnRef, menuRef, pos };
+}
+
+/* Efor seçici — ⋯ menüsünden header'a taşındı (Ağu 2026 kullanıcı kararı):
+   AgentModeButton ile AYNI desen (buton + dışarı tıklama/Escape ile kapanan
+   küçük panel). Herkese açık, her zaman görünür; "otomatik" dışı bir seviye
+   seçilirse Otomatik Pilot'un o mesaj için kararını geçersiz kılar. */
+function EffortHeaderButton() {
   const thinkingMode = useStore((s) => s.thinkingMode);
   const setThinkingMode = useStore((s) => s.setThinkingMode);
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  const { btnRef, menuRef, pos } = useHeaderDropdown(open, close);
+  const current = THINKING_LEVELS.find((l) => l.key === thinkingMode) ?? THINKING_LEVELS[0];
+
   return (
-    <div className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
-      <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-muted/50 pb-1.5">
-        <Brain size={11} /> Düşünme eforu
-      </div>
-      <div className="flex gap-1">
-        {THINKING_LEVELS.map((l) => (
-          <button
-            key={l.key}
-            onClick={() => setThinkingMode(l.key)}
-            title={l.label}
-            className={`flex-1 px-1.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-              thinkingMode === l.key
-                ? "bg-brand/15 text-brand"
-                : "text-muted hover:text-ink hover:bg-bgsoft"
-            }`}
-          >
-            {l.short}
-          </button>
-        ))}
-      </div>
+    <div className="relative shrink-0">
+      <button
+        ref={btnRef}
+        onClick={() => setOpen((v) => !v)}
+        title="Düşünme eforu — Otomatik Pilot'un kararını elle geçersiz kıl"
+        className={`flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg border transition-colors ${
+          thinkingMode === "auto" ? "border-line text-muted hover:text-ink hover:border-brand/40" : "border-brand/40 text-brand bg-brand/5"
+        }`}
+      >
+        <Brain size={12} />
+        <span className="hidden sm:inline">{current.short}</span>
+        <ChevronDown size={11} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && pos && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: "fixed", right: pos.right, top: pos.top }}
+          className="z-[80] w-40 rounded-2xl border border-line bg-surface/95 backdrop-blur-xl shadow-2xl p-1.5 animate-fade-in"
+        >
+          {THINKING_LEVELS.map((l) => (
+            <button
+              key={l.key}
+              onClick={() => { setThinkingMode(l.key); setOpen(false); }}
+              className={`w-full flex items-center justify-between text-left px-2.5 py-1.5 rounded-xl transition-colors text-[12.5px] font-medium ${
+                thinkingMode === l.key ? "bg-brand/10 text-brand" : "hover:bg-bgsoft text-ink"
+              }`}
+            >
+              {l.label}
+              {thinkingMode === l.key && <Check size={13} className="shrink-0" />}
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
@@ -440,18 +500,10 @@ const AGENT_MODES: { key: AgentMode; label: string; short: string; icon: React.R
 function AgentModeButton() {
   const config = useStore((s) => s.config);
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  const { btnRef, menuRef, pos } = useHeaderDropdown(open, close);
   const mode: AgentMode = config.planApprovalMode ? "plan" : config.requireWriteApproval ? "accept" : "auto";
   const current = AGENT_MODES.find((m) => m.key === mode)!;
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
-  }, [open]);
 
   const choose = (next: AgentMode) => {
     const store = useStore.getState();
@@ -464,8 +516,9 @@ function AgentModeButton() {
   };
 
   return (
-    <div ref={ref} className="relative shrink-0">
+    <div className="relative shrink-0">
       <button
+        ref={btnRef}
         onClick={() => setOpen((v) => !v)}
         title="Ajan modu — dosya değişiklikleri nasıl uygulansın?"
         className={`flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg border transition-colors ${
@@ -476,8 +529,12 @@ function AgentModeButton() {
         <span className="hidden sm:inline">{current.short}</span>
         <ChevronDown size={11} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <div className="absolute right-0 top-[calc(100%+6px)] z-30 w-72 max-w-[85vw] rounded-2xl border border-line bg-surface/95 backdrop-blur-xl shadow-2xl p-1.5 animate-fade-in">
+      {open && pos && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: "fixed", right: pos.right, top: pos.top }}
+          className="z-[80] w-72 max-w-[85vw] rounded-2xl border border-line bg-surface/95 backdrop-blur-xl shadow-2xl p-1.5 animate-fade-in"
+        >
           {AGENT_MODES.map((m) => (
             <button
               key={m.key}
@@ -494,7 +551,8 @@ function AgentModeButton() {
               {mode === m.key && <Check size={13} className="text-brand shrink-0 mt-0.5" />}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -834,7 +892,6 @@ export function CoderView() {
      (Kütüphane/Etkinlik günlüğü/Kısayollar) Tem 2026 kullanıcı kararıyla
      Sidebar → Eklentiler'in yanındaki yeni "Araçlar" düğmesine taşındı —
      burada Efor + oturuma özgü kontroller kalıyor (bkz. Sidebar.tsx). */
-  const [moreTab, setMoreTab] = useState<"workspace" | "modes">("workspace");
   /* Plan onayı: bir sonraki istekte plan-modu kapısını geçici aşar. */
   const planApprovedRef = useRef(false);
   /* afterEdit kancası geri-besleme döngü sayacı (her kullanıcı mesajında sıfırlanır,
@@ -3086,109 +3143,60 @@ export function CoderView() {
           {/* Ajan modu — Claude Code'daki Normal/Auto-accept/Plan üçlüsüne
              paralel, her zaman görünür (yalnızca araçlar açıkken anlamlı). */}
           {toolsEnabled && <AgentModeButton />}
-          {/* Birleşik ⋯ menüsü — gruplu: Efor + hızlı eylemler · Çalışma · Modlar
-             (eski "Araçlar" sekmesi — Kütüphane/Etkinlik Günlüğü/Kısayollar —
-             Sidebar'ın "Araçlar" popover'ına taşındı, bkz. Sidebar.tsx). */}
-          {/* Aktif-parıltı yalnız panel aç/kapa durumlarını yansıtır — mod durumları
-             (toolsEnabled/safeMode/ekip/araştırma) zaten StatusBar'da rozet
-             olarak görünür, burada tekrar sinyal vermeye gerek yok. */}
-          <MoreMenu placement="bottom" active={editorOpen || terminalOpen || gitPanelOpen || filesOpen || wsOpen}>
-            {/* Efor seçici herkese açık; "otomatik" dışı bir seviye seçilirse
-               Otomatik Pilot'un o mesaj için kararını geçersiz kılar. */}
-            <EffortMenuControl />
-            <div className="h-px bg-line my-1" />
-
-            <MoreItem
-              icon={<Code2 size={14} />}
-              label={editorOpen ? "Editörü kapat" : "Editör (IDE)"}
-              active={editorOpen}
-              onClick={() => setEditorOpen(!editorOpen)}
-            />
-            {/* Skills → Sidebar'ın "Araçlar" popover'ına taşındı (Tem 2026
-               kullanıcı kararı) — Kütüphane/Etkinlik Günlüğü/Kısayollar gibi
-               global bir eylem, composer state'ine bağlı değil. */}
+          {/* Efor seçici — Ağu 2026 kullanıcı kararı: ⋯ menüsünden çıkıp
+             AgentModeButton'la aynı stilde her zaman görünen kendi pill'i
+             oldu (tek tık, sekmesiz). */}
+          <EffortHeaderButton />
+          {/* Terminal/Git & PR — Ağu 2026 kullanıcı kararı: ⋯ menüsünün
+             "Çalışma" sekmesinden çıkıp header'da sekmesiz ikon butonlarına
+             döndü (tek tıkla açılır/kapanır, ara menü yok). Dosyalar/Sunucu
+             (workspace) BİLEREK burada yok: kullanıcı bu ikisi için ayrı bir
+             erişim planı hazırlıyor — panel/state kodu (leftPanel) dokunulmadan
+             duruyor, yalnız bu üst-seviye giriş noktası kaldırıldı. */}
+          {isAdmin && (
+            <button
+              onClick={() => { setTerminalMounted(true); setTerminalOpen((v) => !v); }}
+              title={terminalOpen ? "Terminal'i kapat" : `Terminal${terminalSupported ? "" : " (masaüstü Chrome/Edge gerekir)"}`}
+              className={`w-8 h-8 rounded-lg grid place-items-center transition-colors shrink-0 ${
+                terminalOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
+              }`}
+            >
+              <Terminal size={15} />
+            </button>
+          )}
+          <button
+            onClick={() => setGitPanelOpen((v) => !v)}
+            title={gitPanelOpen ? "Git & PR'ı kapat" : "Git & PR — dal, PR/MR, incele"}
+            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors shrink-0 ${
+              gitPanelOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
+            }`}
+          >
+            <GitBranch size={15} />
+          </button>
+          {/* ⋯ menüsü artık yalnız "Gizli sohbet" taşıyor — Efor/Editör/
+             Prompt geliştir/Çalışma sekmesi header'a ya da composer'a taşındı
+             (Ağu 2026 kullanıcı kararı). "Güvenli" çipi kaldırıldı: Ayarlar'da
+             zaten aynı config.safeMode alanını değiştiren bir kopyası var,
+             burada tekrar etmenin bir kazancı yoktu (Öğrenme Modu gibi).
+             Tools/Karşılaştır için kullanıcıyla otomatikleştirme netleşene
+             kadar GEÇİCİ olarak burada kalıyor (bkz. konuşma). */}
+          <MoreMenu placement="bottom">
             <MoreItem icon={<VenetianMask size={14} />} label="Gizli sohbet" onClick={() => useStore.getState().newChat(true)} />
-            {/* Composer'daki taslak metni işlediği için (bkz. improvePrompt)
-               burada, oturuma özgü hızlı eylemlerin yanında kalıyor — Sidebar'ın
-               yeni "Araçlar" popover'ına taşınamaz (o global store eylemleri
-               tutuyor, composer state'ine erişemez). */}
-            <MoreItem
-              icon={improvingPrompt ? <Loader2Icon size={14} className="animate-spin" /> : <Wand2 size={14} />}
-              label="Prompt geliştir"
-              desc="yazdığın istemi iyileştirir"
-              onClick={() => void improvePrompt()}
-              keepOpen
-            />
-
-            {/* Sekme çubuğu — tıklanınca menü açık kalır */}
-            <div className="flex gap-0.5 px-1 pt-1 pb-1" onClick={(e) => e.stopPropagation()}>
-              {([["workspace", "Çalışma"], ["modes", "Modlar"]] as const).map(([key, lbl]) => (
-                <button
-                  key={key}
-                  onClick={() => setMoreTab(key)}
-                  className={`flex-1 px-1.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
-                    moreTab === key ? "bg-brand/15 text-brand" : "text-muted hover:text-ink hover:bg-bgsoft"
-                  }`}
-                >
-                  {lbl}
-                </button>
-              ))}
+            <div className="h-px bg-line my-1" />
+            <div className="px-1.5 pb-1 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+              {config.autoPilot !== false && (
+                <p className="w-full text-[10px] text-muted/55 mb-0.5">✦ Otomatik Pilot açık — bunlar elle geçersiz kılar.</p>
+              )}
+              <ModeChip
+                icon={<Wrench size={12} />} label="Tools" active={toolsEnabled}
+                onClick={() => {
+                  const store = useStore.getState();
+                  if (!store.repo) { addToast("Tool-use için önce bir GitHub deposu bağla", "error"); return; }
+                  store.setToolsEnabled(!store.toolsEnabled);
+                }}
+              />
+              <ModeChip icon={<Columns size={12} />} label="Karşılaştır" active={compareMode} onClick={() => setCompareMode((v) => !v)} />
             </div>
-
-            {/* Sekme içeriği */}
-            {moreTab === "workspace" && (
-              <>
-                {isAdmin && (
-                  <MoreItem
-                    icon={<Terminal size={14} />}
-                    label={terminalOpen ? "Terminal'i kapat" : "Terminal"}
-                    desc={terminalSupported ? undefined : "masaüstü Chrome/Edge gerekir"}
-                    active={terminalOpen}
-                    onClick={() => { setTerminalMounted(true); setTerminalOpen((v) => !v); }}
-                  />
-                )}
-                <MoreItem icon={<GitBranch size={14} />} label="Git & PR" desc="dal, PR/MR, incele" active={gitPanelOpen} onClick={() => setGitPanelOpen((v) => !v)} />
-                <MoreItem icon={<FolderOpen size={14} />} label="Dosyalar (depo)" active={filesOpen} onClick={() => setLeftPanel((p) => toggleLeftPanel(p, "files"))} />
-                {localActive && (
-                  <MoreItem
-                    icon={<Server size={14} />}
-                    label="Sunucu (workspace)"
-                    active={wsOpen}
-                    onClick={() => {
-                      const willOpen = leftPanel !== "workspace";
-                      setLeftPanel((p) => toggleLeftPanel(p, "workspace"));
-                      if (willOpen && !wsTree && !wsLoading) loadWorkspace();
-                    }}
-                  />
-                )}
-              </>
-            )}
-
-            {/* Mod çipleri (elle geçersiz kılma) — herkese açık. Ekip/Araştırma
-               çipleri KALDIRILDI (kullanıcı kararı): artık elle açılan bir mod
-               değiller, Otomatik Pilot'un mesaj-bazlı kararına (ya da "/research"
-               gibi bir slash-ajana) göre kendiliğinden devreye girerler — bkz.
-               send() içindeki useSwarm/useResearch. Tools repo bağlanınca
-               kendiliğinden açılır; Güvenli/Karşılaştır kalıcı olmayan, gerçek
-               elle-toggle'lar olduğundan burada kalıyor. Öğrenme Modu Ayarlar →
-               Genel'den standing tercih olarak açılabilir. */}
-            {moreTab === "modes" && (
-              <div className="px-1.5 pb-1 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
-                {config.autoPilot !== false && (
-                  <p className="w-full text-[10px] text-muted/55 mb-0.5">✦ Otomatik Pilot açık — bunlar elle geçersiz kılar.</p>
-                )}
-                <ModeChip
-                  icon={<Wrench size={12} />} label="Tools" active={toolsEnabled}
-                  onClick={() => {
-                    const store = useStore.getState();
-                    if (!store.repo) { addToast("Tool-use için önce bir GitHub deposu bağla", "error"); return; }
-                    store.setToolsEnabled(!store.toolsEnabled);
-                  }}
-                />
-                <ModeChip icon={<ShieldCheck size={12} />} label="Güvenli" active={!!config.safeMode} onClick={() => useStore.getState().saveConfig({ ...config, safeMode: !config.safeMode })} />
-                <ModeChip icon={<Columns size={12} />} label="Karşılaştır" active={compareMode} onClick={() => setCompareMode((v) => !v)} />
-              </div>
-            )}
           </MoreMenu>
         </div>
       </div>
@@ -3908,6 +3916,19 @@ export function CoderView() {
                     onClose={() => setCameraModalOpen(false)}
                   />
                 )}
+                {/* Prompt geliştir — ⋯ menüsünden buraya taşındı (Ağu 2026
+                    kullanıcı kararı): composer'daki taslağa bağlı bir eylem,
+                    iki tık yerine tek tık. improvePrompt() zaten boş taslakta
+                    kendi uyarısını gösteriyor (bkz. tanım), burada ekstra bir
+                    disabled koşuluna gerek yok — yalnız çalışırken kilitlenir. */}
+                <button
+                  onClick={() => void improvePrompt()}
+                  disabled={improvingPrompt}
+                  title="Prompt geliştir — yazdığın istemi iyileştirir"
+                  className="shrink-0 w-9 h-9 sm:w-8 sm:h-8 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors disabled:opacity-40"
+                >
+                  {improvingPrompt ? <Loader2Icon size={15} className="animate-spin" /> : <Wand2 size={15} />}
+                </button>
                 {streaming ? (
                   <button onClick={stop} className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-red hover:bg-red/80 active:bg-red/70 text-white grid place-items-center transition-all hover:scale-105 active:scale-95" title="Durdur">
                     <Square size={13} />
