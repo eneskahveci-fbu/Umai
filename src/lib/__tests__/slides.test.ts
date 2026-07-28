@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   extractJson, parseDeckJson, normalizeDeck, deckToHtml, newSlide,
-  slideNarration, slideThemeById, MAX_SLIDES, SLIDE_THEMES, lintDeck,
+  slideNarration, slideThemeById, MAX_SLIDES, SLIDE_THEMES, lintDeck, slideDensity,
 } from "../slides";
 import type { SlideDeck } from "../types";
 
@@ -118,12 +118,15 @@ describe("deckToHtml — bağımsız dışa aktarma", () => {
       ],
     };
     const html = deckToHtml(deck);
-    // cover: dekoratif — hata olursa sadece gizlenir
+    // cover: dekoratif fon — hata olursa .coverph gradyanına düşer
+    // (eskiden sessizce gizleniyordu; bkz. "kırık görsel yedeği" bloğu)
     expect(html).toContain(`class="coverimg" src=`);
-    expect(html).toContain("onerror=\"this.style.display='none'\"");
+    expect(html).toContain(`<div class="coverph" style="display:none"></div>`);
     // image: hata olursa gizlenir ve hemen yanındaki .imgph görünür olur
     expect(html).toContain("onerror=\"this.style.display='none'; this.nextElementSibling.style.display='block'\"");
     expect(html).toContain(`<div class="imgph" style="display:none"></div>`);
+    // two-col: sütun görseli akış içi yer tutucuya düşer
+    expect(html).toContain(`<div class="imgph inline" style="display:none"></div>`);
   });
 });
 
@@ -243,7 +246,10 @@ describe("G2 — daha zengin/çeşitli temalar", () => {
       slides: [{ id: "s1", layout: "cover", title: "Kapak" }],
     };
     const html = deckToHtml(deck);
-    expect(html).toContain(".slide { position: absolute; inset: 0; display: none; flex-direction: column; justify-content: center;\n           padding: 6vmin 9vmin; background: var(--bg); }");
+    // Bütün .slide kuralını harfiyen eşlemiyoruz (her CSS rötuşunda kırılıyordu);
+    // testin derdi yalnız arka planın gradyansız olması.
+    expect(html).toContain("padding: 6vmin 9vmin; background: var(--bg); }");
+    expect(html).not.toContain("padding: 6vmin 9vmin; background: linear-gradient");
   });
 
   it("gradyanlı bir tema seçilince .slide arka planı gradyanı kullanır", () => {
@@ -331,5 +337,109 @@ describe("G4 — madde başına ikon (emoji-prefix)", () => {
     const html = deckToHtml(deck);
     expect(html).not.toContain("<script>alert(1)</script>");
     expect(html).toContain("&lt;script&gt;");
+  });
+});
+
+/* ── Render kalite testi (Playwright ile ölçülen üç kusurun regresyon kilidi) ── */
+
+const deckWith = (slides: SlideDeck["slides"]): SlideDeck =>
+  ({ id: "d", title: "T", themeId: "gece", createdAt: 0, updatedAt: 0, slides });
+
+describe("two-col — alt başlık ve boş sütun", () => {
+  it("alt başlığı basar (eskiden hesaplanıp atılıyordu)", () => {
+    const html = deckToHtml(deckWith([
+      { id: "s1", layout: "two-col", title: "Başlık", subtitle: "Ithaka alt başlık", bullets: ["A"], body: "Gövde" },
+    ]));
+    expect(html).toContain("Ithaka alt başlık");
+    expect(html).toContain('<p class="sub">Ithaka alt başlık</p>');
+  });
+
+  it("alt başlık da HTML-kaçırılır", () => {
+    const html = deckToHtml(deckWith([
+      { id: "s1", layout: "two-col", title: "B", subtitle: "<img src=x onerror=alert(1)>", bullets: ["A"], body: "G" },
+    ]));
+    // Etiket kaçırıldığı için zararsız düz metne dönüşür — canlı bir <img> doğmaz.
+    expect(html).not.toContain("<img src=x");
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+  });
+
+  it("madde yoksa boş <ul> basmaz ve tek sütuna iner", () => {
+    const html = deckToHtml(deckWith([
+      { id: "s1", layout: "two-col", title: "Başlık", body: "Yalnız gövde" },
+    ]));
+    expect(html).not.toContain("<ul></ul>");
+    expect(html).not.toContain('<div class="cols">');
+  });
+
+  it("hem madde hem sağ içerik varsa iki sütun korunur", () => {
+    const html = deckToHtml(deckWith([
+      { id: "s1", layout: "two-col", title: "Başlık", bullets: ["A", "B"], body: "Gövde" },
+    ]));
+    expect(html).toContain('<div class="cols">');
+    expect(html).toContain("<ul><li>A</li><li>B</li></ul>");
+  });
+});
+
+describe("kırık görsel yedeği — her düzende yer tutucu", () => {
+  const withImage = (layout: SlideDeck["slides"][number]["layout"]) =>
+    deckToHtml(deckWith([
+      { id: "s1", layout, title: "T", body: "B", bullets: ["A"], imageUrl: "https://x.invalid/a.png" },
+    ]));
+
+  it("kapak/bölüm/alıntı görseli .coverph yedeğine düşer", () => {
+    for (const layout of ["cover", "section", "quote", "end"] as const) {
+      const html = withImage(layout);
+      expect(html, layout).toContain('<div class="coverph" style="display:none"></div>');
+      expect(html, layout).toContain("this.nextElementSibling.style.display='block'");
+    }
+  });
+
+  it("iki-sütun ve görselli madde slaytı .imgph.inline yedeğine düşer", () => {
+    for (const layout of ["two-col", "bullets"] as const) {
+      const html = withImage(layout);
+      expect(html, layout).toContain('<div class="imgph inline" style="display:none"></div>');
+    }
+  });
+
+  it("hiçbir görsel artık sessizce yok edilmiyor (yedeksiz onerror kalmadı)", () => {
+    for (const layout of ["cover", "section", "quote", "end", "two-col", "bullets", "image"] as const) {
+      expect(withImage(layout), layout).not.toContain(`onerror="this.style.display='none'"`);
+    }
+  });
+});
+
+describe("slideDensity — içeriğe uyarlanan tipografi ölçeği", () => {
+  it("kısa kapak seyrek (roomy) sayılır", () => {
+    expect(slideDensity({ id: "s", layout: "cover", title: "Umai", subtitle: "Kısa" })).toBe("roomy");
+  });
+
+  it("6+ madde yoğun (dense) sayılır", () => {
+    expect(slideDensity({ id: "s", layout: "bullets", title: "T", bullets: ["a", "b", "c", "d", "e", "f"] })).toBe("dense");
+  });
+
+  it("uzun metin madde sayısından bağımsız olarak yoğun sayılır", () => {
+    expect(slideDensity({ id: "s", layout: "bullets", title: "T", body: "x".repeat(600) })).toBe("dense");
+  });
+
+  it("orta yoğunluk normal kalır", () => {
+    expect(slideDensity({ id: "s", layout: "bullets", title: "T", bullets: ["x".repeat(80), "y".repeat(80), "z".repeat(80), "w".repeat(80)] })).toBe("normal");
+  });
+
+  it("yoğunluk HTML'e data-density olarak yazılır", () => {
+    const html = deckToHtml(deckWith([
+      { id: "s1", layout: "cover", title: "Umai" },
+      { id: "s2", layout: "bullets", title: "T", bullets: ["a", "b", "c", "d", "e", "f"] },
+    ]));
+    expect(html).toContain('data-i="0" data-density="roomy"');
+    expect(html).toContain('data-i="1" data-density="dense"');
+  });
+});
+
+describe("yığın bağlamı — kapak görselinin gerçekten görünmesi", () => {
+  it(".slide izole edilir; aksi halde z-index:-1 katmanları slaytın arka planının arkasında kalır", () => {
+    const html = deckToHtml(deckWith([{ id: "s1", layout: "cover", title: "K", imageUrl: "https://x/y.png" }]));
+    // Playwright ile ölçüldü: isolation olmadan .coverimg/.coverph HİÇ boyanmıyor.
+    expect(html).toContain(".slide { --s: 1; isolation: isolate;");
+    expect(html).toContain(".coverimg { position: absolute; inset: 0;");
   });
 });
