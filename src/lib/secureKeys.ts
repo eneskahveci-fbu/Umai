@@ -167,6 +167,25 @@ export async function resolveModelApiKey(
   return isEncrypted(k) ? "" : k;
 }
 
+/* Bir Git hesabının (GitHub/GitLab) kullanılabilir token'ını üretir — model
+   anahtarları için resolveModelApiKey ne yapıyorsa aynısı. GEREKLİ çünkü
+   githubAccounts[].token / gitlabAccounts[].token depoda AES-GCM ile şifreli
+   durur (bkz. mapConfigSecrets) ve bellekteki çözülmüş kopya rehydrateSecrets()
+   TAMAMLANANA KADAR hazır değildir. Açılışta repo'ya otomatik bağlanan yol bu
+   yarışa giriyor, 'enc:1:…' blob'unu Authorization başlığı olarak yollayıp 401
+   alıyor, sessizce başarısız oluyordu → repo bağlıyken "bağlı değil" görünüyor
+   ve ajana repoCtx hiç gitmediği için model repodan habersiz kalıyordu.
+   Çözülemezse BOŞ döner (asla şifreli blob sızdırma — anonim istek en azından
+   genel repolarda çalışır). */
+export async function resolveGitToken(
+  account?: { token?: string } | null,
+): Promise<string> {
+  const raw = account?.token || "";
+  if (!raw) return "";
+  const k = await decryptField(raw);
+  return isEncrypted(k) ? "" : k;
+}
+
 /* Config'te şifrelenmemiş (düz metin) bir gizli alan var mı? (migrasyon tetiği) */
 export function hasPlaintextSecret(cfg: Config): boolean {
   const vals = [

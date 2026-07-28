@@ -25,7 +25,7 @@ import type {
 } from "./types";
 import { deriveJobTitle, type BackgroundJob } from "./jobs";
 import { DEFAULT_CONFIG, DEFAULT_REPO, DEFAULT_SKILLS, POLLINATIONS_DEFAULT_MODEL } from "./constants";
-import { encryptConfigSecrets, decryptConfigSecrets, isCryptoAvailable, hasPlaintextSecret } from "./secureKeys";
+import { encryptConfigSecrets, decryptConfigSecrets, isCryptoAvailable, hasPlaintextSecret, resolveGitToken } from "./secureKeys";
 import { applyEditBranch, applySwitchBranch, mergeRegeneratedBranches } from "./branching";
 import { modelQualityRank } from "./modelQuality";
 import { createClient } from "./supabase/client";
@@ -402,6 +402,10 @@ interface StoreState {
   removeGitlab: (id: string) => void;
   setActiveGitlab: (id: string | null) => void;
   activeGitlab: () => GitLabAccount | null;
+  /* Aktif Git hesabının ÇÖZÜLMÜŞ token'ı — depodaki 'enc:1:…' blob'u asla
+     doğrudan Authorization başlığına gitmesin diye (bkz. resolveGitToken). */
+  activeGithubToken: () => Promise<string>;
+  activeGitlabToken: () => Promise<string>;
   addRepo: (repo: string) => void;
   setActiveRepo: (repo: string) => void;
   removeRepo: (repo: string) => void;
@@ -898,6 +902,8 @@ export const useStore = create<StoreState>()((set, get) => ({
     const { gitlabAccounts, activeGitlabId } = get().config;
     return (gitlabAccounts ?? []).find((a) => a.id === activeGitlabId) || null;
   },
+  activeGithubToken: () => resolveGitToken(get().activeGithub()),
+  activeGitlabToken: () => resolveGitToken(get().activeGitlab()),
   addRepo: (repo) => {
     const config = get().config;
     const repos = [repo, ...config.repos.filter((r) => r !== repo)].slice(0, 12);

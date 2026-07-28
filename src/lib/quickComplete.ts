@@ -1,5 +1,5 @@
 import { useStore } from "./store";
-import { buildFallbackChain } from "./fallback";
+import { buildChainFor } from "./fallback";
 import { decryptField, isEncrypted } from "./secureKeys";
 
 /* Aktif modelle tek-seferlik (araçsız) bir tamamlanma çağrısı yapar ve TÜM metni
@@ -24,7 +24,7 @@ export async function quickComplete(prompt: string, systemPrompt: string, signal
       messages: [{ role: "user", content: prompt }],
       baseUrl: active.baseUrl, model: active.model, apiKey, provider: active.provider,
       systemPrompt,
-      fallbacks: buildFallbackChain(store.config.models, store.config.activeModelId),
+      fallbacks: buildChainFor(store.config),
       tools: false, webSearch: false, temperature: 0.6,
     }),
   });

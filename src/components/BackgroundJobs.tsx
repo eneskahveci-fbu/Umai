@@ -14,7 +14,7 @@ import { useStore } from "@/lib/store";
 import { useSurfaceNav } from "@/lib/surfaceNav";
 import { streamChat } from "@/lib/genChat";
 import { resolveKey } from "@/lib/studioGen";
-import { buildFallbackChain } from "@/lib/fallback";
+import { buildChainFor } from "@/lib/fallback";
 import { playReady, playError, notifyReady } from "@/lib/sounds";
 import { JOB_SYSTEM, buildJobMessages, nextRunnableJob, jobCounts, latestHeading, type BackgroundJob } from "@/lib/jobs";
 
@@ -53,7 +53,7 @@ function useJobRunner() {
               jobId: id, goal: next.goal,
               baseUrl: resolved.baseUrl, model: resolved.model,
               apiKey: resolved.apiKey, provider: resolved.provider,
-              fallbacks: buildFallbackChain(cfg.models, cfg.activeModelId),
+              fallbacks: buildChainFor(cfg),
             }),
           });
           const d = await r.json().catch(() => ({} as { server?: boolean }));

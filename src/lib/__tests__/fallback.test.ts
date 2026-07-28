@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildFallbackChain, buildQualityFallbackChain, KEYLESS_PROVIDERS } from "../fallback";
+import { buildFallbackChain, buildQualityFallbackChain, buildChainFor, KEYLESS_PROVIDERS } from "../fallback";
 import type { ModelProfile } from "../types";
 
 function m(partial: Partial<ModelProfile> & { id: string; provider: ModelProfile["provider"] }): ModelProfile {
@@ -67,18 +67,31 @@ describe("buildFallbackChain", () => {
     expect(chain.every((c) => c.apiKey === "")).toBe(true);
   });
 
-  it("anahtarsız son çareler (Pollinations + OVH) kullanıcı adaylarınca kesilmez — kendilerine yer ayrılır", () => {
-    /* 2+ kullanılabilir kullanıcı adayı olsa bile maxFallbacks=3'te SON 2 yuva
-       her zaman Pollinations+OVH'e ayrılır — yalnız EN YÜKSEK sıralı kullanıcı
-       adayı (gemini) kalan tek yuvaya girer. Amaç: kullanıcının yapılandırdığı
-       adaylar (kotası dolmuş/bozuk olabilir) güvenilir anahtarsız son çareyi
-       zincirden itmesin (bkz. prompt.md kuzey yıldızı). */
+  it("varsayılanda EKLİ TÜM modelleri zincire alır, sonuna anahtarsız son çareleri ekler", () => {
+    /* Varsayılan sınırsız: kullanıcı kaç model eklediyse hepsi sıraya girer
+       (önceden maxFallbacks=3 idi ve son çarelere ayrılan 2 yuva yüzünden
+       yalnız 1 kullanıcı adayı geçiyordu). Anahtarsız son çareler yine HER
+       ZAMAN en sonda — "istek asla düşmez" sözü korunur. */
+    const models = [
+      m({ id: "active", provider: "deepseek" }),
+      m({ id: "g", provider: "gemini" }),
+      m({ id: "q", provider: "groq" }),
+      m({ id: "c", provider: "cerebras" }),
+      m({ id: "x", provider: "xai" }),
+    ];
+    const chain = buildFallbackChain(models, "active");
+    expect(chain.map((c) => c.provider)).toEqual([
+      "gemini", "groq", "cerebras", "xai", "pollinations", "ovh",
+    ]);
+  });
+
+  it("anahtarsız son çareler kullanıcı adaylarınca kesilmez (açık maxFallbacks verilse bile)", () => {
     const models = [
       m({ id: "active", provider: "deepseek" }),
       m({ id: "g", provider: "gemini" }),
       m({ id: "q", provider: "groq" }),
     ];
-    const chain = buildFallbackChain(models, "active");
+    const chain = buildFallbackChain(models, "active", { maxFallbacks: 3 });
     expect(chain.map((c) => c.provider)).toEqual(["gemini", "pollinations", "ovh"]);
   });
 
@@ -150,13 +163,55 @@ describe("buildQualityFallbackChain", () => {
     expect(chain.map((c) => c.provider)).toEqual(["openai"]);
   });
 
-  it("anahtarsız son çareler (Pollinations + OVH) kendilerine her zaman yer ayırır", () => {
+  it("BU test bloğunun altındaki buildChainFor ile aynı sonucu vermeli (sapma koruması)", () => {
+    const models = [
+      m({ id: "active", provider: "deepseek", model: "deepseek-chat" }),
+      m({ id: "o", provider: "openai", model: "gpt-4o" }),
+    ];
+    expect(buildChainFor({ models, activeModelId: "active", qualityFallbackChain: true }))
+      .toEqual(buildQualityFallbackChain(models, "active"));
+  });
+
+  it("varsayılanda TÜM modelleri kalite sırasıyla alır + anahtarsız son çareler sonda", () => {
     const models = [
       m({ id: "active", provider: "deepseek", model: "deepseek-chat" }),
       m({ id: "o", provider: "openai", model: "gpt-4o" }),
       m({ id: "g", provider: "gemini", model: "gemini-2.5-pro" }),
     ];
     const chain = buildQualityFallbackChain(models, "active");
-    expect(chain.map((c) => c.provider)).toEqual(["gemini", "pollinations", "ovh"]);
+    expect(chain.map((c) => c.provider)).toEqual(["gemini", "openai", "pollinations", "ovh"]);
+  });
+});
+
+describe("buildChainFor — 'kalite öncelikli' tercihi TEK yerden okunur", () => {
+  const models = [
+    m({ id: "active", provider: "deepseek", model: "deepseek-chat" }),
+    m({ id: "x", provider: "xai", model: "grok-4" }),
+    m({ id: "g", provider: "gemini", model: "gemini-2.5-pro" }),
+  ];
+
+  it("seçenek KAPALIYKEN ücretsiz/güvenilir sağlayıcı önceliğini kullanır", () => {
+    const chain = buildChainFor({ models, activeModelId: "active" }, null, { pollinationsBackstop: false });
+    /* Sağlayıcı-rank: gemini(0) < xai(11) */
+    expect(chain.map((c) => c.provider)).toEqual(["gemini", "xai"]);
+  });
+
+  it("seçenek AÇIKKEN model kalitesine göre sıralar (ücretli/ücretsiz ayrımı yok)", () => {
+    const chain = buildChainFor(
+      { models, activeModelId: "active", qualityFallbackChain: true },
+      null,
+      { pollinationsBackstop: false },
+    );
+    /* Kalite: grok-4(7) < gemini-2.5-pro(9) — sağlayıcı-rank'in tersi. */
+    expect(chain.map((c) => c.provider)).toEqual(["xai", "gemini"]);
+  });
+
+  it("açıkça verilen activeId, config.activeModelId'i ezer (Fusion taslakları böyle çağırır)", () => {
+    const chain = buildChainFor(
+      { models, activeModelId: "active" },
+      "g",
+      { pollinationsBackstop: false },
+    );
+    expect(chain.every((c) => c.provider !== "gemini")).toBe(true);
   });
 });

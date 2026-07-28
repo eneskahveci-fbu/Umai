@@ -32,6 +32,29 @@
 :root {
   --accent: #00e39a;
   --font-scale: 1;
+
+  /* ─── Hareket dili (tek kaynak) ───────────────────────────────────────
+     Animasyonlar önceden her yerde farklı eğri/süre kullanıyordu (ease,
+     ease-out, üç ayrı cubic-bezier, 0.15s–0.26s arası dağınık süreler);
+     tek tek iyi olsalar bile bir arada "aynı ürün" hissi vermiyordu.
+     Aşağıdaki token'lar tüm yüzeylerde AYNI fiziği paylaştırır:
+     • --ease-out  : standart giriş/çıkış — sonda yumuşak yavaşlama.
+     • --ease-spring: hafif overshoot; "yerine oturdu" hissi veren öğeler
+                      (mesaj balonu, modal, popover) için.
+     • --ease-in   : kapanış — hızlı başlar, gözü oyalamaz.
+     Süre ölçeği: 1 (mikro geri bildirim) → 4 (en büyük yüzey). */
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-spring: cubic-bezier(.22, 1.12, .36, 1);
+  --ease-in: cubic-bezier(.55, 0, 1, .45);
+  --dur-1: 120ms;
+  --dur-2: 180ms;
+  --dur-3: 240ms;
+  --dur-4: 320ms;
+  /* Kapanış süresi AYRI bir token: useExitAnimation.ts'teki `exitMs`
+     varsayılanıyla EŞLEŞMEK ZORUNDA (JS bu süre kadar bekleyip unmount eder).
+     Biri değişirse diğeri de değişmeli — yoksa modal ya erken kaybolur ya da
+     animasyon bittikten sonra boş yere ekranda kalır. */
+  --dur-exit: 150ms;
 }
 .accent-pine   { --accent: #00e39a; --color-brand: #00e39a; --color-branddim: #00b87e; }
 .accent-green  { --accent: #3ddc84; --color-brand: #3ddc84; --color-branddim: #2abc6a; }
@@ -392,7 +415,7 @@ html.light .prose-chat pre {
   font-size: 13.5px;
   font-family: var(--font-mono);
   color: var(--color-ink);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
 }
 .input-mono:focus {
   outline: none;
@@ -403,7 +426,7 @@ html.light .prose-chat pre {
 /* Yüzen composer'ın odak halkası — vurgu rengini (accent seçimi dahil) izler. */
 .composer-glow {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 16px 40px -12px rgba(0, 0, 0, 0.35);
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  transition: box-shadow var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out);
 }
 .composer-glow:focus-within {
   border-color: color-mix(in srgb, var(--color-brand) 50%, var(--color-line));
@@ -562,8 +585,13 @@ html { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--color-mu
 }
 .animate-in {
   animation-name: enter;
-  animation-duration: 150ms;
+  animation-duration: var(--dur-2);
   animation-fill-mode: both;
+  /* Eskiden zamanlama eğrisi hiç verilmiyordu → tarayıcı varsayılanı `ease`
+     devreye giriyor, öğe sonda ani duruyordu. Ortak eğri hem yumuşatır hem
+     de bu sınıfı kullanan tüm yüzeyleri (banner, tur, sağ panel, menü)
+     modal/mesaj animasyonlarıyla aynı ritme sokar. */
+  animation-timing-function: var(--ease-spring);
 }
 .fade-in { --tw-enter-opacity: 0; }
 .zoom-in-95 { --tw-enter-scale: .95; }
@@ -603,7 +631,7 @@ html.light .user-bubble {
   to { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-in {
-  animation: fade-in 0.25s ease-out;
+  animation: fade-in var(--dur-3) var(--ease-out);
 }
 
 /* ─── Mesaj giriş animasyonu (S2) ───
@@ -622,7 +650,7 @@ html.light .user-bubble {
   from { opacity: 0; transform: translate3d(-10px, 8px, 0) scale(.99); }
   to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
-.msg-enter { animation-duration: 260ms; animation-fill-mode: both; animation-timing-function: cubic-bezier(.22, 1.1, .36, 1); }
+.msg-enter { animation-duration: var(--dur-3); animation-fill-mode: both; animation-timing-function: var(--ease-spring); }
 .msg-enter-user { animation-name: msg-enter-user; }
 .msg-enter-ai { animation-name: msg-enter-ai; }
 
@@ -633,12 +661,19 @@ html.light .user-bubble {
   from { opacity: 0; transform: translate3d(0, 4px, 0); }
   to   { opacity: 1; transform: translate3d(0, 0, 0); }
 }
-.block-reveal { animation: block-reveal 220ms cubic-bezier(.22, 1, .36, 1) both; }
+.block-reveal { animation: block-reveal var(--dur-3) var(--ease-out) both; }
 
 /* ─── Basma geri bildirimi (S5) ───
    Gönder düğmesinde girdinin kaydedildiği anında hissedilsin. */
-.press-fx { transition: transform 120ms cubic-bezier(.22, 1, .36, 1), box-shadow 160ms ease-out; }
+.press-fx { transition: transform var(--dur-1) var(--ease-spring), box-shadow var(--dur-2) var(--ease-out); }
 .press-fx:active:not(:disabled) { transform: scale(.92); }
+/* Basma dışında da hafif bir "canlılık": üzerine gelince 2 px yükselir.
+   Yalnız gerçekten hover'ı olan cihazlarda — dokunmatikte yapışkan hover
+   durumu bırakmasın. */
+@media (hover: hover) {
+  .press-fx:hover:not(:disabled) { transform: translateY(-1px); }
+  .press-fx:active:not(:disabled) { transform: scale(.92) translateY(0); }
+}
 @keyframes send-pulse {
   0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-brand) 55%, transparent); }
   100% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--color-brand) 0%, transparent); }
@@ -651,7 +686,7 @@ html.light .user-bubble {
   to { opacity: 1; }
 }
 .animate-modal-bg {
-  animation: modal-bg 0.15s ease-out;
+  animation: modal-bg var(--dur-2) var(--ease-out);
 }
 
 @keyframes modal-content {
@@ -659,16 +694,17 @@ html.light .user-bubble {
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 .animate-modal-content {
-  animation: modal-content 0.2s ease-out;
+  /* Yay eğrisi: pencere yerine "oturur" — düz ease-out'ta cansız duruyordu. */
+  animation: modal-content var(--dur-3) var(--ease-spring);
 }
 
 /* ─── Modal kapanış (bkz. useExitAnimation) — açılışın tam tersi, kısa ve
    "ease-in" (kapanış her zaman girişten biraz daha hızlı hissettirir). ─── */
 .animate-modal-bg-out {
-  animation: modal-bg 0.15s ease-in reverse both;
+  animation: modal-bg var(--dur-exit) var(--ease-in) reverse both;
 }
 .animate-modal-content-out {
-  animation: modal-content 0.15s ease-in reverse both;
+  animation: modal-content var(--dur-exit) var(--ease-in) reverse both;
 }
 
 /* Yatay kaydırılabilir şeritlerde (örn. modal sekmeleri) kaydırma çubuğunu
@@ -744,7 +780,7 @@ html.light body {
     0 1px 0 color-mix(in srgb, var(--color-ink) 7%, transparent) inset,
     0 8px 24px -12px rgba(0,0,0,.55);
   /* Tailwind hover durumları (border-brand/40, translate, gölge) yumuşak aksın. */
-  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+  transition: border-color var(--dur-3) var(--ease-out), box-shadow var(--dur-3) var(--ease-out), transform var(--dur-3) var(--ease-spring);
 }
 @media (prefers-reduced-motion: reduce) { .premium-card { transition: none; } }
 

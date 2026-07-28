@@ -177,6 +177,16 @@ function isProviderFault(status: number): boolean {
   return status >= 500 || status === 429 || status === 408;
 }
 
+/** Bir adayın yanıt BAŞLIKLARINI göndermesi için tanınan süre (bkz. openCandidate). */
+const CONNECT_TIMEOUT_MS = 20_000;
+
+/** Yetenek hatası mı? 400/422 = "bu isteği bu biçimde yapamam" (kota/erişim
+    değil). openCandidate bunları zaten 2 kademe uyumluluk düşürmesiyle
+    kurtarmayı denedi; hâlâ 400 ise sorun ULAŞILABİLİRLİK değil YETENEKTİR. */
+function isCapabilityFault(status: number): boolean {
+  return status === 400 || status === 422;
+}
+
 /** Aday için chat/completions URL'i (Pollinations anahtarı varsa query-param token). */
 function candidateUrl(c: Candidate): string {
   return c.provider === "pollinations" && c.apiKey
@@ -1325,8 +1335,36 @@ export async function POST(req: Request) {
        (aşağıdaki düşürme mekanizması bunu zaten kurtarırdı ama bir tur boşa
        giderdi). */
     const sendBody = isOpenAiReasoningModel(c.provider, c.model) ? adaptForOpenAiReasoning(b) : b;
-    const post = (payload: Record<string, unknown>, cand: Candidate = c) =>
-      fetch(candidateUrl(cand), { method: "POST", headers: buildCandidateHeaders(cand, req), body: JSON.stringify(payload) });
+    /* G3 — BAĞLANTI (TTFB) ZAMAN AŞIMI. Buradaki fetch'te hiç zaman aşımı yoktu:
+       yanıt vermeyen bir sağlayıcı isteği maxDuration'a (300 sn) kadar asılı
+       bırakabiliyor, kullanıcı "model çok geç cevap veriyor" diye görüyordu.
+       Zamanlayıcı YALNIZ yanıt BAŞLIKLARINI bekler — fetch başlıklar gelir
+       gelmez çözülür ve zamanlayıcı temizlenir, gövde ondan sonra serbestçe
+       akar. Yani uzun süren meşru akışlar (uzun kod üretimi, tool-loop turları)
+       ASLA kesilmez; yalnız hiç başlamayan bağlantı elenip sıradaki adaya
+       geçilir (bkz. fallback.ts BuildChainOptions — zincirin sınırsız
+       olabilmesinin nedeni bu). */
+    const post = async (payload: Record<string, unknown>, cand: Candidate = c) => {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), CONNECT_TIMEOUT_MS);
+      try {
+        return await fetch(candidateUrl(cand), {
+          method: "POST",
+          headers: buildCandidateHeaders(cand, req),
+          body: JSON.stringify(payload),
+          signal: ctl.signal,
+        });
+      } catch (err) {
+        /* Ham "This operation was aborted" yerine anlaşılır neden — bu metin
+           zincir tükenirse kullanıcıya gösterilen hataya girer. */
+        if ((err as Error)?.name === "AbortError") {
+          throw new Error(`${cand.provider} ${Math.round(CONNECT_TIMEOUT_MS / 1000)} sn içinde yanıt vermedi (zaman aşımı).`);
+        }
+        throw err;
+      } finally {
+        clearTimeout(timer);
+      }
+    };
     let res = await post(sendBody);
     /* Kendi kendine kurtarma: anahtarsız da çalışabilen bir sağlayıcıda (ör. OVH)
        saklı/bayat bir anahtar 401/403 alırsa AYNI adayı anonim (anahtarsız) bir
@@ -1365,6 +1403,22 @@ export async function POST(req: Request) {
     `"düşünme"/"analiz" adımlarını, kendi kendine notları ("we need…", "user wants…", ` +
     `"provide answer", "no code", "ok") veya sahte konuşma dökümlerini (User:/Assistant:) ` +
     `ASLA yanıt metnine yazma. Doğrudan sonucu ver.`;
+  /* G1 — DÜRÜSTLÜK. Sistem promptu (ve platform bilgisi) Umai'nin TÜM
+     yeteneklerini anlatır; ama o yeteneklerin bir kısmı O ANKİ turda gerçekten
+     elde olmayabilir: repo bağlı değilse dosya araçları, anahtarsız uçta
+     function-calling, görsel üretimi kapalıysa generate_image yoktur. Model bu
+     farkı bilmediği için elinde olmayan bir yeteneği varmış gibi davranıp
+     takılıyor ya da yaptığını sanıp uydurmuş oluyordu. Kural: yapamadığında
+     BUNU SÖYLE — sessizce yapamamak, yapmış gibi davranmak ya da konuyu
+     değiştirmek yerine. */
+  sysPrompt +=
+    `\n\n[Dürüstlük] Elindeki araçlarla YAPAMAYACAĞIN bir şey istenirse (ör. sunum/slayt ` +
+    `oluşturma, görsel üretme, dosya yazma, internete çıkma) bunu AÇIKÇA ve tek cümleyle ` +
+    `söyle: neyi yapamadığını ve nedenini belirt, mümkünse kullanıcının bunu nasıl ` +
+    `açabileceğini ekle (ör. "Ayarlar → Model'den görsel üretimi olan bir sağlayıcı ekle", ` +
+    `"depo bağla"). Yapamadığın bir işi yapmış gibi anlatma, sahte çıktı/bağlantı/dosya adı ` +
+    `uydurma, sessizce başka bir konuya kayma. Emin değilsen "emin değilim" de. Kısmen ` +
+    `yapabiliyorsan yapabildiğin kadarını yap ve neyin eksik kaldığını açıkça yaz.`;
   /* Araç kapıları — sysPrompt rehberi de bunlara göre yazıldığı için allTools'tan
      ÖNCE hesaplanır (ikisi de aynı üç sabiti kullanır, sapma olmaz).
      askUserCapable: anahtarsız ücretsiz uçlar (Pollinations/OVH…) function-calling
@@ -1814,6 +1868,18 @@ export async function POST(req: Request) {
             lastStatus = r.status || 500;
             if (isProviderFault(lastStatus)) markProviderDown(c.provider, c.baseUrl);
             lastDetail = await r.text().catch(() => ""); lastCand = c;
+            /* G1 — DÜRÜSTLÜK KAPISI. Yedek zinciri ULAŞILABİLİRLİK arızaları
+               içindir (kota/yetki/sunucu/bağlantı): "istek asla düşmez" sözü
+               budur. Kullanıcının SEÇTİĞİ model bir YETENEK hatası verdiğinde
+               (400/422 — ör. araç çağırmayı, JSON modunu ya da istenen biçimi
+               desteklemiyor) sessizce başka bir modele geçmek kullanıcıyı
+               yanıltıyordu: yanıt seçtiğini sandığı modelden gelmiyor, üstelik
+               "yapamıyorum" demek yerine başka model devraldığı için sorunun
+               varlığı hiç görünmüyordu. Artık zincir burada kırılır ve aşağıdaki
+               friendlyApiError kullanıcıya NE olduğunu dürüstçe söyler.
+               Yalnız BİRİNCİL model için: zaten yedeğe düşülmüşse dayanıklılık
+               öncelikli, sıradaki aday denenmeye devam eder. */
+            if (isCapabilityFault(lastStatus) && c === primary) break;
           }
           if (!upstream) {
             safe.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**${friendlyApiError(lastStatus, lastDetail, { model: lastCand.model, provider: lastCand.provider as Provider })}**` } }] })}\n\n`));
