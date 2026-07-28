@@ -76,11 +76,16 @@ function MapSvg({
               stroke={isSel ? "var(--brand, #5c9478)" : "var(--line, #d9d3c4)"}
               strokeWidth={isSel ? 2 : 1}
             />
+            {/* Satırlar layoutMap'ten gelir — dışa aktarılan SVG ile birebir aynı sarma. */}
             <text
-              x={n.x + n.w / 2} y={n.y + n.h / 2 + 4}
+              x={n.x + n.w / 2} y={n.y + n.h / 2 + 4 - (n.lines.length - 1) * 8}
               textAnchor="middle" fontSize={12.5} fontWeight={isRoot ? 700 : 500}
               className={isRoot ? "fill-[#111110]" : "fill-ink"}
-            >{n.displayText}</text>
+            >
+              {n.lines.map((line, i) => (
+                <tspan key={i} x={n.x + n.w / 2} dy={i === 0 ? 0 : 16}>{line}</tspan>
+              ))}
+            </text>
           </g>
         );
       })}
