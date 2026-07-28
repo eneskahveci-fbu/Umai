@@ -146,36 +146,63 @@ export default function AppPage() {
     (async () => {
       const sb = createClient();
       if (!sb) { clean(); return; }
+      const addToast = useStore.getState().addToast;
       try {
-        const { data } = await sb.auth.getSession();
-        const token = data.session?.provider_token;
-        const addToast = useStore.getState().addToast;
+        /* Oturum HAZIR olana kadar bekle. Önceden getSession() mount'ta BİR KEZ
+           okunuyordu; Supabase dönüşteki kodu oturuma ASENKRON çevirdiği için
+           bu okuma çoğu zaman değişimden önce dönüyor ve elde ya hiç anahtar
+           olmuyor ya da ÖNCEKİ girişten kalan BAYAT bir provider_token
+           bulunuyordu. Bayat anahtarla yapılan /user çağrısı 401 dönüyor,
+           kullanıcı da sohbet ekranında ham "Git bağlanamadı: GitHub 401"
+           mesajını görüyordu. */
+        const token = await (async () => {
+          const deadline = Date.now() + 8000;
+          for (;;) {
+            const { data } = await sb.auth.getSession();
+            const t = data.session?.provider_token;
+            if (t) return t;
+            if (Date.now() > deadline) return null;
+            await new Promise((r) => setTimeout(r, 250));
+          }
+        })();
         if (!token) {
-          addToast("Git bağlantısı tamamlanamadı: erişim anahtarı alınamadı. Tekrar dene.", "error");
+          addToast("Git bağlantısı tamamlanamadı: erişim anahtarı alınamadı. Tekrar dene ya da Ayarlar → Git'ten token ile bağla.", "error");
           clean();
           return;
         }
+        const label = which === "github" ? "GitHub" : "GitLab";
+        const r = which === "github"
+          ? await fetch("https://api.github.com/user", {
+              headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
+            })
+          : await fetch("https://gitlab.com/api/v4/user", {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+        if (!r.ok) {
+          /* Ham durum kodu yerine ne yapılacağını söyle — 401/403 burada
+             "anahtar bayat ya da yetersiz kapsamlı" demektir ve token ile
+             bağlama yolu her zaman çalışır. */
+          addToast(
+            r.status === 401 || r.status === 403
+              ? `${label} erişim anahtarı kabul edilmedi (${r.status}) — anahtar süresi dolmuş veya yetkisi yetersiz olabilir. Ayarlar → Git'ten token ile bağlamayı dene.`
+              : `${label} bağlanamadı (${r.status}). Birazdan tekrar dene.`,
+            "error",
+          );
+          clean();
+          return;
+        }
+        const u = await r.json();
         if (which === "github") {
-          const r = await fetch("https://api.github.com/user", {
-            headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
-          });
-          if (!r.ok) throw new Error(`GitHub ${r.status}`);
-          const u = await r.json();
           useStore.getState().addGithub({ username: u.login ?? "github", token });
           addToast(`GitHub bağlandı: ${u.login} ✓`, "success");
         } else {
-          const r = await fetch("https://gitlab.com/api/v4/user", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (!r.ok) throw new Error(`GitLab ${r.status}`);
-          const u = await r.json();
           useStore.getState().addGitlab({ username: u.username ?? "gitlab", token });
           addToast(`GitLab bağlandı: ${u.username} ✓`, "success");
         }
         useStore.getState().setSettingsOpen(true);
       } catch (err) {
-        useStore.getState().addToast(
-          `Git bağlanamadı: ${err instanceof Error ? err.message : "bilinmeyen hata"}`,
+        addToast(
+          `Git bağlanamadı: ${err instanceof Error ? err.message : "bilinmeyen hata"} — Ayarlar → Git'ten token ile bağlayabilirsin.`,
           "error",
         );
       } finally {
