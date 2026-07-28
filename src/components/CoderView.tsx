@@ -40,7 +40,6 @@ import {
   Search,
   Server,
   Sparkles,
-  Wand2,
   Trash2,
   Square,
   Terminal,
@@ -808,39 +807,6 @@ export function CoderView() {
     return () => clearTimeout(t);
   }, [input]);
 
-  const [improvingPrompt, setImprovingPrompt] = useState(false);
-
-  /* Prompt geliştirici — composer'daki taslağı ücretsiz LLM ile daha net/etkili
-     bir isteme dönüştürür (akışı doğrudan input'a yazar). ÖNCEDEN /api/chat'i
-     (asıl sohbet/ajan uç noktası) çağırıyordu; o rota HER isteğe ask_user'ı
-     teşvik eden bir "[Açıklayıcı diyalog]" talimatı enjekte ettiğinden, kısa/
-     belirsiz taslaklar (tam da iyileştirilmek istenen türden) "belirsiz istek"
-     sayılıp bir soru listesiyle yanıtlanıyor, bu da composer'a yazılınca
-     taslağı bozuyordu. Artık dar amaçlı /api/improve-prompt kullanılıyor
-     (bkz. o dosyadaki açıklama) — ajan çerçevesi/araç teşviki yok. */
-  const improvePrompt = async () => {
-    const base = input.trim();
-    if (improvingPrompt) return;
-    if (!base) { addToast("Önce composer'a bir taslak yaz.", "info"); return; }
-    setImprovingPrompt(true);
-    try {
-      const store = useStore.getState();
-      const active = store.activeModel();
-      if (!active) throw new Error("Önce Ayarlar → Modeller'den bir model seç.");
-      const apiKey = await usableApiKey(active);
-      const res = await fetch("/api/improve-prompt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: base, baseUrl: active.baseUrl, model: active.model, apiKey }),
-      });
-      if (!res.ok) throw new Error(`LLM ${res.status}`);
-      const { improved } = await res.json() as { improved?: string };
-      if (improved?.trim()) setInput(improved.trim());
-      else addToast("İstem geliştirilemedi — tekrar dene.", "error");
-    } catch (e) {
-      addToast(`Geliştirme hatası: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");
-    } finally { setImprovingPrompt(false); }
-  };
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -3880,19 +3846,6 @@ export function CoderView() {
                     onClose={() => setCameraModalOpen(false)}
                   />
                 )}
-                {/* Prompt geliştir — ⋯ menüsünden buraya taşındı (Ağu 2026
-                    kullanıcı kararı): composer'daki taslağa bağlı bir eylem,
-                    iki tık yerine tek tık. improvePrompt() zaten boş taslakta
-                    kendi uyarısını gösteriyor (bkz. tanım), burada ekstra bir
-                    disabled koşuluna gerek yok — yalnız çalışırken kilitlenir. */}
-                <button
-                  onClick={() => void improvePrompt()}
-                  disabled={improvingPrompt}
-                  title="Prompt geliştir — yazdığın istemi iyileştirir"
-                  className="shrink-0 w-9 h-9 sm:w-8 sm:h-8 rounded-lg text-muted hover:text-ink hover:bg-bgsoft grid place-items-center transition-colors disabled:opacity-40"
-                >
-                  {improvingPrompt ? <Loader2Icon size={15} className="animate-spin" /> : <Wand2 size={15} />}
-                </button>
                 {streaming ? (
                   <button onClick={stop} className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-red hover:bg-red/80 active:bg-red/70 text-white grid place-items-center transition-all hover:scale-105 active:scale-95" title="Durdur">
                     <Square size={13} />
