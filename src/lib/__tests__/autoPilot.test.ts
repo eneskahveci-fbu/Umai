@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { decidePilot, decidePilotAsync, autoEffort, autoWeb, autoResearch, autoFusion, autoImageGen } from "../autoPilot";
+import { decidePilot, decidePilotAsync, isPilotConfident, autoEffort, autoWeb, autoResearch, autoFusion, autoImageGen } from "../autoPilot";
 
 const ctx = { hasRepo: true };
 
@@ -39,41 +39,74 @@ describe("decidePilot", () => {
   });
 });
 
+describe("isPilotConfident — regex ne zaman ağa hiç çıkmadan karar verir", () => {
+  it("kısa mesajlarda emin (selam, kısa komut, kısa soru)", () => {
+    expect(isPilotConfident("selam")).toBe(true);
+    expect(isPilotConfident("bunu düzelt")).toBe(true);
+    expect(isPilotConfident("peki ya bu?")).toBe(true);
+  });
+  it("açık 'kapsamlı' sinyalinde emin", () => {
+    expect(isPilotConfident("Bu konuyu kapsamlı bir şekilde uzun uzun ele alan bir metin yazar mısın acaba")).toBe(true);
+  });
+  it("kod bloklu istekte emin (uzun olsa bile)", () => {
+    const t = "Şu kodu incele ve neden hatalı olduğunu açıkla, gerekirse düzelt:\n```ts\nconst x = 1;\n```";
+    expect(isPilotConfident(t)).toBe(true);
+  });
+  it("açık görsel/araştırma niyetinde emin", () => {
+    expect(isPilotConfident("bana gün batımında sisli bir dağ manzarası çiz, çok detaylı ve renkli olsun lütfen")).toBe(true);
+    expect(isPilotConfident("React ile Vue arasında kapsamlı bir karşılaştırmalı analiz raporu hazırla, kaynaklarıyla anlat")).toBe(true);
+  });
+  it("uzunca, sinyalsiz düz yazıda EMİN DEĞİL — LLM'e sorulmalı", () => {
+    const t = "Yeni başlayan bir ürün için hem kullanıcıların hem de yatırımcıların ilgisini çekecek, biraz da rekabet analizine değinen bir sayfa hazırlar mısın";
+    expect(isPilotConfident(t)).toBe(false);
+  });
+});
+
 describe("decidePilotAsync — LLM-tabanlı yönlendirme + senkron yedek", () => {
   const llm = { baseUrl: "https://x", model: "m", apiKey: "k" };
+  const ambiguousText = "Yeni başlayan bir ürün için hem kullanıcıların hem de yatırımcıların ilgisini çekecek, biraz da rekabet analizine değinen bir sayfa hazırlar mısın";
 
-  it("başarılı /api/route-plan yanıtı effort/quality/fusion'ı uygular (web/research/swarm hâlâ regex'ten)", async () => {
+  it("regex EMİN olduğunda (kısa mesaj) ağa hiç çıkmaz, doğrudan regex kararını döner", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const d = await decidePilotAsync("selam", ctx, llm);
+    expect(d).toEqual(decidePilot("selam", ctx));
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("regex belirsiz kaldığında başarılı /api/route-plan yanıtı effort/quality/fusion'ı uygular (web/research/swarm hâlâ regex'ten)", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(
       new Response(JSON.stringify({ effort: "max", quality: true, fusion: false }), { status: 200 }),
     );
     vi.stubGlobal("fetch", fetchMock);
-    const d = await decidePilotAsync("selam", ctx, llm);
+    const d = await decidePilotAsync(ambiguousText, ctx, llm);
+    expect(fetchMock).toHaveBeenCalledOnce();
     expect(d.effort).toBe("max");
     expect(d.quality).toBe(true);
     expect(d.fusion).toBe(false);
-    expect(d.web).toBe(false); // regex: "selam" web tetiklemez
     vi.unstubAllGlobals();
   });
 
   it("ağ hatasında senkron decidePilot'a düşer (asla fırlatmaz)", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("network down")));
-    const d = await decidePilotAsync("kapsamlı bir mimari kur", ctx, llm);
-    expect(d).toEqual(decidePilot("kapsamlı bir mimari kur", ctx));
+    const d = await decidePilotAsync(ambiguousText, ctx, llm);
+    expect(d).toEqual(decidePilot(ambiguousText, ctx));
     vi.unstubAllGlobals();
   });
 
   it("geçersiz/eksik JSON yanıtında senkron decidePilot'a düşer", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 })));
-    const d = await decidePilotAsync("selam", ctx, llm);
-    expect(d).toEqual(decidePilot("selam", ctx));
+    const d = await decidePilotAsync(ambiguousText, ctx, llm);
+    expect(d).toEqual(decidePilot(ambiguousText, ctx));
     vi.unstubAllGlobals();
   });
 
   it("llm bilgisi yoksa (baseUrl/model eksik) doğrudan senkron decidePilot'a düşer, ağ çağrısı yapmaz", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const d = await decidePilotAsync("selam", ctx, null);
-    expect(d).toEqual(decidePilot("selam", ctx));
+    const d = await decidePilotAsync(ambiguousText, ctx, null);
+    expect(d).toEqual(decidePilot(ambiguousText, ctx));
     expect(fetchMock).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });

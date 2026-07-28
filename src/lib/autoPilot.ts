@@ -156,10 +156,29 @@ export function decidePilot(text: string, ctx: { hasRepo: boolean }): PilotDecis
   return assemblePilotDecision(effort, quality, fusion, web, research, swarm, image);
 }
 
+/* Regex'in GERÇEKTEN emin olduğu mesajlar: kısa selamlar/komutlar, açık
+   "kapsamlı" sinyali, kod bloklu istekler, açık görsel/araştırma niyeti.
+   Bunlarda LLM'e sormanın hiçbir kazancı yok — regex zaten doğru okuyor —
+   ama her sohbet turunda `/api/route-plan`'a bloklayan bir ağ isteği atmak
+   gerçek bir maliyet: fazladan tur + gecikme. Yalnız GERÇEKTEN belirsiz
+   (uzunca, sinyalsiz düz yazı) mesajlarda LLM'e sorulur — bkz. decidePilotAsync. */
+export function isPilotConfident(text: string): boolean {
+  const t = (text || "").trim();
+  if (t.length < 60) return true;
+  if (/```/.test(t)) return true;
+  if (autoEffort(t) === "max") return true;
+  if (autoImageGen(t) || autoResearch(t)) return true;
+  return false;
+}
+
 /** LLM-tabanlı yönlendirme kararı — sabit regex yerine `/api/route-plan`'a
     hızlı bir sınıflandırma çağrısı yapar (yalnızca effort/quality/fusion;
     web/research/swarm/image hâlâ regex'te kalır — bunlar artık organik araç
     kararları, bkz. generate_image/deep_research/dispatch_agents araçları).
+    ÖNCEDEN her mesajda (kısa bir "selam" dahil) bloklayan bir ağ turu
+    atılıyordu — gecikme şikayetlerinin bir kaynağıydı. Artık regex GERÇEKTEN
+    emin olduğunda (bkz. isPilotConfident) ağa hiç çıkılmıyor; yalnız
+    belirsiz/uzun düz-yazı isteklerde LLM'e soruluyor.
     Ağ/format hatasında SESSİZCE senkron `decidePilot`'a düşer — sohbet akışı
     asla bloklanmaz/bozulmaz. */
 export async function decidePilotAsync(
@@ -167,6 +186,7 @@ export async function decidePilotAsync(
   ctx: { hasRepo: boolean },
   llm: { baseUrl: string; model: string; apiKey: string } | null,
 ): Promise<PilotDecision> {
+  if (isPilotConfident(text)) return decidePilot(text, ctx);
   if (llm?.baseUrl && llm?.model) {
     try {
       const res = await fetch("/api/route-plan", {
