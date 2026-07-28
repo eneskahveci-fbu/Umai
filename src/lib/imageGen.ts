@@ -30,6 +30,28 @@ export function pickImageModel(models: ModelProfile[]): ModelProfile | null {
   return null;
 }
 
+/** Kullanıcının eklediği TÜM görüntü-yetenekli modelleri, öncelik sırasıyla
+    (IMAGE_PROVIDERS — kalite/hız dengesine göre en iyiden en kötüye) anahtarı
+    ÇÖZÜLMÜŞ hâlde döner. "Yedek zincir" (config.imageFallbackChain) açıkken
+    çağıran bunu sırayla dener; kapalıyken (varsayılan) yalnız pickImageProvider
+    ile seçilen TEK adayı dener — davranış değişmez. `exclude` verilirse o
+    sağlayıcı listeden çıkarılır (çağıran onu zaten ayrı denediyse tekrar
+    denenmesin diye — pickImageProvider'ın auto/pin mantığıyla çakışmaz). */
+export async function buildImageFallbackChain(
+  config: Config,
+  exclude?: ImageProvider,
+): Promise<{ provider: ImageProvider; apiKey: string }[]> {
+  const out: { provider: ImageProvider; apiKey: string }[] = [];
+  for (const p of IMAGE_PROVIDERS) {
+    if (p === exclude) continue;
+    const m = config.models.find((x) => x.provider === p);
+    if (!m) continue;
+    const apiKey = await resolveModelApiKey(m, config.providerKeys);
+    if (apiKey) out.push({ provider: p, apiKey });
+  }
+  return out;
+}
+
 function isImageProvider(p: string): p is ImageProvider {
   return (IMAGE_PROVIDERS as readonly string[]).includes(p);
 }

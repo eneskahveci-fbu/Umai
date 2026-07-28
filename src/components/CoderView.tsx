@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
-import { buildFallbackChain } from "@/lib/fallback";
+import { buildFallbackChain, buildQualityFallbackChain } from "@/lib/fallback";
 import { createReveal, type RevealController } from "@/lib/streamReveal";
 import { switchLeftPanel, type LeftPanel } from "@/lib/leftPanel";
 import { compactPlan } from "@/lib/contextWindow";
@@ -2088,8 +2088,10 @@ export function CoderView() {
           apiKey: await usableApiKey(s.profile), temperature: s.temperature,
         })));
         /* Taslak modellerinden biri kota/erişim hatası verirse (kredi bittiyse)
-           otomatik bir sonraki uygun modele düşülür — bkz. generateDrafts. */
-        const fusionFallbacks = buildFallbackChain(store.config.models, active.id);
+           otomatik bir sonraki uygun modele düşülür — bkz. generateDrafts.
+           Ayarlar'daki "kalite öncelikli" seçeneği açıksa aynı kurallarla
+           (anahtarsız son çare güvencesi dahil) ama en güçlüden en zayıfa. */
+        const fusionFallbacks = (store.config.qualityFallbackChain ? buildQualityFallbackChain : buildFallbackChain)(store.config.models, active.id);
         boostDrafts = await generateDrafts({ userText: _lastUserText, models: withKeys, fallbacks: fusionFallbacks, signal: coderAbort.signal });
         if (boostDrafts.length >= 2) {
           /* HAKEM: en iyi taslağı seç + diğerlerinden alınacakları not et —
@@ -2255,8 +2257,10 @@ export function CoderView() {
           baseUrl: active.baseUrl, model: active.model, apiKey: reqKey,
           provider: active.provider, systemPrompt: finalSystemPrompt,
           /* Çok-sağlayıcılı otomatik fallback: aktif model hata verirse sunucu
-             sırayla bu ücretsiz adayları dener (kullanıcı duvara çarpmaz). */
-          fallbacks: buildFallbackChain(store.config.models, active.id),
+             sırayla bu adayları dener (kullanıcı duvara çarpmaz). Ayarlar'daki
+             "kalite öncelikli" seçeneği açıksa ücretli/ücretsiz ayrımı yapmadan
+             en güçlüden en zayıfa sıralanır. */
+          fallbacks: (store.config.qualityFallbackChain ? buildQualityFallbackChain : buildFallbackChain)(store.config.models, active.id),
           style: store.config.style,
           memories: store.config.memories,
           skills: activeSkills.map((s) => ({
@@ -2782,21 +2786,33 @@ export function CoderView() {
          (Gemini/OpenAI/xAI/HF, /api/image proxy'siyle) onunla üret; anahtar
          yoksa VEYA üretim başarısız olursa Pollinations tabanına düş —
          metindeki fallback zinciriyle aynı "istek asla düşmez" sözleşmesi. */
-      const { pickImageProvider, generateImageBYOK, compressDataUrl, IMAGE_PROVIDER_LABEL } = await import("@/lib/imageGen");
+      const { pickImageProvider, generateImageBYOK, compressDataUrl, IMAGE_PROVIDER_LABEL, buildImageFallbackChain } = await import("@/lib/imageGen");
       let url = "";
       let providerNote = "";
       const byok = await pickImageProvider(store.config).catch(() => null);
-      if (byok) {
-        const label = IMAGE_PROVIDER_LABEL[byok.provider];
+      /* Ayarlar'daki "görsel yedek zinciri" açıksa tek adayla yetinmeyip
+         eklediğin diğer görüntü-yetenekli modelleri de (en iyiden en kötüye)
+         sırayla dener; kapalıyken (varsayılan) davranış değişmez — yalnız
+         pickImageProvider'ın seçtiği TEK aday denenir. */
+      const attempts = byok ? [byok] : [];
+      if (store.config.imageFallbackChain) {
+        const rest = await buildImageFallbackChain(store.config, byok?.provider).catch(() => []);
+        attempts.push(...rest);
+      }
+      for (const attempt of attempts) {
+        const label = IMAGE_PROVIDER_LABEL[attempt.provider];
         store.pushMessage({ role: "assistant", content: `🎨 ${label} ile üretiliyor…` });
         try {
-          const raw = await generateImageBYOK(imgPrompt, byok.provider, byok.apiKey);
+          const raw = await generateImageBYOK(imgPrompt, attempt.provider, attempt.apiKey);
           url = await compressDataUrl(raw);
           providerNote = ` _(${label})_`;
+          useStore.getState().popLastMessage(); // "üretiliyor…" yer tutucusu
+          break;
         } catch (e) {
-          addToast(`${label} üretimi başarısız (${friendlyError((e as Error).message)}) — Pollinations'a düşüldü.`, "info");
+          useStore.getState().popLastMessage();
+          const isLast = attempt === attempts[attempts.length - 1];
+          addToast(`${label} üretimi başarısız (${friendlyError((e as Error).message)})${isLast ? " — Pollinations'a düşüldü." : " — sıradaki deneniyor…"}`, "info");
         }
-        useStore.getState().popLastMessage(); // "üretiliyor…" yer tutucusu
       }
       if (!url) url = pollinationsImageUrl(imgPrompt, { seed });
 

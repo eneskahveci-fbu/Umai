@@ -1,5 +1,6 @@
 import type { ModelProfile, Provider } from "./types";
 import { POLLINATIONS_DEFAULT_MODEL, OVH_FREE_MODEL } from "./constants";
+import { modelQualityRank } from "./modelQuality";
 
 /**
  * Çok-sağlayıcılı otomatik fallback zinciri.
@@ -81,31 +82,17 @@ export interface BuildChainOptions {
   pollinationsBackstop?: boolean;
 }
 
-/**
- * Yapılandırılmış modellerden, aktif modeli HARİÇ tutarak sıralı bir fallback
- * listesi üretir. Sıra: ücretsiz/güvenilir sağlayıcılar önce. İstemcinin hiç
- * ücretsiz modeli yoksa bile anahtarsız Pollinations tabanı eklenir → her zaman
- * bir yedek vardır.
- */
-export function buildFallbackChain(
-  models: ModelProfile[],
-  activeId: string | null,
-  opts: BuildChainOptions = {},
+/* buildFallbackChain ve buildQualityFallbackChain YALNIZ sıralama
+   stratejisinde farklılaşır (sağlayıcı-rank vs model-kalite-rank); geri
+   kalan her şey — aktif modeli hariç tutma, anahtarsız son çarelere HER
+   ZAMAN yer ayırma, tekilleştirme, maxFallbacks sınırı — birebir aynı.
+   İkisinin ayrı ayrı kopyalanıp sapması yerine TEK bir montaj fonksiyonu. */
+function assembleChain(
+  sortedCandidates: FallbackCandidate[],
+  seen: Set<string>,
+  maxFallbacks: number,
+  pollinationsBackstop: boolean,
 ): FallbackCandidate[] {
-  const maxFallbacks = opts.maxFallbacks ?? 3;
-  const pollinationsBackstop = opts.pollinationsBackstop ?? true;
-
-  const active = models.find((m) => m.id === activeId) ?? null;
-  const seen = new Set<string>();
-  if (active) {
-    seen.add(dedupeKey({ provider: active.provider, baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey }));
-  }
-
-  const candidates: FallbackCandidate[] = models
-    .filter((m) => m.id !== activeId && isUsable(m))
-    .map((m) => ({ provider: m.provider, baseUrl: m.baseUrl, model: m.model, apiKey: m.apiKey }))
-    .sort((a, b) => rank(a.provider) - rank(b.provider));
-
   /* Anahtarsız son çareler (Pollinations + OVH) önceden HESAPLA — aşağıda
      kullanıcı adaylarına kaç yuva ayrılacağını belirlemek için gerekiyor. */
   const backstops: FallbackCandidate[] = [];
@@ -141,7 +128,7 @@ export function buildFallbackChain(
      kullanıcı gerçek bir yedeği hiç denemeden duvara çarpıyordu. */
   const userSlotLimit = Math.max(0, maxFallbacks - backstops.length);
   const out: FallbackCandidate[] = [];
-  for (const c of candidates) {
+  for (const c of sortedCandidates) {
     if (out.length >= userSlotLimit) break;
     const key = dedupeKey(c);
     if (seen.has(key)) continue;
@@ -151,4 +138,53 @@ export function buildFallbackChain(
 
   out.push(...backstops);
   return out.slice(0, maxFallbacks);
+}
+
+function seedSeen(models: ModelProfile[], activeId: string | null): Set<string> {
+  const active = models.find((m) => m.id === activeId) ?? null;
+  const seen = new Set<string>();
+  if (active) {
+    seen.add(dedupeKey({ provider: active.provider, baseUrl: active.baseUrl, model: active.model, apiKey: active.apiKey }));
+  }
+  return seen;
+}
+
+/**
+ * Yapılandırılmış modellerden, aktif modeli HARİÇ tutarak sıralı bir fallback
+ * listesi üretir. Sıra: ücretsiz/güvenilir sağlayıcılar önce. İstemcinin hiç
+ * ücretsiz modeli yoksa bile anahtarsız Pollinations tabanı eklenir → her zaman
+ * bir yedek vardır.
+ */
+export function buildFallbackChain(
+  models: ModelProfile[],
+  activeId: string | null,
+  opts: BuildChainOptions = {},
+): FallbackCandidate[] {
+  const seen = seedSeen(models, activeId);
+  const candidates: FallbackCandidate[] = models
+    .filter((m) => m.id !== activeId && isUsable(m))
+    .map((m) => ({ provider: m.provider, baseUrl: m.baseUrl, model: m.model, apiKey: m.apiKey }))
+    .sort((a, b) => rank(a.provider) - rank(b.provider));
+  return assembleChain(candidates, seen, opts.maxFallbacks ?? 3, opts.pollinationsBackstop ?? true);
+}
+
+/**
+ * Kalite-öncelikli zincir — Ayarlar'daki "kalite öncelikli" seçeneği
+ * açıldığında kullanılır. "Ücretli mi ücretsiz mi" ayrımı YAPMAZ; yalnız
+ * bilinen model gücüne göre (bkz. modelQuality.ts — Fusion'ın strongestModel
+ * seçimiyle TEK kaynak) en güçlüden en zayıfa dizer. Anahtarsız son-çare
+ * güvencesi (Pollinations/OVH) ve maxFallbacks/tekilleştirme kuralları
+ * buildFallbackChain ile BİREBİR aynı — yalnız sıralama stratejisi değişir.
+ */
+export function buildQualityFallbackChain(
+  models: ModelProfile[],
+  activeId: string | null,
+  opts: BuildChainOptions = {},
+): FallbackCandidate[] {
+  const seen = seedSeen(models, activeId);
+  const candidates: FallbackCandidate[] = models
+    .filter((m) => m.id !== activeId && isUsable(m))
+    .sort((a, b) => modelQualityRank(a.model, a.label) - modelQualityRank(b.model, b.label))
+    .map((m) => ({ provider: m.provider, baseUrl: m.baseUrl, model: m.model, apiKey: m.apiKey }));
+  return assembleChain(candidates, seen, opts.maxFallbacks ?? 3, opts.pollinationsBackstop ?? true);
 }

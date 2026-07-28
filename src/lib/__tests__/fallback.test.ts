@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildFallbackChain, KEYLESS_PROVIDERS } from "../fallback";
+import { buildFallbackChain, buildQualityFallbackChain, KEYLESS_PROVIDERS } from "../fallback";
 import type { ModelProfile } from "../types";
 
 function m(partial: Partial<ModelProfile> & { id: string; provider: ModelProfile["provider"] }): ModelProfile {
@@ -101,5 +101,62 @@ describe("buildFallbackChain", () => {
     ];
     const chain = buildFallbackChain(models, "active", { pollinationsBackstop: false });
     expect(chain.filter((c) => c.provider === "custom").length).toBe(1);
+  });
+});
+
+describe("buildQualityFallbackChain", () => {
+  it("aktif modeli zincire eklemez", () => {
+    const models = [
+      m({ id: "a", provider: "gemini", model: "gemini-2.5-pro" }),
+      m({ id: "b", provider: "groq", model: "llama-3.3-70b" }),
+    ];
+    const chain = buildQualityFallbackChain(models, "a", { pollinationsBackstop: false });
+    expect(chain.every((c) => c.provider !== "gemini")).toBe(true);
+    expect(chain.map((c) => c.provider)).toContain("groq");
+  });
+
+  it("ücretli/ücretsiz ayrımı yapmadan en güçlü modelden en zayıfa sıralar", () => {
+    /* Sağlayıcı-rank sıralamasında (buildFallbackChain) openai/xai en sona
+       düşerdi; kalite sıralamasında yalnız bilinen model gücü sayılır. */
+    const models = [
+      m({ id: "active", provider: "deepseek", model: "deepseek-chat" }),
+      m({ id: "x", provider: "xai", model: "grok-4" }),
+      m({ id: "o", provider: "openai", model: "gpt-4o" }),
+      m({ id: "g", provider: "groq", model: "llama-3.3-70b" }),
+    ];
+    const chain = buildQualityFallbackChain(models, "active", { pollinationsBackstop: false });
+    expect(chain[0].provider).toBe("xai"); // grok-4
+    expect(chain[1].provider).toBe("openai"); // gpt-4o
+    expect(chain[2].provider).toBe("groq"); // llama-3.3-70b
+  });
+
+  it("tanınmayan model adları listenin sonuna düşer", () => {
+    const models = [
+      m({ id: "active", provider: "deepseek", model: "deepseek-chat" }),
+      m({ id: "u", provider: "custom", model: "acme-mystery-model", apiKey: "k" }),
+      m({ id: "g", provider: "gemini", model: "gemini-2.5-pro" }),
+    ];
+    const chain = buildQualityFallbackChain(models, "active", { pollinationsBackstop: false });
+    expect(chain.map((c) => c.provider)).toEqual(["gemini", "custom"]);
+  });
+
+  it("anahtarı olmayan modelleri eler", () => {
+    const models = [
+      m({ id: "active", provider: "gemini", model: "gemini-2.5-pro" }),
+      m({ id: "nokey", provider: "groq", model: "llama-3.3-70b", apiKey: "" }),
+      m({ id: "ok", provider: "openai", model: "gpt-4o" }),
+    ];
+    const chain = buildQualityFallbackChain(models, "active", { pollinationsBackstop: false });
+    expect(chain.map((c) => c.provider)).toEqual(["openai"]);
+  });
+
+  it("anahtarsız son çareler (Pollinations + OVH) kendilerine her zaman yer ayırır", () => {
+    const models = [
+      m({ id: "active", provider: "deepseek", model: "deepseek-chat" }),
+      m({ id: "o", provider: "openai", model: "gpt-4o" }),
+      m({ id: "g", provider: "gemini", model: "gemini-2.5-pro" }),
+    ];
+    const chain = buildQualityFallbackChain(models, "active");
+    expect(chain.map((c) => c.provider)).toEqual(["gemini", "pollinations", "ovh"]);
   });
 });
