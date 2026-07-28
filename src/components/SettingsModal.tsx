@@ -65,7 +65,7 @@ import { quickComplete } from "@/lib/quickComplete";
 import { fetchUserRepos } from "@/lib/github";
 import { fetchGitLabUserRepos } from "@/lib/gitlab";
 import { friendlyError } from "@/lib/friendlyError";
-import { decryptField, isEncrypted } from "@/lib/secureKeys";
+import { decryptField, isEncrypted, resolveGitToken } from "@/lib/secureKeys";
 
 /* Kullanım anında şifre çözme: bellekteki config'den gelen anahtar `enc:1:`
    (şifreli) olabilir — açılıştaki rehydrate yarışı ya da bulut senkronunun
@@ -361,11 +361,14 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
       if (!gh && !gl) { if (!cancelled) setAccountRepos([]); return; }
       setLoadingAccountRepos(true);
       const results: string[] = [];
+      /* ÇÖZÜLMÜŞ token — hesap token'ları depoda AES-GCM ile şifreli durur;
+         ham 'enc:1:…' blob'u gönderilirse GitHub/GitLab 401 döner ve aşağıdaki
+         sessiz catch yüzünden liste sebepsizce boş görünürdü. */
       try {
-        if (gh) results.push(...(await fetchUserRepos(gh.token, gh.username)));
+        if (gh) results.push(...(await fetchUserRepos(await resolveGitToken(gh), gh.username)));
       } catch { /* sessiz */ }
       try {
-        if (gl) results.push(...(await fetchGitLabUserRepos(gl.token, gl.username)));
+        if (gl) results.push(...(await fetchGitLabUserRepos(await resolveGitToken(gl), gl.username)));
       } catch { /* sessiz */ }
       if (cancelled) return;
       const have = new Set(config.repos);
