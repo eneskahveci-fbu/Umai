@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickImageModel, pickImageProvider, IMAGE_PROVIDERS } from "../imageGen";
+import { pickImageModel, pickImageProvider, buildImageFallbackChain, IMAGE_PROVIDERS } from "../imageGen";
 import type { Config, ModelProfile } from "../types";
 
 const mk = (provider: ModelProfile["provider"], id: string = provider): ModelProfile => ({
@@ -87,5 +87,30 @@ describe("pickImageProvider — Ayarlar → Görsel üretimi tercihi (bkz. image
       const cfg = mkConfig({ models: [mk("hf"), mk("openai")], activeModelId: "olmayan-id" });
       expect((await pickImageProvider(cfg))?.provider).toBe("openai");
     });
+  });
+});
+
+describe("buildImageFallbackChain — Ayarlar → görsel yedek zinciri", () => {
+  it("görüntü-yetenekli TÜM modelleri öncelik sırasıyla döner", async () => {
+    const cfg = mkConfig({ models: [mk("hf"), mk("groq"), mk("openai"), mk("gemini")] });
+    const chain = await buildImageFallbackChain(cfg);
+    expect(chain.map((c) => c.provider)).toEqual(["gemini", "openai", "hf"]);
+  });
+
+  it("anahtarı olmayan modelleri eler", async () => {
+    const noKey: ModelProfile = { id: "openai-nokey", label: "o", provider: "openai", baseUrl: "", model: "m", apiKey: "" };
+    const cfg = mkConfig({ models: [noKey, mk("hf")] });
+    const chain = await buildImageFallbackChain(cfg);
+    expect(chain.map((c) => c.provider)).toEqual(["hf"]);
+  });
+
+  it("exclude verilirse o sağlayıcıyı listeden çıkarır (çağıran onu zaten ayrı denedi)", async () => {
+    const cfg = mkConfig({ models: [mk("gemini"), mk("openai"), mk("hf")] });
+    const chain = await buildImageFallbackChain(cfg, "gemini");
+    expect(chain.map((c) => c.provider)).toEqual(["openai", "hf"]);
+  });
+
+  it("görüntü-yetenekli model yoksa boş dizi döner", async () => {
+    expect(await buildImageFallbackChain(mkConfig({ models: [mk("groq")] }))).toEqual([]);
   });
 });

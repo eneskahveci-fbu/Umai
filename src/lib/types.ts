@@ -673,6 +673,18 @@ export interface Config {
       anahtarı olsa bile), ya da belirli bir sağlayıcıyı SABİTLE. Sabitlenen
       sağlayıcı için model/anahtar artık yoksa sessizce "auto" davranışına döner. */
   imageModelProvider?: "auto" | "pollinations" | "gemini" | "openai" | "xai" | "hf";
+  /** Sohbet yedek zinciri stratejisi (Ayarlar → Model). Varsayılan (false/yok):
+      "ücretsiz öncelikli" — buildFallbackChain, güvenilir ücretsiz katmanları
+      öne alır (bkz. fallback.ts PROVIDER_RANK). true: "kalite öncelikli" —
+      buildQualityFallbackChain, ücretli/ücretsiz ayrımı yapmadan yalnız bilinen
+      model gücüne göre (modelQuality.ts) en iyiden en kötüye dizer. */
+  qualityFallbackChain?: boolean;
+  /** Görsel üretimi yedek zinciri (Ayarlar → Model). Varsayılan (false/yok):
+      yalnız pickImageProvider'ın seçtiği TEK aday denenir, başarısızsa doğrudan
+      Pollinations'a düşülür. true: o aday başarısız olursa kalan görüntü-
+      yetenekli eklenmiş modeller de (öncelik sırasıyla, bkz. imageGen.ts
+      buildImageFallbackChain) Pollinations'a düşmeden önce sırayla denenir. */
+  imageFallbackChain?: boolean;
 }
 
 export interface RepoState {

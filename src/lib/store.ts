@@ -27,6 +27,7 @@ import { deriveJobTitle, type BackgroundJob } from "./jobs";
 import { DEFAULT_CONFIG, DEFAULT_REPO, DEFAULT_SKILLS, POLLINATIONS_DEFAULT_MODEL } from "./constants";
 import { encryptConfigSecrets, decryptConfigSecrets, isCryptoAvailable, hasPlaintextSecret } from "./secureKeys";
 import { applyEditBranch, applySwitchBranch, mergeRegeneratedBranches } from "./branching";
+import { modelQualityRank } from "./modelQuality";
 import { createClient } from "./supabase/client";
 
 /* Config yazımları için monotonik sıra: async şifreli yazımların sırasını korur
@@ -836,14 +837,16 @@ export const useStore = create<StoreState>()((set, get) => ({
        gpt-4o-mini anahtarsızsa atlanır, aktif modele/anahtarlı güçlüye gidilir). */
     const pool = models.filter((m) => (m.apiKey || "").trim().length > 0);
     if (pool.length === 0) return get().activeModel();
-    /* En güçlüden zayıfa öncelik sırası — ilk eşleşen yapılandırılmış model
-       seçilir; hiçbiri tanınmıyorsa aktif modele düşer. */
-    const order = ["opus", "gpt-5", "o4", "o3", "deepseek-reasoner", "sonnet", "claude-3.7", "grok-4", "gpt-4.1", "gemini-2.5-pro", "gpt-4o", "deepseek", "gemini-2.5", "llama-3.3-70b", "70b", "qwen3", "mistral-large", "codestral"];
-    for (const key of order) {
-      const m = pool.find((x) => `${x.model} ${x.label}`.toLowerCase().includes(key));
-      if (m) return m;
+    /* En güçlüden zayıfa öncelik sırası (modelQuality.ts — Ayarlar'daki
+       "kalite öncelikli" yedek zinciriyle TEK kaynak); hiçbiri tanınmıyorsa
+       aktif modele düşer. */
+    let best: ModelProfile | null = null;
+    let bestRank = Infinity;
+    for (const m of pool) {
+      const r = modelQualityRank(m.model, m.label);
+      if (r < bestRank) { best = m; bestRank = r; }
     }
-    return get().activeModel();
+    return bestRank < Infinity ? best : get().activeModel();
   },
   addGithub: (a) => {
     const acc: GitHubAccount = { ...a, id: uid() };

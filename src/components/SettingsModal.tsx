@@ -44,6 +44,7 @@ import {
   Zap,
   Eye,
   Braces,
+  TrendingUp,
 } from "lucide-react";
 import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
 import { detectModelCapabilities } from "@/lib/modelCapabilities";
@@ -57,7 +58,7 @@ import { AdminAnalytics } from "@/components/AdminAnalytics";
 import { AdminUsers } from "@/components/AdminUsers";
 import { createClient } from "@/lib/supabase/client";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, ALL_TOOL_CATALOG } from "@/lib/constants";
-import { buildFallbackChain, KEYLESS_PROVIDERS } from "@/lib/fallback";
+import { buildFallbackChain, buildQualityFallbackChain, KEYLESS_PROVIDERS } from "@/lib/fallback";
 import { IMAGE_PROVIDERS, IMAGE_PROVIDER_LABEL } from "@/lib/imageGen";
 import { calculateCost, formatCost } from "@/lib/pricing";
 import { quickComplete } from "@/lib/quickComplete";
@@ -1054,21 +1055,39 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               </div>
             )}
             {config.activeModelId && (() => {
-              /* Otomatik ücretsiz yedek zinciri: aktif model hata verirse sunucu
-                 sırayla bu adayları dener. İstemcinin yolladığı zincirle birebir
-                 aynı mantık (buildFallbackChain) → kullanıcı ne denenecek görür. */
+              /* Otomatik yedek zinciri: aktif model hata verirse sunucu sırayla
+                 bu adayları dener. İstemcinin yolladığı zincirle birebir aynı
+                 mantık → kullanıcı ne denenecek görür. Varsayılan sıralama
+                 ücretsiz/güvenilir sağlayıcıyı öne alır (buildFallbackChain);
+                 "kalite öncelikli" açıksa ücretli/ücretsiz ayrımı yapmadan
+                 bilinen en güçlü modeli öne alır (buildQualityFallbackChain —
+                 Fusion'ın strongestModel'iyle AYNI kaynak, bkz. modelQuality.ts). */
               const activeM = config.models.find((m) => m.id === config.activeModelId);
               if (!activeM) return null;
-              const chain = buildFallbackChain(config.models, config.activeModelId);
+              const qualityMode = config.qualityFallbackChain ?? false;
+              const chain = (qualityMode ? buildQualityFallbackChain : buildFallbackChain)(config.models, config.activeModelId);
               return (
                 <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50 mb-4">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Layers size={13} className="text-yellow shrink-0" />
-                    <span className="text-xs font-bold text-muted uppercase tracking-wide">Otomatik ücretsiz yedek zinciri</span>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Layers size={13} className="text-yellow shrink-0" />
+                      <span className="text-xs font-bold text-muted uppercase tracking-wide">Otomatik yedek zinciri</span>
+                    </div>
+                    <button
+                      onClick={() => saveConfig({ ...config, qualityFallbackChain: !qualityMode })}
+                      className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-semibold transition-colors shrink-0 ${
+                        qualityMode ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink hover:border-brand/40"
+                      }`}
+                      title="Açıkken ücretli/ücretsiz farketmeksizin en güçlü modelden en zayıfa sıralanır"
+                    >
+                      <TrendingUp size={12} />
+                      Kalite öncelikli
+                    </button>
                   </div>
                   <p className="text-xs text-muted leading-relaxed mb-2.5">
-                    Aktif model kota/erişim hatası verirse istek düşmez; soldan sağa sırayla denenir.
-                    Her ücretsiz katmanın ayrı kotası birleşince kesintisiz kullanım sağlar.
+                    {qualityMode
+                      ? "Aktif model hata verirse ücretli/ücretsiz farketmeksizin en güçlü modelden en zayıfa sırayla dener."
+                      : "Aktif model kota/erişim hatası verirse istek düşmez; soldan sağa sırayla denenir. Her ücretsiz katmanın ayrı kotası birleşince kesintisiz kullanım sağlar."}
                   </p>
                   <div className="flex flex-wrap items-center gap-1.5 text-xs">
                     <span className="px-2 py-1 rounded-lg border border-branddim bg-brand/10 text-brand font-semibold font-mono" title={cleanLabel(activeM.provider)}>
@@ -1104,16 +1123,58 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                raporu). Yalnız kullanıcının ZATEN eklediği (anahtarı olan)
                sağlayıcılar listelenir — "halihazırda var olan anahtarlarla". */}
             <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <ImageIcon size={13} className="text-brand shrink-0" />
-                <span className="text-xs font-bold text-muted uppercase tracking-wide">Görsel üretimi</span>
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <ImageIcon size={13} className="text-brand shrink-0" />
+                  <span className="text-xs font-bold text-muted uppercase tracking-wide">Görsel üretimi</span>
+                </div>
+                {(() => {
+                  const imageModels = IMAGE_PROVIDERS
+                    .map((p) => config.models.find((m) => m.provider === p))
+                    .filter((m): m is NonNullable<typeof m> => !!m);
+                  if (imageModels.length < 2) return null;
+                  const imgChainOn = config.imageFallbackChain ?? false;
+                  return (
+                    <button
+                      onClick={() => saveConfig({ ...config, imageFallbackChain: !imgChainOn })}
+                      className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-semibold transition-colors shrink-0 ${
+                        imgChainOn ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink hover:border-brand/40"
+                      }`}
+                      title="Açıkken bir sağlayıcı başarısız olursa sırasıyla diğerleri de denenir"
+                    >
+                      <TrendingUp size={12} />
+                      Yedek zinciri
+                    </button>
+                  );
+                })()}
               </div>
               <p className="text-xs text-muted leading-relaxed mb-2.5">
                 Sohbette bir görsel istediğinde hangi sağlayıcı kullanılsın? <b>Otomatik</b>, önce o an
                 aktif sohbet modelin görüntü-yetenekliyse ONU kullanır; değilse eklediğin modeller
                 arasından uygun olanı önceliğe göre (Gemini → OpenAI → xAI → Hugging Face) kendi seçer.
                 İstersen ücretsiz Pollinations&apos;ı ya da belirli bir sağlayıcıyı sabitleyebilirsin.
+                {(config.imageFallbackChain ?? false)
+                  ? " Yedek zinciri açık: seçilen sağlayıcı başarısız olursa aşağıdaki sırayla diğerleri de denenir."
+                  : ""}
               </p>
+              {(() => {
+                const imageModels = IMAGE_PROVIDERS
+                  .map((p) => config.models.find((m) => m.provider === p))
+                  .filter((m): m is NonNullable<typeof m> => !!m);
+                if (imageModels.length === 0) return null;
+                return (
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs mb-2.5">
+                    {imageModels.map((m, i) => (
+                      <Fragment key={m.id}>
+                        {i > 0 && <ChevronRight size={12} className="text-muted shrink-0" />}
+                        <span className="px-2 py-1 rounded-lg border border-line bg-bgsoft text-muted font-mono" title={cleanLabel(m.provider)}>
+                          {m.model}
+                        </span>
+                      </Fragment>
+                    ))}
+                  </div>
+                );
+              })()}
               <div className="flex flex-wrap gap-1.5">
                 {([
                   { value: "auto" as const, label: "Otomatik (en iyisi)" },
