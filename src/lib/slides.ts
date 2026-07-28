@@ -214,12 +214,26 @@ export function escapeHtml(s: string): string {
 }
 
 /* Pollinations üretim görselleri ağa bağımlı ve bazen yavaş/hatalı olabiliyor
-   (yavaş üretim, ara sıra 5xx). Ham <img> başarısız olursa varsayılan kırık-
-   resim ikonu yerine sessizce kaybolsun (dekoratif kapak arka planı/iki-sütun
-   görseli) veya zaten var olan gradyan yer tutucuya (.imgph) düşsün (odak
-   noktası "image" düzeninde) — hiçbir zaman kırık ikon görünmesin. */
-const IMG_HIDE_ONERROR = `onerror="this.style.display='none'"`;
+   (yavaş üretim, ara sıra 5xx). Ham <img> başarısız olursa kırık-resim ikonu
+   ASLA görünmemeli.
+
+   Eskiden yalnız "image" düzeni gradyan yer tutucuya (.imgph) düşüyordu;
+   diğer beş düzen görseli sessizce YOK EDİYORDU. Sonuç, render testinde
+   ölçüldü: görsel yüklenmeyince kapak slaytı çıplak metne dönüyor, iki-sütun
+   düzeninin sağ sütunu tamamen boşalıyor — yani kompozisyonda delik kalıyor.
+   Artık her görsel bir yer tutucuya düşüyor: dekoratif kapak fonu .coverph'e,
+   akış içindeki içerik görselleri .imgph.inline'a. */
 const IMG_FALLBACK_ONERROR = `onerror="this.style.display='none'; this.nextElementSibling.style.display='block'"`;
+
+/** Dekoratif kapak fonu + başarısızlık yedeği (fon her zaman -1 katmanında). */
+function coverImgHtml(img: string): string {
+  return `<img class="coverimg" src="${escapeHtml(img)}" alt="" ${IMG_FALLBACK_ONERROR}><div class="coverph" style="display:none"></div>`;
+}
+
+/** Akış içindeki içerik görseli + gradyan yer tutucu yedeği. */
+function inlineImgHtml(img: string): string {
+  return `<img src="${escapeHtml(img)}" alt="" ${IMG_FALLBACK_ONERROR}><div class="imgph inline" style="display:none"></div>`;
+}
 
 /* Madde başına ikon (G4): fragile bir icon-adı→SVG eşlemesi yerine, LLM'e
    maddenin başına ilgili TEK bir emoji eklettiriyoruz (deckSystem, slidesGen.ts)
@@ -247,18 +261,18 @@ function slideInnerHtml(s: Slide, t: SlideTheme): string {
     case "cover":
     case "end":
       return `<div class="center">
-        ${img ? `<img class="coverimg" src="${escapeHtml(img)}" alt="" ${IMG_HIDE_ONERROR}>` : ""}
+        ${img ? coverImgHtml(img) : ""}
         <h1>${title}</h1>
         ${subtitle ? `<p class="sub">${subtitle}</p>` : ""}
       </div>`;
     case "section":
       return `<div class="center">
-        ${img ? `<img class="coverimg" src="${escapeHtml(img)}" alt="" ${IMG_HIDE_ONERROR}>` : ""}
+        ${img ? coverImgHtml(img) : ""}
         <p class="kicker">— ${escapeHtml(t.name)} —</p><h1>${title}</h1>${subtitle ? `<p class="sub">${subtitle}</p>` : ""}
       </div>`;
     case "quote":
       return `<div class="center">
-        ${img ? `<img class="coverimg" src="${escapeHtml(img)}" alt="" ${IMG_HIDE_ONERROR}>` : ""}
+        ${img ? coverImgHtml(img) : ""}
         <blockquote>“${body || title}”</blockquote>${subtitle ? `<p class="sub">${subtitle}</p>` : ""}
       </div>`;
     case "image":
@@ -266,8 +280,23 @@ function slideInnerHtml(s: Slide, t: SlideTheme): string {
         ? `<img src="${escapeHtml(img)}" alt="" ${IMG_FALLBACK_ONERROR}><div class="imgph" style="display:none"></div>`
         : `<div class="imgph"></div>`}</div>
         <div class="imgcap"><h2>${title}</h2>${body ? `<p>${body}</p>` : ""}</div>`;
-    case "two-col":
-      return `<h2>${title}</h2><div class="cols"><ul>${bullets}</ul><div class="colbody">${img ? `<img src="${escapeHtml(img)}" alt="" ${IMG_HIDE_ONERROR}>` : ""}${body ? `<p>${body}</p>` : ""}</div></div>`;
+    case "two-col": {
+      /* İki hata birden düzeltildi (render testinde yakalandı):
+         1) `subtitle` hesaplanıyor ama HTML'e HİÇ basılmıyordu — LLM alt
+            başlık yazdıysa sessizce kayboluyordu.
+         2) Madde yoksa boş bir `<ul>` basılıyor, 1fr/1fr ızgarada kocaman
+            boş bir sol sütun bırakıyordu. Artık tek sütuna iniyor. */
+      const left = bullets ? `<ul>${bullets}</ul>` : "";
+      const imgHtml = img ? inlineImgHtml(img) : "";
+      const bodyHtml = body ? `<p>${body}</p>` : "";
+      const cols = left && (imgHtml || bodyHtml)
+        /* İki sütun: sol madde, sağ görsel+metin. */
+        ? `<div class="cols"><div>${left}</div><div class="colbody">${imgHtml}${bodyHtml}</div></div>`
+        /* Tek sütun: görsel metnin ARDINDAN gelir — aksi halde görsel alt
+           başlıkla gövde metninin arasına girip okuma akışını kesiyordu. */
+        : `<div class="colbody onecol">${left}${bodyHtml}${imgHtml}</div>`;
+      return `<h2>${title}</h2>${subtitle ? `<p class="sub">${subtitle}</p>` : ""}${cols}`;
+    }
     case "stats": {
       const cards = (s.stats ?? []).map((it) => `<div class="statcard"><div class="statval">${escapeHtml(it.value)}</div><div class="statlabel">${escapeHtml(it.label)}</div></div>`).join("");
       return `<h2>${title}</h2>${subtitle ? `<p class="sub">${subtitle}</p>` : ""}<div class="statgrid">${cards}</div>${body ? `<p>${body}</p>` : ""}`;
@@ -278,10 +307,31 @@ function slideInnerHtml(s: Slide, t: SlideTheme): string {
          (G1: her slaytta görsel garantisi) — düz metin listesi yerine
          daha zengin/dolu bir görünüm. */
       if (img) {
-        return `<div class="cols"><div><h2>${title}</h2>${subtitle ? `<p class="sub">${subtitle}</p>` : ""}<ul>${bullets}</ul>${body ? `<p>${body}</p>` : ""}</div><div class="colbody"><img src="${escapeHtml(img)}" alt="" ${IMG_HIDE_ONERROR}></div></div>`;
+        return `<div class="cols"><div><h2>${title}</h2>${subtitle ? `<p class="sub">${subtitle}</p>` : ""}<ul>${bullets}</ul>${body ? `<p>${body}</p>` : ""}</div><div class="colbody">${inlineImgHtml(img)}</div></div>`;
       }
       return `<h2>${title}</h2>${subtitle ? `<p class="sub">${subtitle}</p>` : ""}<ul>${bullets}</ul>${body ? `<p>${body}</p>` : ""}`;
   }
+}
+
+export type SlideDensity = "roomy" | "normal" | "dense";
+
+/** Slaytın ne kadar "dolu" olduğunu ölçer — tipografi ölçeği (--s) buna göre
+    seçilir. Saf fonksiyon: yalnız slayt verisine bakar, DOM ölçümü yapmaz,
+    böylece hem dışa aktarılan HTML hem birim testler aynı sonucu verir.
+    Eşikler render testiyle kalibre edildi: 6+ madde ya da ~560 karakterden
+    sonra 1280x720'de büyük ölçek taşmaya başlıyor. */
+export function slideDensity(s: Slide): SlideDensity {
+  const bullets = s.bullets ?? [];
+  const stats = s.stats ?? [];
+  const chars =
+    (s.title?.length ?? 0) +
+    (s.subtitle?.length ?? 0) +
+    (s.body?.length ?? 0) +
+    bullets.reduce((n, b) => n + b.length, 0) +
+    stats.reduce((n, it) => n + it.value.length + it.label.length, 0);
+  if (bullets.length >= 6 || stats.length >= 5 || chars > 560) return "dense";
+  if (bullets.length <= 3 && stats.length <= 3 && chars < 260) return "roomy";
+  return "normal";
 }
 
 /** Desteyi tek, kendi kendine yeten sunum HTML'ine çevirir: ok tuşları/tıkla
@@ -289,7 +339,7 @@ function slideInnerHtml(s: Slide, t: SlideTheme): string {
     yazdırınca slayt-başına-sayfa (PDF). Ağ bağımlılığı yalnız görseller. */
 export function deckToHtml(deck: SlideDeck): string {
   const t = slideThemeById(deck.themeId);
-  const slides = deck.slides.map((s, i) => `<section class="slide" data-i="${i}">
+  const slides = deck.slides.map((s, i) => `<section class="slide" data-i="${i}" data-density="${slideDensity(s)}">
     ${slideInnerHtml(s, t)}
     ${s.notes ? `<aside class="notes">${escapeHtml(s.notes)}</aside>` : ""}
   </section>`).join("\n");
@@ -305,35 +355,62 @@ export function deckToHtml(deck: SlideDeck): string {
   * { box-sizing: border-box; margin: 0; }
   html, body { height: 100%; }
   body { background: var(--bg); color: var(--ink); font-family: ${t.bodyFont}; overflow: hidden; }
-  .slide { position: absolute; inset: 0; display: none; flex-direction: column; justify-content: center;
+  /* isolation:isolate ŞART. .slide kendi yığın bağlamını KURMAZSA içindeki
+     z-index:-1 katmanları (.coverimg, .coverph) slaytın KENDİ arka planının
+     ARKASINA boyanıyor ve hiç görünmüyordu — yani kapak/bölüm/alıntı
+     görselleri baştan beri ekrana hiç çıkmamış. Playwright'ta düz kırmızı bir
+     test katmanıyla doğrulandı: izolasyon olmadan görünmüyor, varken görünüyor. */
+  .slide { --s: 1; isolation: isolate; position: absolute; inset: 0; display: none; flex-direction: column; justify-content: center;
            padding: 6vmin 9vmin; background: ${t.bgGradient ? t.bgGradient : "var(--bg)"}; }
+  .slide[data-density="roomy"] { --s: 1.12; }
+  .slide[data-density="dense"] { --s: 0.84; }
   .slide.on { display: flex; }
-  h1 { font-family: ${t.headingFont}; font-size: 7vmin; line-height: 1.1; letter-spacing: -0.02em; }
-  h2 { font-family: ${t.headingFont}; font-size: 5vmin; line-height: 1.15; margin-bottom: 3vmin; }
+  /* Tipografi ölçeği içeriğe göre uyarlanır (--s). Sabit ölçek, projeksiyon
+     için fazla küçük kalıyordu (1280x720'de h1 yalnız 50px; Gamma/Beautiful.ai
+     kapak başlıkları 64-80px bandında). Ölçeği tek başına büyütmek yoğun
+     slaytları taşırırdı; bu yüzden slayt başına yoğunluk ölçülüp (deckToHtml,
+     slideDensity) taban ölçek seyrek slaytta büyütülüyor, yoğun slaytta eski
+     boyuta iniyor — böylece taşma riski artmadan tipografi büyüdü. */
+  h1 { font-family: ${t.headingFont}; font-size: calc(9vmin * var(--s)); line-height: 1.08; letter-spacing: -0.02em; }
+  h2 { font-family: ${t.headingFont}; font-size: calc(6.2vmin * var(--s)); line-height: 1.15; margin-bottom: 3vmin; }
   h2::after { content: ""; display: block; width: 8vmin; height: 4px; background: var(--accent); margin-top: 1.6vmin; border-radius: 2px; }
-  .sub { color: var(--muted); font-size: 2.8vmin; margin-top: 2vmin; max-width: 60ch; }
-  .kicker { color: var(--accent); font-size: 2vmin; letter-spacing: 0.3em; text-transform: uppercase; margin-bottom: 2vmin; }
-  ul { list-style: none; display: grid; gap: 2.2vmin; font-size: 3.2vmin; max-width: 75ch; }
+  .sub { color: var(--muted); font-size: calc(3.1vmin * var(--s)); margin-top: 2vmin; max-width: 60ch; }
+  .kicker { color: var(--accent); font-size: calc(2.2vmin * var(--s)); letter-spacing: 0.3em; text-transform: uppercase; margin-bottom: 2vmin; }
+  ul { list-style: none; display: grid; gap: 2.2vmin; font-size: calc(3.7vmin * var(--s)); max-width: 75ch; }
   li { padding-left: 3.6vmin; position: relative; line-height: 1.35; }
   li::before { content: ""; position: absolute; left: 0; top: 1.1vmin; width: 1.6vmin; height: 1.6vmin; border-radius: 50%; background: var(--accent); }
   li.hasicon { padding-left: 4.6vmin; }
   li.hasicon::before { content: none; }
-  .bicon { position: absolute; left: 0; top: -0.1vmin; font-size: 3.4vmin; line-height: 1; }
-  p { font-size: 2.9vmin; line-height: 1.5; max-width: 70ch; margin-top: 2vmin; }
-  blockquote { font-family: ${t.headingFont}; font-size: 5vmin; line-height: 1.3; max-width: 30ch; }
+  .bicon { position: absolute; left: 0; top: -0.1vmin; font-size: calc(3.9vmin * var(--s)); line-height: 1; }
+  p { font-size: calc(3.2vmin * var(--s)); line-height: 1.5; max-width: 70ch; margin-top: 2vmin; }
+  blockquote { font-family: ${t.headingFont}; font-size: calc(6vmin * var(--s)); line-height: 1.3; max-width: 30ch; }
   .center { display: grid; justify-items: start; align-content: center; height: 100%; }
   .coverimg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.22; z-index: -1; }
+  /* Kapak görseli yüklenemezse fon çıplak kalmasın (kompozisyon deliği). */
+  .coverph { position: absolute; inset: 0; z-index: -1; background: linear-gradient(135deg, var(--surface), var(--bg)); }
+  .coverph::after { content: ""; position: absolute; inset: 0; background: radial-gradient(70% 60% at 78% 18%, var(--accent), transparent 62%); opacity: .18; }
   .imgwrap { flex: 1; min-height: 0; border-radius: 1.5vmin; overflow: hidden; background: var(--surface); }
   .imgwrap img { width: 100%; height: 100%; object-fit: cover; }
-  .imgph { width: 100%; height: 100%; background: linear-gradient(135deg, var(--surface), var(--bg)); }
+  .imgph { width: 100%; height: 100%; position: relative; overflow: hidden; background: linear-gradient(135deg, var(--surface), var(--bg)); }
+  .imgph::after { content: ""; position: absolute; inset: 0; background: radial-gradient(70% 60% at 70% 25%, var(--accent), transparent 62%); opacity: .16; }
+  /* Akış içindeki (sütun) görseli ve yedeği — yükseklik slayta göre SINIRLI.
+     En-boy oranına bırakılırsa tek sütunlu two-col'da görsel slayt genişliğini
+     alıp 700px'i aşıyor (render testinde ölçüldü: 911px > 677px sınır).
+     Aynı sınır gerçek görselde de gerekli: dikey bir Pollinations çıktısı
+     aksi halde düzeni taşırırdı. */
+  .colbody img { max-height: 42vmin; object-fit: cover; }
+  .imgph.inline { width: 100%; height: 34vmin; border-radius: 1.5vmin; }
+  /* Madde yokken two-col tek sütuna iner — görsel tüm genişliği kaplamamalı. */
+  .onecol { display: grid; gap: 2vmin; }
+  .onecol img, .onecol .imgph.inline { max-width: 54vmin; }
   .imgcap { padding-top: 2.5vmin; }
-  .imgcap h2 { font-size: 3.6vmin; margin-bottom: 0; } .imgcap h2::after { display: none; }
+  .imgcap h2 { font-size: calc(4vmin * var(--s)); margin-bottom: 0; } .imgcap h2::after { display: none; }
   .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 5vmin; align-items: center; }
   .colbody img { width: 100%; border-radius: 1.5vmin; }
   .statgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18vmin, 1fr)); gap: 3vmin; margin-top: 2vmin; }
   .statcard { background: var(--surface); border-radius: 1.5vmin; padding: 3vmin 2vmin; text-align: center; }
-  .statval { font-family: ${t.headingFont}; font-size: 6vmin; font-weight: 700; color: var(--accent); line-height: 1; }
-  .statlabel { color: var(--muted); font-size: 2.2vmin; margin-top: 1.2vmin; }
+  .statval { font-family: ${t.headingFont}; font-size: calc(7vmin * var(--s)); font-weight: 700; color: var(--accent); line-height: 1; }
+  .statlabel { color: var(--muted); font-size: calc(2.4vmin * var(--s)); margin-top: 1.2vmin; }
   .notes { display: none; position: absolute; left: 3vmin; right: 3vmin; bottom: 8vmin; background: var(--surface);
            color: var(--muted); border-left: 4px solid var(--accent); padding: 2vmin 2.5vmin; font-size: 2vmin;
            border-radius: 1vmin; box-shadow: 0 1vmin 4vmin rgb(0 0 0 / .3); }
