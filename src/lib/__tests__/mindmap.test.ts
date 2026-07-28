@@ -96,23 +96,50 @@ describe("layoutMap / dışa aktarma", () => {
     expect(l.height).toBeGreaterThan(0);
   });
 
-  it("layoutMap uzun metni kısaltır (displayText) — mapToSvg ile React tuvali AYNI kısaltmayı paylaşır", () => {
+  it("layoutMap uzun metni İKİ SATIRA sarar — mapToSvg ile React tuvali AYNI satırları paylaşır", () => {
     /* ÖNCEDEN: yalnız MapStudio.tsx'in kendi JSX'i 30 karakterden uzun metni
        kısaltıyordu; mapToSvg TAM metni basıyordu — düğüm genişliği 240px'te
        tavan yaptığından (nodeWidth) dışa aktarılan/yayınlanan SVG'de uzun
-       (MAX_NODE_TEXT=80'e kadar geçerli) metin kutudan taşıyordu. Artık
-       kısaltma layoutMap'te TEK yerde hesaplanıyor. */
+       (MAX_NODE_TEXT=80'e kadar geçerli) metin kutudan taşıyordu. Sonra tek
+       satırlık 30-karakter kırpması geldi; o da meşru düğümleri kelime
+       ortasından kesiyordu. Artık sarma layoutMap'te TEK yerde hesaplanıyor
+       ve iki satıra kadar yayılıyor. */
     const longText = "Bu çok ama çok uzun bir düğüm metni örneğidir kesinlikle";
     const longMap = normalizeMap({ title: "T", root: { text: "kök", children: [{ text: longText, children: [] }] } })!;
     const l = layoutMap(longMap.root);
     const child = l.nodes.find((n) => n.text === longText)!;
-    expect(child.displayText.length).toBeLessThan(longText.length);
-    expect(child.displayText.endsWith("…")).toBe(true);
-    expect(longText.startsWith(child.displayText.slice(0, -1))).toBe(true);
+    expect(child.lines.length).toBe(2);
+    expect(child.lines.at(-1)!.endsWith("…")).toBe(true); // sığmayan kuyruk işaretlenir
+    expect(longText.startsWith(child.lines[0])).toBe(true); // kelime sınırında bölünür
+    expect(child.h).toBe(48); // iki satırlık kutu yükselir
 
     const svg = mapToSvg(longMap);
-    expect(svg).toContain(child.displayText);
+    for (const line of child.lines) expect(svg).toContain(line);
     expect(svg).not.toContain(longText); // tam metin SVG'ye asla girmemeli
+  });
+
+  it("kısa metin tek satırda kalır ve kutu yüksekliği değişmez", () => {
+    const m = normalizeMap({ title: "T", root: { text: "kök", children: [{ text: "Kısa dal", children: [] }] } })!;
+    const child = layoutMap(m.root).nodes.find((n) => n.text === "Kısa dal")!;
+    expect(child.lines).toEqual(["Kısa dal"]);
+    expect(child.h).toBe(32);
+  });
+
+  it("iki satırlık düğümler komşularıyla dikey olarak ÇAKIŞMAZ", () => {
+    /* Eski sabit 46px'lik satır ızgarası 48px'lik iki satırlık kutuyla
+       çakışıyordu; yerleşim artık yükseklik-farkındalı bir imleç kullanıyor. */
+    const m = normalizeMap({
+      title: "T",
+      root: { text: "kök", children: [
+        { text: "Konumlandırma ve mesajlaşma stratejisi", children: [] },
+        { text: "Ölçümleme ve raporlama altyapısının kurulması", children: [] },
+        { text: "Kısa", children: [] },
+      ] },
+    })!;
+    const leaves = layoutMap(m.root).nodes.filter((n) => n.depth === 1).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < leaves.length; i++) {
+      expect(leaves[i].y).toBeGreaterThanOrEqual(leaves[i - 1].y + leaves[i - 1].h);
+    }
   });
 
   it("mapToSvg bağımsız SVG üretir (başlık + tüm düğüm metinleri, XSS kaçışlı)", () => {
