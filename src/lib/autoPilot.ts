@@ -348,3 +348,24 @@ export function autoStudioSkill(brief: string): string | null {
   for (const [re, id] of rules) if (re.test(t)) return id;
   return null;
 }
+
+/* Takip mesajında hangi skill kullanılacağına karar verir (DesignStudio.tsx).
+   Bug (Tem 2026, kullanıcı ekran görüntüsü): ilk üretim BAŞARISIZ olursa
+   (ör. sunum JSON'u ayrıştırılamazsa) projectSkillId hiç set edilmez
+   (çağıran yalnız BAŞARILI üretimden sonra kaydeder) — eski mantık
+   `followup ? projectSkillId : autoStudioSkill(brief)` bu durumda HER
+   takip mesajında (composer'daki ilk mesajdan sonraki HER gönderim
+   followup:true'dur) kilitli `undefined`'ı kullanıp autoStudioSkill'i hiç
+   ÇALIŞTIRMIYORDU — kullanıcı "sunum" diye tekrar tekrar yazsa bile.
+   Yalnız GERÇEKTEN yerleşmiş bir skill (önceki BAŞARILI üretimden) varsa
+   kilitlenir; yoksa brief her seferinde yeniden sınıflandırılır. */
+export function resolveStudioSkillId(opts: {
+  brief: string;
+  followup: boolean;
+  projectSkillId?: string | null;
+  templateSkillId?: string | null;
+}): string | null {
+  if (opts.templateSkillId) return opts.templateSkillId;
+  if (opts.followup && opts.projectSkillId) return opts.projectSkillId;
+  return autoStudioSkill(opts.brief);
+}
