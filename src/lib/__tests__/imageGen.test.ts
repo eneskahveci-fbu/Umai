@@ -23,7 +23,10 @@ describe("pickImageModel — sağlayıcı önceliği", () => {
     expect(pickImageModel([mk("pollinations"), mk("anthropic"), mk("hf")])?.provider).toBe("hf");
   });
   it("öncelik listesi /api/image'ın desteklediği kümedir", () => {
-    expect([...IMAGE_PROVIDERS]).toEqual(["gemini", "openai", "xai", "hf"]);
+    /* NVIDIA NIM eklendi: FLUX.1-schnell'i ücretsiz nvapi anahtarıyla sunuyor
+       ve HF'nin aynı modelinden farklı olarak cold-start yaşatmıyor, bu yüzden
+       HF'nin ÖNÜNDE. */
+    expect([...IMAGE_PROVIDERS]).toEqual(["gemini", "openai", "xai", "nvidia", "hf"]);
   });
 });
 
@@ -112,5 +115,32 @@ describe("buildImageFallbackChain — Ayarlar → görsel yedek zinciri", () => 
 
   it("görüntü-yetenekli model yoksa boş dizi döner", async () => {
     expect(await buildImageFallbackChain(mkConfig({ models: [mk("groq")] }))).toEqual([]);
+  });
+});
+
+describe("NVIDIA NIM görsel sağlayıcısı (kullanıcı isteği)", () => {
+  it("bağlıysa görsel zincirine girer ve HF'nin ÖNÜNDE gelir", async () => {
+    const cfg = mkConfig({ models: [mk("hf"), mk("nvidia")] });
+    const chain = await buildImageFallbackChain(cfg);
+    expect(chain.map((c) => c.provider)).toEqual(["nvidia", "hf"]);
+  });
+
+  it("aktif model NVIDIA ise görsel de NVIDIA ile üretilir (seçili model önce)", async () => {
+    /* Kullanıcı isteği: "hangi model seçiliyse o kullanılsın". Normal öncelikte
+       gemini kazanırdı; aktif model nvidia olduğu için o seçilmeli. */
+    const cfg = mkConfig({
+      models: [mk("gemini"), mk("nvidia", "nvidia-active")],
+      activeModelId: "nvidia-active",
+    });
+    expect((await pickImageProvider(cfg))?.provider).toBe("nvidia");
+  });
+
+  it("aktif model görüntü üretemiyorsa bağlı en iyi görsel modeline düşer", async () => {
+    /* Agnes AI gibi görüntü-yeteneksiz bir model aktifken zincir devreye girer. */
+    const cfg = mkConfig({
+      models: [mk("agnes", "agnes-active"), mk("nvidia")],
+      activeModelId: "agnes-active",
+    });
+    expect((await pickImageProvider(cfg))?.provider).toBe("nvidia");
   });
 });

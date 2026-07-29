@@ -20,6 +20,17 @@ interface Body {
 interface GeminiPart { inlineData?: { data?: string; mimeType?: string } }
 interface GeminiResp { candidates?: { content?: { parts?: GeminiPart[] } }[]; error?: { message?: string } }
 interface OpenAIImg { data?: { b64_json?: string; url?: string }[]; error?: { message?: string } }
+/* NVIDIA NIM görsel uçları tek bir gövde biçiminde anlaşmıyor: FLUX ailesi
+   {artifacts:[{base64}]} döndürürken bazı modeller {image}/{b64_json} veriyor.
+   Üçünü de okuyup ilk bulduğumuzu kullanıyoruz (biçim değişirse sessizce
+   kırılmak yerine "görüntü döndürmedi" hatası veririz). */
+interface NvidiaImg {
+  artifacts?: { base64?: string }[];
+  image?: string;
+  b64_json?: string;
+  detail?: string;
+  message?: string;
+}
 
 const OPENAI_COMPAT: Record<string, { base: string; model: string; size: boolean }> = {
   openai: { base: "https://api.openai.com/v1", model: "gpt-image-1", size: true },
@@ -79,8 +90,50 @@ export async function POST(req: Request) {
       return NextResponse.json({ image: `data:${ct};base64,${buf.toString("base64")}` });
     }
 
+    /* NVIDIA NIM — FLUX.1-schnell (ücretsiz nvapi anahtarıyla, hızlı).
+       DİKKAT: NIM'in görsel ucu sohbet ucundan FARKLIDIR; OpenAI-uyumlu
+       /images/generations değil, ai.api.nvidia.com/v1/genai/<model> kullanır.
+       Bu yüzden OPENAI_COMPAT tablosuna eklenemez, kendi dalı gerekir. */
+    if (provider === "nvidia") {
+      const [w, h] = size.split("x").map((n) => Number(n) || 1024);
+      const r = await fetch("https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-schnell", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          prompt,
+          width: w,
+          height: h,
+          /* schnell az adımda tasarlandı (4 adım önerilir) — daha fazlası
+             kaliteyi artırmaz, yalnız bekletir. */
+          steps: 4,
+          seed: 0,
+        }),
+        signal: AbortSignal.timeout(60000),
+      });
+      const j = await r.json().catch(() => ({})) as NvidiaImg;
+      if (!r.ok) {
+        return NextResponse.json(
+          { error: j?.detail || j?.message || `NVIDIA ${r.status}` },
+          { status: 502 },
+        );
+      }
+      const b64 = j.artifacts?.find((a) => a.base64)?.base64 ?? j.b64_json;
+      const image = b64 ? `data:image/png;base64,${b64}` : j.image;
+      if (!image) {
+        return NextResponse.json(
+          { error: "NVIDIA görüntü döndürmedi (anahtarın bu modele erişimi olmayabilir)." },
+          { status: 502 },
+        );
+      }
+      return NextResponse.json({ image });
+    }
+
     const cfg = OPENAI_COMPAT[provider];
-    if (!cfg) return NextResponse.json({ error: `'${provider}' için görüntü üretimi henüz desteklenmiyor. (Gemini, OpenAI, xAI, HF veya Pollinations kullan.)` }, { status: 400 });
+    if (!cfg) return NextResponse.json({ error: `'${provider}' için görüntü üretimi henüz desteklenmiyor. (Gemini, OpenAI, xAI, NVIDIA NIM, HF veya Pollinations kullan.)` }, { status: 400 });
     const payload: Record<string, unknown> = { model: cfg.model, prompt, n: 1 };
     if (cfg.size) payload.size = size;
     const r = await fetch(`${cfg.base}/images/generations`, {
