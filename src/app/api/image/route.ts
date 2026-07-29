@@ -23,13 +23,26 @@ interface OpenAIImg { data?: { b64_json?: string; url?: string }[]; error?: { me
 /* NVIDIA NIM görsel uçları tek bir gövde biçiminde anlaşmıyor: FLUX ailesi
    {artifacts:[{base64}]} döndürürken bazı modeller {image}/{b64_json} veriyor.
    Üçünü de okuyup ilk bulduğumuzu kullanıyoruz (biçim değişirse sessizce
-   kırılmak yerine "görüntü döndürmedi" hatası veririz). */
+   kırılmak yerine "görüntü döndürmedi" hatası veririz).
+   `detail`: FastAPI doğrulama hatasında (422) DİZGE değil bir DİZİ döner
+   (ör. [{type,loc,msg,...}]) — gerçek anahtarla canlı test edilerek
+   doğrulandı; string sanıp doğrudan göstermek "[object Object]" yazdırırdı. */
 interface NvidiaImg {
   artifacts?: { base64?: string }[];
   image?: string;
   b64_json?: string;
-  detail?: string;
+  detail?: string | { msg?: string; message?: string }[];
   message?: string;
+}
+
+/** NVIDIA doğrulama hatasını ("422 body.steps: Input should be...") okunur tek
+    satıra çevirir; zaten dizgeyse aynen döner. */
+function nvidiaErrorText(j: NvidiaImg, status: number): string {
+  if (typeof j.detail === "string") return j.detail;
+  if (Array.isArray(j.detail) && j.detail.length) {
+    return j.detail.map((d) => d.msg || d.message).filter(Boolean).join("; ");
+  }
+  return j.message || `NVIDIA ${status}`;
 }
 
 const OPENAI_COMPAT: Record<string, { base: string; model: string; size: boolean }> = {
@@ -90,13 +103,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ image: `data:${ct};base64,${buf.toString("base64")}` });
     }
 
-    /* NVIDIA NIM — FLUX.1-schnell (ücretsiz nvapi anahtarıyla, hızlı).
-       DİKKAT: NIM'in görsel ucu sohbet ucundan FARKLIDIR; OpenAI-uyumlu
-       /images/generations değil, ai.api.nvidia.com/v1/genai/<model> kullanır.
-       Bu yüzden OPENAI_COMPAT tablosuna eklenemez, kendi dalı gerekir. */
+    /* NVIDIA NIM — black-forest-labs/flux.1-dev. DİKKAT: NIM'in görsel ucu
+       sohbet ucundan FARKLIDIR; OpenAI-uyumlu /images/generations değil,
+       ai.api.nvidia.com/v1/genai/<model> kullanır. Bu yüzden OPENAI_COMPAT
+       tablosuna eklenemez, kendi dalı gerekir.
+       MODEL SEÇİMİ — gerçek bir nvapi anahtarıyla canlı test edildi:
+       "black-forest-labs/flux.1-schnell" (önceki seçim) hiçbir istekte
+       yanıt vermiyor, 60 sn+ asılı kalıyor (muhtemelen bu hesap altında
+       bozuk/devre dışı bir dağıtım) — kullanıcının "model çok bekletiyor"
+       şikâyetinin doğrudan sebebiydi. "flux.1-dev" aynı testte ~5 sn'de
+       gerçek bir görüntü döndürdü; kullanılıyor.
+       BOYUT KISITI — width/height keyfi değer kabul etmiyor, yalnız
+       {768,832,896,960,1024,1088,1152,1216,1280,1344} kümesinden birini
+       (422 ile doğrulandı). DIMENSIONS tablosundaki üç değer (1024, 1280,
+       768) zaten bu kümede — ek eşleme gerekmiyor.
+       ADIM SAYISI — "steps" en az 5 olmalı (422 ile doğrulandı; schnell'in
+       4-adım kuralı dev için geçerli değil, dev damıtılmamış/guidance
+       modelidir ve daha fazla adım ister); 25 hem hızlı (~5 sn) hem kaliteli
+       çıktı verdi. */
     if (provider === "nvidia") {
       const [w, h] = size.split("x").map((n) => Number(n) || 1024);
-      const r = await fetch("https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-schnell", {
+      const r = await fetch("https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -107,28 +134,29 @@ export async function POST(req: Request) {
           prompt,
           width: w,
           height: h,
-          /* schnell az adımda tasarlandı (4 adım önerilir) — daha fazlası
-             kaliteyi artırmaz, yalnız bekletir. */
-          steps: 4,
+          steps: 25,
           seed: 0,
         }),
         signal: AbortSignal.timeout(60000),
       });
       const j = await r.json().catch(() => ({})) as NvidiaImg;
       if (!r.ok) {
-        return NextResponse.json(
-          { error: j?.detail || j?.message || `NVIDIA ${r.status}` },
-          { status: 502 },
-        );
+        return NextResponse.json({ error: nvidiaErrorText(j, r.status) }, { status: 502 });
       }
       const b64 = j.artifacts?.find((a) => a.base64)?.base64 ?? j.b64_json;
-      const image = b64 ? `data:image/png;base64,${b64}` : j.image;
-      if (!image) {
+      if (!b64 && !j.image) {
         return NextResponse.json(
           { error: "NVIDIA görüntü döndürmedi (anahtarın bu modele erişimi olmayabilir)." },
           { status: 502 },
         );
       }
+      /* Yanıt PNG DEĞİL — canlı testte JPEG (\xff\xd8 magic) döndüğü
+         doğrulandı. base64'ün ilk karakterlerinden gerçek türü SEZ; sabit
+         "image/png" yazmak tarayıcıda görüntüyü sessizce bozuk gösterirdi
+         (yanlış MIME ile decode edilen JPEG baytları). */
+      const image = b64
+        ? `data:${b64.startsWith("iVBORw0KGgo") ? "image/png" : "image/jpeg"};base64,${b64}`
+        : j.image!;
       return NextResponse.json({ image });
     }
 

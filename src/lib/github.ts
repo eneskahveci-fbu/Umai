@@ -5,6 +5,33 @@ interface GitHubTreeItem {
   type: string;
 }
 
+/** Ayarlar → Git'teki depo giriş kutusu "sahip/depo VEYA sahip/depo:dal"
+    biçimini kabul ettiğini söylüyordu (bkz. SettingsModal.tsx placeholder),
+    ama HİÇBİR YERDE ":dal" kısmı ayrıştırılmıyordu — kullanıcı tam da
+    önerilen biçimde yazınca parseRepo/parseGitLabRepo, repo adında ":"
+    karakteri gördüğü için deseni reddedip depoyu "geçersiz" sayıyordu.
+    connectRepo bu fonksiyonla dal soneki varsa ayırır (öyleyse
+    fetchRepoTree/fetchGitLabRepoTree'ye `branchOverride` olarak geçer).
+    Şema (`https://`) ve GitLab'ın "gl:" ÖNEKİ kasıtlı olarak atlanır —
+    onlardaki ":" bir dal ayracı değildir. */
+export function splitRepoBranch(input: string): { repoStr: string; branch: string | null } {
+  const trimmed = input.trim();
+  let prefix = "";
+  let rest = trimmed;
+  const schemeMatch = rest.match(/^https?:\/\//i);
+  if (schemeMatch) {
+    prefix = schemeMatch[0];
+    rest = rest.slice(prefix.length);
+  } else if (/^gl:/i.test(rest)) {
+    prefix = rest.slice(0, 3);
+    rest = rest.slice(3);
+  }
+  const colonIdx = rest.indexOf(":");
+  if (colonIdx === -1) return { repoStr: trimmed, branch: null };
+  const branch = rest.slice(colonIdx + 1).trim();
+  return { repoStr: prefix + rest.slice(0, colonIdx), branch: branch || null };
+}
+
 /** "kullanici/depo" ya da tam GitHub URL'sini owner/repo'ya çevirir. */
 export function parseRepo(input: string): { owner: string; repo: string } | null {
   const v = input
@@ -57,11 +84,13 @@ export async function fetchUserRepos(
     : [];
 }
 
-/** Deponun varsayılan dalını ve özyinelemeli dosya ağacını getirir. */
+/** Deponun varsayılan dalını (ya da `branchOverride` verilmişse ONU) ve
+    özyinelemeli dosya ağacını getirir. */
 export async function fetchRepoTree(
   owner: string,
   repo: string,
   token?: string,
+  branchOverride?: string,
 ): Promise<{ branch: string; items: GitHubTreeItem[] }> {
   const infoRes = await fetch(
     `https://api.github.com/repos/${owner}/${repo}`,
@@ -70,9 +99,13 @@ export async function fetchRepoTree(
   const info = await infoRes.json();
   if (!infoRes.ok) throw new Error(info.message || "Depo bulunamadı");
 
-  const branch: string = info.default_branch;
+  const branch: string = branchOverride || info.default_branch;
+  /* Dal adı URL'e GİRERKEN kodlanmalı — "feature/x" gibi eğik çizgi içeren
+     (çok yaygın) dal adları önceden kodlanmadan gönderiliyordu, GitHub'ın
+     API yol ayrıştırması bunu farklı bir kaynağa yönlendiriyor ya da 404
+     veriyordu. */
   const treeRes = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,
+    `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
     ghInit(token),
   );
   const data = await treeRes.json();

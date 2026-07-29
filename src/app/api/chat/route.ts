@@ -192,6 +192,18 @@ function isCapabilityFault(status: number): boolean {
   return status === 400 || status === 422;
 }
 
+/** Model KONFİGÜRASYON hatası mı? 404 = "bu model adı yok/yanlış yazılmış",
+    410 = "bu model kullanımdan kaldırıldı" (canlı NVIDIA testiyle doğrulandı:
+    bir hesap sağlayıcısı bir modeli emekliye ayırınca TAM OLARAK bu durum
+    kodunu döndürüyor). İkisi de geçici bir arıza DEĞİL — sağlayıcı hesabı
+    gayet ayakta, yalnızca o model kimliği artık çözülmüyor. isProviderFault
+    (5xx/429/408 — "şu an meşgul, azıcık sonra çalışır") ile KARIŞTIRILMAMALI:
+    burada beklemek/tekrar denemek durumu DÜZELTMEZ, kullanıcının model
+    listesini güncellemesi gerekir. */
+function isModelGoneFault(status: number): boolean {
+  return status === 404 || status === 410;
+}
+
 /** Aday için chat/completions URL'i (Pollinations anahtarı varsa query-param token). */
 function candidateUrl(c: Candidate): string {
   return c.provider === "pollinations" && c.apiKey
@@ -1150,10 +1162,19 @@ function friendlyApiError(status: number, rawDetail: string, ctx?: { model?: str
     return `🔑 API anahtarı geçersiz${tag}: Ayarlar → Modeller'den anahtarı kontrol et. Anahtarın doğru sağlayıcıya ait olduğundan emin ol.`;
   if (low.includes("rate limit") || low.includes("too many") || status === 429)
     return `⏱️ İstek limiti aşıldı${tag}: 30-60 saniye bekle ve tekrar dene.`;
-  if (low.includes("model") && (low.includes("not found") || low.includes("does not exist") || low.includes("decommissioned") || low.includes("unknown"))) {
-    return `🚫 Model bulunamadı${tag}: Bu model artık desteklenmiyor veya yanlış yazılmış. Ayarlar'dan farklı bir model seç.`;
+  if (status === 410 || (low.includes("model") && (low.includes("not found") || low.includes("does not exist") || low.includes("decommissioned") || low.includes("unknown") || low.includes("end of life") || low.includes("no longer available")))) {
+    /* status===410 KOŞULSUZ eklendi: sağlayıcının tam metnini beklemek
+       kırılgan (ör. NVIDIA'nın "has reached its end of life... no longer
+       available" ifadesi yukarıdaki anahtar kelimelerin hiçbirini tam
+       eşleştirmiyordu — canlı testte görüldü). HTTP 410 Gone zaten kendi
+       başına "bu kaynak kalıcı olarak kaldırıldı" demek — sağlayıcı hangi
+       kelimeyi kullanırsa kullansın anlam aynı. */
+    return `🚫 Model artık mevcut değil${tag}: Bu model kaldırılmış/kullanımdan çıkarılmış olabilir. Ayarlar → Model'den bu modeli güncelle ya da kaldır.`;
   }
-  if (status === 400 || status === 404) {
+  if (status === 404) {
+    return `🚫 Model bulunamadı${tag}: Model adı yanlış yazılmış olabilir. Ayarlar → Model'den kontrol et.`;
+  }
+  if (status === 400) {
     const hint = providerMsg ? `\n\nDetay: ${providerMsg.slice(0, 200)}` : "";
     return `⚠️ Geçersiz istek (${status})${tag}: Model adı, baseUrl veya sağlayıcı yanlış olabilir.${hint}`;
   }
@@ -1899,16 +1920,22 @@ export async function POST(req: Request) {
             lastDetail = await r.text().catch(() => ""); lastCand = c;
             /* G1 — DÜRÜSTLÜK KAPISI. Yedek zinciri ULAŞILABİLİRLİK arızaları
                içindir (kota/yetki/sunucu/bağlantı): "istek asla düşmez" sözü
-               budur. Kullanıcının SEÇTİĞİ model bir YETENEK hatası verdiğinde
-               (400/422 — ör. araç çağırmayı, JSON modunu ya da istenen biçimi
-               desteklemiyor) sessizce başka bir modele geçmek kullanıcıyı
-               yanıltıyordu: yanıt seçtiğini sandığı modelden gelmiyor, üstelik
-               "yapamıyorum" demek yerine başka model devraldığı için sorunun
-               varlığı hiç görünmüyordu. Artık zincir burada kırılır ve aşağıdaki
-               friendlyApiError kullanıcıya NE olduğunu dürüstçe söyler.
-               Yalnız BİRİNCİL model için: zaten yedeğe düşülmüşse dayanıklılık
+               budur. Kullanıcının SEÇTİĞİ model bir YETENEK hatası (400/422 —
+               ör. araç çağırmayı/JSON modunu desteklemiyor) YA DA MODEL
+               KONFİGÜRASYON hatası (404/410 — model adı yanlış ya da
+               kullanımdan kaldırılmış; canlı NVIDIA testiyle doğrulandı: bir
+               model emekliye ayrılınca tam 410 dönüyor) verdiğinde sessizce
+               başka bir modele geçmek kullanıcıyı yanıltıyordu: yanıt
+               seçtiğini sandığı modelden gelmiyor, üstelik "bu model artık
+               yok" demek yerine her mesajda yeniden deneyip başka model
+               devraldığı için sorun HİÇ ÇÖZÜLMEDEN sürekli tekrarlanıyordu —
+               kullanıcının "model çok bekletiyor, farklı modele geçiyor"
+               şikâyetinin doğrudan sebebiydi. Artık zincir burada kırılır ve
+               aşağıdaki friendlyApiError kullanıcıya NE olduğunu (ve model
+               listesini güncellemesi gerektiğini) dürüstçe söyler. Yalnız
+               BİRİNCİL model için: zaten yedeğe düşülmüşse dayanıklılık
                öncelikli, sıradaki aday denenmeye devam eder. */
-            if (isCapabilityFault(lastStatus) && c === primary) break;
+            if ((isCapabilityFault(lastStatus) || isModelGoneFault(lastStatus)) && c === primary) break;
           }
           if (!upstream) {
             safe.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `\n\n**${friendlyApiError(lastStatus, lastDetail, { model: lastCand.model, provider: lastCand.provider as Provider })}**` } }] })}\n\n`));

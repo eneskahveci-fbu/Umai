@@ -9,9 +9,8 @@ import type { Config, ModelProfile } from "./types";
 import { resolveModelApiKey } from "./secureKeys";
 
 /* Öncelik sırası: kalite/hız dengesi — Gemini (native, hızlı) → OpenAI
-   (gpt-image-1) → xAI (grok-2-image) → NVIDIA NIM (FLUX.1-schnell; ücretsiz
-   nvapi anahtarıyla hızlı, HF'nin aynı modelinden daha güvenilir çünkü
-   cold-start yok) → HF (FLUX.1-schnell, cold-start'ta 503 dönebilir). */
+   (gpt-image-1) → xAI (grok-2-image) → NVIDIA NIM (flux.1-dev; canlı test
+   edilmiş, ~5 sn) → HF (FLUX.1-schnell, cold-start'ta 503 dönebilir). */
 export const IMAGE_PROVIDERS = ["gemini", "openai", "xai", "nvidia", "hf"] as const;
 export type ImageProvider = (typeof IMAGE_PROVIDERS)[number];
 
