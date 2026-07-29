@@ -672,7 +672,7 @@ export interface Config {
       "pollinations" — anahtar gerektirmeyen ücretsiz tabanı ZORLA kullan (BYOK
       anahtarı olsa bile), ya da belirli bir sağlayıcıyı SABİTLE. Sabitlenen
       sağlayıcı için model/anahtar artık yoksa sessizce "auto" davranışına döner. */
-  imageModelProvider?: "auto" | "pollinations" | "gemini" | "openai" | "xai" | "hf";
+  imageModelProvider?: "auto" | "pollinations" | "gemini" | "openai" | "xai" | "nvidia" | "hf";
   /** Sohbet yedek zinciri stratejisi (Ayarlar → Model). Varsayılan (false/yok):
       "ücretsiz öncelikli" — buildFallbackChain, güvenilir ücretsiz katmanları
       öne alır (bkz. fallback.ts PROVIDER_RANK). true: "kalite öncelikli" —
