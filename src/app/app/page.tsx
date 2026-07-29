@@ -143,10 +143,23 @@ export default function AppPage() {
     const which = params.get("gitlink");
     if (which !== "github" && which !== "gitlab") return;
     const clean = () => window.history.replaceState({}, "", "/app");
+    const addToast = useStore.getState().addToast;
+    /* /auth/callback bir BAĞLAMA hatasını (ör. exchangeCodeForSession
+       başarısız oldu, ya da sağlayıcı OAuth adımını reddetti) artık /login'e
+       değil BURAYA, bu query'yle geri gönderiyor — kullanıcı uygulamadan hiç
+       kopmadan hatayı görür. Hata zaten biliniyorsa aşağıdaki 8 saniyelik
+       "provider_token gelene kadar bekle" döngüsüne hiç girmeye gerek yok
+       (zaten hiç gelmeyecek). */
+    const linkError = params.get("link_error");
+    if (linkError) {
+      const label = which === "github" ? "GitHub" : "GitLab";
+      addToast(`${label} bağlanamadı: ${linkError}`, "error");
+      clean();
+      return;
+    }
     (async () => {
       const sb = createClient();
       if (!sb) { clean(); return; }
-      const addToast = useStore.getState().addToast;
       try {
         /* Oturum HAZIR olana kadar bekle. Önceden getSession() mount'ta BİR KEZ
            okunuyordu; Supabase dönüşteki kodu oturuma ASENKRON çevirdiği için
