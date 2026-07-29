@@ -115,6 +115,11 @@ interface ChatRequest {
       anahtarı. Verilmezse (ya da üretim başarısız olursa) generate_image
       anahtarsız Pollinations tabanına düşer — "istek asla düşmez" sözleşmesi. */
   imageModel?: { provider: string; apiKey: string };
+  /** İstemcinin kurduğu TAM görsel yedek zinciri (en iyiden en kötüye; bkz.
+      imageGen.ts buildImageFallbackChain + Ayarlar → Görsel üretimi → "Yedek
+      zinciri"). Verilirse sırayla denenir; verilmezse `imageModel` tek aday
+      olarak kullanılır (eski davranış). */
+  imageModels?: { provider: string; apiKey: string }[];
   requireWriteApproval?: boolean;
   safeMode?: boolean;
   toolPermissions?: Record<string, boolean>;
@@ -2022,14 +2027,21 @@ export async function POST(req: Request) {
             };
             const dims = DIMENSIONS[String(args.aspect_ratio ?? "square")] ?? DIMENSIONS.square;
             let markdown: string | null = null;
-            if (body.imageModel?.provider && body.imageModel?.apiKey) {
+            /* BYOK adayları: istemci tam zinciri yolladıysa hepsi sırayla
+               denenir (Ayarlar → Görsel üretimi → "Yedek zinciri"), yoksa tek
+               aday (eski davranış). */
+            const imgCandidates = body.imageModels?.length
+              ? body.imageModels
+              : (body.imageModel?.provider && body.imageModel?.apiKey ? [body.imageModel] : []);
+            for (const cand of imgCandidates) {
+              if (!cand?.provider || !cand?.apiKey) continue;
               try {
                 const byokRes = await fetch(`${ownOrigin}/api/image`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
-                    provider: body.imageModel.provider,
-                    apiKey: body.imageModel.apiKey,
+                    provider: cand.provider,
+                    apiKey: cand.apiKey,
                     prompt,
                     size: `${dims.width}x${dims.height}`,
                   }),
@@ -2038,12 +2050,45 @@ export async function POST(req: Request) {
                 const byokData = await byokRes.json().catch(() => ({})) as { image?: string; error?: string };
                 if (byokRes.ok && byokData.image) {
                   markdown = `![${prompt.slice(0, 120)}](${byokData.image})`;
+                  break;
                 }
-              } catch { /* BYOK başarısız → aşağıda Pollinations'a düş */ }
+              } catch { /* bu aday olmadı → sıradakini dene */ }
             }
             if (!markdown) {
-              const url = pollinationsImageUrl(prompt, { ...dims, seed: stableSeed(prompt) });
-              markdown = `![${prompt.slice(0, 120)}](${url})`;
+              /* Anahtarsız Pollinations tabanı — ama artık DOĞRULANARAK.
+                 ÖNCEDEN yalnızca bir URL METNİ kuruluyordu (pollinationsImageUrl
+                 hiç ağa çıkmaz): araç 255 ms'de "Görsel üretildi" diyor, model
+                 "işte görselin" yazıyor, gerçek üretim ise tarayıcı <img>'i
+                 yüklerken başlıyordu. Pollinations yavaş/dolu olduğunda
+                 kullanıcı uzun uzun bekleyip KIRIK bir görsel görüyordu —
+                 üstelik hem araç hem model başarı bildirmiş oluyordu.
+                 Artık görsel BURADA çekilir ve veri-URL'i olarak gömülür:
+                 kullanıcının gördüğü şey, doğrulanmış olan şeydir. */
+              try {
+                const url = pollinationsImageUrl(prompt, { ...dims, seed: stableSeed(prompt) });
+                const pRes = await fetch(url, { signal: AbortSignal.timeout(60_000) });
+                const ctype = (pRes.headers.get("content-type") ?? "").split(";")[0];
+                if (pRes.ok && ctype.startsWith("image/")) {
+                  const buf = Buffer.from(await pRes.arrayBuffer());
+                  /* Çok büyük çıktıyı mesaj geçmişine gömmek depolamayı şişirir;
+                     sınırın üstündeyse URL'e düşülür — o hâlde bile ucun AYAKTA
+                     olduğunu doğrulamış oluruz. */
+                  markdown = buf.byteLength <= 4_000_000
+                    ? `![${prompt.slice(0, 120)}](data:${ctype};base64,${buf.toString("base64")})`
+                    : `![${prompt.slice(0, 120)}](${url})`;
+                }
+              } catch { /* aşağıda dürüst hata bildirilir */ }
+            }
+            if (!markdown) {
+              /* G1 — dürüstlük: üretemediysek "üretildi" DEMEYİZ. Model bu
+                 sonucu görüp kullanıcıya doğru olanı söyler. */
+              fail(
+                "Görsel üretilemedi: görsel sağlayıcılarının hiçbiri (anahtarsız taban dahil) " +
+                "yanıt vermedi. Kullanıcıya görseli ÜRETEMEDİĞİNİ açıkça söyle, başarılı gibi " +
+                "anlatma; Ayarlar → Model → Görsel üretimi'nden bir sağlayıcı eklemesini ya da " +
+                "birazdan tekrar denemesini öner.",
+              );
+              return;
             }
             safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: "Görsel üretildi" } })}\n\n`));
             resultById.set(tc.id, markdown);
