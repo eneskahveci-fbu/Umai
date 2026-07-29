@@ -3252,9 +3252,9 @@ export function CoderView() {
             <div className="flex-1 overflow-y-auto py-1">
               {!tree && connecting ? (
                 /* Profesyonel iskelet: ağaç yüklenirken titreşimli satırlar. */
-                <div className="px-2 py-1.5 space-y-1.5">
+                <div className="stagger px-2 py-1.5 space-y-1.5">
                   {Array.from({ length: 9 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-2" style={{ paddingLeft: `${(i % 3) * 12 + 4}px` }}>
+                    <div key={i} className="flex items-center gap-2" style={{ paddingLeft: `${(i % 3) * 12 + 4}px`, "--i": i } as React.CSSProperties}>
                       <div className="w-3 h-3 rounded shimmer shrink-0" />
                       <div className="h-3 rounded shimmer" style={{ width: `${45 + ((i * 7) % 40)}%` }} />
                     </div>

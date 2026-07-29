@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fraunces, Inter, JetBrains_Mono, Noto_Emoji } from "next/font/google";
 import "./globals.css";
 import { NativeInit } from "@/components/NativeInit";
+import { RouteTransition } from "@/components/RouteTransition";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -134,7 +135,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full"><NativeInit />{children}</body>
+      <body className="min-h-full"><NativeInit /><RouteTransition />{children}</body>
     </html>
   );
 }

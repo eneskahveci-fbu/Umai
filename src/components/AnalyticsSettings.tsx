@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { AlertTriangle, BarChart3, Coins, Cpu, MessageSquare } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { calculateCost, formatCost, getModelPrice } from "@/lib/pricing";
+import { useCountUp } from "@/lib/useCountUp";
 import { calcBudgetStatus } from "@/lib/budget";
 
 /* Kullanım panosu — sohbet/mesaj/token/maliyet özetleri + son 7 gün grafiği.
@@ -47,11 +48,19 @@ export function AnalyticsSettings() {
   const cost = active ? calculateCost(active.model, stats.tin, stats.tout) : null;
   const budget = calcBudgetStatus(chats, active?.model, config.monthlyBudgetUsd);
 
+  /* Sayılar bir kareden diğerine ZIPLAMAK yerine kısaca sayarak değişir —
+     değişimi çevresel görüşte bile yakalatır. İlk gösterimde ve "hareketi
+     azalt" tercihinde doğrudan son değere atlar (bkz. useCountUp). */
+  const countAnim = useCountUp(stats.count);
+  const msgsAnim = useCountUp(stats.msgs);
+  const totalAnim = useCountUp(stats.total);
+  const costAnim = useCountUp(cost ?? 0, { minDelta: 0 });
+
   const cards = [
-    { icon: MessageSquare, label: "Sohbet", value: stats.count.toLocaleString("tr-TR") },
-    { icon: BarChart3, label: "Mesaj", value: stats.msgs.toLocaleString("tr-TR") },
-    { icon: Cpu, label: "Token", value: stats.total.toLocaleString("tr-TR") },
-    { icon: Coins, label: "Tahmini maliyet", value: cost !== null && hasPrice ? formatCost(cost) : "—" },
+    { icon: MessageSquare, label: "Sohbet", value: Math.round(countAnim).toLocaleString("tr-TR") },
+    { icon: BarChart3, label: "Mesaj", value: Math.round(msgsAnim).toLocaleString("tr-TR") },
+    { icon: Cpu, label: "Token", value: Math.round(totalAnim).toLocaleString("tr-TR") },
+    { icon: Coins, label: "Tahmini maliyet", value: cost !== null && hasPrice ? formatCost(costAnim) : "—" },
   ];
 
   return (
@@ -61,9 +70,9 @@ export function AnalyticsSettings() {
         <p className="text-xs text-muted/70 mt-1 leading-relaxed">Tüm sohbetlerinin özeti — yalnızca senin tarayıcında hesaplanır. Gizli sohbetler dahil değildir.</p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {cards.map(({ icon: I, label, value }) => (
-          <div key={label} className="premium-card rounded-xl p-3 text-center">
+      <div className="stagger grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {cards.map(({ icon: I, label, value }, i) => (
+          <div key={label} className="premium-card rounded-xl p-3 text-center" style={{ "--i": i } as React.CSSProperties}>
             <I size={15} className="text-brand/70 mx-auto mb-1" />
             <div className="text-lg font-bold leading-none truncate">{value}</div>
             <div className="text-[10px] text-muted/55 mt-1">{label}</div>
