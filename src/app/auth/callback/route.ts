@@ -15,8 +15,28 @@ export async function GET(request: Request) {
   const rawNext = searchParams.get("next") ?? "/app";
   const next = /^\/(?!\/)/.test(rawNext) ? rawNext : "/app";
 
+  /* BAĞLAMA (linkIdentity) mı, giriş/kayıt/magic-link mi? Ayrım önemli: bir
+     hesap BAĞLAMA denemesi TANIM GEREĞİ zaten oturum açmış bir kullanıcıda
+     çalışır (SettingsModal.tsx connectGitOAuth → linkIdentity, next=
+     "/app?gitlink=…"). ÖNCEDEN bağlama başarısız olduğunda (ör. "Identity is
+     already linked to another user", PKCE code_verifier çerezi bulunamadı)
+     kullanıcı KOŞULSUZ /login'e atılıyordu; /login zaten girişli olup
+     olmadığına hiç bakmadığı için kullanıcı, oturumu aslında hâlâ geçerliyken
+     "hesabımdan çıktı" izlenimine kapılıyordu ("GitHub'a tıklayınca login
+     ekranına atıp hesaptan çıkarıyor" raporu tam buydu). Bağlama denemesinde
+     hata olursa artık /login'e DEĞİL, doğrudan /app'e (next'e) bir hata
+     query'siyle dönülür — app/page.tsx'teki gitlink efekti bunu toast olarak
+     gösterir, kullanıcı uygulamadan hiç kopmaz. */
+  const isLinkAttempt = next.includes("gitlink=");
+  const backToAppWithError = (msg: string) => {
+    const sep = next.includes("?") ? "&" : "?";
+    return `${origin}${next}${sep}link_error=${encodeURIComponent(msg)}`;
+  };
+
   if (oauthError) {
-    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(oauthError)}`);
+    return NextResponse.redirect(
+      isLinkAttempt ? backToAppWithError(oauthError) : `${origin}/login?error=${encodeURIComponent(oauthError)}`,
+    );
   }
 
   if (code) {
@@ -29,7 +49,9 @@ export async function GET(request: Request) {
          hiçbir hata görmeden "giriş yapılmış gibi" bir sayfaya düşüyordu. */
       const { error } = await supabase.auth.exchangeCodeForSession(code);
       if (error) {
-        return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`);
+        return NextResponse.redirect(
+          isLinkAttempt ? backToAppWithError(error.message) : `${origin}/login?error=${encodeURIComponent(error.message)}`,
+        );
       }
     }
   }
