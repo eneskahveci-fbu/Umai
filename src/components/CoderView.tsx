@@ -91,6 +91,7 @@ import {
   fetchFileContent,
   fetchRepoTree,
   parseRepo,
+  splitRepoBranch,
 } from "@/lib/github";
 import {
   buildGitLabTree,
@@ -1093,32 +1094,40 @@ export function CoderView() {
     connectingRef.current = true;
     const store = useStore.getState();
     const activeRepo = store.config.activeRepo || "";
+    /* SettingsModal'daki giriş kutusu "sahip/depo VEYA sahip/depo:dal" biçimini
+       kabul ettiğini SÖYLÜYORDU (placeholder metni), ama ":dal" kısmı hiçbir
+       yerde ayrıştırılmıyordu — kullanıcı tam da önerilen biçimde yazınca
+       parseRepo/parseGitLabRepo, repodaki ":" karakterini geçersiz sayıp
+       depoyu reddediyordu ("hâlâ bağlanmıyor" raporunun bir parçası buydu).
+       Dal soneki varsa ayrılır ve fetch*RepoTree'ye branchOverride olarak
+       geçilir; yoksa davranış birebir eskisi gibi kalır (branch: null). */
+    const { repoStr, branch: branchOverride } = splitRepoBranch(activeRepo);
     setConnecting(true);
     try {
-      if (isGitLabRepo(activeRepo)) {
-        const parsed = parseGitLabRepo(activeRepo);
+      if (isGitLabRepo(repoStr)) {
+        const parsed = parseGitLabRepo(repoStr);
         if (!parsed) { addToast("Geçersiz GitLab deposu. Örnek: gitlab.com/namespace/repo", "error"); return; }
         const token = await store.activeGitlabToken();
-        const { branch, items } = await fetchGitLabRepoTree(parsed.namespace, parsed.repo, token);
+        const { branch, items } = await fetchGitLabRepoTree(parsed.namespace, parsed.repo, token, branchOverride ?? undefined);
         setRepo({ owner: parsed.namespace, repo: parsed.repo, branch });
         setTree(buildGitLabTree(items));
       } else {
-        const parsed = parseRepo(activeRepo);
+        const parsed = parseRepo(repoStr);
         if (!parsed) { addToast("Ayarlar'dan bir GitHub veya GitLab deposu ekle.", "error"); return; }
         const token = await store.activeGithubToken();
         try {
-          const { branch, items } = await fetchRepoTree(parsed.owner, parsed.repo, token);
+          const { branch, items } = await fetchRepoTree(parsed.owner, parsed.repo, token, branchOverride ?? undefined);
           setRepo({ ...parsed, branch });
           setTree(buildTree(items));
         } catch (ghErr) {
           /* GitHub'da bulunamadı → aynı namespace/repo'yu GitLab'da dene. Repolar
              GitLab'a taşındıysa kullanıcı `namespace/repo` yazınca da bağlanır
              (genel/public repolarda token gerekmez). */
-          const gl = parseGitLabRepo(activeRepo);
+          const gl = parseGitLabRepo(repoStr);
           if (!gl) throw ghErr;
           try {
             const gtoken = await store.activeGitlabToken();
-            const { branch, items } = await fetchGitLabRepoTree(gl.namespace, gl.repo, gtoken);
+            const { branch, items } = await fetchGitLabRepoTree(gl.namespace, gl.repo, gtoken, branchOverride ?? undefined);
             setRepo({ owner: gl.namespace, repo: gl.repo, branch });
             setTree(buildGitLabTree(items));
           } catch {

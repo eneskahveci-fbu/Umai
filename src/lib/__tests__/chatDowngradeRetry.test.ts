@@ -217,3 +217,75 @@ describe("sağlayıcı sağlığı yalnız SAĞLAYICI hatalarında işaretlenir 
     expect(isProviderDown(NVIDIA.provider, NVIDIA.baseUrl)).toBe(true);
   });
 });
+
+describe("model KONFİGÜRASYON hatası (404/410) — sağlık sinyali DEĞİL, dürüstçe durur (I3)", () => {
+  afterEach(() => { vi.unstubAllGlobals(); __resetProviderHealthForTests(); });
+
+  it("410 Gone (canlı NVIDIA'da doğrulanan 'model emekli' durumu): BİRİNCİL modelde durur, fallback'e sessizce geçmez", async () => {
+    /* Gerçek nvapi anahtarıyla canlı test edilen NVIDIA yanıtının aynısı:
+       "The model 'minimaxai/minimax-m2.7' has reached its end of life on
+       2026-07-27T00:00:00Z and is no longer available." */
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        type: "about:blank", title: "Gone", status: 410,
+        detail: "The model 'minimaxai/minimax-m2.7' has reached its end of life on 2026-07-27T00:00:00Z and is no longer available.",
+      }), { status: 410 }))
+      .mockImplementation(async () => sseText("yedekten cevap"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "9.9.9.72" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "selam" }], ...NVIDIA, fallbacks: FALLBACK }),
+    });
+    const out = await readAll(await POST(req));
+
+    expect(fetchMock.mock.calls.every((c) => String(c[0]).includes("nvidia"))).toBe(true);
+    expect(out).not.toContain("fallback_event");
+    expect(out).toContain("artık mevcut değil");
+  });
+
+  it("404 (yanlış/emekli model adı): BİRİNCİL modelde durur, fallback'e sessizce geçmez", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("404 page not found", { status: 404 }))
+      .mockImplementation(async () => sseText("yedekten cevap"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "9.9.9.73" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "selam" }], ...NVIDIA, fallbacks: FALLBACK }),
+    });
+    const out = await readAll(await POST(req));
+
+    expect(fetchMock.mock.calls.every((c) => String(c[0]).includes("nvidia"))).toBe(true);
+    expect(out).not.toContain("fallback_event");
+    expect(out).toContain("Model bulunamadı");
+  });
+
+  it("404/410 sağlayıcıyı 'down' işaretlemez (sağlayıcı ayakta, yalnız o model adı geçersiz)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("", { status: 410 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "9.9.9.74" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "selam" }], ...NVIDIA }),
+    });
+    await readAll(await POST(req));
+    expect(isProviderDown(NVIDIA.provider, NVIDIA.baseUrl)).toBe(false);
+  });
+
+  it("429 (gerçek kota arızası) hâlâ eskisi gibi fallback'e geçer — 404/410 ile karıştırılmadı", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(err(429, "rate limit exceeded"))
+      .mockImplementation(async () => sseText("yedekten cevap"));
+    vi.stubGlobal("fetch", fetchMock);
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "9.9.9.75" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "selam" }], ...NVIDIA, fallbacks: FALLBACK }),
+    });
+    await readAll(await POST(req));
+    expect(urlOf(fetchMock, fetchMock.mock.calls.length - 1)).toContain("api.groq.com");
+  });
+});

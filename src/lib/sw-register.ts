@@ -1,3 +1,37 @@
+import { useStore } from "./store";
+
+/** Yeni SW devraldığında reload'u YÖNETİR — bağımlılıklar enjekte edilir ki
+    DOM/tarayıcı ortamı olmadan (bu proje testleri jsdom KULLANMAZ) saf birim
+    testiyle doğrulanabilsin. Akış devam ederken (`isStreaming()` true)
+    reload ERTELENİR: aksi halde yeni bir sürüm dağıtıldığı TAM O AN
+    kullanıcı bir yanıtın ortasındaysa sayfa aniden yenileniyor, henüz
+    kaydedilmemiş yanıt kayboluyor ve kullanıcıya "sohbetten aniden atıldım,
+    tarayıcı kendiliğinden yeniden başladı gibi" hissettiriyordu — canlı
+    deploy sıklığı yüksek bir uygulamada bu gerçek, tekrar eden bir risktir.
+    Akış bitince (ya da `safetyMs` sonra — streaming bayrağı bir hatadan
+    dolayı sonsuza dek takılı kalırsa diye güvenlik ağı) reload çalışır. */
+export function scheduleReloadAfterStreaming(opts: {
+  isStreaming: () => boolean;
+  subscribe: (listener: () => void) => () => void;
+  reload: () => void;
+  safetyMs?: number;
+}): void {
+  const { isStreaming, subscribe, reload, safetyMs = 120_000 } = opts;
+  if (!isStreaming()) { reload(); return; }
+  let done = false;
+  let unsub: (() => void) | null = null;
+  let safety: ReturnType<typeof setTimeout> | null = null;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    unsub?.();
+    if (safety) clearTimeout(safety);
+    reload();
+  };
+  unsub = subscribe(() => { if (!isStreaming()) finish(); });
+  safety = setTimeout(finish, safetyMs);
+}
+
 /* PWA service worker'ını kaydeder (public/sw.js — network-first, bayat-bundle
    güvenli). Kurulabilir uygulama + çevrimdışı yedek sağlar; gezinmede daima
    ağdan taze HTML çekildiği için eski "bayat paket" sorunu geri gelmez. */
@@ -27,7 +61,13 @@ export function registerServiceWorker() {
           sessionStorage.setItem(RELOAD_GUARD_KEY, String(Date.now()));
         } catch { /* sessionStorage erişilemezse eski davranışa düş */ }
         refreshing = true;
-        window.location.reload();
+        /* ÖNCEDEN reload KOŞULSUZDU (bkz. scheduleReloadAfterStreaming'in
+           üstündeki not) — artık akış bitene kadar ertelenir. */
+        scheduleReloadAfterStreaming({
+          isStreaming: () => useStore.getState().streaming,
+          subscribe: (cb) => useStore.subscribe(cb),
+          reload: () => window.location.reload(),
+        });
       })();
     });
   }

@@ -66,11 +66,13 @@ export async function fetchGitLabUserRepos(
     : [];
 }
 
-/** Deponun varsayılan dalını ve özyinelemeli dosya ağacını getirir. */
+/** Deponun varsayılan dalını (ya da `branchOverride` verilmişse ONU) ve
+    özyinelemeli dosya ağacını getirir. */
 export async function fetchGitLabRepoTree(
   namespace: string,
   repo: string,
   token?: string,
+  branchOverride?: string,
 ): Promise<{ branch: string; items: GitLabTreeItem[] }> {
   const proj = encodeProject(namespace, repo);
   const infoRes = await fetch(
@@ -79,7 +81,7 @@ export async function fetchGitLabRepoTree(
   );
   const info = await infoRes.json();
   if (!infoRes.ok) throw new Error(info.message || "Depo bulunamadı");
-  const branch: string = info.default_branch || "main";
+  const branch: string = branchOverride || info.default_branch || "main";
 
   const items: GitLabTreeItem[] = [];
   let page = 1;
