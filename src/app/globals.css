@@ -34,22 +34,24 @@
   --font-scale: 1;
 
   /* ─── Hareket dili (tek kaynak) ───────────────────────────────────────
-     Animasyonlar önceden her yerde farklı eğri/süre kullanıyordu (ease,
-     ease-out, üç ayrı cubic-bezier, 0.15s–0.26s arası dağınık süreler);
-     tek tek iyi olsalar bile bir arada "aynı ürün" hissi vermiyordu.
-     Aşağıdaki token'lar tüm yüzeylerde AYNI fiziği paylaştırır:
-     • --ease-out  : standart giriş/çıkış — sonda yumuşak yavaşlama.
-     • --ease-spring: hafif overshoot; "yerine oturdu" hissi veren öğeler
-                      (mesaj balonu, modal, popover) için.
-     • --ease-in   : kapanış — hızlı başlar, gözü oyalamaz.
-     Süre ölçeği: 1 (mikro geri bildirim) → 4 (en büyük yüzey). */
-  --ease-out: cubic-bezier(.22, 1, .36, 1);
-  --ease-spring: cubic-bezier(.22, 1.12, .36, 1);
-  --ease-in: cubic-bezier(.55, 0, 1, .45);
-  --dur-1: 120ms;
-  --dur-2: 180ms;
-  --dur-3: 240ms;
-  --dur-4: 320ms;
+     KARAKTER: "hassas & hızlı" (Linear/Vercel hissi) — kısa mesafe, kısa
+     süre, hızlı ivmelenip yumuşak oturan eğri, MİNİMUM overshoot. Amaç
+     hareketin fark edilmesi değil; arayüzün "anında ama sert değil"
+     hissettirmesi. Büyük zıplama/uzun süre yumuşak-oyuncak hissi verir,
+     teknolojik değil — bu yüzden overshoot bilerek küçük tutuldu.
+     • --ease-out   : standart giriş — hızlı başlar, sonda yumuşar.
+     • --ease-spring: "yerine oturdu" hissi (mesaj balonu, modal, popover).
+     • --ease-in    : kapanış — hızlanarak çıkar, gözü oyalamaz.
+     Süre ölçeği: 1 (mikro geri bildirim) → 4 (en büyük yüzey).
+     • --stagger    : liste öğeleri arası gecikme adımı (bkz. .stagger). */
+  --ease-out: cubic-bezier(.2, .9, .3, 1);
+  --ease-spring: cubic-bezier(.24, 1.06, .36, 1);
+  --ease-in: cubic-bezier(.6, 0, .9, .3);
+  --dur-1: 90ms;
+  --dur-2: 140ms;
+  --dur-3: 190ms;
+  --dur-4: 260ms;
+  --stagger: 32ms;
   /* Kapanış süresi AYRI bir token: useExitAnimation.ts'teki `exitMs`
      varsayılanıyla EŞLEŞMEK ZORUNDA (JS bu süre kadar bekleyip unmount eder).
      Biri değişirse diğeri de değişmeli — yoksa modal ya erken kaybolur ya da
@@ -155,6 +157,11 @@ body {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+    /* GECİKME de sıfırlanmalı: süreyi sıfırlamak kademeli beliriş (.stagger)
+       için YETMEZ — öğe hâlâ kendi sırasına kadar GÖRÜNMEZ bekler ve liste
+       "hareketsiz ama yavaş dolan" bir hâl alır. */
+    animation-delay: 0ms !important;
+    transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
 }
@@ -175,12 +182,19 @@ body {
 :root[data-anim="reduced"] .msg-enter {
   animation-duration: 90ms !important;
 }
+/* Kademeli beliriş "azaltılmış" modda da kapanır: giriş animasyonunun
+   kendisi (işlevsel geri bildirim) korunur, yalnız BEKLEME kalkar. */
+:root[data-anim="reduced"] .stagger > * {
+  animation-delay: 0ms !important;
+}
 :root[data-anim="off"] *,
 :root[data-anim="off"] *::before,
 :root[data-anim="off"] *::after {
   animation-duration: 0.001ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;
+  animation-delay: 0ms !important;
+  transition-delay: 0ms !important;
   scroll-behavior: auto !important;
 }
 
@@ -680,10 +694,15 @@ html.light .user-bubble {
 }
 .send-pulse { animation: send-pulse 420ms ease-out; }
 
-/* ─── Modal backdrop ─── */
+/* ─── Modal backdrop ───
+   Bulanıklık ARTIK RAMPALANIYOR: önceden zemin `backdrop-blur-sm` ile anında
+   tam bulanık geliyor, yalnız opaklık açılıyordu — arkadaki içerik bir anda
+   "donuyor" gibi duruyordu. 0'dan 4px'e (Tailwind'in backdrop-blur-sm değeri)
+   çıkınca göz öndeki yüzeye yumuşakça kilitleniyor. Bitiş değeri sınıfınkiyle
+   AYNI seçildi ki animasyon bitince sıçrama olmasın. */
 @keyframes modal-bg {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from { opacity: 0; backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px); }
+  to { opacity: 1; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 }
 .animate-modal-bg {
   animation: modal-bg var(--dur-2) var(--ease-out);
@@ -706,6 +725,83 @@ html.light .user-bubble {
 .animate-modal-content-out {
   animation: modal-content var(--dur-exit) var(--ease-in) reverse both;
 }
+
+/* ─── Kademeli beliriş (stagger) ────────────────────────────────────────
+   Liste öğeleri hep birlikte değil, birbiri ardına belirir. Tek başına en
+   "teknolojik" duran detay: göz listeyi bir blok olarak değil, sırayla
+   dolan bir akış olarak okur.
+
+   Kullanım — kapsayıcıya `.stagger`, öğelere sıra numarası:
+     <div class="stagger">
+       {items.map((it, i) => <div style={{ "--i": i }}>…</div>)}
+
+   `--i` verilmezse 0 sayılır (öğe gecikmesiz belirir), yani sınıfı eklemek
+   tek başına hiçbir şeyi bozmaz. Gecikme ÜST SINIRLI: uzun listelerde son
+   öğe saniyelerce beklemesin diye 10 adımda sabitlenir (min()). */
+.stagger > * {
+  animation: enter var(--dur-2) var(--ease-out) both;
+  animation-delay: min(var(--i, 0) * var(--stagger), 10 * var(--stagger));
+  --tw-enter-opacity: 0;
+  --tw-enter-translate-y: 0.375rem;
+}
+
+/* ─── Kayan aktif gösterge ──────────────────────────────────────────────
+   Sekme/seçim altındaki çizgi zıplayarak değil kayarak yeni yerine gider.
+   Kapsayıcı `.indicator-track` (position:relative), gösterge
+   `.indicator-thumb` + sol/genişlik CSS değişkenleriyle konumlanır. */
+.indicator-track { position: relative; }
+/* Yatay şerit: alt çizgi soldan sağa kayar. */
+.indicator-thumb {
+  position: absolute;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-brand);
+  left: var(--ind-left, 0);
+  width: var(--ind-width, 0);
+  transition: left var(--dur-3) var(--ease-spring), width var(--dur-3) var(--ease-spring);
+  pointer-events: none;
+}
+/* Dikey liste (ör. Ayarlar sekmeleri): sol kenarda yukarı/aşağı kayan çubuk.
+   Aynı token'lar → yatay göstergeyle birebir aynı fizik. */
+.indicator-thumb-v {
+  position: absolute;
+  left: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--color-brand);
+  top: var(--ind-left, 0);
+  height: var(--ind-width, 0);
+  transition: top var(--dur-3) var(--ease-spring), height var(--dur-3) var(--ease-spring);
+  pointer-events: none;
+}
+
+/* ─── Rota (sayfa) geçişi ───────────────────────────────────────────────
+   Sohbet ↔ Stüdyo ↔ Kütüphane arası geçiş önceden SERT KESMEYDİ: yeni sayfa
+   hiçbir ara adım olmadan belirir, göz nereye bakacağını kaybederdi.
+   Yeni içerik çok kısa bir yukarı-kayma + açılmayla girer. Mesafe bilerek
+   küçük (4px): "hassas & hızlı" karakterde hareket hissedilir ama sayfayı
+   oynatmaz. Bkz. components/RouteTransition.tsx. */
+@keyframes route-enter {
+  from { opacity: 0; transform: translate3d(0, 4px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+.route-enter { animation: route-enter var(--dur-3) var(--ease-out) both; }
+
+/* ─── Yan panel aç/kapa ─────────────────────────────────────────────────
+   Panel ile daraltılmış ray arasındaki geçiş önceden ANIDIR: biri yok olur,
+   diğeri hiçbir ara adım olmadan belirir (mobilde tam ekran panelin böyle
+   "patlaması" en sert duran yerdi). Kısa bir soldan kayma + açılma.
+
+   NOT: iki durum da aynı konumda <aside> döndürdüğü için React DOM düğümünü
+   YENİDEN KULLANIR ve CSS animasyonu tekrar başlamaz — bu yüzden iki dal
+   farklı `key` alır (bkz. Sidebar.tsx), böylece gerçekten remount olurlar. */
+@keyframes sidebar-in {
+  from { opacity: 0; transform: translate3d(-12px, 0, 0); }
+  to   { opacity: 1; transform: none; }
+}
+.sidebar-in { animation: sidebar-in var(--dur-3) var(--ease-out) both; }
+
 
 /* Yatay kaydırılabilir şeritlerde (örn. modal sekmeleri) kaydırma çubuğunu
    gizle — iOS/Safari dahil. Erişilebilirlik için kaydırma yine çalışır. */
@@ -740,9 +836,39 @@ details[open] > summary ~ * {
   100% { background-position: 200% 0; }
 }
 .shimmer {
-  background: linear-gradient(90deg, var(--color-surface) 25%, var(--color-surface2) 50%, var(--color-surface) 75%);
+  /* Parıltı bandı DARALTILDI ve marka rengiyle hafifçe ısıtıldı: eskiden
+     yumuşak/geniş bir gri dalgaydı, "yükleniyor" demekten çok soluk
+     duruyordu. Dar ve belirgin bir bant, tarama (scan) hissi verir. */
+  background: linear-gradient(
+    90deg,
+    var(--color-surface) 40%,
+    color-mix(in srgb, var(--color-brand) 12%, var(--color-surface2)) 50%,
+    var(--color-surface) 60%
+  );
   background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  animation: shimmer 1.2s var(--ease-out) infinite;
+}
+
+/* ─── İskelet (skeleton) satırı ─────────────────────────────────────────
+   Tailwind'in `animate-pulse`'ı yalnız opaklığı gidip getirir; tüm blok
+   birlikte soluklaşır ve "ölü" durur. Bunun yerine .shimmer'ın tarayan
+   bandını kullanan, yuvarlatılmış hazır bir satır. */
+.skeleton {
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    var(--color-surface) 40%,
+    color-mix(in srgb, var(--color-brand) 12%, var(--color-surface2)) 50%,
+    var(--color-surface) 60%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.2s var(--ease-out) infinite;
+}
+/* Sürekli/dekoratif olduğu için "azaltılmış" modda durur — yerinde sabit
+   bir yüzey kalır (kaybolmaz, yalnız hareket etmez). */
+:root[data-anim="reduced"] .shimmer,
+:root[data-anim="reduced"] .skeleton {
+  animation: none !important;
 }
 
 /* ════════════════════════════════════════════════════════════════════════

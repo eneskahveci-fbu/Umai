@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useModalA11y } from "@/lib/useModalA11y";
+import { useSlidingIndicator } from "@/lib/useSlidingIndicator";
 import { useExitAnimation } from "@/lib/useExitAnimation";
 import { useModKey } from "@/lib/useModKey";
 import {
@@ -378,6 +379,10 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     return () => { cancelled = true; };
   }, [open, tab, config.activeGithubId, config.activeGitlabId, config.githubAccounts, config.gitlabAccounts, config.repos]);
 
+  /* Aktif sekme göstergesi — TÜM hook'lar erken `return null`'dan ÖNCE
+     çağrılmalı, yoksa React "hook sırası değişti" hatası verir. */
+  const { trackRef: tabTrack, registerTab, style: tabIndStyle } = useSlidingIndicator<SettingsTab>(tab, "y");
+
   const { mounted, closing } = useExitAnimation(open);
   if (!mounted) return null;
 
@@ -731,7 +736,13 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             </div>
           </div>
           {/* sm+: pill listesi (GNOME). Mobil: iOS satırları (chevron + büyük dokunma). */}
-          <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-3 sm:px-2 pb-3 sm:gap-0.5">
+          {/* Aktif sekme göstergesi ZIPLAMAZ, kayar (yalnız sm+ pill düzeninde;
+              mobil iOS satırlarında sol çubuk anlamsız olurdu). */}
+          <nav
+            ref={tabTrack}
+            className="indicator-track flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 px-3 sm:px-2 pb-3 sm:gap-0.5"
+          >
+            <span className="indicator-thumb-v hidden sm:block" style={tabIndStyle} aria-hidden />
             {visibleTabs.map(({ key, label, icon: Icon, group }) => {
               const hit = matchingTabs.has(key);
               const active = tab === key;
@@ -741,6 +752,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     <div className="px-3 sm:px-2.5 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-muted/40 first:pt-0">{group}</div>
                   )}
                 <button
+                  ref={registerTab(key)}
                   onClick={() => { changeTab(key); setMobileDetail(true); }}
                   className={`relative w-full flex items-center gap-3 sm:gap-2.5 px-3 py-3 sm:py-2 rounded-xl sm:rounded-lg text-[15px] sm:text-sm font-medium transition-colors text-left ${
                     active ? "sm:bg-brand/12 sm:text-brand bg-bgsoft text-ink" : "text-ink sm:text-muted hover:text-ink hover:bg-bgsoft sm:hover:bg-surface"
@@ -1013,8 +1025,8 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             </div>
 
             {config.models.length > 0 && (
-              <div className="flex flex-col gap-2 mb-4">
-                {config.models.map((m) => {
+              <div className="stagger flex flex-col gap-2 mb-4">
+                {config.models.map((m, mi) => {
                   const active = config.activeModelId === m.id;
                   const ed = editId === m.id;
                   /* Yetenek rozetleri (I4) — "hangi modeli eklersem ekleyeyim, o
@@ -1031,7 +1043,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   if (caps.tools) badges.push({ Icon: Wrench, label: "Araç çağırma" });
                   if (caps.jsonMode) badges.push({ Icon: Braces, label: "JSON modu" });
                   return (
-                    <div key={m.id} className={`flex flex-col gap-2 px-3 py-2.5 rounded-xl border ${active ? "border-branddim bg-brand/10" : "border-line bg-bgsoft"}`}>
+                    <div key={m.id} style={{ "--i": mi } as React.CSSProperties} className={`flex flex-col gap-2 px-3 py-2.5 rounded-xl border ${active ? "border-branddim bg-brand/10" : "border-line bg-bgsoft"}`}>
                       <div className="flex items-center gap-2">
                         <button onClick={() => setActiveModel(m.id)} className={`w-5 h-5 rounded-full grid place-items-center border ${active ? "bg-brand border-brand text-[#111110]" : "border-muted"}`}>
                           {active && <Check size={11} />}
