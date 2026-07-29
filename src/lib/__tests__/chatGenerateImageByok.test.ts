@@ -44,6 +44,15 @@ function textStopUpstream(text: string): Response {
   return new Response(stream, { status: 200, headers: { "Content-Type": "text/event-stream" } });
 }
 
+/* Pollinations artık SUNUCUDA çekilip doğrulanıyor (eskiden yalnız bir URL
+   metni kuruluyordu). Gerçek bir görsel yanıtını taklit eder. */
+function pollinationsImageResponse(): Response {
+  return new Response(new Uint8Array([137, 80, 78, 71]), {
+    status: 200,
+    headers: { "Content-Type": "image/jpeg" },
+  });
+}
+
 async function readAllText(res: Response): Promise<string> {
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
@@ -106,6 +115,7 @@ describe("POST /api/chat — generate_image BYOK önceliği", () => {
       if (url.includes("/api/image")) {
         return Promise.resolve(new Response(JSON.stringify({ error: "quota aşıldı" }), { status: 402 }));
       }
+      if (url.includes("pollinations")) return Promise.resolve(pollinationsImageResponse());
       llmCallCount += 1;
       return Promise.resolve(llmCallCount === 1 ? toolCallUpstream(args) : textStopUpstream("İşte görsel!"));
     });
@@ -131,6 +141,7 @@ describe("POST /api/chat — generate_image BYOK önceliği", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       expect(url.includes("/api/image")).toBe(false); // BYOK'a hiç gidilmemeli
+      if (url.includes("pollinations")) return Promise.resolve(pollinationsImageResponse());
       llmCallCount += 1;
       return Promise.resolve(llmCallCount === 1 ? toolCallUpstream(args) : textStopUpstream("İşte görsel!"));
     });
@@ -145,5 +156,65 @@ describe("POST /api/chat — generate_image BYOK önceliği", () => {
     const res = await POST(req);
     expect(res.status).toBe(200);
     await readAllText(res);
+  });
+
+  it("hiçbir sağlayıcı üretemezse 'üretildi' DEMEZ — dürüstçe başarısızlık bildirir (IMG_1174)", async () => {
+    /* Canlı hata: araç 255 ms'de "Görsel üretildi" diyor, model "işte
+       görselin" yazıyordu; oysa yalnızca bir Pollinations URL METNİ
+       kurulmuştu (pollinationsImageUrl hiç ağa çıkmaz). Gerçek üretim
+       tarayıcı <img>'i yüklerken başlıyor, Pollinations dolu/yavaş olduğunda
+       kullanıcı uzun bekleyip KIRIK görsel görüyordu. */
+    const args = JSON.stringify({ prompt: "a knight with a sword" });
+    let llmCallCount = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/image")) {
+        return Promise.resolve(new Response(JSON.stringify({ error: "quota" }), { status: 402 }));
+      }
+      /* Pollinations de ayakta değil (503) → hiçbir görsel yok. */
+      if (url.includes("pollinations")) {
+        return Promise.resolve(new Response("upstream down", { status: 503 }));
+      }
+      llmCallCount += 1;
+      return Promise.resolve(llmCallCount === 1 ? toolCallUpstream(args) : textStopUpstream("tamam"));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "9.9.9.23" },
+      body: JSON.stringify({ ...baseBody, imageModel: { provider: "gemini", apiKey: "gk" } }),
+    });
+    const text = await readAllText(await POST(req));
+
+    expect(text).not.toContain("Görsel üretildi");
+    expect(text).toContain("Görsel üretilemedi");
+  });
+
+  it("Pollinations görsel DÖNDÜRÜRSE veri-URL'i olarak gömülür (tarayıcı ikinci kez üretmez)", async () => {
+    const args = JSON.stringify({ prompt: "a knight" });
+    let llmCallCount = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      void init;
+      if (url.includes("pollinations")) return Promise.resolve(pollinationsImageResponse());
+      llmCallCount += 1;
+      return Promise.resolve(llmCallCount === 1 ? toolCallUpstream(args) : textStopUpstream("tamam"));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "9.9.9.24" },
+      body: JSON.stringify(baseBody),
+    });
+    await readAllText(await POST(req));
+    /* Modelin bir sonraki turuna giden tool sonucu veri-URL'i içermeli. */
+    const llmCalls = fetchMock.mock.calls.filter((c) => !String(c[0]).includes("pollinations"));
+    const lastLlmBody = JSON.parse(
+      String((llmCalls.at(-1)?.[1] as RequestInit | undefined)?.body ?? "{}"),
+    ) as { messages: { role: string; content?: string }[] };
+    const toolMsg = lastLlmBody.messages.find((m) => m.role === "tool");
+    expect(toolMsg?.content ?? "").toContain("data:image/jpeg;base64,");
   });
 });

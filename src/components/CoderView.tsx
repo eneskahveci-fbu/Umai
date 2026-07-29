@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
+import type { ImageProvider } from "@/lib/imageGen";
 import { buildChainFor } from "@/lib/fallback";
 import { createReveal, type RevealController } from "@/lib/streamReveal";
 import { switchLeftPanel, type LeftPanel } from "@/lib/leftPanel";
@@ -1897,11 +1898,21 @@ export function CoderView() {
        tercihine göre (auto/pollinations/sabit sağlayıcı) BYOK sağlayıcıyı
        burada, istekten ÖNCE çöz ve sunucuya ilet — /gorsel komutunun zaten
        kullandığı AYNI pickImageProvider mantığı. */
-    let imageModelPref: { provider: string; apiKey: string } | null = null;
+    let imageModelPref: { provider: ImageProvider; apiKey: string } | null = null;
+    /* Ajanın generate_image aracı için TÜM zincir gönderilir (yalnız ilk aday
+       değil): önceden tek aday yollanıyordu, o da başarısız olunca sunucu
+       doğrudan anahtarsız Pollinations'a düşüyordu — Ayarlar'daki "görsel
+       yedek zinciri" seçeneği ajan yolunda hiç işlemiyordu. */
+    let imageModelChain: { provider: ImageProvider; apiKey: string }[] = [];
     if (wantImageGen) {
       try {
-        const { pickImageProvider } = await import("@/lib/imageGen");
+        const { pickImageProvider, buildImageFallbackChain } = await import("@/lib/imageGen");
         imageModelPref = await pickImageProvider(store.config);
+        if (imageModelPref) imageModelChain.push(imageModelPref);
+        if (store.config.imageFallbackChain) {
+          const rest = await buildImageFallbackChain(store.config, imageModelPref?.provider).catch(() => []);
+          imageModelChain = [...imageModelChain, ...rest];
+        }
       } catch { /* yoksay → sunucu Pollinations tabanına düşer */ }
     }
     /* Ajan Ekibi / Araştırma turunda otomatik EN GÜÇLÜ modeli kullan (ayar açıksa)
@@ -2274,6 +2285,7 @@ export function CoderView() {
           webSearch: wantWeb,
           imageGen: wantImageGen,
           imageModel: imageModelPref ?? undefined,
+          imageModels: imageModelChain.length ? imageModelChain : undefined,
           requireWriteApproval: store.config.requireWriteApproval,
           safeMode: store.config.safeMode,
           toolPermissions: store.config.toolPermissions,
