@@ -1469,9 +1469,15 @@ export async function POST(req: Request) {
     `netlik gerekiyorsa aynı yolla yeni bir kısa soru daha sorarak bu turu birkaç kez ` +
     `tekrarlayabilirsin — ama gereksiz yere sorma, istek zaten netse doğrudan işe koyul.`;
   /* R1 — Kimlik: model kendi kimliğini TAHMİN ETMESİN diye gerçeği veriyoruz.
-     ÇÖZÜMLENMİŞ provider/model kullanılır: anahtarsız istek Pollinations'a
-     düştüyse kimlik de onu söyler, kullanıcıya yanlış model adı verilmez. */
-  sysPrompt += `\n\n${buildIdentityPrompt(provider, model)}`;
+     DİKKAT: kimlik bloğu BURAYA (sysPrompt'a) YAZILMAZ. sysPrompt istek
+     başında BİR KEZ kurulur ve o an yalnızca BİRİNCİL adayın kim olduğu
+     bilinir; oysa yanıtı gerçekte hangi adayın vereceği aşağıdaki fallback
+     döngüsünde belli olur. Kimlik burada sabitlenirse zincir devreye
+     girdiğinde yanıtı veren model kendisine söylenen YANLIŞ kimliği bildirir
+     — canlıda görülen tam da buydu: aktif model NVIDIA NIM, istek
+     gemini-2.5-flash'e düştü, yanıt ise "DeepSeek V4 Pro modeliyim" dedi
+     (birincil NIM modeli bir DeepSeek'ti ve Gemini itaatle onu tekrarladı).
+     Kimlik artık ADAY BAŞINA ekleniyor — bkz. withIdentity / toolBodyFor. */
   /* R3 — Platform bilgisi iki kademeli: kısa dizin her zaman, 11 KB'lik tam
      rehber yalnız soru gerçekten arayüz/platform hakkındaysa. Her isteğe
      ~3.150 token dokümantasyon eklemek ilk token gecikmesini büyütüyordu. */
@@ -1816,9 +1822,27 @@ export async function POST(req: Request) {
       /* Seçili aday: ilk turda fallback adayları sırayla denenir; ilki başarılı
          olunca tüm sohbet o sağlayıcıya sabitlenir (tutarlı tool-call durumu). */
       let chosen: Candidate | null = null;
+      /* Kimlik bloğunu O ADAY için üretip system bloğunun HEMEN ARDINA koyar
+         (kullanıcı mesajlarından önce). Böylece yanıtı kim veriyorsa kimliği
+         de o söyler; zincir başka bir modele düşünce kimlik onunla birlikte
+         değişir. Ayrı bir system mesajı olarak eklenir çünkü:
+         • pruneMessages mesaj SİLMEZ (yalnız uzun içeriği kırpar) → blok
+           uzun sohbetlerde de hayatta kalır;
+         • Anthropic native yolu her system mesajını KENDİ bloğuna çevirir
+           (bkz. anthropic.ts convertMessages) → orada da doğru iletilir;
+         • sysPrompt'un büyük ve turlar arası SABİT gövdesine dokunmaz →
+           Anthropic prompt caching bozulmaz. */
+      const withIdentity = (msgs: ChatRequest["messages"], c: Candidate): ChatRequest["messages"] => {
+        const out = msgs.slice();
+        out.splice(systemMessages.length, 0, {
+          role: "system",
+          content: buildIdentityPrompt(c.provider, c.model),
+        });
+        return out;
+      };
       const toolBodyFor = (c: Candidate, lastRound: boolean) => ({
         /* Bağlam yönetimi: eski/büyük tool çıktılarını kırp (yapı korunur). */
-        messages: pruneMessages(convo, { keepRecent: 16, maxContentChars: 12000 }),
+        messages: pruneMessages(withIdentity(convo, c), { keepRecent: 16, maxContentChars: 12000 }),
         extra: {
           tools: allTools,
           tool_choice: lastRound ? "none" : "auto",

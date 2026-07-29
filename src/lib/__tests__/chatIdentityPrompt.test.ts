@@ -109,3 +109,57 @@ describe("platform rehberi iki kademeli gönderilir (R3)", () => {
     expect(ui.length - plain.length).toBeGreaterThan(8000);
   });
 });
+
+describe("yedeğe düşünce kimlik de DEĞİŞİR (canlı hata: IMG_1173)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** Belirli bir uca giden isteğin sistem metnini toplar. */
+  function sysOfCall(mock: ReturnType<typeof vi.fn>, i: number): string {
+    const sent = JSON.parse(mock.mock.calls[i]![1]!.body as string) as {
+      messages: { role: string; content: string }[];
+      system?: { text?: string }[];
+    };
+    return [
+      ...(sent.system ?? []).map((b) => b.text ?? ""),
+      ...sent.messages.filter((m) => m.role === "system").map((m) => m.content),
+    ].join("\n");
+  }
+
+  it("birincil (NVIDIA/DeepSeek) düşüp Gemini devralınca Gemini'ye GEMINI kimliği gider", async () => {
+    /* Canlıda görülen hata: aktif model NVIDIA NIM (bir DeepSeek modeli),
+       istek gemini-2.5-flash'e düştü, ama yanıt "DeepSeek V4 Pro modeliyim"
+       dedi. Sebep: kimlik bloğu istek başında BİRİNCİL adaya göre bir kez
+       yazılıyordu; devralan model kendisine söylenen yanlış kimliği itaatle
+       tekrarlıyordu. */
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: "quota" } }), { status: 429 }))
+      .mockImplementation(async () => sseText("merhaba"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "9.9.9.90" },
+      body: JSON.stringify({
+        messages: [{ role: "user", content: "hangi modelsin" }],
+        provider: "nvidia", model: "deepseek-ai/deepseek-v3",
+        apiKey: "nvapi-x", baseUrl: "https://integrate.api.nvidia.com/v1",
+        fallbacks: [{
+          provider: "gemini", model: "models/gemini-2.5-flash", apiKey: "gk",
+          baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+        }],
+      }),
+    });
+    await drain(await POST(req));
+
+    /* 0. çağrı birincil (NVIDIA) → DeepSeek kimliği doğru. */
+    const primarySys = sysOfCall(fetchMock, 0);
+    expect(primarySys).toContain("DeepSeek");
+
+    /* 1. çağrı yedek (Gemini) → kimlik ARTIK Google/Gemini olmalı,
+       DeepSeek'ten hiç söz edilmemeli. */
+    const fallbackSys = sysOfCall(fetchMock, 1);
+    expect(String(fetchMock.mock.calls[1]![0])).toContain("generativelanguage");
+    expect(fallbackSys).toContain("Gemini");
+    expect(fallbackSys).not.toContain("DeepSeek");
+  });
+});
