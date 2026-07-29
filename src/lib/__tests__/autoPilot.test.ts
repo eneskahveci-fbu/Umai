@@ -222,6 +222,31 @@ describe("autoStudioSkill", () => {
   });
 });
 
+describe("resolveStudioSkillId — regresyon: başarısız ilk üretim sonrası kilitlenmemeli", () => {
+  it("ilk mesaj (followup=false) her zaman brief'ten sınıflandırır", async () => {
+    const { resolveStudioSkillId } = await import("../autoPilot");
+    expect(resolveStudioSkillId({ brief: "10 slaytlık bir sunum hazırla", followup: false, projectSkillId: null })).toBe("slides");
+  });
+  it("takip mesajı + yerleşik (BAŞARILI üretimden gelen) skill → skill korunur, brief yok sayılır", async () => {
+    const { resolveStudioSkillId } = await import("../autoPilot");
+    expect(resolveStudioSkillId({ brief: "başlığı büyüt", followup: true, projectSkillId: "landing" })).toBe("landing");
+  });
+  it("KRİTİK regresyon: ilk üretim başarısız olup projectSkillId hâlâ null/undefined iken takip mesajı brief'ten YENİDEN sınıflandırılır (eskiden sonsuza dek undefined'a kilitleniyordu)", async () => {
+    const { resolveStudioSkillId } = await import("../autoPilot");
+    expect(resolveStudioSkillId({ brief: "uluslararası ilişkiler ve siber güvenlik hakkında bir sunum hazırla", followup: true, projectSkillId: null })).toBe("slides");
+    expect(resolveStudioSkillId({ brief: "uluslararası ilişkiler ve siber güvenlik hakkında bir sunum hazırla", followup: true, projectSkillId: undefined })).toBe("slides");
+  });
+  it("şablon seçildiyse (templateSkillId) her zaman önceliklidir", async () => {
+    const { resolveStudioSkillId } = await import("../autoPilot");
+    expect(resolveStudioSkillId({ brief: "bir sunum yap", followup: false, projectSkillId: null, templateSkillId: "dashboard" })).toBe("dashboard");
+    expect(resolveStudioSkillId({ brief: "bir sunum yap", followup: true, projectSkillId: "landing", templateSkillId: "dashboard" })).toBe("dashboard");
+  });
+  it("takip mesajında brief belirsizse ve yerleşik skill yoksa null döner (generateArtifact serbest format seçer)", async () => {
+    const { resolveStudioSkillId } = await import("../autoPilot");
+    expect(resolveStudioSkillId({ brief: "tekrar dene", followup: true, projectSkillId: null })).toBe(null);
+  });
+});
+
 describe("autoFusion — füzyon yalnız üretim işlerinde", () => {
   it("site/uygulama üretim isteklerinde tetiklenir", () => {
     expect(autoFusion("bana modern bir portfolyo sitesi yap, koyu tema olsun")).toBe(true);

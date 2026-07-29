@@ -22,7 +22,7 @@ import { useStore } from "@/lib/store";
 import { friendlyError } from "@/lib/friendlyError";
 import { useSurfaceNav, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
-import { autoStudioSkill } from "@/lib/autoPilot";
+import { resolveStudioSkillId } from "@/lib/autoPilot";
 import type { Artifact, SlideDeck, StudioProject } from "@/lib/types";
 import { designSystemById, designSystemPromptText } from "@/lib/designSystems";
 import { type StudioTemplate } from "@/lib/studioTemplates";
@@ -366,8 +366,11 @@ export function DesignStudio() {
     /* Skill/yön artık ZORUNLU değil — eşleşme yoksa null kalır ve LLM formatı
        (html/kod/markdown/mermaid) brief'in kendisinden serbestçe seçer (Claude
        Artifacts paritesi). Eskiden "landing"/"minimal" zorla atanıyordu; bir
-       Python script isteğine "hero+CTA" talimatı enjekte etmek anlamsızdı. */
-    const skillId = template?.skillId ?? (followup ? project.skillId : autoStudioSkill(brief));
+       Python script isteğine "hero+CTA" talimatı enjekte etmek anlamsızdı.
+       resolveStudioSkillId (autoPilot.ts) İLK üretim başarısız olup
+       project.skillId hiç set edilmemişse brief'i yeniden sınıflandırır —
+       bkz. fonksiyonun kendi yorumu (Tem 2026 kullanıcı hata raporu). */
+    const skillId = resolveStudioSkillId({ brief, followup, projectSkillId: project.skillId, templateSkillId: template?.skillId });
     const directionId = template?.directionId ?? project.directionId;
     /* Marka seçici composer'a geri getirildi (kullanıcı kararı) — üretim,
        composer'da seçili tasarım sistemini kullanır (bkz. designSystemId
