@@ -1904,7 +1904,14 @@ export function CoderView() {
        doğrudan anahtarsız Pollinations'a düşüyordu — Ayarlar'daki "görsel
        yedek zinciri" seçeneği ajan yolunda hiç işlemiyordu. */
     let imageModelChain: { provider: ImageProvider; apiKey: string }[] = [];
-    if (wantImageGen) {
+    /* KAPI GENİŞ TUTULUR: sağlayıcı yalnız `wantImageGen` (doğal dil regex'i)
+       tetiklendiğinde çözülüyordu. Oysa generate_image aracı modele DAHA GENİŞ
+       durumda sunuluyor (repo bağlı/Tools açıkken coderTools içinde de var) —
+       o hâllerde istemci hiç BYOK adayı yollamıyor, sunucu da mecburen
+       anahtarsız Pollinations'a düşüyordu. Kullanıcının şikâyeti tam buydu:
+       "Pollinations değil, hangi model seçiliyse o kullanılsın". Araç
+       çağrılabiliyorsa aday da hazır olmalı. */
+    if (wantImageGen || (store.toolsEnabled && pilotRepoCtx)) {
       try {
         const { pickImageProvider, buildImageFallbackChain } = await import("@/lib/imageGen");
         imageModelPref = await pickImageProvider(store.config);

@@ -2027,6 +2027,10 @@ export async function POST(req: Request) {
             };
             const dims = DIMENSIONS[String(args.aspect_ratio ?? "square")] ?? DIMENSIONS.square;
             let markdown: string | null = null;
+            /* Hangi sağlayıcının ürettiği araç kartında GÖRÜNÜR olsun —
+               "Model X seçili ama Pollinations kullanılıyor" şüphesi ancak
+               böyle kesin cevap bulur. */
+            let usedLabel = "";
             /* BYOK adayları: istemci tam zinciri yolladıysa hepsi sırayla
                denenir (Ayarlar → Görsel üretimi → "Yedek zinciri"), yoksa tek
                aday (eski davranış). */
@@ -2050,6 +2054,7 @@ export async function POST(req: Request) {
                 const byokData = await byokRes.json().catch(() => ({})) as { image?: string; error?: string };
                 if (byokRes.ok && byokData.image) {
                   markdown = `![${prompt.slice(0, 120)}](${byokData.image})`;
+                  usedLabel = cand.provider;
                   break;
                 }
               } catch { /* bu aday olmadı → sıradakini dene */ }
@@ -2076,6 +2081,7 @@ export async function POST(req: Request) {
                   markdown = buf.byteLength <= 4_000_000
                     ? `![${prompt.slice(0, 120)}](data:${ctype};base64,${buf.toString("base64")})`
                     : `![${prompt.slice(0, 120)}](${url})`;
+                  usedLabel = "pollinations (ücretsiz taban)";
                 }
               } catch { /* aşağıda dürüst hata bildirilir */ }
             }
@@ -2090,7 +2096,7 @@ export async function POST(req: Request) {
               );
               return;
             }
-            safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: "Görsel üretildi" } })}\n\n`));
+            safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: `Görsel üretildi${usedLabel ? ` · ${usedLabel}` : ""}` } })}\n\n`));
             resultById.set(tc.id, markdown);
             return;
           }
