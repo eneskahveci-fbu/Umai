@@ -77,22 +77,3 @@ export async function streamChat(opts: GenChatOptions): Promise<string> {
   }
   return full;
 }
-
-/** Yanıttan ilk dengeli { } JSON bloğunu ayıklar (```json çitleri desteklenir). */
-export function extractJsonObject(text: string): string {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const src = fenced ? fenced[1] : text;
-  const start = src.indexOf("{");
-  if (start === -1) throw new Error("JSON bulunamadı — tekrar dene.");
-  let depth = 0, inStr = false, esc = false;
-  for (let i = start; i < src.length; i++) {
-    const c = src[i];
-    if (esc) { esc = false; continue; }
-    if (c === "\\") { esc = true; continue; }
-    if (c === '"') { inStr = !inStr; continue; }
-    if (inStr) continue;
-    if (c === "{") depth++;
-    else if (c === "}") { depth--; if (depth === 0) return src.slice(start, i + 1); }
-  }
-  throw new Error("JSON tamamlanmamış — tekrar dene.");
-}

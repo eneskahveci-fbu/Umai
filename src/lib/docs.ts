@@ -4,7 +4,8 @@
    Markdown / bağımsız HTML olarak dışa aktarır. */
 import type { CraftDoc, DocBlock, DocBlockType } from "./types";
 import { escapeHtml } from "./slides";
-import { streamChat, extractJsonObject } from "./genChat";
+import { extractJsonObject } from "./jsonExtract";
+import { streamJson } from "./genJson";
 
 export const DOC_BLOCK_TYPES: { id: DocBlockType; name: string }[] = [
   { id: "h1", name: "Başlık 1" },
@@ -21,6 +22,12 @@ export const DOC_BLOCK_TYPES: { id: DocBlockType; name: string }[] = [
 ];
 
 export const MAX_DOC_BLOCKS = 120;
+
+/* Token bütçesi — sunucu varsayılanı 8192 ve uzun bir doküman (120 bloğa
+   kadar) buna sığmayıp JSON ortada kesiliyordu. Devam turu çok daha kısa
+   olduğu için ayrı ve küçük tutuldu (gereksiz gecikme eklemesin). */
+const DOC_MAX_TOKENS = 16_000;
+const DOC_CONTINUE_MAX_TOKENS = 8_000;
 
 export function newBlockId(): string {
   return `db_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -174,8 +181,12 @@ export async function generateDoc(opts: DocGenOptions): Promise<CraftDoc> {
     "listelenebilir içeriği bullet yap; eylem maddelerini todo yap; önemli tek cümleyi quote, " +
     "kritik uyarı/ipucunu callout yap. Bilgi uydurma; brief'te olmayan sayısal iddia ekleme. " +
     "8-30 blok arası, taranabilir ve öz.";
-  const full = await streamChat({ system: sys, messages: [{ role: "user", content: opts.brief }], onDelta: opts.onDelta, signal: opts.signal, temperature: 0.6 });
-  const doc = parseDocJson(full, opts.brief.slice(0, 48));
+  const doc = await streamJson({
+    system: sys, messages: [{ role: "user", content: opts.brief }],
+    onDelta: opts.onDelta, signal: opts.signal, temperature: 0.6,
+    maxTokens: DOC_MAX_TOKENS,
+    parse: (raw) => parseDocJson(raw, opts.brief.slice(0, 48)),
+  });
   doc.brief = opts.brief;
   return doc;
 }
@@ -186,8 +197,20 @@ export async function continueDoc(doc: CraftDoc, instruction: string, signal?: A
     "Bir dokümana DEVAM blokları yazıyorsun. SADECE JSON döndür: {\"blocks\": [...]} — şema ve kurallar aynı:\n" + DOC_SCHEMA +
     "\nMevcut içeriği TEKRARLAMA; akışı ve tonu sürdür; 3-10 yeni blok üret. Türkçe.";
   const user = `Doküman:\n${docToMarkdown(doc).slice(0, 6000)}\n\nİstek: ${instruction || "Doğal biçimde devam et."}`;
-  const full = await streamChat({ system: sys, messages: [{ role: "user", content: user }], signal, temperature: 0.7 });
-  const parsed = normalizeDoc(JSON.parse(extractJsonObject(full)), doc.title);
-  if (!parsed) throw new Error("Devam blokları üretilemedi — tekrar dene.");
-  return parsed.blocks;
+  /* Eskiden bu JSON.parse SARILMAMIŞTI (aynı dosyadaki parseDocJson sarılı) —
+     bozuk model çıktısı Türkçe arayüze ham İngilizce SyntaxError olarak
+     sızıyordu ("Unexpected token < in JSON at position 0"). streamJson'ın
+     parse geri çağrısı hem sarar hem bir kez daha dener. */
+  return await streamJson({
+    system: sys, messages: [{ role: "user", content: user }], signal, temperature: 0.7,
+    maxTokens: DOC_CONTINUE_MAX_TOKENS,
+    parse: (raw) => {
+      let obj: unknown;
+      try { obj = JSON.parse(extractJsonObject(raw)); }
+      catch { throw new Error("Devam blokları JSON'u bozuk — tekrar dene."); }
+      const parsed = normalizeDoc(obj, doc.title);
+      if (!parsed) throw new Error("Devam blokları üretilemedi — tekrar dene.");
+      return parsed.blocks;
+    },
+  });
 }

@@ -3,9 +3,15 @@
    Tam SM-2 DEĞİL (bilinçli): 5 kutulu Leitner basit, açıklanabilir ve yerel
    veriyle (config) yeterli. Dışa aktarma: Anki'nin içe aktardığı TSV. */
 import type { CraftDeck, FlashCard, Highlight } from "./types";
-import { streamChat, extractJsonObject } from "./genChat";
+import { extractJsonObject } from "./jsonExtract";
+import { streamJson } from "./genJson";
 
 export const MAX_DECK_CARDS = 60;
+
+/* Token bütçesi — 60 karta kadar ön/arka metin (300+600 karakter tavanlı)
+   sunucu varsayılanı 8192'yi kolayca aşıyor. */
+const CARDS_MAX_TOKENS = 14_000;
+const CARDS_FROM_HIGHLIGHTS_MAX_TOKENS = 8_000;
 export const MAX_FRONT_CHARS = 300;
 export const MAX_BACK_CHARS = 600;
 export const MAX_HIGHLIGHTS = 300;
@@ -156,8 +162,12 @@ export async function generateDeck(opts: DeckGenOptions): Promise<CraftDeck> {
     "Sen deneyimli bir eğitmen ve bilişsel bilim meraklısısın. Kullanıcının brief'inden çalışma kartları " +
     "(flashcard) üret. SADECE geçerli JSON döndür (istersen tek ```json bloğu). Şema:\n" +
     DECK_SCHEMA + "\n" + DECK_RULES;
-  const full = await streamChat({ system: sys, messages: [{ role: "user", content: opts.brief }], onDelta: opts.onDelta, signal: opts.signal, temperature: 0.5 });
-  const deck = parseDeckJson(full, opts.brief.slice(0, 48));
+  const deck = await streamJson({
+    system: sys, messages: [{ role: "user", content: opts.brief }],
+    onDelta: opts.onDelta, signal: opts.signal, temperature: 0.5,
+    maxTokens: CARDS_MAX_TOKENS,
+    parse: (raw) => parseDeckJson(raw, opts.brief.slice(0, 48)),
+  });
   deck.brief = opts.brief;
   return deck;
 }
@@ -170,7 +180,10 @@ export async function cardsFromHighlights(highlights: Highlight[], signal?: Abor
     "Aşağıdaki VURGULARDAN çalışma kartları üret — yalnız vurgulardaki bilgiyi kullan, ekleme yapma. " +
     "SADECE geçerli JSON döndür. Şema:\n" + DECK_SCHEMA + "\n" + DECK_RULES;
   const user = highlights.map((h, i) => `${i + 1}. ${h.text}`).join("\n\n").slice(0, 8000);
-  const full = await streamChat({ system: sys, messages: [{ role: "user", content: user }], signal, temperature: 0.4 });
-  const deck = parseDeckJson(full, "Vurgulardan");
+  const deck = await streamJson({
+    system: sys, messages: [{ role: "user", content: user }], signal, temperature: 0.4,
+    maxTokens: CARDS_FROM_HIGHLIGHTS_MAX_TOKENS,
+    parse: (raw) => parseDeckJson(raw, "Vurgulardan"),
+  });
   return deck.cards;
 }

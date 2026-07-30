@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { extractJsonObject, streamChat } from "../genChat";
+import { streamChat } from "../genChat";
+import { extractJsonObject } from "../jsonExtract";
 import { useStore } from "../store";
 import type { Skill } from "../types";
 
