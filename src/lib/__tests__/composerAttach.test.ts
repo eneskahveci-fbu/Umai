@@ -24,9 +24,13 @@ describe("composer dosya ekleme — tek düğme (Ö11)", () => {
     expect(src).not.toContain("cameraRef");
   });
 
-  it("tek bir dosya girişi var", () => {
-    expect(src.match(/type="file"/g) ?? []).toHaveLength(1);
+  /* Composer'ın girişi `fileRef` ile işaretli. Dosyada başka bir `type="file"`
+     bulunabilir (ör. Sunucu panelinin yükleme girişi, Ö10) — bu testin konusu
+     COMPOSER, o yüzden sayım ref'e göre yapılıyor. */
+  it("composer'da tek bir dosya girişi var", () => {
     expect(src.match(/ref=\{fileRef\}/g) ?? []).toHaveLength(1);
+    /* Kamera girişi (capture özniteliği) tamamen kalktı. */
+    expect(src).not.toContain("capture=");
   });
 
   it("accept listesi görselleri DE kapsar (yoksa görsel eklenemezdi)", () => {

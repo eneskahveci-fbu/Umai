@@ -42,6 +42,23 @@ export async function bridgeReadFile(url: string, token: string, path: string): 
   return typeof data.content === "string" ? data.content : "";
 }
 
+/* ── Yazma işlemleri (Ö10, kullanıcı isteği: "silinip yüklenebilsin") ────────
+   Sunucu tarafı ZATEN hazırdı (local-bridge/server.js: /fs/write, /fs/delete,
+   /fs/rename — hepsi safeResolve ile workspace kökünün dışına çıkışı
+   engelliyor); eksik olan yalnız istemci sarmalayıcılarıydı, bu yüzden
+   panelde salt-okunur bir görünüm vardı. */
+
+/** Dosya oluşturur ya da içeriğini DEĞİŞTİRİR. `true` → yeni oluşturuldu. */
+export async function bridgeWriteFile(url: string, token: string, path: string, content: string): Promise<boolean> {
+  const data = await bridgePost(url, token, "/fs/write", { path, content });
+  return data.created === true;
+}
+
+/** Dosyayı (ya da dizini) siler. GERİ ALINAMAZ — çağıran onay almalı. */
+export async function bridgeDeleteFile(url: string, token: string, path: string): Promise<void> {
+  await bridgePost(url, token, "/fs/delete", { path });
+}
+
 /** Köprü ulaşılabilir mi? /health token gerektirmez. */
 export async function bridgeHealth(url: string): Promise<boolean> {
   try {
