@@ -13,6 +13,8 @@ import {
   ArrowDown,
   AlertTriangle,
   ArrowUp,
+  BookMarked,
+  BookOpen,
   Brain,
   ChevronDown,
   ChevronRight,
@@ -52,7 +54,7 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { detectLanguage, type EditorFile } from "@/lib/editor";
-import { bridgeListFiles, bridgeReadFile, buildTreeFromPaths } from "@/lib/bridgeFs";
+import { bridgeListFiles, bridgeReadFile, bridgeWriteFile, bridgeDeleteFile, buildTreeFromPaths } from "@/lib/bridgeFs";
 import { extractAllFileFences } from "@/lib/parsers";
 import { fuzzyFiles } from "@/lib/fuzzy";
 import { buildPreview } from "@/lib/preview";
@@ -137,7 +139,7 @@ import { autoEffort, autoSwarm, decidePilot, decidePilotAsync, type PilotDecisio
 import { pickDraftModels, buildBoostInstruction, generateDrafts, fillSelfConsistency, judgeDrafts } from "@/lib/boost";
 import { runCompare } from "@/lib/compare";
 import { fetchTextModels } from "@/lib/pollinations";
-import { importSkillFromUrl } from "@/lib/skillImport";
+import { importSkillFromUrl, skillFromText } from "@/lib/skillImport";
 import { trackEvent } from "@/lib/analytics";
 import { retrieve } from "@/lib/retrieval";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
@@ -819,6 +821,9 @@ export function CoderView() {
   const [wsPaths, setWsPaths] = useState<string[]>([]);
   const [wsLoading, setWsLoading] = useState(false);
   const [wsSearch, setWsSearch] = useState("");
+  /* Ö10 — sunucu dosyası sağ tık menüsü + yükleme girişi. */
+  const [wsMenu, setWsMenu] = useState<{ path: string; x: number; y: number } | null>(null);
+  const wsUploadRef = useRef<HTMLInputElement>(null);
   const [wsFetching, setWsFetching] = useState<string | null>(null);
   const [terminalOpen, setTerminalOpen] = useState(false);
   /* Terminal bir kez boot olur ve ARKAPLANDA mount kalır (kapatınca unmount
@@ -1400,6 +1405,87 @@ export function CoderView() {
       addToast(`Workspace okunamadı: ${(e as Error).message}`, "error");
     } finally {
       setWsLoading(false);
+    }
+  };
+
+  /* Ö10 (kullanıcı isteği): workspace dosyaları silinip yüklenebilsin, skill
+     veya snippet olarak kaydedilebilsin. Sunucu tarafı ZATEN hazırdı
+     (local-bridge: /fs/write, /fs/delete — ikisi de safeResolve ile kökün
+     dışına çıkışı engelliyor); eksik olan istemci sarmalayıcıları ve UI'dı. */
+  const wsUpload = () => wsUploadRef.current?.click();
+
+  const openWsMenu = (f: TreeFile, e: React.MouseEvent) => {
+    e.preventDefault();
+    setWsMenu({ path: f.path, x: Math.min(e.clientX, window.innerWidth - 190), y: Math.min(e.clientY, window.innerHeight - 150) });
+  };
+
+  /** Seçilen dosyaları köprünün /fs/write ucuna yazar. Köprü UTF-8 METİN
+      yazdığı için ikili dosyalar (görsel/zip) bilerek reddedilir — sessizce
+      bozuk dosya oluşturmaktansa açıkça söylemek doğru. */
+  const wsUploadFiles = async (files: globalThis.File[]) => {
+    const cfg = useStore.getState().config;
+    const url = cfg.localBridgeUrl?.trim();
+    if (!url || files.length === 0) return;
+    const token = cfg.localBridgeToken || "";
+    let ok = 0;
+    for (const f of files) {
+      if (f.size > 2_000_000) { addToast(`${f.name} 2MB'den büyük — atlandı.`, "error"); continue; }
+      if (/^(image|video|audio)\//.test(f.type) || /\.(zip|gz|tar|pdf|png|jpe?g|webp|gif|docx|xlsx|pptx)$/i.test(f.name)) {
+        addToast(`${f.name} ikili dosya — sunucuya yalnız metin dosyası yüklenebilir.`, "error");
+        continue;
+      }
+      try {
+        await bridgeWriteFile(url, token, f.name, await f.text());
+        ok++;
+      } catch (e) {
+        addToast(`${f.name} yüklenemedi: ${(e as Error).message}`, "error");
+      }
+    }
+    if (ok > 0) { addToast(`${ok} dosya sunucuya yüklendi`, "success"); await loadWorkspace(); }
+  };
+
+  const wsDeleteFile = async (path: string) => {
+    const cfg = useStore.getState().config;
+    const url = cfg.localBridgeUrl?.trim();
+    if (!url) return;
+    /* Silme GERİ ALINAMAZ (sunucuda rm -rf) — onay şart. */
+    if (!window.confirm(`"${path}" sunucudan KALICI olarak silinsin mi?`)) return;
+    try {
+      await bridgeDeleteFile(url, cfg.localBridgeToken || "", path);
+      addToast(`${path} silindi`, "success");
+      await loadWorkspace();
+    } catch (e) {
+      addToast(`Silinemedi: ${(e as Error).message}`, "error");
+    }
+  };
+
+  /** Dosyayı okuyup Skills'e ya da Snippet'lere kaydeder — mevcut store
+      eylemleri (addSkill/addSnippet) aynen kullanılır. */
+  const wsSaveAs = async (path: string, as: "skill" | "snippet") => {
+    const cfg = useStore.getState().config;
+    const url = cfg.localBridgeUrl?.trim();
+    if (!url) return;
+    try {
+      const content = await bridgeReadFile(url, cfg.localBridgeToken || "", path);
+      if (!content.trim()) { addToast("Dosya boş — kaydedilmedi.", "info"); return; }
+      const name = path.split("/").pop() || path;
+      if (as === "skill") {
+        /* SKILL.md biçimindeyse başlık/açıklama frontmatter'dan alınır —
+           "skill indir" ile AYNI dönüşüm (skillFromText, tek kaynak). */
+        const skill = skillFromText(content, path, ["sunucu"]);
+        useStore.getState().addSkill(skill);
+        addToast(`Skill olarak kaydedildi: ${skill.title}`, "success");
+      } else {
+        useStore.getState().addSnippet({
+          title: name,
+          code: content,
+          language: detectLanguage(path),
+          tags: [],
+        });
+        addToast(`Snippet olarak kaydedildi: ${name}`, "success");
+      }
+    } catch (e) {
+      addToast(`Kaydedilemedi: ${(e as Error).message}`, "error");
     }
   };
 
@@ -3522,12 +3608,59 @@ export function CoderView() {
                     ))}
                 </div>
               ) : (
-                <FileTreeNode node={wsTree} onSelect={openWorkspaceFile} attached={[]} />
+                <FileTreeNode node={wsTree} onSelect={openWorkspaceFile} attached={[]} onContextMenu={openWsMenu} />
               )}
             </div>
 
-            <div className="px-3 py-2 border-t border-line/40 shrink-0 text-[10px] text-muted/40">
-              {wsPaths.length > 0 ? `${wsPaths.length} dosya` : "—"}
+            {/* Sağ tık menüsü — sil / skill / snippet. Repo panelindeki sağ tık
+                deseniyle aynı (onContextMenu prop'u FileTreeNode'da zaten var). */}
+            {wsMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setWsMenu(null)} onContextMenu={(e) => { e.preventDefault(); setWsMenu(null); }} />
+                <div
+                  className="fixed z-50 min-w-44 rounded-xl border border-line bg-surface elev-2 overflow-hidden text-[11px]"
+                  style={{ left: wsMenu.x, top: wsMenu.y }}
+                >
+                  <div className="px-3 py-1.5 text-[10px] text-muted/50 truncate border-b border-line/40">{wsMenu.path}</div>
+                  <button onClick={() => { const p = wsMenu.path; setWsMenu(null); void wsSaveAs(p, "skill"); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bgsoft/70 text-left text-ink/85 transition-colors">
+                    <BookMarked size={12} /> Skill olarak kaydet
+                  </button>
+                  <button onClick={() => { const p = wsMenu.path; setWsMenu(null); void wsSaveAs(p, "snippet"); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bgsoft/70 text-left text-ink/85 transition-colors">
+                    <BookOpen size={12} /> Snippet olarak kaydet
+                  </button>
+                  <button onClick={() => { const p = wsMenu.path; setWsMenu(null); void wsDeleteFile(p); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-red/10 text-left text-red transition-colors border-t border-line/40">
+                    <Trash2 size={12} /> Sunucudan sil
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Yükleme: metin dosyaları (köprünün /fs/write ucu UTF-8 metin yazar). */}
+            <input
+              ref={wsUploadRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => { void wsUploadFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }}
+            />
+
+            {/* Ö10 — kaynak ŞEFFAFLIĞI: bu panel Hibrit Köprü'nün workspace
+                KÖKÜNÜ listeler. Terminalden indirilen bir dosya, terminal
+                sunucusunun çalışma dizini bu kökle aynı değilse burada
+                GÖRÜNMEZ; kullanıcı boşuna aramasın diye açıkça yazılıyor. */}
+            <div className="px-3 py-1.5 border-t border-line/40 shrink-0 text-[9px] leading-snug text-muted/40">
+              Kaynak: Hibrit Sunucu workspace kökü. Terminalden indirdiğin dosya
+              burada yoksa terminalin çalışma dizini bu kökten farklıdır.
+            </div>
+
+            <div className="px-3 py-2 border-t border-line/40 shrink-0 text-[10px] text-muted/40 flex items-center justify-between gap-2">
+              <span>{wsPaths.length > 0 ? `${wsPaths.length} dosya` : "—"}</span>
+              <button onClick={wsUpload} className="text-muted/60 hover:text-brand transition-colors flex items-center gap-1" title="Sunucuya dosya yükle">
+                <ArrowUp size={9} /> Yükle
+              </button>
             </div>
           </div>
         )}

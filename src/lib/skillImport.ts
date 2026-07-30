@@ -15,6 +15,33 @@ export function deriveSkillTitle(text: string, url: string): string {
   return raw.replace(/^#+\s*/, "").slice(0, 60).trim();
 }
 
+/** Ham metinden eklenmeye hazır bir skill kaydı üretir. SAF — birim testli.
+ *
+ *  Open Design SKILL.md formatı: frontmatter'daki ad/açıklama kullanılır,
+ *  gövde (workflow) skill içeriği olur — OD kayıt defterleri doğrudan uyumlu.
+ *
+ *  `importSkillFromUrl`ın içindeydi; sohbetten ve sunucu dosyalarından da
+ *  aynı dönüşüm gerektiği için tek kaynağa çıkarıldı (Ö4/Ö10). `origin`
+ *  başlık türetmede ve fileName'de kullanılır (URL, dosya yolu ya da
+ *  "sohbet" gibi bir etiket olabilir). */
+export function skillFromText(
+  text: string,
+  origin: string,
+  extraTags: string[] = [],
+): { title: string; content: string; tags: string[]; enabled: true; source: "file"; fileName: string } {
+  const od = looksLikeSkillMd(text) ? parseSkillMd(text) : null;
+  const title = od?.name ?? deriveSkillTitle(text, origin);
+  const content = od ? (od.description ? `${od.description}\n\n${od.body}` : od.body) : text;
+  return {
+    title,
+    content,
+    tags: [...(od ? ["içe-aktarılan", "open-design"] : ["içe-aktarılan"]), ...extraTags],
+    enabled: true,
+    source: "file",
+    fileName: origin,
+  };
+}
+
 /** URL'den skill indirir ve ekler. Hata fırlatır — çağıran dostane gösterir. */
 export async function importSkillFromUrl(url: string): Promise<{ title: string; chars: number }> {
   const res = await fetch(`/api/fetch-text?url=${encodeURIComponent(url)}`);
@@ -22,19 +49,7 @@ export async function importSkillFromUrl(url: string): Promise<{ title: string; 
   if (!res.ok || typeof data.text !== "string" || !data.text.trim()) {
     throw new Error(data.error || `İçerik alınamadı (HTTP ${res.status})`);
   }
-  const text = (data.text as string).slice(0, 50_000);
-  /* Open Design SKILL.md formatı: frontmatter'daki ad/açıklama kullanılır,
-     gövde (workflow) skill içeriği olur — OD kayıt defterleri doğrudan uyumlu. */
-  const od = looksLikeSkillMd(text) ? parseSkillMd(text) : null;
-  const title = od?.name ?? deriveSkillTitle(text, url);
-  const content = od ? (od.description ? `${od.description}\n\n${od.body}` : od.body) : text;
-  useStore.getState().addSkill({
-    title,
-    content,
-    tags: od ? ["içe-aktarılan", "open-design"] : ["içe-aktarılan"],
-    enabled: true,
-    source: "file",
-    fileName: url,
-  });
-  return { title, chars: content.length };
+  const skill = skillFromText((data.text as string).slice(0, 50_000), url);
+  useStore.getState().addSkill(skill);
+  return { title: skill.title, chars: skill.content.length };
 }
