@@ -373,6 +373,29 @@ function pushCloudConfig(get: () => StoreState, userId: string, config: Config) 
     });
 }
 
+/* Akış sırasında yazılacak mesajı ROLE göre bulur — konuma göre DEĞİL.
+   (Tem 2026 hata raporu: "bazen modelin cevabı ben yazmışım gibi görünüyor".)
+
+   Kök neden: aşağıdaki tüm `*OnLast` yardımcıları körlemesine
+   `messages[messages.length - 1]`'e yazıyordu. Akış SÜRERKEN araya bir
+   `role:"user"` mesajı girerse (ör. terminal/kod çıktısının ajana geri
+   beslenmesi) akan metin O mesajın içeriğini eziyordu. Belirti şuydu: gizli
+   bağlam mesajları içeriği `**Terminal çıktısı**` ile başladığı için
+   gizleniyor; içerik ezilince önek kayboluyor, mesaj GÖRÜNÜR hâle geliyor ve
+   `role` hâlâ `"user"` olduğu için modelin cevabı sağa hizalı KULLANICI
+   balonunda çiziliyordu. Ayrıca `popLastMessage` kullanıcının mesajını
+   siliyordu.
+
+   Doğru desen zaten kodda vardı (`addCommandRun` geriye doğru asistan arıyor);
+   burada tek kaynağa çıkarıldı. Asistan yoksa çağıranlar HİÇBİR ŞEY yazmaz —
+   kullanıcı mesajına düşmek bu hatanın ta kendisiydi. */
+function lastAssistantIndex(messages: readonly ChatMessage[]): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "assistant") return i;
+  }
+  return -1;
+}
+
 interface StoreState {
   userId: string | null;
   userEmail: string | null;
@@ -1353,9 +1376,10 @@ export const useStore = create<StoreState>()((set, get) => ({
       chats: s.chats.map((c) => {
         if (c.id !== s.currentId) return c;
         const messages = c.messages.slice();
-        if (messages.length) {
-          messages[messages.length - 1] = {
-            ...messages[messages.length - 1],
+        const li = lastAssistantIndex(messages);
+        if (li >= 0) {
+          messages[li] = {
+            ...messages[li],
             content,
             ...(opts?.isError ? { isError: true } : {}),
           };
@@ -1369,8 +1393,9 @@ export const useStore = create<StoreState>()((set, get) => ({
       chats: s.chats.map((c) => {
         if (c.id !== s.currentId) return c;
         const messages = c.messages.slice();
-        if (messages.length) {
-          messages[messages.length - 1] = { ...messages[messages.length - 1], thinking };
+        const li = lastAssistantIndex(messages);
+        if (li >= 0) {
+          messages[li] = { ...messages[li], thinking };
         }
         return { ...c, messages };
       }),
@@ -1380,8 +1405,9 @@ export const useStore = create<StoreState>()((set, get) => ({
       chats: s.chats.map((c) => {
         if (c.id !== s.currentId) return c;
         const messages = c.messages.slice();
-        if (messages.length) {
-          messages[messages.length - 1] = { ...messages[messages.length - 1], fusionModels: models };
+        const li = lastAssistantIndex(messages);
+        if (li >= 0) {
+          messages[li] = { ...messages[li], fusionModels: models };
         }
         return { ...c, messages };
       }),
@@ -1391,8 +1417,9 @@ export const useStore = create<StoreState>()((set, get) => ({
       chats: s.chats.map((c) => {
         if (c.id !== s.currentId) return c;
         const messages = c.messages.slice();
-        if (messages.length) {
-          messages[messages.length - 1] = { ...messages[messages.length - 1], plan };
+        const li = lastAssistantIndex(messages);
+        if (li >= 0) {
+          messages[li] = { ...messages[li], plan };
         }
         return { ...c, messages };
       }),
@@ -1402,8 +1429,9 @@ export const useStore = create<StoreState>()((set, get) => ({
       chats: s.chats.map((c) => {
         if (c.id !== s.currentId) return c;
         const messages = c.messages.slice();
-        if (messages.length) {
-          messages[messages.length - 1] = { ...messages[messages.length - 1], swarm };
+        const li = lastAssistantIndex(messages);
+        if (li >= 0) {
+          messages[li] = { ...messages[li], swarm };
         }
         return { ...c, messages };
       }),
@@ -1413,8 +1441,9 @@ export const useStore = create<StoreState>()((set, get) => ({
       chats: s.chats.map((c) => {
         if (c.id !== s.currentId) return c;
         const messages = c.messages.slice();
-        if (messages.length) {
-          messages[messages.length - 1] = { ...messages[messages.length - 1], checkpoints };
+        const li = lastAssistantIndex(messages);
+        if (li >= 0) {
+          messages[li] = { ...messages[li], checkpoints };
         }
         return { ...c, messages };
       }),
@@ -1431,11 +1460,12 @@ export const useStore = create<StoreState>()((set, get) => ({
       chats: s.chats.map((c) => {
         if (c.id !== s.currentId) return c;
         const messages = c.messages.slice();
-        if (messages.length) {
-          const last = messages[messages.length - 1];
+        const li = lastAssistantIndex(messages);
+        if (li >= 0) {
+          const last = messages[li];
           const images = last.images ?? [];
           if (!images.includes(url)) {
-            messages[messages.length - 1] = { ...last, images: [...images, url] };
+            messages[li] = { ...last, images: [...images, url] };
           }
         }
         return { ...c, messages };
@@ -1488,8 +1518,9 @@ export const useStore = create<StoreState>()((set, get) => ({
       chats: s.chats.map((c) => {
         if (c.id !== s.currentId) return c;
         const messages = c.messages.slice();
-        if (messages.length) {
-          messages[messages.length - 1] = { ...messages[messages.length - 1], finishReason };
+        const li = lastAssistantIndex(messages);
+        if (li >= 0) {
+          messages[li] = { ...messages[li], finishReason };
         }
         return { ...c, messages };
       }),
@@ -1500,8 +1531,9 @@ export const useStore = create<StoreState>()((set, get) => ({
       chats: s.chats.map((c) => {
         if (c.id !== s.currentId) return c;
         const messages = c.messages.slice();
-        if (messages.length) {
-          messages[messages.length - 1] = { ...messages[messages.length - 1], sources };
+        const li = lastAssistantIndex(messages);
+        if (li >= 0) {
+          messages[li] = { ...messages[li], sources };
         }
         return { ...c, messages };
       }),
@@ -1512,9 +1544,10 @@ export const useStore = create<StoreState>()((set, get) => ({
       chats: s.chats.map((c) => {
         if (c.id !== s.currentId) return c;
         const messages = c.messages.slice();
-        if (messages.length) {
-          messages[messages.length - 1] = {
-            ...messages[messages.length - 1],
+        const li = lastAssistantIndex(messages);
+        if (li >= 0) {
+          messages[li] = {
+            ...messages[li],
             tokenIn,
             tokenOut,
           };
@@ -1528,11 +1561,18 @@ export const useStore = create<StoreState>()((set, get) => ({
       }),
     })),
 
+  /* İptal/hata/yeniden-deneme yollarında akış için açılan asistan balonunu
+     geri alır. Konumsal `slice(0, -1)` DEĞİL: araya bir bağlam mesajı
+     (role:"user") girmişse o silinir ve kullanıcının yazdığı şey kaybolurdu.
+     Asistan yoksa hiçbir şey silinmez. */
   popLastMessage: () =>
     set((s) => ({
-      chats: s.chats.map((c) =>
-        c.id === s.currentId ? { ...c, messages: c.messages.slice(0, -1) } : c,
-      ),
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const li = lastAssistantIndex(c.messages);
+        if (li < 0) return c;
+        return { ...c, messages: c.messages.filter((_, i) => i !== li) };
+      }),
     })),
 
   editMessageBranch: (index, content) => {
@@ -1756,9 +1796,10 @@ export const useStore = create<StoreState>()((set, get) => ({
       chats: s.chats.map((c) => {
         if (c.id !== s.currentId) return c;
         const messages = c.messages.slice();
-        if (messages.length) {
-          const last = messages[messages.length - 1];
-          messages[messages.length - 1] = {
+        const li = lastAssistantIndex(messages);
+        if (li >= 0) {
+          const last = messages[li];
+          messages[li] = {
             ...last,
             toolCalls: [...(last.toolCalls ?? []), tc],
           };
@@ -1771,9 +1812,10 @@ export const useStore = create<StoreState>()((set, get) => ({
       chats: s.chats.map((c) => {
         if (c.id !== s.currentId) return c;
         const messages = c.messages.slice();
-        if (messages.length) {
-          const last = messages[messages.length - 1];
-          messages[messages.length - 1] = {
+        const li = lastAssistantIndex(messages);
+        if (li >= 0) {
+          const last = messages[li];
+          messages[li] = {
             ...last,
             toolCalls: (last.toolCalls ?? []).map((tc) =>
               tc.id === id ? { ...tc, ...patch } : tc,

@@ -571,6 +571,28 @@ function getExt(name: string) {
   return name.split(".").pop()?.toLowerCase() ?? "";
 }
 
+/* Akış SÜRERKEN sohbete `role:"user"` mesaj eklenmesini erteler.
+
+   Terminal/kod çıktısı ajana gizli bir kullanıcı mesajı olarak geri beslenir.
+   Bu, akışın ORTASINDA olursa akan metin o mesajın üzerine yazılıyor ve
+   modelin cevabı kullanıcı balonunda görünüyordu (Tem 2026 hata raporu).
+   store.ts tarafındaki `lastAssistantIndex` artık yanlış mesaja yazmayı
+   imkânsız kılıyor; burada ayrıca mesajın DOĞRU SIRAYA girmesini sağlıyoruz.
+
+   Çıktı DÜŞÜRÜLMEZ, KUYRUĞA alınır: checklist yolundaki `if (store.streaming)
+   return;` orada doğru (kullanıcı tekrar tıklayabilir), ama burada vazgeçmek
+   ajanın çalıştırdığı komutun sonucunu kalıcı olarak kaybettirir. */
+function runWhenNotStreaming(fn: () => void): void {
+  if (!useStore.getState().streaming) { fn(); return; }
+  let done = false;
+  const unsub = useStore.subscribe(() => {
+    if (done || useStore.getState().streaming) return;
+    done = true;
+    unsub();
+    fn();
+  });
+}
+
 const EXT_COLOR: Record<string, string> = {
   ts: "text-blue-400", tsx: "text-blue-400",
   js: "text-yellow-400", jsx: "text-yellow-400",
@@ -1305,10 +1327,14 @@ export function CoderView() {
          (MessageBubble "**Terminal çıktısı**" ile başlayanları render etmez);
          çıktı zaten todo kutusunda görünür. */
       const msg = `**Terminal çıktısı** (\`${command}\`):\n\`\`\`\n${output}\n\`\`\``;
-      useStore.getState().pushMessage({ role: "user", content: msg });
-      /* callApi is a stable useCallback defined below; it's only invoked here
-         from an event handler that fires after mount, so the forward ref is safe. */
-      void callApi();
+      /* Akış sürüyorsa bitene kadar bekle — yoksa akan metin bu mesajın
+         üzerine yazılır (bkz. runWhenNotStreaming). */
+      runWhenNotStreaming(() => {
+        useStore.getState().pushMessage({ role: "user", content: msg });
+        /* callApi is a stable useCallback defined below; it's only invoked here
+           from an event handler that fires after mount, so the forward ref is safe. */
+        void callApi();
+      });
     };
     window.addEventListener("craftai:terminal-output", handler);
     return () => window.removeEventListener("craftai:terminal-output", handler);
@@ -1325,8 +1351,10 @@ export function CoderView() {
       const { language, code, output } = (e as CustomEvent<{ language: string; code: string; output: string }>).detail ?? {};
       if (!output) return;
       const msg = `**Kod çıktısı** (${language}):\n\`\`\`${language}\n${code}\n\`\`\`\nÇıktı:\n\`\`\`\n${output}\n\`\`\``;
-      useStore.getState().pushMessage({ role: "user", content: msg });
-      void callApi();
+      runWhenNotStreaming(() => {
+        useStore.getState().pushMessage({ role: "user", content: msg });
+        void callApi();
+      });
     };
     window.addEventListener("craftai:code-output", handler);
     return () => window.removeEventListener("craftai:code-output", handler);
