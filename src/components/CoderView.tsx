@@ -84,6 +84,30 @@ import { isAdminEmail } from "@/lib/admin";
 import { extractCheckedItems } from "@/lib/checklist";
 import { MessageBubble } from "./MessageBubble";
 import { SlashMenu } from "./SlashMenu";
+
+/* Üretilen görseli Kütüphane'ye kaydeder — hem "/gorsel" komutu hem de
+   generate_image aracı (image_event) buradan geçer, böylece data-URL kota
+   kuralı (bkz. addMediaAsset, imageGen.ts) tek bir yerde tanımlı kalır. */
+function saveGeneratedImage(url: string, prompt: string, seed?: number): void {
+  const store = useStore.getState();
+  const config = store.config;
+  void import("@/lib/imageGen").then(({ addMediaAsset }) => {
+    store.saveConfig({
+      ...useStore.getState().config,
+      mediaAssets: addMediaAsset(useStore.getState().config.mediaAssets, {
+        id: `img_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+        title: prompt.slice(0, 72) || "Görsel",
+        url,
+        prompt,
+        seed,
+        createdAt: Date.now(),
+        projectId: config.activeProjectId ?? undefined,
+        chatId: store.currentId ?? undefined,
+        source: "image-gen",
+      }),
+    });
+  });
+}
 import { MentionMenu } from "./MentionMenu";
 import {
   buildTree,
@@ -2512,6 +2536,21 @@ export function CoderView() {
               }
               continue;
             }
+            /* generate_image sonucu — görsel AYRI bir kanaldan gelir, model
+               üzerinden GEÇMEZ. Eskiden sunucu `![...](data:image/...)`
+               markdown'ını araç sonucu olarak modele veriyor, model de onu
+               yanıtına kopyalamaya çalışıyordu; base64 yüz binlerce token
+               olduğu için yarıda kesilip sohbete ham metin olarak dökülüyordu
+               (kullanıcı ekran görüntüsü, Tem 2026). Artık doğrudan son
+               asistan mesajının images[] alanına iliştirilir ve MessageBubble'ın
+               GeneratedImage önizlemesiyle render edilir — "/gorsel" komutunun
+               kullandığı AYNI yol. */
+            if (parsed.image_event?.url) {
+              const url = String(parsed.image_event.url);
+              useStore.getState().addImageToLast(url);
+              saveGeneratedImage(url, String(parsed.image_event.prompt ?? ""));
+              continue;
+            }
             /* ajan plan (update_plan) olayı */
             if (parsed.plan_event) {
               useStore.getState().setPlanOnLast(String(parsed.plan_event.plan ?? ""));
@@ -2853,29 +2892,9 @@ export function CoderView() {
         content: `**"${imgPrompt}"** için oluşturdum:${providerNote}`,
         images: [url],
       });
-      const chatId = useStore.getState().currentId ?? undefined;
-      const config = useStore.getState().config;
-      /* Kütüphane kaydı: BYOK sonucu data-URL'dir (sıkıştırılmış JPEG) —
-         localStorage kotasını korumak için data-URL girdileri 20 ile sınırlı
-         (Pollinations URL'leri küçüktür, genel 200 sınırı yeter). */
-      const allAssets = [{
-        id: `img_${Date.now().toString(36)}_${seed}`,
-        title: imgPrompt.slice(0, 72) || "Görsel",
-        url,
-        prompt: imgPrompt,
-        seed,
-        createdAt: Date.now(),
-        projectId: config.activeProjectId ?? undefined,
-        chatId,
-        source: "image-gen" as const,
-      }, ...(config.mediaAssets ?? [])];
-      let dataCount = 0;
-      useStore.getState().saveConfig({
-        ...config,
-        mediaAssets: allAssets
-          .filter((a) => !a.url.startsWith("data:") || ++dataCount <= 20)
-          .slice(0, 200),
-      });
+      /* Kütüphane kaydı — kota kuralı addMediaAsset'te tek yerde (imageGen.ts);
+         generate_image aracı da AYNI yardımcıyı kullanır. */
+      saveGeneratedImage(url, imgPrompt, seed);
       void store.persistCurrent();
       return;
     }

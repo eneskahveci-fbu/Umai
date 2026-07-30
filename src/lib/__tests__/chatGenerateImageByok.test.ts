@@ -191,7 +191,13 @@ describe("POST /api/chat — generate_image BYOK önceliği", () => {
     expect(text).toContain("Görsel üretilemedi");
   });
 
-  it("Pollinations görsel DÖNDÜRÜRSE veri-URL'i olarak gömülür (tarayıcı ikinci kez üretmez)", async () => {
+  /* Kullanıcı hata raporu (Tem 2026, ekran görüntüsü): görsel üretilince
+     sohbete ham "![...](data:image/jpeg;base64,/9j/4QPARX…" metni dökülüyordu.
+     Sebep: araç sonucu olarak MODELE bir veri-URL'i veriliyor ve sistem promptu
+     "bunu yanıtına göm" diyordu; base64 yüz binlerce token olduğundan model
+     kopyalarken yarıda kesiliyordu. Görsel artık modele HİÇ gitmez — ayrı bir
+     image_event ile doğrudan istemciye ulaşır. */
+  it("görsel MODELE gitmez: araç sonucunda base64/veri-URL'i bulunmaz", async () => {
     const args = JSON.stringify({ prompt: "a knight" });
     let llmCallCount = 0;
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -209,12 +215,43 @@ describe("POST /api/chat — generate_image BYOK önceliği", () => {
       body: JSON.stringify(baseBody),
     });
     await readAllText(await POST(req));
-    /* Modelin bir sonraki turuna giden tool sonucu veri-URL'i içermeli. */
+
     const llmCalls = fetchMock.mock.calls.filter((c) => !String(c[0]).includes("pollinations"));
     const lastLlmBody = JSON.parse(
       String((llmCalls.at(-1)?.[1] as RequestInit | undefined)?.body ?? "{}"),
     ) as { messages: { role: string; content?: string }[] };
     const toolMsg = lastLlmBody.messages.find((m) => m.role === "tool");
-    expect(toolMsg?.content ?? "").toContain("data:image/jpeg;base64,");
+    const toolText = toolMsg?.content ?? "";
+    expect(toolText).not.toContain("data:image");
+    expect(toolText).not.toMatch(/;base64,/);
+    expect(toolText).not.toContain("![");
+    /* Kısa kalmalı — eskiden tüm görsel gövdesi buraya giriyordu. */
+    expect(toolText.length).toBeLessThan(400);
+    /* Yine de modele üretimin BAŞARILI olduğu bildirilmeli. */
+    expect(toolText).toContain("üretildi");
+  });
+
+  /* Görsel kaybolmuyor: sunucuda doğrulanıp çekilen veri-URL'i istemciye
+     image_event ile ulaşır (tarayıcı ikinci kez üretmez — bu davranış korunur). */
+  it("görsel istemciye image_event ile veri-URL'i olarak ulaşır", async () => {
+    const args = JSON.stringify({ prompt: "a knight" });
+    let llmCallCount = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      void init;
+      if (url.includes("pollinations")) return Promise.resolve(pollinationsImageResponse());
+      llmCallCount += 1;
+      return Promise.resolve(llmCallCount === 1 ? toolCallUpstream(args) : textStopUpstream("tamam"));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "9.9.9.25" },
+      body: JSON.stringify(baseBody),
+    });
+    const out = await readAllText(await POST(req));
+    expect(out).toContain("image_event");
+    expect(out).toContain("data:image/jpeg;base64,");
   });
 });

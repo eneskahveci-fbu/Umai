@@ -511,6 +511,7 @@ interface StoreState {
   addCommandRun: (command: string, kind?: "shell" | "code") => void;
   setCommandOutput: (command: string, output: string, status: "done" | "error") => void;
   setCheckpointsOnLast: (checkpoints: FileCheckpoint[]) => void;
+  addImageToLast: (url: string) => void;
   setFinishReasonOnLast: (finishReason: string | undefined) => void;
   setSourcesOnLast: (sources: { title: string; url: string }[]) => void;
   updateLastTokens: (tokenIn: number, tokenOut: number) => void;
@@ -1414,6 +1415,28 @@ export const useStore = create<StoreState>()((set, get) => ({
         const messages = c.messages.slice();
         if (messages.length) {
           messages[messages.length - 1] = { ...messages[messages.length - 1], checkpoints };
+        }
+        return { ...c, messages };
+      }),
+    })),
+  /* generate_image aracının ürettiği görseli son asistan mesajına EKLER.
+     Neden ayrı bir kanal: görsel eskiden `![...](url)` markdown'ı olarak
+     ARAÇ SONUCUNA konup modele geri veriliyordu; BYOK sağlayıcılarda bu bir
+     data-URI (yüz binlerce token'lık base64) olduğundan model onu yanıtına
+     kopyalamaya çalışıp yarıda kesiyor ve sohbete ham base64 dökülüyordu.
+     Artık görsel modelden TAMAMEN bağımsız olarak buraya iliştirilir ve
+     MessageBubble'ın GeneratedImage önizlemesiyle render edilir. */
+  addImageToLast: (url) =>
+    set((s) => ({
+      chats: s.chats.map((c) => {
+        if (c.id !== s.currentId) return c;
+        const messages = c.messages.slice();
+        if (messages.length) {
+          const last = messages[messages.length - 1];
+          const images = last.images ?? [];
+          if (!images.includes(url)) {
+            messages[messages.length - 1] = { ...last, images: [...images, url] };
+          }
         }
         return { ...c, messages };
       }),

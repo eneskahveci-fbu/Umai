@@ -1587,7 +1587,7 @@ export async function POST(req: Request) {
       `• discover_rules() — CLAUDE.md/AGENTS.md/.rules gibi davranış dosyalarını otomatik tara\n` +
       `• trigger_ci(workflow, ref?, inputs?) — GitHub Actions workflow'unu tetikle\n` +
       `• dispatch_agents(tasks[]) — karmaşık görevi PARALEL salt-okunur alt-ajanlara böl (Claude'daki gibi)\n` +
-      `• generate_image(prompt, aspect_ratio?) — kullanıcı görsel/resim isteyince ÇAĞIR (doğal dilde, komut gerekmez); sonucu '![açıklama](url)' olarak yanıtına göm\n` +
+      `• generate_image(prompt, aspect_ratio?) — kullanıcı görsel/resim isteyince ÇAĞIR (doğal dilde, komut gerekmez); görsel arayüzde OTOMATİK gösterilir, yanıtına markdown/URL/base64 YAZMA\n` +
       `• deep_research(topic) — kullanıcı derinlemesine/kaynaklı bir araştırma/rapor isteyince ÇAĞIR; dönen atıflı raporu ÖZETLEMEDEN aynen ilet\n` +
       `• update_plan(plan) — çok adımlı görevde canlı yapılacaklar listesi\n` +
       (webToolsOn ? `• web_search(query) — internette ara\n• read_url(url) — web sayfası oku\n` : "") +
@@ -1597,7 +1597,7 @@ export async function POST(req: Request) {
       `— ARAÇLARI GERÇEKTEN ÇAĞIR — anlatma/simüle etme. Komutu veya kodu kullanıcıya "şunu çalıştır / şunu yapıştır" diye METİN olarak VERME; uygun araç varsa (run_command, str_replace, write_file) KENDİN çağır ve sonucu göster. Kullanıcı senin yapmanı bekliyor, tarif etmeni değil.\n` +
       `— Çok adımlı (2+) görevlerde MUTLAKA önce update_plan ile yapılacaklar listesini yaz (kullanıcı ilerlemeyi canlı "todo" kutusunda görür), her adım bitince planı güncelleyip [x] işaretle — bunu atlama.\n` +
       `— Görev BAĞIMSIZ paralel parçalara bölünebiliyorsa (ör. birden çok modülü ayrı ayrı incelemek) dispatch_agents ile alt-ajanlara dağıt; basitse kendin yap.\n` +
-      `— Kullanıcı bir görsel/resim/illüstrasyon istediğinde (komut/buton beklemeden, doğal dilden anla) generate_image'i çağır; dönen URL'i düz metin YAZMA, '![açıklama](url)' markdown biçiminde göm.\n` +
+      `— Kullanıcı bir görsel/resim/illüstrasyon istediğinde (komut/buton beklemeden, doğal dilden anla) generate_image'i çağır. Üretilen görsel arayüzde OTOMATİK olarak gösterilir: yanıtına markdown görsel etiketi (![...]), URL ya da base64 veri YAZMA — yalnızca bir-iki cümleyle tanıt.\n` +
       `— Kullanıcı derinlemesine/kaynaklı/kapsamlı bir araştırma istediğinde deep_research'ü çağır; dönen atıflı raporu ÖZETLEMEDEN/KISALTMADAN, atıfları ve Kaynaklar bölümünü koruyarak ilet.\n` +
       `— Cevaplamadan önce ilgili dosyaları oku. Bağımsız okumaları TEK turda birlikte iste (paralel çalışır).\n` +
       `— list_files veya search_code ile önce yapıyı anla, sonra spesifik dosyalara gir.\n` +
@@ -1642,8 +1642,9 @@ export async function POST(req: Request) {
     sysPrompt +=
       `\n\n[Görsel üretim modu]\n` +
       `Mevcut araç: generate_image(prompt, aspect_ratio?) — kullanıcı bir görsel/resim/illüstrasyon ` +
-      `istediğinde (doğal dilden anla, komut/buton gerekmez) ÇAĞIR. Sonucu '![açıklama](url)' markdown ` +
-      `biçiminde yanıtına göm, URL'i düz metin olarak yazma.`;
+      `istediğinde (doğal dilden anla, komut/buton gerekmez) ÇAĞIR. Üretilen görsel arayüzde OTOMATİK ` +
+      `gösterilir; yanıtına markdown görsel etiketi (![...]), URL ya da base64 veri YAZMA — yalnızca ` +
+      `bir-iki cümleyle kısaca tanıt.`;
   }
 
   /* searchContext'i (varsa) AYRI, İKİNCİ bir system mesajı olarak en sona
@@ -2053,7 +2054,10 @@ export async function POST(req: Request) {
               portrait: { width: 768, height: 1280 },
             };
             const dims = DIMENSIONS[String(args.aspect_ratio ?? "square")] ?? DIMENSIONS.square;
-            let markdown: string | null = null;
+            /* Görselin KENDİSİ (URL ya da data-URL). Eskiden burada hazır bir
+               `![...](...)` markdown'ı tutuluyordu ve o markdown ARAÇ SONUCU
+               olarak modele geri veriliyordu — aşağıdaki nota bak. */
+            let imageUrl: string | null = null;
             /* Hangi sağlayıcının ürettiği araç kartında GÖRÜNÜR olsun —
                "Model X seçili ama Pollinations kullanılıyor" şüphesi ancak
                böyle kesin cevap bulur. */
@@ -2080,13 +2084,13 @@ export async function POST(req: Request) {
                 });
                 const byokData = await byokRes.json().catch(() => ({})) as { image?: string; error?: string };
                 if (byokRes.ok && byokData.image) {
-                  markdown = `![${prompt.slice(0, 120)}](${byokData.image})`;
+                  imageUrl = byokData.image;
                   usedLabel = cand.provider;
                   break;
                 }
               } catch { /* bu aday olmadı → sıradakini dene */ }
             }
-            if (!markdown) {
+            if (!imageUrl) {
               /* Anahtarsız Pollinations tabanı — ama artık DOĞRULANARAK.
                  ÖNCEDEN yalnızca bir URL METNİ kuruluyordu (pollinationsImageUrl
                  hiç ağa çıkmaz): araç 255 ms'de "Görsel üretildi" diyor, model
@@ -2105,14 +2109,14 @@ export async function POST(req: Request) {
                   /* Çok büyük çıktıyı mesaj geçmişine gömmek depolamayı şişirir;
                      sınırın üstündeyse URL'e düşülür — o hâlde bile ucun AYAKTA
                      olduğunu doğrulamış oluruz. */
-                  markdown = buf.byteLength <= 4_000_000
-                    ? `![${prompt.slice(0, 120)}](data:${ctype};base64,${buf.toString("base64")})`
-                    : `![${prompt.slice(0, 120)}](${url})`;
+                  imageUrl = buf.byteLength <= 4_000_000
+                    ? `data:${ctype};base64,${buf.toString("base64")}`
+                    : url;
                   usedLabel = "pollinations (ücretsiz taban)";
                 }
               } catch { /* aşağıda dürüst hata bildirilir */ }
             }
-            if (!markdown) {
+            if (!imageUrl) {
               /* G1 — dürüstlük: üretemediysek "üretildi" DEMEYİZ. Model bu
                  sonucu görüp kullanıcıya doğru olanı söyler. */
               fail(
@@ -2123,8 +2127,32 @@ export async function POST(req: Request) {
               );
               return;
             }
+            /* KRİTİK (kullanıcı hata raporu, Tem 2026 — ekran görüntüsü):
+               görsel ARTIK modele GERİ VERİLMİYOR. Eskiden araç sonucu hazır
+               bir `![...](url)` markdown'ıydı ve sistem promptu modele "bunu
+               yanıtına göm" diyordu. Kısa bir Pollinations URL'iyle bu
+               çalışıyordu; ama hem BYOK sağlayıcılar hem de (artık doğrulanmış
+               indirme yapan) Pollinations yolu bir DATA-URL döndürüyor —
+               yüz binlerce token'lık base64. Model onu token token kopyalamaya
+               çalışıp yarıda kesiyor ve sohbete ham
+               "![...](data:image/jpeg;base64,/9j/4QPARX…" çöpü dökülüyordu;
+               üstelik bağlam penceresi de tükeniyordu.
+               Artık görsel AYRI bir olayla doğrudan istemciye gider ve son
+               asistan mesajının `images[]` alanına iliştirilir (MessageBubble'ın
+               GeneratedImage önizlemesi — "/gorsel" komutunun ZATEN kullandığı
+               aynı yol); modele yalnız kısa, düz metin bir onay döner. */
+            safe.enqueue(encoder.encode(`data: ${JSON.stringify({
+              image_event: { id: tc.id, url: imageUrl, prompt, provider: usedLabel },
+            })}\n\n`));
             safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: `Görsel üretildi${usedLabel ? ` · ${usedLabel}` : ""}` } })}\n\n`));
-            resultById.set(tc.id, markdown);
+            resultById.set(
+              tc.id,
+              /* Metnin KENDİSİ de örnek içermemeli: modele "![...]" ya da
+                 "base64" gibi bir kalıp göstermek onu kopyalamaya davet eder. */
+              `Görsel başarıyla üretildi ve kullanıcıya GÖSTERİLDİ (istek: "${prompt.slice(0, 120)}").` +
+              " Görsel arayüzde zaten görünüyor; yanıtında görsel etiketi, bağlantı ya da ham veri" +
+              " TEKRARLAMA. Yalnızca bir-iki cümleyle kısaca tanıt.",
+            );
             return;
           }
           /* deep_research: doğal dilden ("şu konuyu derinlemesine araştır")
