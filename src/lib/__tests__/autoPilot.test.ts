@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   decidePilot, decidePilotAsync, pilotConfidence, isPilotConfident,
-  autoEffort, autoWeb, autoResearch, autoFusion, autoImageGen,
+  autoEffort, autoWeb, autoResearch, autoFusion, autoImageGen, autoSwarm,
 } from "../autoPilot";
 
 const ctx = { hasRepo: true };
@@ -31,10 +31,15 @@ describe("decidePilot", () => {
     expect(d.quality).toBe(true);
     expect(d.effort).toBe("max");
   });
-  it("çok maddeli görev + repo → ajan ekibi", () => {
+  /* H3 — "ajan ekibi çalışmıyor". Önceden `ctx.hasRepo && autoSwarm(text)` idi
+     ve bu test de o davranışı (hasRepo:false → swarm:false) doğruluyordu.
+     Oysa ajan ekibinin gittiği uç (/api/orchestrate) reposuz durumu ZATEN
+     destekliyor: işçiler depo yoksa dosya araçları olmadan düz model çağrısına
+     düşüyor. Kapı tamamen istemci taraflıydı ve özelliği tümden kapatıyordu. */
+  it("çok maddeli görev → ajan ekibi (depo GEREKMEZ)", () => {
     const t = "Şu işleri sırayla yap:\n- login sayfası ekle ve doğrulama kur\n- navbar'ı responsive olacak şekilde düzenle\n- birim testleri güncelle\n- README dosyasını yaz ve dağıtım betiği oluştur";
     expect(decidePilot(t, { hasRepo: true }).swarm).toBe(true);
-    expect(decidePilot(t, { hasRepo: false }).swarm).toBe(false);
+    expect(decidePilot(t, { hasRepo: false }).swarm).toBe(true);
   });
   it("reasons okunur etiketler içerir", () => {
     const d = decidePilot("bugün en yeni Next.js sürümü çıktı mı?", ctx);
@@ -261,5 +266,33 @@ describe("autoFusion — füzyon yalnız üretim işlerinde", () => {
   });
   it("çok kısa metinde tetiklenmez", () => {
     expect(autoFusion("site yap")).toBe(false);
+  });
+});
+
+/* H3 — "taşı" hiçbir zaman eşleşmiyordu. JS'te `\b` yalnız [A-Za-z0-9_]'ye
+   göre tanımlıdır; `ı` bu kümede olmadığı için `\btaşı\b`'nin kapanış sınırı
+   kendinden SONRA bir kelime karakteri ister → "taşı " ya da satır sonundaki
+   "taşı" asla eşleşmez. (Aynı tuzak autoImageGen'de zaten belgeliydi.) */
+describe("Türkçe kelime sınırı: 'taşı' (H3)", () => {
+  it("autoEffort: 'taşı' ağır iş sinyali sayılır", () => {
+    expect(autoEffort("bu modülü yeni klasöre taşı")).toBe("high");
+    expect(autoEffort("veritabanını taşı.")).toBe("high");
+  });
+
+  it("autoEffort: 'taşı' bir kelimenin İÇİNDE geçince sinyal DEĞİL", () => {
+    /* "taşımak"/"taşınabilir" gibi çekimler bu listedeki diğer maddelerle
+       (ör. \bekle\b'nin "ekleme"yi saymaması) tutarlı biçimde sayılmaz. */
+    expect(autoEffort("küçük bir taşınabilir not")).not.toBe("high");
+  });
+
+  it("autoSwarm: fiil sayımına 'taşı' dahil edilir", () => {
+    /* Dört fiil + 280'den uzun metin → ajan ekibi. 'taşı' sayılmazsa üç fiil
+       kalır ve eşik geçilmez; bu test o regresyonu yakalar. */
+    const t = "Projede şunları yap: eski yapılandırma dosyasını yeni klasöre taşı, "
+      + "ardından eksik olan doğrulama katmanını ekle, sonra kullanıcı listesi ekranını "
+      + "yeniden düzenle ve en sonunda değişiklikleri açıklayan kısa bir özet yaz. "
+      + "Bu işleri sırayla ve dikkatli yapmanı istiyorum, her adımda ne yaptığını anlat.";
+    expect(t.length).toBeGreaterThan(280);
+    expect(autoSwarm(t)).toBe(true);
   });
 });

@@ -26,6 +26,26 @@ export interface PilotDecision {
   reasons: string[];
 }
 
+/* "taşı" NEDEN ayrı bir dal: JS'te `\b` yalnız [A-Za-z0-9_]'ye göre tanımlıdır
+   ve `ı` bu kümede DEĞİLDİR. "taşı" kelimesinin sonundaki `\b`, kendinden
+   sonra bir kelime karakteri İSTER — "taşı " ya da satır sonundaki "taşı"
+   için sınır oluşmaz, yani `\btaşı\b` hiçbir zaman eşleşmez. (Aynı tuzak bu
+   dosyada autoImageGen için zaten belgelenmiş; çözüm de aynı: `\p{L}` tabanlı
+   sınır + `u` bayrağı.) Diğer alternatifler BİLEREK `\b` ile bırakıldı —
+   hepsi kelime karakteriyle bitiyor, dokunmak davranışı gereksiz yere
+   genişletirdi. */
+const TASI = String.raw`(?<!\p{L})taşı(?!\p{L})`;
+
+const HEAVY_WORK = new RegExp(
+  String.raw`(?:\b(?:refactor|optimi|debug|implement|mimari|architect|algorithm|performans|g[üu]venlik|security|migrate|tasarla|yeniden yaz)\b|${TASI})`,
+  "iu",
+);
+
+const ACTION_VERBS = new RegExp(
+  String.raw`(?:\b(?:ekle|oluştur|yaz|düzenle|refactor|kur|sil|güncelle|test et|implement|build)\b|${TASI})`,
+  "giu",
+);
+
 /* Otomatik düşünme eforu: kısa/basit → düşük-orta; uzun/kod/ağır anahtar
    kelime → yüksek; "kapsamlı/derinlemesine" → max. */
 export function autoEffort(text: string): Effort {
@@ -35,7 +55,7 @@ export function autoEffort(text: string): Effort {
   if (
     len > 280 ||
     /```/.test(t) ||
-    /\b(refactor|optimi|debug|implement|mimari|architect|algorithm|performans|g[üu]venlik|security|migrate|taşı|tasarla|yeniden yaz)\b/i.test(t)
+    HEAVY_WORK.test(t)
   ) return "high";
   if (len < 36 && !/\?/.test(t)) return "low";
   return "medium";
@@ -48,7 +68,7 @@ export function autoSwarm(text: string): boolean {
   if (t.length < 120) return false;
   const listItems = (t.match(/^\s*(?:[-*•]|\d+[.)])\s+/gm) || []).length;
   if (listItems >= 3) return true;
-  const verbs = (t.toLowerCase().match(/\b(ekle|oluştur|yaz|düzenle|refactor|kur|taşı|sil|güncelle|test et|implement|build)\b/g) || []).length;
+  const verbs = (t.toLowerCase().match(ACTION_VERBS) || []).length;
   if (verbs >= 4 && t.length > 280) return true;
   if (/(her .{2,30} için|tüm .{2,40}(?:ler|lar))/i.test(t) && t.length > 200) return true;
   return false;
@@ -254,14 +274,26 @@ function assemblePilotDecision(
 
 /** Tek karar noktası (senkron, regex-tabanlı) — ağ isteği ATMAZ. `decidePilotAsync`
     başarısız olduğunda (ağ hatası, format hatası) düştüğü güvenli yedek; ayrıca
-    birim testlerde saf/deterministik davranış için kullanılır. */
-export function decidePilot(text: string, ctx: { hasRepo: boolean }): PilotDecision {
+    birim testlerde saf/deterministik davranış için kullanılır.
+
+    `_ctx` şu an KULLANILMIYOR: tek tüketicisi ajan ekibi kapısıydı ve o kapı
+    kaldırıldı (bkz. aşağıdaki not). İmzada bırakıldı çünkü `decidePilotAsync`
+    aynı bağlamı `/api/route-plan`'a yolluyor ve çağıranlar zaten geçiriyor —
+    kaldırmak tüm çağrı noktalarını gereksizce değiştirirdi. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- imza bilerek korunuyor (bkz. üstteki not)
+export function decidePilot(text: string, _ctx: { hasRepo: boolean }): PilotDecision {
   const effort = autoEffort(text);
   const research = autoResearch(text);
   const web = research || autoWeb(text);
   const quality = autoQuality(text, effort);
   const fusion = autoFusion(text);
-  const swarm = ctx.hasRepo && autoSwarm(text);
+  /* Ajan ekibi REPO GEREKTİRMEZ. Önceden `ctx.hasRepo && …` idi; depo bağlı
+     değilken ajan ekibi HİÇ çalışmıyordu ("ajan ekibi çalışmıyor" şikayetinin
+     kök nedeni). Oysa /api/orchestrate reposuz durumu zaten destekliyor:
+     işçiler depo yoksa dosya okuma araçları olmadan düz callModel'e düşüyor.
+     Kapı tamamen istemci tarafındaydı ve gereksizdi. `ctx` yine de imzada
+     kalıyor — decidePilotAsync bunu /api/route-plan'a bağlam olarak yolluyor. */
+  const swarm = autoSwarm(text);
   const image = autoImageGen(text);
   return assemblePilotDecision(effort, quality, fusion, web, research, swarm, image);
 }

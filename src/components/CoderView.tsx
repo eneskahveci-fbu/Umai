@@ -2317,17 +2317,21 @@ export function CoderView() {
       /* Sunucu-proxy üzerinden çağrı (tüm sağlayıcılar için ortak; Pollinations
          doğrudan tarayıcı çağrısı başarısız olursa yedek olarak da kullanılır.
          Sunucu Pollinations'ı anahtarsız destekler). */
-      /* Ajan Ekibi/Derin Araştırma artık /api/chat İÇİNDE de birer araç olarak
+      /* Ajan Ekibi/Derin Araştırma /api/chat İÇİNDE de birer araç olarak
          çalışabiliyor (dispatch_agents/deep_research, bkz. tools.ts) — ama bu
-         araçlar yalnızca gerçek bir repo bağlıyken görünür (body.tools &&
+         araçlar yalnızca gerçek bir repo bağlıyken SUNULUYOR (body.tools &&
          body.repoCtx, bkz. api/chat/route.ts). /api/research ve /api/orchestrate
          repo GEREKTİRMEZ (yalnızca web/alt-ajan çalıştırır) — bu yüzden repo
          bağlı değilken (veya yalnız yerel köprü bağlıyken, ki o da gerçek bir
-         repoCtx üretmez) bu iki eski endpoint hâlâ TEK güvenilir yol. Bunu
-         şimdi /api/chat'e toptan taşımak, repo bağlamayan kullanıcılarda Ekip/
-         Araştırma'yı sessizce devre dışı bırakır — bu kasıtlı olarak ERTELENDİ
-         (mimari planın "Faz 6" notu: araçları repo'suz sohbete açmak ayrı bir
-         kullanıcı onayı gerektiriyor). */
+         repoCtx üretmez) bu iki uç Ekip/Araştırma'nın çalıştığı yoldur.
+         Araçların tümünü repo'suz sohbete açmak ayrı bir karar olarak
+         ERTELENDİ (mimari planın "Faz 6" notu).
+
+         H3 (Tem 2026): kullanıcının kararına göre ajan ekibi artık DEPO
+         GEREKTİRMİYOR — kapı autoPilot'taydı (`ctx.hasRepo && autoSwarm`) ve
+         useSwarm'ı reposuz sohbette hep false yapıyordu, yani aşağıdaki
+         /api/orchestrate dalına hiç girilmiyordu. Kapı kaldırıldı; uç zaten
+         reposuz çalışmayı destekliyordu. */
       const endpoint = useResearch
         ? "/api/research"
         : useSwarm && !isContinuation ? "/api/orchestrate" : "/api/chat";
