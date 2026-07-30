@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { readJson, asString, isValidationError } from "@/lib/validate";
+import { isKnownImageModel, imageModelSteps, defaultImageModel } from "@/lib/imageGen";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +16,10 @@ interface Body {
   apiKey?: string;
   prompt?: string;
   size?: string;
+  /** Seçilen görsel modeli (Ayarlar → Model → Görsel üretimi). Katalog dışı
+      bir değer KABUL EDİLMEZ: NVIDIA'da model adı URL yoluna girdiğinden
+      doğrulanmamış girdi yol enjeksiyonu olurdu. */
+  model?: string;
 }
 
 interface GeminiPart { inlineData?: { data?: string; mimeType?: string } }
@@ -53,13 +58,16 @@ const OPENAI_COMPAT: Record<string, { base: string; model: string; size: boolean
 export async function POST(req: Request) {
   const limited = rateLimit(req, "image", 20, 60_000);
   if (limited) return limited;
-  let provider: string, apiKey: string, prompt: string, size: string;
+  let provider: string, apiKey: string, prompt: string, size: string, model: string;
   try {
     const body = await readJson(req) as Body;
     provider = (body.provider || "").trim();
     apiKey = (body.apiKey || "").trim();
     prompt = asString(body.prompt, "prompt", { max: 4000 }).trim();
     size = body.size || "1024x1024";
+    /* Katalogda yoksa sessizce o sağlayıcının varsayılanına düş. */
+    const wanted = (body.model || "").trim();
+    model = wanted && isKnownImageModel(provider, wanted) ? wanted : defaultImageModel(provider);
   } catch (e) {
     if (isValidationError(e)) return NextResponse.json({ error: e.message }, { status: e.status });
     return NextResponse.json({ error: "Geçersiz istek." }, { status: 400 });
@@ -68,7 +76,6 @@ export async function POST(req: Request) {
 
   try {
     if (provider === "gemini") {
-      const model = "gemini-2.5-flash-image-preview";
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
@@ -85,7 +92,7 @@ export async function POST(req: Request) {
     /* Hugging Face — açık kaynak FLUX.1-schnell (ücretsiz anahtar). İkili (binary)
        görüntü döner → base64 data URL'e çevrilir. Cold-start'ta 503 dönebilir. */
     if (provider === "hf") {
-      const r = await fetch("https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell", {
+      const r = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", Accept: "image/png" },
         body: JSON.stringify({ inputs: prompt }),
@@ -123,7 +130,7 @@ export async function POST(req: Request) {
        çıktı verdi. */
     if (provider === "nvidia") {
       const [w, h] = size.split("x").map((n) => Number(n) || 1024);
-      const r = await fetch("https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev", {
+      const r = await fetch(`https://ai.api.nvidia.com/v1/genai/${model}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -134,7 +141,7 @@ export async function POST(req: Request) {
           prompt,
           width: w,
           height: h,
-          steps: 25,
+          steps: imageModelSteps("nvidia", model),
           seed: 0,
         }),
         signal: AbortSignal.timeout(60000),
@@ -162,7 +169,7 @@ export async function POST(req: Request) {
 
     const cfg = OPENAI_COMPAT[provider];
     if (!cfg) return NextResponse.json({ error: `'${provider}' için görüntü üretimi henüz desteklenmiyor. (Gemini, OpenAI, xAI, NVIDIA NIM, HF veya Pollinations kullan.)` }, { status: 400 });
-    const payload: Record<string, unknown> = { model: cfg.model, prompt, n: 1 };
+    const payload: Record<string, unknown> = { model: model || cfg.model, prompt, n: 1 };
     if (cfg.size) payload.size = size;
     const r = await fetch(`${cfg.base}/images/generations`, {
       method: "POST",

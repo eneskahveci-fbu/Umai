@@ -2874,7 +2874,7 @@ export function CoderView() {
         const label = IMAGE_PROVIDER_LABEL[attempt.provider];
         store.pushMessage({ role: "assistant", content: `🎨 ${label} ile üretiliyor…` });
         try {
-          const raw = await generateImageBYOK(imgPrompt, attempt.provider, attempt.apiKey);
+          const raw = await generateImageBYOK(imgPrompt, attempt.provider, attempt.apiKey, undefined, attempt.model);
           url = await compressDataUrl(raw);
           providerNote = ` _(${label})_`;
           useStore.getState().popLastMessage(); // "üretiliyor…" yer tutucusu

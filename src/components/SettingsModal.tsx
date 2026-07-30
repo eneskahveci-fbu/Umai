@@ -60,7 +60,7 @@ import { AdminUsers } from "@/components/AdminUsers";
 import { createClient } from "@/lib/supabase/client";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, ALL_TOOL_CATALOG } from "@/lib/constants";
 import { buildChainFor, KEYLESS_PROVIDERS } from "@/lib/fallback";
-import { IMAGE_PROVIDERS, IMAGE_PROVIDER_LABEL } from "@/lib/imageGen";
+import { IMAGE_PROVIDERS, IMAGE_PROVIDER_LABEL, IMAGE_MODELS, resolveImageModel, type ImageProvider } from "@/lib/imageGen";
 import { calculateCost, formatCost } from "@/lib/pricing";
 import { quickComplete } from "@/lib/quickComplete";
 import { fetchUserRepos } from "@/lib/github";
@@ -1177,7 +1177,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               <p className="text-xs text-muted leading-relaxed mb-2.5">
                 Sohbette bir görsel istediğinde hangi sağlayıcı kullanılsın? <b>Otomatik</b>, önce o an
                 aktif sohbet modelin görüntü-yetenekliyse ONU kullanır; değilse eklediğin modeller
-                arasından uygun olanı önceliğe göre (Gemini → OpenAI → xAI → Hugging Face) kendi seçer.
+                arasından uygun olanı önceliğe göre (Gemini → OpenAI → xAI → NVIDIA NIM → Hugging Face) kendi seçer.
                 İstersen ücretsiz Pollinations&apos;ı ya da belirli bir sağlayıcıyı sabitleyebilirsin.
                 {(config.imageFallbackChain ?? false)
                   ? " Yedek zinciri açık: seçilen sağlayıcı başarısız olursa aşağıdaki sırayla diğerleri de denenir."
@@ -1225,10 +1225,17 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               </div>
               {IMAGE_PROVIDERS.every((p) => !config.models.some((m) => m.provider === p)) && (
                 <p className="text-xs text-muted/60 leading-relaxed mt-2.5">
-                  Gemini/OpenAI/xAI/Hugging Face gibi görsel-yetenekli bir model eklersen burada
-                  sabitleyebileceğin bir seçenek olarak görünür.
+                  Gemini/OpenAI/xAI/NVIDIA NIM/Hugging Face gibi görsel-yetenekli bir model eklersen
+                  burada sabitleyebileceğin bir seçenek olarak görünür.
                 </p>
               )}
+
+              {/* Sağlayıcı başına GÖRSEL MODEL seçimi + canlı deneme.
+                  Önceden her sağlayıcının görsel modeli sunucuda sabit kodluydu:
+                  kullanıcı ne kullanıldığını göremiyor, değiştiremiyor ve
+                  anahtarının gerçekten çalışıp çalışmadığını ancak sohbette
+                  deneyerek anlıyordu. */}
+              <ImageModelPicker config={config} saveConfig={saveConfig} />
             </div>
           </section>
         )}
@@ -2458,6 +2465,101 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
 
 /* Granüler araç-izin tablosu: her aracı kategori bazında allow/deny yapar.
    Reddedilenler (toolPermissions[name] === false) ajana hiç sunulmaz. */
+/* Sağlayıcı başına görsel MODEL seçimi + "Test et".
+
+   Yalnız kullanıcının GERÇEKTEN eklediği (anahtarı olan) sağlayıcılar
+   listelenir — "ayarlara bağlı olan sağlayıcılar". Test düğmesi o anahtarla
+   gerçek bir istek atar ve dönen görseli yerinde gösterir: anahtarın/modelin
+   çalıştığı sohbete girmeden, tek tıkla doğrulanır. */
+function ImageModelPicker({ config, saveConfig }: {
+  config: import("@/lib/types").Config;
+  saveConfig: (c: import("@/lib/types").Config) => void;
+}) {
+  const [testing, setTesting] = useState<string | null>(null);
+  const [results, setResults] = useState<Record<string, { url?: string; error?: string; ms?: number }>>({});
+
+  const connected = IMAGE_PROVIDERS.filter((p) => config.models.some((m) => m.provider === p));
+  if (connected.length === 0) return null;
+
+  const runTest = async (provider: ImageProvider) => {
+    setTesting(provider);
+    setResults((r) => ({ ...r, [provider]: {} }));
+    const t0 = Date.now();
+    try {
+      const { resolveModelApiKey } = await import("@/lib/secureKeys");
+      const profile = config.models.find((m) => m.provider === provider);
+      const apiKey = profile ? await resolveModelApiKey(profile, config.providerKeys) : "";
+      if (!apiKey) throw new Error("Bu sağlayıcı için anahtar çözülemedi (Ayarlar → Modeller).");
+      const res = await fetch("/api/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider,
+          apiKey,
+          prompt: "a red apple on a wooden table, soft daylight, photographic",
+          model: resolveImageModel(provider, config.imageModelIds),
+        }),
+      });
+      const data = await res.json().catch(() => ({})) as { image?: string; error?: string };
+      if (!res.ok || !data.image) throw new Error(data.error || `Sağlayıcı hatası (${res.status})`);
+      setResults((r) => ({ ...r, [provider]: { url: data.image, ms: Date.now() - t0 } }));
+    } catch (e) {
+      setResults((r) => ({ ...r, [provider]: { error: e instanceof Error ? e.message : "Bilinmeyen hata" } }));
+    } finally {
+      setTesting(null);
+    }
+  };
+
+  return (
+    <div className="mt-3.5 pt-3.5 border-t border-line">
+      <p className="text-xs font-bold text-muted uppercase tracking-wide mb-2">Görsel modelleri</p>
+      <div className="flex flex-col gap-2.5">
+        {connected.map((p) => {
+          const chosen = resolveImageModel(p, config.imageModelIds);
+          const opts = IMAGE_MODELS[p];
+          const r = results[p];
+          return (
+            <div key={p} className="rounded-lg border border-line bg-bg/40 p-2.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-semibold shrink-0">{IMAGE_PROVIDER_LABEL[p]}</span>
+                <select
+                  value={chosen}
+                  onChange={(e) => saveConfig({
+                    ...config,
+                    imageModelIds: { ...(config.imageModelIds ?? {}), [p]: e.target.value },
+                  })}
+                  className="flex-1 min-w-[140px] bg-bgsoft border border-line rounded-lg px-2 py-1 text-xs outline-none focus:border-brand/50"
+                  aria-label={`${IMAGE_PROVIDER_LABEL[p]} görsel modeli`}
+                >
+                  {opts.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+                <button
+                  onClick={() => runTest(p)}
+                  disabled={testing !== null}
+                  className="px-2.5 py-1 rounded-lg border border-line text-[11px] font-semibold text-muted hover:text-ink hover:border-brand/40 disabled:opacity-50 shrink-0"
+                >
+                  {testing === p ? "Deneniyor…" : "Test et"}
+                </button>
+              </div>
+              {opts.find((o) => o.id === chosen)?.note && (
+                <p className="text-[11px] text-muted/70 mt-1">{opts.find((o) => o.id === chosen)!.note}</p>
+              )}
+              {r?.error && <p className="text-[11px] text-red mt-1.5">{r.error}</p>}
+              {r?.url && (
+                <div className="mt-1.5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={r.url} alt={`${IMAGE_PROVIDER_LABEL[p]} deneme görseli`} className="w-28 h-28 object-cover rounded-lg border border-line" />
+                  <p className="text-[11px] text-brand mt-1">Çalışıyor · {((r.ms ?? 0) / 1000).toFixed(1)} sn</p>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ToolPermissions() {
   const config = useStore((s) => s.config);
   const saveConfig = useStore((s) => s.saveConfig);

@@ -114,12 +114,12 @@ interface ChatRequest {
       imageGen.ts pickImageProvider) ÖNCEDEN çözdüğü BYOK görsel sağlayıcısı +
       anahtarı. Verilmezse (ya da üretim başarısız olursa) generate_image
       anahtarsız Pollinations tabanına düşer — "istek asla düşmez" sözleşmesi. */
-  imageModel?: { provider: string; apiKey: string };
+  imageModel?: { provider: string; apiKey: string; model?: string };
   /** İstemcinin kurduğu TAM görsel yedek zinciri (en iyiden en kötüye; bkz.
       imageGen.ts buildImageFallbackChain + Ayarlar → Görsel üretimi → "Yedek
       zinciri"). Verilirse sırayla denenir; verilmezse `imageModel` tek aday
       olarak kullanılır (eski davranış). */
-  imageModels?: { provider: string; apiKey: string }[];
+  imageModels?: { provider: string; apiKey: string; model?: string }[];
   requireWriteApproval?: boolean;
   safeMode?: boolean;
   toolPermissions?: Record<string, boolean>;
@@ -2079,6 +2079,9 @@ export async function POST(req: Request) {
                     apiKey: cand.apiKey,
                     prompt,
                     size: `${dims.width}x${dims.height}`,
+                    /* Kullanıcının Ayarlar'da seçtiği görsel modeli (varsa) —
+                       /api/image bunu katalog karşısında doğrular. */
+                    model: cand.model,
                   }),
                   signal: AbortSignal.timeout(70_000),
                 });
