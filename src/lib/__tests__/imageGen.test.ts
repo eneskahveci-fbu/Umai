@@ -144,3 +144,86 @@ describe("NVIDIA NIM görsel sağlayıcısı (kullanıcı isteği)", () => {
     expect((await pickImageProvider(cfg))?.provider).toBe("nvidia");
   });
 });
+
+/* Görsel MODEL kataloğu — sağlayıcı başına seçim (Ayarlar → Model → Görsel
+   üretimi). Model adı NVIDIA'da URL YOLUNA girdiğinden katalog doğrulaması
+   güvenlik açısından da kritik. */
+describe("görsel model kataloğu", () => {
+  it("her sağlayıcının en az bir modeli ve bir varsayılanı var", async () => {
+    const { IMAGE_PROVIDERS, IMAGE_MODELS, defaultImageModel } = await import("../imageGen");
+    for (const p of IMAGE_PROVIDERS) {
+      expect(IMAGE_MODELS[p].length).toBeGreaterThan(0);
+      expect(defaultImageModel(p)).toBe(IMAGE_MODELS[p][0].id);
+    }
+  });
+
+  it("seçim yoksa varsayılana düşer", async () => {
+    const { resolveImageModel, defaultImageModel } = await import("../imageGen");
+    expect(resolveImageModel("nvidia", undefined)).toBe(defaultImageModel("nvidia"));
+    expect(resolveImageModel("nvidia", {})).toBe(defaultImageModel("nvidia"));
+  });
+
+  it("kullanıcının seçtiği geçerli model korunur", async () => {
+    const { resolveImageModel } = await import("../imageGen");
+    expect(resolveImageModel("openai", { openai: "dall-e-3" })).toBe("dall-e-3");
+  });
+
+  /* Katalogdan kaldırılan/yeniden adlandırılan bir modelde kilitlenme olmasın. */
+  it("katalogda OLMAYAN seçim sessizce varsayılana düşer", async () => {
+    const { resolveImageModel, defaultImageModel } = await import("../imageGen");
+    expect(resolveImageModel("nvidia", { nvidia: "silinmis/model" })).toBe(defaultImageModel("nvidia"));
+  });
+
+  /* Sunucu doğrulaması: keyfi bir değer NVIDIA'da yol enjeksiyonu olurdu. */
+  it("isKnownImageModel yalnız katalogdakileri kabul eder", async () => {
+    const { isKnownImageModel } = await import("../imageGen");
+    expect(isKnownImageModel("nvidia", "black-forest-labs/flux.1-dev")).toBe(true);
+    expect(isKnownImageModel("nvidia", "../../etc/passwd")).toBe(false);
+    expect(isKnownImageModel("bilinmeyen", "her-ne-ise")).toBe(false);
+  });
+
+  /* flux.1-dev canlı testte "steps >= 5" istiyor; 25 ile ~5 sn'de dönüyor. */
+  it("NVIDIA adım sayısı modele göre gelir", async () => {
+    const { imageModelSteps } = await import("../imageGen");
+    expect(imageModelSteps("nvidia", "black-forest-labs/flux.1-dev")).toBe(25);
+    expect(imageModelSteps("nvidia", "bilinmeyen")).toBe(25);
+  });
+
+  /* Canlı doğrulandı: flux.1-schnell geçerli steps=4 ile 60 sn yanıt vermiyor;
+     sdxl-turbo / stable-diffusion-xl / bria-2.3 bu uçta 404. Çalışmayan bir
+     seçeneği menüye koymamak bilinçli bir karar — testle sabitleniyor. */
+  it("NVIDIA kataloğunda yalnız canlı doğrulanmış model var", async () => {
+    const { IMAGE_MODELS } = await import("../imageGen");
+    const ids = IMAGE_MODELS.nvidia.map((m) => m.id);
+    expect(ids).toEqual(["black-forest-labs/flux.1-dev"]);
+  });
+});
+
+describe("addMediaAsset — Kütüphane kotası", () => {
+  const asset = (id: string, url: string) => ({
+    id, title: id, url, createdAt: 1, source: "image-gen" as const,
+  });
+
+  it("yeni öğeyi başa ekler", async () => {
+    const { addMediaAsset } = await import("../imageGen");
+    const out = addMediaAsset([asset("a", "https://x/1.png")], asset("b", "https://x/2.png"));
+    expect(out.map((a) => a.id)).toEqual(["b", "a"]);
+  });
+
+  it("data-URL girdilerini 20 ile sınırlar, URL girdilerine dokunmaz", async () => {
+    const { addMediaAsset, MAX_DATA_URL_ASSETS } = await import("../imageGen");
+    const existing = [
+      ...Array.from({ length: 30 }, (_, i) => asset(`d${i}`, "data:image/jpeg;base64,AAAA")),
+      ...Array.from({ length: 30 }, (_, i) => asset(`u${i}`, `https://x/${i}.png`)),
+    ];
+    const out = addMediaAsset(existing, asset("yeni", "data:image/jpeg;base64,BBBB"));
+    expect(out.filter((a) => a.url.startsWith("data:")).length).toBe(MAX_DATA_URL_ASSETS);
+    expect(out.filter((a) => !a.url.startsWith("data:")).length).toBe(30);
+  });
+
+  it("toplam listeyi 200 ile sınırlar", async () => {
+    const { addMediaAsset, MAX_MEDIA_ASSETS } = await import("../imageGen");
+    const existing = Array.from({ length: 250 }, (_, i) => asset(`u${i}`, `https://x/${i}.png`));
+    expect(addMediaAsset(existing, asset("yeni", "https://x/new.png")).length).toBe(MAX_MEDIA_ASSETS);
+  });
+});

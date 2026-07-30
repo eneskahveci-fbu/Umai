@@ -673,6 +673,9 @@ export interface Config {
       anahtarı olsa bile), ya da belirli bir sağlayıcıyı SABİTLE. Sabitlenen
       sağlayıcı için model/anahtar artık yoksa sessizce "auto" davranışına döner. */
   imageModelProvider?: "auto" | "pollinations" | "gemini" | "openai" | "xai" | "nvidia" | "hf";
+  /** Sağlayıcı başına seçilen görsel modeli (bkz. IMAGE_MODELS, imageGen.ts).
+      Seçilmemişse o sağlayıcının katalogdaki ilk modeli kullanılır. */
+  imageModelIds?: Partial<Record<string, string>>;
   /** Sohbet yedek zinciri stratejisi (Ayarlar → Model). Varsayılan (false/yok):
       "ücretsiz öncelikli" — buildFallbackChain, güvenilir ücretsiz katmanları
       öne alır (bkz. fallback.ts PROVIDER_RANK). true: "kalite öncelikli" —
