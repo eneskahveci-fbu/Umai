@@ -6,7 +6,8 @@
    kiosk / sınıf / atölye senaryoları için sıfır maliyet. */
 import type { CraftForm, FormQuestion, FormQuestionType } from "./types";
 import { escapeHtml } from "./slides";
-import { streamChat, extractJsonObject } from "./genChat";
+import { extractJsonObject } from "./jsonExtract";
+import { streamJson } from "./genJson";
 
 export const FORM_QUESTION_TYPES: { id: FormQuestionType; name: string }[] = [
   { id: "short", name: "Kısa yanıt" },
@@ -26,6 +27,10 @@ export const OPTION_QTYPES: ReadonlySet<FormQuestionType> = new Set(["choice", "
 export const CONDITION_SOURCE_QTYPES: ReadonlySet<FormQuestionType> = new Set(["choice", "dropdown"]);
 
 export const MAX_FORM_QUESTIONS = 40;
+
+/* Token bütçesi — 40 soruya kadar bir anket JSON'u sunucu varsayılanı 8192'ye
+   sığmayabiliyor (her soru: etiket + tip + seçenekler + koşul). */
+const FORM_MAX_TOKENS = 12_000;
 
 export function newQuestionId(): string {
   return `fq_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -387,8 +392,12 @@ export async function generateForm(opts: FormGenOptions): Promise<CraftForm> {
     "Kurallar: 5-12 soru; yönlendirici/çift-namlulu soru yazma; soru türlerini ÇEŞİTLENDİR " +
     "(kapalı uçlular önce, açık uçlular sonda); memnuniyet/olasılık ölçümünde rating kullan; " +
     "yalnızca gerçekten kritik soruları required yap.";
-  const full = await streamChat({ system: sys, messages: [{ role: "user", content: opts.brief }], onDelta: opts.onDelta, signal: opts.signal, temperature: 0.6 });
-  const form = parseFormJson(full, opts.brief.slice(0, 48));
+  const form = await streamJson({
+    system: sys, messages: [{ role: "user", content: opts.brief }],
+    onDelta: opts.onDelta, signal: opts.signal, temperature: 0.6,
+    maxTokens: FORM_MAX_TOKENS,
+    parse: (raw) => parseFormJson(raw, opts.brief.slice(0, 48)),
+  });
   form.brief = opts.brief;
   return form;
 }

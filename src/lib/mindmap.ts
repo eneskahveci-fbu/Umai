@@ -4,9 +4,16 @@
    Dışa aktarma: .svg / Markdown taslak / yayınlanabilir SVG (/api/publish). */
 import type { CraftMap, MindNode } from "./types";
 import { escapeHtml } from "./slides";
-import { streamChat, extractJsonObject } from "./genChat";
+import { extractJsonObject } from "./jsonExtract";
+import { streamJson } from "./genJson";
 
 export const MAX_MAP_NODES = 80;
+
+/* Token bütçesi — kroki düğüm metinleri kısa (80 karakter tavanlı), bu yüzden
+   Doküman/Kartlar kadar cömert olmasına gerek yok; dallandırma alt-çağrısı
+   ise tek düğümün çocuklarını üretiyor, çok daha küçük. */
+const MAP_MAX_TOKENS = 8_000;
+const MAP_EXPAND_MAX_TOKENS = 3_000;
 export const MAX_MAP_DEPTH = 4;   // kök = 0
 export const MAX_NODE_CHILDREN = 8;
 export const MAX_NODE_TEXT = 80;
@@ -319,8 +326,12 @@ export async function generateMap(opts: MapGenOptions): Promise<CraftMap> {
     `Kurallar: merkezde TEK kavram; 3-6 ana dal; gerekli yerde 2-5 alt dal (en çok ${MAX_MAP_DEPTH} seviye); ` +
     `düğüm metinleri KISA (2-6 kelime, en çok ${MAX_NODE_TEXT} karakter); toplam ${MAX_MAP_NODES} düğümü aşma; ` +
     "bilgi uydurma, brief'in kapsamında kal.";
-  const full = await streamChat({ system: sys, messages: [{ role: "user", content: opts.brief }], onDelta: opts.onDelta, signal: opts.signal, temperature: 0.5 });
-  const map = parseMapJson(full, opts.brief.slice(0, 48));
+  const map = await streamJson({
+    system: sys, messages: [{ role: "user", content: opts.brief }],
+    onDelta: opts.onDelta, signal: opts.signal, temperature: 0.5,
+    maxTokens: MAP_MAX_TOKENS,
+    parse: (raw) => parseMapJson(raw, opts.brief.slice(0, 48)),
+  });
   map.brief = opts.brief;
   return map;
 }
@@ -336,16 +347,22 @@ export async function expandNode(map: CraftMap, nodeId: string, signal?: AbortSi
     `Harita: ${map.title}\nDüğüm: ${node.text}\n` +
     `Mevcut alt dallar: ${node.children.map((c) => c.text).join(", ") || "(yok)"}\n` +
     (map.brief ? `Bağlam: ${map.brief.slice(0, 500)}` : "");
-  const full = await streamChat({ system: sys, messages: [{ role: "user", content: user }], signal, temperature: 0.6 });
-  let raw: unknown;
-  try { raw = JSON.parse(extractJsonObject(full)); } catch { throw new Error("Dallandırma JSON'u bozuk — tekrar dene."); }
-  const arr = (raw && typeof raw === "object" && Array.isArray((raw as { children?: unknown }).children))
-    ? ((raw as { children: unknown[] }).children)
-    : [];
-  const texts = arr
-    .filter((t): t is string => typeof t === "string" && !!t.trim())
-    .map((t) => t.trim().slice(0, MAX_NODE_TEXT))
-    .slice(0, MAX_NODE_CHILDREN);
-  if (!texts.length) throw new Error("Dallandırma sonuç vermedi — tekrar dene.");
+  const texts = await streamJson({
+    system: sys, messages: [{ role: "user", content: user }], signal, temperature: 0.6,
+    maxTokens: MAP_EXPAND_MAX_TOKENS,
+    parse: (full) => {
+      let raw: unknown;
+      try { raw = JSON.parse(extractJsonObject(full)); } catch { throw new Error("Dallandırma JSON'u bozuk — tekrar dene."); }
+      const arr = (raw && typeof raw === "object" && Array.isArray((raw as { children?: unknown }).children))
+        ? ((raw as { children: unknown[] }).children)
+        : [];
+      const out = arr
+        .filter((t): t is string => typeof t === "string" && !!t.trim())
+        .map((t) => t.trim().slice(0, MAX_NODE_TEXT))
+        .slice(0, MAX_NODE_CHILDREN);
+      if (!out.length) throw new Error("Dallandırma geçersiz — tekrar dene.");
+      return out;
+    },
+  });
   return texts;
 }

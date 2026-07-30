@@ -2,7 +2,9 @@
    Ortak akış çekirdeği genChat.ts'tedir (docs/forms/defter ile paylaşılır);
    çıktı serbest HTML değil ŞEMALI JSON'dur: slides.ts doğrular ve render eder.
    Anahtarsız kullanıcıda zincir ücretsiz Pollinations'a düşer → hep çalışır. */
-import { streamChat, extractJsonObject } from "./genChat";
+import { streamChat } from "./genChat";
+import { extractJsonObject } from "./jsonExtract";
+import { streamJson } from "./genJson";
 import { parseDeckJson } from "./slides";
 import { generateDrafts, judgeDrafts } from "./boost";
 import { CATEGORY_CRAFT } from "./studioCraft";
@@ -76,41 +78,20 @@ export interface DeckGenOptions {
   signal?: AbortSignal;
 }
 
-/* Modelin JSON şemasına uymadığı (fazladan açıklama, eksik virgül, kaçırılmamış
-   tırnak — özellikle zayıf/ücretsiz modellerde sık) İLK denemede eklenen,
-   daha KATI bir düzeltme talimatı. */
-const STRICT_JSON_RETRY_SUFFIX =
-  "\n\nÖNEMLİ: Bir önceki yanıt geçerli/tam JSON DEĞİLDİ. Bu kez YALNIZCA " +
-  "tek bir dengeli JSON nesnesi yaz — kod bloğu işareti (```), açıklama, " +
-  "giriş/kapanış cümlesi YOK. İlk karakter '{' ve son karakter '}' olsun.";
-
 /** Brief'ten tam deste üretir. Model geçersiz/yarım JSON döndürürse (özellikle
     zayıf/ücretsiz modellerde sık rastlanır — bkz. F1/F2 yorumları) kullanıcıya
     hemen hata göstermeden ÖNCE, daha katı bir talimatla BİR KEZ daha dener;
     "bazen hiç üretilemiyor" şikayetinin doğrudan azaltılması. */
 export async function generateDeck(opts: DeckGenOptions): Promise<SlideDeck> {
-  const baseSystem = deckSystem(opts.slideCount);
-  const attempt = (system: string) => streamChat({
-    system,
+  const deck = await streamJson({
+    system: deckSystem(opts.slideCount),
     messages: [{ role: "user", content: opts.brief }],
     onDelta: opts.onDelta, signal: opts.signal, temperature: 0.7,
     maxTokens: deckMaxTokens(opts.slideCount),
-    jsonMode: true,
+    parse: (raw) => parseDeckJson(raw, opts.brief.slice(0, 48)),
   });
-
-  let full: string;
-  try {
-    full = await attempt(baseSystem);
-    const deck = parseDeckJson(full, opts.brief.slice(0, 48));
-    deck.brief = opts.brief;
-    return deck;
-  } catch (firstErr) {
-    if ((firstErr as Error)?.name === "AbortError") throw firstErr;
-    full = await attempt(baseSystem + STRICT_JSON_RETRY_SUFFIX);
-    const deck = parseDeckJson(full, opts.brief.slice(0, 48));
-    deck.brief = opts.brief;
-    return deck;
-  }
+  deck.brief = opts.brief;
+  return deck;
 }
 
 export interface DeckFusionOptions {

@@ -2,12 +2,13 @@ import { beforeEach, describe, it, expect, vi } from "vitest";
 import { generateDeck, generateDeckFusion, rewriteSlide, deckMaxTokens } from "../slidesGen";
 import type { SlideDeck } from "../types";
 
-vi.mock("../genChat", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../genChat")>();
-  return { ...actual, streamChat: vi.fn() };
-});
-import { streamChat } from "../genChat";
-const mockedStreamChat = vi.mocked(streamChat);
+/* Mock fabrikasında `importOriginal` KULLANMA: vitest'te iki adım
+   derinlikteki modüllere (test → slidesGen → genJson → genChat) sızmıyor,
+   genJson gerçek streamChat'i çağırıp ağa çıkmaya çalışıyordu. genChat artık
+   yalnız taşımayı dışa veriyor (ayrıştırıcı jsonExtract.ts'te), bu yüzden
+   düz bir fabrika hem yeterli hem eksiksiz. */
+const mockedStreamChat = vi.hoisted(() => vi.fn());
+vi.mock("../genChat", () => ({ streamChat: mockedStreamChat }));
 
 vi.mock("../boost", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../boost")>();
