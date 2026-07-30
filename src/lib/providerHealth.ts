@@ -1,36 +1,50 @@
-/* Sağlayıcı sağlık takibi — bir aday (provider+baseUrl) çok kısa süre önce hata
-   verdiyse, aynı sıcak sunucu örneğinde (process ömrü boyunca; rate-limit.ts'teki
-   aynı in-memory Map deseni) hemen tekrar denemek yerine atlanır.
+/* Sağlayıcı sağlık takibi — bir aday (provider+baseUrl+MODEL) çok kısa süre önce
+   hata verdiyse, aynı sıcak sunucu örneğinde (process ömrü boyunca;
+   rate-limit.ts'teki aynı in-memory Map deseni) SONA alınır.
 
-   Bu YALNIZ bir hız optimizasyonudur, hiçbir adayı KALICI olarak devre dışı
-   bırakmaz: soğuma süresi dolunca otomatik tekrar denenir, süreç yeniden
-   başlarsa (soğuk başlangıç) sıfırlanır, ve TÜM adaylar "down" işaretliyse
-   (ör. yeni başlayan bir process'te hiç veri yok, ya da gerçekten hepsi kısa
-   sürede hata verdi) çağıran taraf yine de TAM aday listesine düşer — hiçbir
-   koşulda "denenecek aday kalmadı" durumuna yol açmaz. Amaç: bir isteğin
-   içinde saniyelerce sürebilecek bir zaman aşımını beklemeden, halihazırda
-   ölü olduğu BİLİNEN bir sağlayıcıyı atlayıp doğrudan bir sonraki adaya
-   geçerek toplam fallback gecikmesini azaltmak. */
+   Bu YALNIZ bir sıralama optimizasyonudur, hiçbir adayı elemez: soğuma süresi
+   dolunca aday yine başa döner, süreç yeniden başlarsa (soğuk başlangıç)
+   sıfırlanır. Amaç, bir isteğin içinde saniyelerce sürebilecek bir zaman
+   aşımını beklemeden, halihazırda ölü olduğu BİLİNEN bir sağlayıcıyı sona
+   atıp toplam fallback gecikmesini azaltmak.
+
+   ─── Tem 2026 düzeltmesi (H6): iki ayrı hata ───────────────────────────────
+
+   (a) Anahtar MODELİ İÇERMİYORDU (`provider|baseUrl`). Yani
+   `openrouter.ai/api/v1` üzerindeki HERHANGİ bir modelde tek bir 429/5xx, o
+   base URL'deki TÜM modelleri — kullanıcının o an seçtiği model dahil — 15 sn
+   ilâ 5 dk boyunca "down" işaretliyordu. Farklı modeller birbirini
+   sakatlıyordu. Artık anahtar modeli de içerir; soğuma yalnız gerçekten hata
+   veren modele uygulanır.
+
+   (b) `prioritizeHealthyCandidates` adayı listeden ÇIKARIYORDU (filter). İki
+   sonucu vardı: kullanıcının SEÇTİĞİ model hiç denenmeden başka bir modelden
+   yanıt geliyordu; ve /api/chat'teki dürüstlük kapısı `c === primary` şartına
+   bağlı olduğu için HİÇ tetiklenemiyor, 400/404/410 gibi "bu model yanlış/
+   kaldırılmış" hataları sessizce gizleniyordu. Dosyanın kendi "bir aday asla
+   kalıcı olarak elenmez" sözü de bu pencerede yanlıştı: hepsi down değilse
+   eleme gerçekten kalıcıydı. Artık ELEME YOK — yalnız yeniden sıralama, ve
+   birincil aday her zaman listede kalır. */
 
 interface HealthEntry { downUntil: number; failCount: number }
 const health = new Map<string, HealthEntry>();
 
-const BASE_COOLDOWN_MS = 15_000;    // ilk hatada 15sn atla
+const BASE_COOLDOWN_MS = 15_000;    // ilk hatada sona al
 const MAX_COOLDOWN_MS = 5 * 60_000; // üst üste hatada azami 5dk
 
-function key(provider: string, baseUrl: string): string {
-  return `${provider}|${baseUrl.toLowerCase()}`;
+function key(provider: string, baseUrl: string, model: string): string {
+  return `${provider}|${baseUrl.toLowerCase()}|${model}`;
 }
 
 /** true → bu aday az önce hata verdi, soğuma süresi henüz bitmedi. */
-export function isProviderDown(provider: string, baseUrl: string): boolean {
-  const e = health.get(key(provider, baseUrl));
+export function isProviderDown(provider: string, baseUrl: string, model: string): boolean {
+  const e = health.get(key(provider, baseUrl, model));
   return !!e && e.downUntil > Date.now();
 }
 
 /** Bir aday hata verdi → soğuma süresini işaretle (üst üste hatada üstel artar). */
-export function markProviderDown(provider: string, baseUrl: string): void {
-  const k = key(provider, baseUrl);
+export function markProviderDown(provider: string, baseUrl: string, model: string): void {
+  const k = key(provider, baseUrl, model);
   const prev = health.get(k);
   const failCount = (prev?.failCount ?? 0) + 1;
   const cooldown = Math.min(BASE_COOLDOWN_MS * 2 ** (failCount - 1), MAX_COOLDOWN_MS);
@@ -38,18 +52,23 @@ export function markProviderDown(provider: string, baseUrl: string): void {
 }
 
 /** Bir aday başarılı oldu → soğuma kaydını temizle (hemen "sağlıklı" sayılsın). */
-export function markProviderUp(provider: string, baseUrl: string): void {
-  health.delete(key(provider, baseUrl));
+export function markProviderUp(provider: string, baseUrl: string, model: string): void {
+  health.delete(key(provider, baseUrl, model));
 }
 
-/** Adayları sağlık durumuna göre önceliklendirir: bilinen sağlıklı olanlar önce
- *  denenir. Hepsi "down" işaretliyse (ör. hepsi gerçekten kısa sürede hata
- *  verdi) orijinal TAM listeye düşülür — bir aday asla kalıcı olarak elenmez. */
-export function prioritizeHealthyCandidates<C extends { provider: string; baseUrl: string }>(
+/** Adayları sağlık durumuna göre YENİDEN SIRALAR: bilinen sağlıklı olanlar
+ *  önce, soğumadakiler sona. Hiçbir aday çıkarılmaz ve göreli sıra korunur
+ *  (kararlı sıralama) — böylece birincil aday, sağlıklıysa yine ilk sırada
+ *  kalır; sağlıksızsa bile listede kalır ve son çare olarak denenir. */
+export function prioritizeHealthyCandidates<C extends { provider: string; baseUrl: string; model: string }>(
   candidates: C[],
 ): C[] {
-  const healthy = candidates.filter((c) => !isProviderDown(c.provider, c.baseUrl));
-  return healthy.length > 0 ? healthy : candidates;
+  const healthy: C[] = [];
+  const cooling: C[] = [];
+  for (const c of candidates) {
+    (isProviderDown(c.provider, c.baseUrl, c.model) ? cooling : healthy).push(c);
+  }
+  return [...healthy, ...cooling];
 }
 
 /* Yalnız testler için: durumu sıfırla. */

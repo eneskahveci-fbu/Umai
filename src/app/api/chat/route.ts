@@ -1317,10 +1317,11 @@ export async function POST(req: Request) {
   }
 
   /* Güvenilirlik: bu sıcak süreçte az önce hata verdiği bilinen adaylar
-     (kota/5xx/bağlantı) soğuma süresi dolana kadar ertelenir — aynı isteğin
-     içinde saniyelerce sürebilecek bir zaman aşımını beklemeden doğrudan
-     sıradaki adaya geçilir. Hepsi "down" işaretliyse TAM listeye düşülür,
-     bir aday asla kalıcı olarak elenmez (bkz. providerHealth.ts). */
+     (kota/5xx/bağlantı) listenin SONUNA alınır — aynı isteğin içinde
+     saniyelerce sürebilecek bir zaman aşımını beklemeden doğrudan sıradaki
+     adaya geçilir. Hiçbir aday ÇIKARILMAZ: birincil model sağlıksız
+     işaretliyken bile listede kalır, böylece aşağıdaki dürüstlük kapısı
+     (`c === primary`) çalışabilir (bkz. providerHealth.ts). */
   const tryOrder = prioritizeHealthyCandidates(candidates);
 
   /* Bir adayı çağırır (Anthropic native ucu ayrı; diğerleri OpenAI-uyumlu fetch).
@@ -1773,12 +1774,12 @@ export async function POST(req: Request) {
       try {
         upstream = await openCandidate(c, messages);
       } catch (err) {
-        markProviderDown(c.provider, c.baseUrl);
+        markProviderDown(c.provider, c.baseUrl, c.model);
         lastStatus = 502; lastDetail = (err as Error).message; lastCand = c;
         continue; // bağlantı hatası → sıradaki aday
       }
       if (upstream.ok && upstream.body) {
-        markProviderUp(c.provider, c.baseUrl);
+        markProviderUp(c.provider, c.baseUrl, c.model);
         const headers = { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" };
         if (!noKeyFallback && c === primary) {
           return new Response(upstream.body, { headers });
@@ -1802,7 +1803,7 @@ export async function POST(req: Request) {
         return new Response(combined, { headers });
       }
       lastStatus = upstream.status || 500;
-      if (isProviderFault(lastStatus)) markProviderDown(c.provider, c.baseUrl);
+      if (isProviderFault(lastStatus)) markProviderDown(c.provider, c.baseUrl, c.model);
       lastDetail = await upstream.text().catch(() => "");
       lastCand = c;
     }
@@ -1912,12 +1913,12 @@ export async function POST(req: Request) {
               const { messages: msgs, extra } = toolBodyFor(c, lastRound);
               r = await openCandidate(c, msgs, extra);
             } catch (err) {
-              markProviderDown(c.provider, c.baseUrl);
+              markProviderDown(c.provider, c.baseUrl, c.model);
               lastStatus = 502; lastDetail = (err as Error).message; lastCand = c; continue;
             }
-            if (r.ok && r.body) { markProviderUp(c.provider, c.baseUrl); chosen = c; upstream = r; break; }
+            if (r.ok && r.body) { markProviderUp(c.provider, c.baseUrl, c.model); chosen = c; upstream = r; break; }
             lastStatus = r.status || 500;
-            if (isProviderFault(lastStatus)) markProviderDown(c.provider, c.baseUrl);
+            if (isProviderFault(lastStatus)) markProviderDown(c.provider, c.baseUrl, c.model);
             lastDetail = await r.text().catch(() => ""); lastCand = c;
             /* G1 — DÜRÜSTLÜK KAPISI. Yedek zinciri ULAŞILABİLİRLİK arızaları
                içindir (kota/yetki/sunucu/bağlantı): "istek asla düşmez" sözü
