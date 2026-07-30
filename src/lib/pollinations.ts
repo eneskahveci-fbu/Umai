@@ -112,7 +112,14 @@ let textModelsCache: string[] | null = null;
 export async function fetchTextModels(): Promise<string[]> {
   if (textModelsCache) return textModelsCache;
   try {
-    const res = await fetch(`${POLLINATIONS_TEXT_BASE}/models`, { headers: { Accept: "application/json" } });
+    /* Zaman aşımı ŞART: bu çağrı fusion yolunda ilk token'dan ÖNCE, seri
+       olarak bekleniyor. Timeout'suz hâlinde yanıt vermeyen bir uç ilk mesajı
+       dakikalarca askıda bırakabiliyordu ("ilk mesajda çok geç cevap veriyor").
+       Hata/zaman aşımı zaten sabit listeye düşüyor — kayıp yok, yalnız süre. */
+    const res = await fetch(`${POLLINATIONS_TEXT_BASE}/models`, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(4000),
+    });
     if (!res.ok) return POLLINATIONS_TEXT_MODEL_FALLBACK;
     const data: unknown = await res.json();
     const raw = (data as { data?: unknown })?.data ?? data;

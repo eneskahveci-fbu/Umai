@@ -199,7 +199,7 @@ describe("sağlayıcı sağlığı yalnız SAĞLAYICI hatalarında işaretlenir 
       body: JSON.stringify({ messages: [{ role: "user", content: "selam" }], ...NVIDIA, fallbacks: FALLBACK }),
     });
     await readAll(await POST(req));
-    expect(isProviderDown(NVIDIA.provider, NVIDIA.baseUrl)).toBe(false);
+    expect(isProviderDown(NVIDIA.provider, NVIDIA.baseUrl, NVIDIA.model)).toBe(false);
   });
 
   it("500 (gerçek sağlayıcı arızası) sağlayıcıyı 'down' işaretler", async () => {
@@ -214,7 +214,7 @@ describe("sağlayıcı sağlığı yalnız SAĞLAYICI hatalarında işaretlenir 
       body: JSON.stringify({ messages: [{ role: "user", content: "selam" }], ...NVIDIA, fallbacks: FALLBACK }),
     });
     await readAll(await POST(req));
-    expect(isProviderDown(NVIDIA.provider, NVIDIA.baseUrl)).toBe(true);
+    expect(isProviderDown(NVIDIA.provider, NVIDIA.baseUrl, NVIDIA.model)).toBe(true);
   });
 });
 
@@ -272,7 +272,7 @@ describe("model KONFİGÜRASYON hatası (404/410) — sağlık sinyali DEĞİL, 
       body: JSON.stringify({ messages: [{ role: "user", content: "selam" }], ...NVIDIA }),
     });
     await readAll(await POST(req));
-    expect(isProviderDown(NVIDIA.provider, NVIDIA.baseUrl)).toBe(false);
+    expect(isProviderDown(NVIDIA.provider, NVIDIA.baseUrl, NVIDIA.model)).toBe(false);
   });
 
   it("429 (gerçek kota arızası) hâlâ eskisi gibi fallback'e geçer — 404/410 ile karıştırılmadı", async () => {

@@ -136,7 +136,7 @@ import { buildContextSections, selectRelevantSkills } from "@/lib/prompt";
 import { detectSensitive } from "@/lib/pii";
 import { isOfficeFile } from "@/lib/office";
 import { friendlyError } from "@/lib/friendlyError";
-import { autoEffort, autoSwarm, decidePilotAsync, type PilotDecision } from "@/lib/autoPilot";
+import { autoEffort, autoSwarm, decidePilot, decidePilotAsync, type PilotDecision } from "@/lib/autoPilot";
 import { pickDraftModels, buildBoostInstruction, generateDrafts, fillSelfConsistency, judgeDrafts } from "@/lib/boost";
 import { runCompare } from "@/lib/compare";
 import { fetchTextModels } from "@/lib/pollinations";
@@ -1936,13 +1936,25 @@ export function CoderView() {
     const pilotEnabled = isAdminNow ? store.config.autoPilot !== false : true;
     const pilotRepoCtx = !!store.repo || !!(store.config.localMode && store.config.localBridgeUrl?.trim());
     const pilotShouldRun = pilotEnabled && !opts?.continuation && !overrideAgent;
-    const pilot: PilotDecision | null = pilotShouldRun
-      ? await decidePilotAsync(
-          _lastUserText,
-          { hasRepo: pilotRepoCtx },
-          { baseUrl: active.baseUrl, model: active.model, apiKey: await usableApiKey(active) },
-        )
-      : null;
+    /* H6 — "ilk mesajda çok geç cevap veriyor". Pilot turu (/api/route-plan)
+       ilk token'dan ÖNCE, seri olarak bekleniyor. O uç AYRI bir lambda: sohbetin
+       ilk mesajında kendi soğuk açılışını da yaşıyor ve tipik bir ilk mesaj
+       (60-300 karakter) `pilotConfidence`'tan geçemediği için bu tur neredeyse
+       her zaman çalışıyordu. Sohbetin İLK mesajında artık ağa hiç çıkılmıyor;
+       aynı kararlar senkron regex yoluyla (decidePilot — zaten dokümante edilmiş
+       güvenli yedek) anında veriliyor. Sonraki mesajlarda lambda ısınmış olur ve
+       LLM-tabanlı yönlendirme eskisi gibi devreye girer. */
+    const userTurns = (store.current()?.messages ?? []).filter((m) => m.role === "user").length;
+    const isFirstTurn = userTurns <= 1;
+    const pilot: PilotDecision | null = !pilotShouldRun
+      ? null
+      : isFirstTurn
+        ? decidePilot(_lastUserText, { hasRepo: pilotRepoCtx })
+        : await decidePilotAsync(
+            _lastUserText,
+            { hasRepo: pilotRepoCtx },
+            { baseUrl: active.baseUrl, model: active.model, apiKey: await usableApiKey(active) },
+          );
     setLastPilot(pilot);
     /* Ajan Ekibi: elle çip artık yok — yalnız Otomatik Pilot'un kararına
        (ya da Pilot devre dışıysa eski regex yedeğine) bağlı. */

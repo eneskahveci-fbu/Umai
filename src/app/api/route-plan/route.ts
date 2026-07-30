@@ -81,6 +81,12 @@ export async function POST(req: NextRequest) {
         Authorization: `Bearer ${apiKey || ""}`,
       },
       body: JSON.stringify({ model, messages, max_tokens: 20 * wanted.length, stream: false }),
+      /* Zaman aşımı ŞART: istemci bu uca 4 sn'lik kendi timeout'uyla geliyor
+         ama BURADAKİ upstream fetch'in sınırı yoktu — yavaş bir sağlayıcı
+         lambda'yı meşgul edip istemcinin iptalinden sonra da beklemeye devam
+         ediyordu. İstemci sınırının biraz altında tutuldu; hata/zaman aşımı
+         zaten boş yanıta (regex yedeği) düşüyor. */
+      signal: AbortSignal.timeout(3500),
     });
     if (!res.ok) return Response.json({});
     const ct = res.headers.get("content-type") || "";
