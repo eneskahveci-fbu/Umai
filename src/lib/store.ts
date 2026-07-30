@@ -27,6 +27,7 @@ import { deriveJobTitle, type BackgroundJob } from "./jobs";
 import { DEFAULT_CONFIG, DEFAULT_REPO, DEFAULT_SKILLS, POLLINATIONS_DEFAULT_MODEL } from "./constants";
 import { encryptConfigSecrets, decryptConfigSecrets, isCryptoAvailable, hasPlaintextSecret, resolveGitToken } from "./secureKeys";
 import { applyEditBranch, applySwitchBranch, mergeRegeneratedBranches } from "./branching";
+import { toggleLeftPanel, type LeftPanel } from "./leftPanel";
 import { modelQualityRank } from "./modelQuality";
 import { createClient } from "./supabase/client";
 
@@ -619,6 +620,17 @@ interface StoreState {
   // keyboard shortcuts overlay
   shortcutsOpen: boolean;
   setShortcutsOpen: (b: boolean) => void;
+
+  /** Sol "Alan" paneli: "files" = bağlı deponun dosyaları, "workspace" =
+   *  sunucu (Local Bridge) dosyaları, null = kapalı. En fazla biri açık.
+   *
+   *  CoderView'ın YEREL useState'iydi; Sidebar CoderView'ın KARDEŞİ olduğu
+   *  için "Araçlar" menüsünden açılabilmesi ancak store'a taşınarak mümkün.
+   *  Geçiş mantığı saf kalıyor (lib/leftPanel.ts: toggleLeftPanel/switchLeftPanel). */
+  leftPanel: LeftPanel;
+  setLeftPanel: (p: LeftPanel) => void;
+  /** Menüden tıklama: aynı panel açıksa kapatır, değilse açar (diğerini kapatır). */
+  toggleLeftPanelState: (which: "files" | "workspace") => void;
 
   // onboarding
   onboardingDone: boolean;
@@ -1773,6 +1785,10 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   shortcutsOpen: false,
   setShortcutsOpen: (b) => set({ shortcutsOpen: b }),
+
+  leftPanel: null,
+  setLeftPanel: (p) => set({ leftPanel: p }),
+  toggleLeftPanelState: (which) => set((s) => ({ leftPanel: toggleLeftPanel(s.leftPanel, which) })),
 
   onboardingDone:
     typeof window !== "undefined" && localStorage.getItem("craftai_onboarded") === "1",

@@ -41,3 +41,24 @@ describe("composer dosya ekleme — tek düğme (Ö11)", () => {
     }
   });
 });
+
+/* Ö8 — panellerin Araçlar menüsünde GERÇEKTEN listelendiğini kilitler.
+   (Sidebar JSX'i React/DOM gerektiriyor; bu proje jsdom kullanmıyor.) */
+describe("Araçlar menüsü — Dosyalar/Sunucu girişleri (Ö8)", () => {
+  const sidebar = readFileSync(join(process.cwd(), "src/components/Sidebar.tsx"), "utf8");
+
+  it("iki panel de Araçlar öğesi olarak var", () => {
+    expect(sidebar).toContain('label: "Dosyalar (depo)"');
+    expect(sidebar).toContain('label: "Sunucu (workspace)"');
+  });
+
+  it("mevcut saf yardımcıyı kullanan store eylemine bağlılar", () => {
+    expect(sidebar).toContain('toggleLeftPanelState("files")');
+    expect(sidebar).toContain('toggleLeftPanelState("workspace")');
+  });
+
+  it("CoderView paneli artık yerel state'te değil, store'dan okuyor", () => {
+    expect(src).toContain("useStore((s) => s.leftPanel)");
+    expect(src).not.toMatch(/useState<LeftPanel>/);
+  });
+});
