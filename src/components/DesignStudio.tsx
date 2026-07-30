@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, FileCode2, FileText, FolderOpen, Loader2, Paperclip, Save, Sparkles, Square, X } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { friendlyError } from "@/lib/friendlyError";
+import { friendlyErrorFrom } from "@/lib/friendlyError";
 import { useSurfaceNav, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { generateArtifact, type StudioPhase } from "@/lib/studioGen";
 import { resolveStudioSkillId } from "@/lib/autoPilot";
@@ -536,7 +536,7 @@ export function DesignStudio() {
       if ((e as Error)?.name === "AbortError") {
         setMessages((m) => m.slice(0, -1));
       } else {
-        const msg = friendlyError(e instanceof Error ? e.message : "bilinmeyen hata");
+        const msg = friendlyErrorFrom(e);
         setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: `Hata: ${msg}` }; return c; });
       }
     } finally {
@@ -578,7 +578,7 @@ export function DesignStudio() {
       if ((e as Error)?.name === "AbortError") {
         setMessages((m) => m.slice(0, -1));
       } else {
-        const msg = friendlyError(e instanceof Error ? e.message : "bilinmeyen hata");
+        const msg = friendlyErrorFrom(e);
         setMessages((m) => { const c = [...m]; c[c.length - 1] = { role: "assistant", text: `Hata: ${msg}` }; return c; });
       }
     } finally {

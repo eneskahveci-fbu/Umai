@@ -7,7 +7,7 @@ import {
   Plus, Save, SpellCheck, Sparkles, Trash2, Wand2, X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { friendlyError } from "@/lib/friendlyError";
+import { friendlyErrorFrom } from "@/lib/friendlyError";
 import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { SavedItemsModal } from "./SavedItemsModal";
 import { ExportMenu } from "./ExportMenu";
@@ -137,7 +137,7 @@ export function DocsStudio() {
       const d = await generateDoc({ brief: b });
       setDoc(d); setView("work");
     } catch (e) {
-      addToast(`Doküman üretilemedi: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
+      addToast(`Doküman üretilemedi: ${friendlyErrorFrom(e)}`, "error");
     } finally { setBusy(false); }
   };
 
@@ -174,7 +174,7 @@ export function DocsStudio() {
       patchDoc({ ...doc, blocks: [...doc.blocks, ...extra].slice(0, MAX_DOC_BLOCKS) });
       setContText("");
     } catch (e) {
-      addToast(`Devam üretilemedi: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
+      addToast(`Devam üretilemedi: ${friendlyErrorFrom(e)}`, "error");
     } finally { setContBusy(false); }
   };
 
@@ -199,7 +199,7 @@ export function DocsStudio() {
       if (!issues.length) { setProofRows(null); addToast("Sorun bulunamadı — metin temiz.", "success"); }
       else setProofRows(issues.map((issue) => ({ issue, blockId: segBlocks[issue.blockIndex].id })));
     } catch (e) {
-      addToast(`Denetim başarısız: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
+      addToast(`Denetim başarısız: ${friendlyErrorFrom(e)}`, "error");
     } finally { setProofBusy(false); }
   };
 

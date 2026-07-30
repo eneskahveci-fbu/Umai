@@ -5,7 +5,7 @@ import {
   ArrowLeft, Download, FolderOpen, GitBranch, Loader2, Network, Plus, Presentation, Save, Sparkles, Trash2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { friendlyError } from "@/lib/friendlyError";
+import { friendlyErrorFrom } from "@/lib/friendlyError";
 import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { SavedItemsModal } from "./SavedItemsModal";
 import { ExportMenu } from "./ExportMenu";
@@ -133,7 +133,7 @@ export function MapStudio() {
       const m = await generateMap({ brief: b });
       setMap(m); setView("work"); setSelectedId(null);
     } catch (e) {
-      addToast(`Kroki üretilemedi: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
+      addToast(`Kroki üretilemedi: ${friendlyErrorFrom(e)}`, "error");
     } finally { setBusy(false); }
   };
 
@@ -166,7 +166,7 @@ export function MapStudio() {
       for (const t of texts) root = addChild(root, selectedId, newNode(t));
       patchRoot(root);
     } catch (e) {
-      addToast(`Dallandırılamadı: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
+      addToast(`Dallandırılamadı: ${friendlyErrorFrom(e)}`, "error");
     } finally { setExpanding(false); }
   };
 
