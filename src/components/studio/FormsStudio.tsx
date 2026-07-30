@@ -16,7 +16,7 @@ import { FormResponsesModal } from "./FormResponses";
 import { ExportMenu } from "./ExportMenu";
 import { safeFileName } from "./DocsStudio";
 import type { CraftForm, FormQuestion, FormQuestionType } from "@/lib/types";
-import { CONDITION_SOURCE_QTYPES, FORM_QUESTION_TYPES, formToHtml, generateForm, MAX_FORM_QUESTIONS, newQuestion, OPTION_QTYPES } from "@/lib/forms";
+import { CONDITION_SOURCE_QTYPES, FORM_QUESTION_TYPES, formToHtml, generateForm, MAX_FORM_QUESTIONS, newQuestion, OPTION_QTYPES, parseOptionsDraft } from "@/lib/forms";
 import { downloadTemplate, pickTemplateFile } from "@/lib/templateShare";
 import { publishArtifact } from "@/lib/studioExport";
 import { useStudioProject } from "@/lib/useStudioProject";
@@ -48,6 +48,12 @@ export function FormsStudio() {
   const [responsesOpen, setResponsesOpen] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
+  /* Seçenek kutusunun HAM metni — yalnız o an odaklanılmış soru için tutulur
+     (aynı anda tek kutu odakta olabilir, bu yüzden tek slot yeterli).
+     Kontrollü textarea'da `filter` yazarken uygulanınca Enter'ın açtığı boş
+     satır anında siliniyor ve yeni satır hiç görünmüyordu; ayrıştırma artık
+     blur'da yapılır (bkz. parseOptionsDraft, forms.ts). */
+  const [optionsDraft, setOptionsDraft] = useState<{ id: string; text: string } | null>(null);
 
   useEffect(() => {
     const b = consumeSurfaceHandoff("forms");
@@ -107,6 +113,8 @@ export function FormsStudio() {
   };
 
   const changeType = (q: FormQuestion, type: FormQuestionType) => {
+    /* Tip değişimi options'ı yeniden kurar; açık taslak eski metni geri yazmasın. */
+    setOptionsDraft(null);
     const patch: Partial<FormQuestion> = { type };
     if (OPTION_QTYPES.has(type) && (!q.options || q.options.length < 2)) {
       patch.options = ["Seçenek 1", "Seçenek 2"];
@@ -300,9 +308,16 @@ export function FormsStudio() {
                   </div>
                   {OPTION_QTYPES.has(q.type) && (
                     <textarea
-                      value={(q.options ?? []).join("\n")}
-                      onChange={(e) => patchQ(q.id, { options: e.target.value.split("\n").filter((o) => o.trim()).slice(0, 10) })}
-                      rows={Math.max(2, (q.options ?? []).length)}
+                      value={optionsDraft?.id === q.id ? optionsDraft.text : (q.options ?? []).join("\n")}
+                      onFocus={() => setOptionsDraft({ id: q.id, text: (q.options ?? []).join("\n") })}
+                      onChange={(e) => {
+                        /* Ham metni koru (Enter yeni satır açsın), ayrıştırılmış
+                           hâlini de yaz ki önizleme canlı kalsın. */
+                        setOptionsDraft({ id: q.id, text: e.target.value });
+                        patchQ(q.id, { options: parseOptionsDraft(e.target.value) });
+                      }}
+                      onBlur={() => setOptionsDraft(null)}
+                      rows={Math.max(2, (optionsDraft?.id === q.id ? optionsDraft.text.split("\n").length : (q.options ?? []).length))}
                       placeholder={"Seçenek 1\nSeçenek 2"}
                       className="w-full ml-7 max-w-[calc(100%-1.75rem)] bg-bgsoft border border-line rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand/50 resize-none"
                     />

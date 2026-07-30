@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formToHtml, MAX_FORM_QUESTIONS, normalizeForm, parseFormJson } from "../forms";
+import { formToHtml, MAX_FORM_QUESTIONS, MAX_QUESTION_OPTIONS, normalizeForm, parseFormJson, parseOptionsDraft } from "../forms";
 import { parseTemplate, templateToJson } from "../templateShare";
 import type { CraftForm } from "../types";
 
@@ -216,5 +216,69 @@ describe("Faz 7 — merkezî yanıt toplama (collect)", () => {
     expect(html).toContain("var COLLECT = null");
     expect(html).toContain("sunucusuz, yanıtlar bu cihazda saklanır");
     expect(html).not.toContain("api/forms/respond");
+  });
+});
+
+/* Kullanıcı hata raporu: çoktan seçmeli soruda Enter'a basınca yeni seçenek
+   satırı AÇILMIYORDU. Kontrollü textarea `onChange` içinde boş satırları
+   anında eliyordu; geri yazılan değer aynı kalınca React yeni satırı hiç
+   render etmiyor, imleç geri sıçrıyordu. Ayrıştırma artık saf ve ayrı. */
+describe("parseOptionsDraft", () => {
+  it("satırları seçeneklere çevirir", () => {
+    expect(parseOptionsDraft("A\nB\nC")).toEqual(["A", "B", "C"]);
+  });
+  it("sondaki boş satırı (Enter'ın açtığı) sonuçtan düşürür ama metni bozmaz", () => {
+    expect(parseOptionsDraft("A\nB\n")).toEqual(["A", "B"]);
+  });
+  it("aradaki boş satırlar ve yalnız-boşluk satırları elenir", () => {
+    expect(parseOptionsDraft("A\n\n   \nB")).toEqual(["A", "B"]);
+  });
+  it("baştaki/sondaki boşluklar kırpılır", () => {
+    expect(parseOptionsDraft("  A  \n\tB\t")).toEqual(["A", "B"]);
+  });
+  it("üst sınırı aşan seçenekler kırpılır", () => {
+    const many = Array.from({ length: 25 }, (_, i) => `S${i}`).join("\n");
+    expect(parseOptionsDraft(many)).toHaveLength(MAX_QUESTION_OPTIONS);
+  });
+  it("boş metin boş dizi verir", () => {
+    expect(parseOptionsDraft("")).toEqual([]);
+    expect(parseOptionsDraft("\n\n")).toEqual([]);
+  });
+});
+
+/* "Zorunlu" işareti çoktan seçmelide dışa aktarılan HTML'de sessizce yok
+   sayılıyordu (multi dalında `required` hiç basılmıyordu). Naif çözüm — her
+   checkbox'a `required` koymak — HEPSİNİN işaretlenmesini şart koşardı; bu
+   yüzden "en az bir" kuralı JS ile uygulanıyor. */
+describe("formToHtml — zorunlu çoktan seçmeli", () => {
+  const form = (required: boolean) => ({
+    id: "f1", title: "T", createdAt: 1, updatedAt: 1,
+    questions: [{ id: "q1", type: "multi" as const, label: "Hangileri?", options: ["A", "B"], required }],
+  });
+
+  it("checkbox'lara HTML required BASILMAZ (hepsini zorunlu kılardı)", () => {
+    const html = formToHtml(form(true));
+    const boxes = html.match(/<input type="checkbox"[^>]*>/g) ?? [];
+    expect(boxes.length).toBe(2);
+    expect(boxes.every((b) => !/\brequired\b/.test(b))).toBe(true);
+  });
+
+  it("zorunlu multi sorusunun indeksi REQUIRED_MULTI'ye yazılır", () => {
+    expect(formToHtml(form(true))).toMatch(/var REQUIRED_MULTI = \[0\]/);
+  });
+
+  it("zorunlu DEĞİLSE listeye girmez", () => {
+    expect(formToHtml(form(false))).toMatch(/var REQUIRED_MULTI = \[\]/);
+  });
+
+  it("en-az-bir doğrulaması setCustomValidity ile bağlanır", () => {
+    const html = formToHtml(form(true));
+    expect(html).toContain("syncMultiValidity");
+    expect(html).toContain("setCustomValidity");
+    expect(html).toContain("En az bir seçenek seç.");
+  });
+
+  it("zorunlu işareti (*) etikette görünmeye devam eder", () => {
+    expect(formToHtml(form(true))).toContain('<em title="Zorunlu">*</em>');
   });
 });
