@@ -6,7 +6,7 @@ import {
   Plus, Save, Sparkles, Trash2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { friendlyError } from "@/lib/friendlyError";
+import { friendlyErrorFrom } from "@/lib/friendlyError";
 import { createClient } from "@/lib/supabase/client";
 import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { GenSkeleton } from "./GenSkeleton";
@@ -83,7 +83,7 @@ export function FormsStudio() {
       const f = await generateForm({ brief: b });
       setForm(f); setView("work");
     } catch (e) {
-      addToast(`Anket üretilemedi: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
+      addToast(`Anket üretilemedi: ${friendlyErrorFrom(e)}`, "error");
     } finally { setBusy(false); }
   };
 

@@ -5,7 +5,7 @@ import {
   ArrowLeft, Download, FolderOpen, Highlighter, Layers, Loader2, Plus, RotateCcw, Save, Sparkles, Trash2, Upload,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { friendlyError } from "@/lib/friendlyError";
+import { friendlyErrorFrom } from "@/lib/friendlyError";
 import { consumeSurfaceHandoff, consumeSurfaceOpenItem } from "@/lib/surfaceNav";
 import { SavedItemsModal } from "./SavedItemsModal";
 import { safeFileName } from "./DocsStudio";
@@ -103,7 +103,7 @@ export function CardsStudio() {
       const d = await generateDeck({ brief: b });
       openDeck(d);
     } catch (e) {
-      addToast(`Kartlar üretilemedi: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
+      addToast(`Kartlar üretilemedi: ${friendlyErrorFrom(e)}`, "error");
     } finally { setBusy(false); }
   };
 
@@ -224,7 +224,7 @@ export function CardsStudio() {
       }
       setPicked(new Set());
     } catch (e) {
-      addToast(`Üretilemedi: ${friendlyError(e instanceof Error ? e.message : "bilinmeyen")}`, "error");
+      addToast(`Üretilemedi: ${friendlyErrorFrom(e)}`, "error");
     } finally { setGenFromHl(false); }
   };
 
