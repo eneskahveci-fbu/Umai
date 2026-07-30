@@ -1,3 +1,4 @@
+import { PLATFORM_KNOWLEDGE_BRIEF } from "@/lib/platform-knowledge";
 import { rateLimit } from "@/lib/rate-limit";
 import { isSafeRemoteUrl } from "@/lib/urlSafety";
 import { resolveModelAccess } from "@/lib/plan";
@@ -308,7 +309,12 @@ export async function POST(req: Request) {
   }));
   /* Kullanıcı bağlamı (stil + hafıza + skills + arama) /api/chat ile aynı kaynaktan
      → nihai cevap (birleştirici / tek-ajan) bu kurallara uyar. */
-  const baseSys = (body.systemPrompt || DEFAULT_SYSTEM_PROMPT) + buildContextSections({
+  /* Ö2 — platform bilgisi (kullanıcı isteği): ajan ekibinin KENDİSİ bu bilgiyi
+     hiç almıyordu. Kullanıcı "ajan ekibi nedir / şu buton nerede" diye
+     sorduğunda birleştirici cevap uyduruyordu. /api/chat ile aynı kısa dizin
+     (BRIEF, ~350 token) buraya da eklendi — tam rehber değil, çünkü burada
+     birden çok ajan çalışıyor ve maliyet katlanır. */
+  const baseSys = (body.systemPrompt || DEFAULT_SYSTEM_PROMPT) + `\n\n${PLATFORM_KNOWLEDGE_BRIEF}` + buildContextSections({
     style: body.style,
     memories: body.memories,
     skills: body.skills,
@@ -415,7 +421,8 @@ export async function POST(req: Request) {
               `Önce kısaca planla, sonra çöz; çıktını sunmadan önce öz-doğrula (hata/eksik yakala). ` +
               `Uydurma — emin olmadığın yeri belirt. ` +
               `Net, uygulanabilir sonuç üret (gerekiyorsa kod blokları). Türkçe yaz.` +
-              (repoCtx ? ` Gerekirse read_file/list_files/grep araçlarıyla repoyu kendin incele (varsayma, doğrula).` : ``);
+              (repoCtx ? ` Gerekirse read_file/list_files/grep araçlarıyla repoyu kendin incele (varsayma, doğrula).` : ``) +
+              `\n\n${PLATFORM_KNOWLEDGE_BRIEF}`;
             const wmsgs = [
               { role: "system", content: workerSys },
               ...shared,
