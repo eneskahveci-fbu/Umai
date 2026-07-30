@@ -5,7 +5,7 @@
    olursa çağıran Pollinations'a (anahtarsız taban) düşer — fallback.ts'teki
    metin zinciriyle aynı "istek asla düşmez" sözleşmesi. */
 
-import type { Config, ModelProfile } from "./types";
+import type { Config, MediaAsset, ModelProfile } from "./types";
 import { resolveModelApiKey } from "./secureKeys";
 
 /* Öncelik sırası: kalite/hız dengesi — Gemini (native, hızlı) → OpenAI
@@ -133,4 +133,26 @@ export function compressDataUrl(dataUrl: string, maxDim = 1024, quality = 0.82):
       img.src = dataUrl;
     } catch { resolve(dataUrl); }
   });
+}
+
+/* ── Kütüphane kaydı ────────────────────────────────────────────────────
+   Üretilen görseli Kütüphane'ye (config.mediaAssets) ekler. SAF: yeni
+   mediaAssets dizisini döndürür, kaydetmeyi çağıran yapar → birim testli.
+
+   Kota kuralı: BYOK ve (artık) doğrulanmış Pollinations çıktıları data-URL'dir
+   ve localStorage'ı hızla doldurur; bu yüzden data-URL girdileri 20 ile,
+   toplam liste 200 ile sınırlanır (URL girdileri küçük olduğundan onlara
+   cömert davranılır). Kural İKİ çağrı yerinde de aynı olsun diye tek yerde:
+   "/gorsel" komutu ve generate_image aracı. */
+export const MAX_DATA_URL_ASSETS = 20;
+export const MAX_MEDIA_ASSETS = 200;
+
+export function addMediaAsset(
+  existing: readonly MediaAsset[] | undefined,
+  asset: MediaAsset,
+): MediaAsset[] {
+  let dataCount = 0;
+  return [asset, ...(existing ?? [])]
+    .filter((a) => !a.url.startsWith("data:") || ++dataCount <= MAX_DATA_URL_ASSETS)
+    .slice(0, MAX_MEDIA_ASSETS);
 }
