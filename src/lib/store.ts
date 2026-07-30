@@ -245,13 +245,31 @@ function loadLocalChats(): Chat[] {
   }
 }
 
+/* Kota koruması `saveConfig` ile AYNI desen. Önceden try/catch YOKTU: uzun
+   sohbetler + eklenen görseller (base64) localStorage kotasını doldurunca
+   setItem QuotaExceededError fırlatıyor, hata bu fonksiyonu çağıran store
+   aksiyonunun ORTASINDA yukarı kaçıyor ve arayüz akışın ortasında donuyordu.
+   Artık kayıt sessizce başarısız olur (bellekteki state doğru kalır) ve
+   kullanıcı ne yapması gerektiğini öğrenir. */
+let localChatsQuotaWarned = false;
 function saveLocalChats(chats: Chat[]) {
   const store = getStore();
   if (!store) return;
-  store.setItem(
-    CHATS_KEY,
-    JSON.stringify(chats.filter((c) => !c.incognito)),
-  );
+  try {
+    store.setItem(
+      CHATS_KEY,
+      JSON.stringify(chats.filter((c) => !c.incognito)),
+    );
+    localChatsQuotaWarned = false;
+  } catch (e) {
+    if ((e as Error)?.name === "QuotaExceededError" && !localChatsQuotaWarned) {
+      localChatsQuotaWarned = true; // her tuş vuruşunda tekrar uyarma
+      useStore.getState().addToast(
+        "Tarayıcı depolaması dolu — sohbetler yerele kaydedilemiyor. Eski sohbetleri sil.",
+        "error",
+      );
+    }
+  }
 }
 
 function applyTheme(theme: "dark" | "light") {

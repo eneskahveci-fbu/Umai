@@ -46,7 +46,15 @@ const COOP_COEP_HEADERS = [
   { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
 ];
 
+/* Derlemeye özel sürüm damgası — service worker önbelleklerini adlandırmak
+   için (bkz. src/lib/sw-register.ts + public/sw.js). Vercel'de commit SHA,
+   yerelde derleme zamanı kullanılır; her ikisi de derleme başına SABİT ama
+   derlemeler ARASINDA farklıdır — tam olarak istenen davranış. */
+const BUILD_ID =
+  process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || `dev-${Date.now().toString(36)}`;
+
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_BUILD_ID: BUILD_ID },
   async headers() {
     return [
       {
