@@ -15,6 +15,47 @@ export interface SavedLike {
   updatedAt?: number;
 }
 
+/* Zaman damgasından BAĞIMSIZ içerik imzası.
+
+   Neden gerekli: `hasUnsavedItem` eskiden yalnız `updatedAt` karşılaştırıyordu,
+   ama HİÇBİR yüzey düzenleme sırasında bu damgayı vurmuyor — damga yalnız
+   KAYDETME anında vuruluyor (bkz. DocsStudio `patchDoc`, MapStudio `patchRoot`,
+   CardsStudio `patchCard`, FormsStudio `patchForm`). Sonuç: KAYITLI bir öğeyi
+   açıp baştan sona değiştirdikten sonra "+ Yeni"ye basınca iki damga eşit
+   kalıyor, uyarı çıkmıyor ve tüm düzenleme sessizce siliniyordu — modülün tam
+   da önlemek için yazıldığı kayıp.
+
+   Neden damgayı düzenlemede vurmuyoruz: render gövdesinde `Date.now()`
+   çağırmak saf olmayan bir işlem (eslint react-hooks/purity) — NotebookStudio
+   bu duvara çarpıp aynı çözüme (içerik imzası) geçmişti, bkz. nbSignature.
+   Ayrıca damgayı mutasyon noktalarına serpmek yalnız CardsStudio'da 9 ayrı
+   `setDeck` çağrısı demek; biri unutulduğunda hata sessizce geri gelir.
+
+   JSON semantiği kasıtlı: anahtarlar özyinelemeli sıralanır ve `undefined`
+   değerler düşer — çünkü karşılaştırılan kopya localStorage'dan JSON olarak
+   geri okunuyor. Örn. FormsStudio `required: e.target.checked || undefined`
+   yazıyor: oturum içinde anahtar VAR (değeri undefined), yeniden yüklemeden
+   sonra anahtar YOK. Naif bir derin karşılaştırma bunu fark sanıp her
+   "+ Yeni"de boş yere onay sorardı. */
+const SIGNATURE_IGNORED_KEYS = ["updatedAt", "createdAt"];
+
+export function contentSignature(value: unknown, ignore: readonly string[] = SIGNATURE_IGNORED_KEYS): string {
+  const walk = (v: unknown, top: boolean): unknown => {
+    if (v === null || typeof v !== "object") return v;
+    if (Array.isArray(v)) return v.map((x) => walk(x, false));
+    const src = v as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(src).sort()) {
+      if (top && ignore.includes(key)) continue;
+      const child = src[key];
+      if (child === undefined) continue; // JSON round-trip ile aynı davran
+      out[key] = walk(child, false);
+    }
+    return out;
+  };
+  return JSON.stringify(walk(value, true)) ?? "";
+}
+
 export interface ProjectLike {
   id: string;
   /** Üretilmiş çıktı — boşsa ortada henüz bir iş yok. */
@@ -27,10 +68,10 @@ export interface ProjectLike {
  *
  * • Hiç çıktı üretilmediyse (html boş) kaybedilecek bir şey yoktur.
  * • Kayıtlılar arasında bu id yoksa hiç kaydedilmemiş demektir.
- * • Kayıtlı kopya varsa ama projenin updatedAt'i daha yeniyse, kaydedildikten
- *   SONRA değişmiş demektir.
+ * • Kayıtlı kopya varsa: içeriği farklıysa YA DA updatedAt'i daha yeniyse,
+ *   kaydedildikten SONRA değişmiş demektir (bkz. contentSignature).
  */
-export function hasUnsavedWork(project: ProjectLike, saved: readonly SavedLike[]): boolean {
+export function hasUnsavedWork(project: ProjectLike, saved: readonly ProjectLike[]): boolean {
   /* Tasarım stüdyosunda "iş var mı" ölçütü üretilmiş çıktıdır (html). */
   if (!project.html) return false;
   return hasUnsavedItem(project, saved);
@@ -51,7 +92,17 @@ export function hasUnsavedItem(
   if (!current) return false;
   const copy = saved.find((p) => p.id === current.id);
   if (!copy) return true;
-  return (current.updatedAt ?? 0) > (copy.updatedAt ?? 0);
+  /* VEYA-hibrit: içerik farkı YA DA daha yeni damga. Damga kuralı korunuyor
+     çünkü bazı çağıranlar (ve mevcut testler) yalnız {id, updatedAt} taşıyan
+     çıplak nesneler veriyor — onlarda içerik imzası eşit çıkar. İki kuralın
+     birleşimi her zaman daha TEMKİNLİ: daha çok onay = daha az kayıp. */
+  if ((current.updatedAt ?? 0) > (copy.updatedAt ?? 0)) return true;
+  /* Ucuz ön eleme: Tasarım projesi `html` + `versions[]` taşır (MB'larca
+     olabilir); değişmişse imzaya hiç gerek yok. */
+  const a = current as { html?: string };
+  const b = copy as { html?: string };
+  if (a.html !== b.html) return true;
+  return contentSignature(current) !== contentSignature(copy);
 }
 
 /** Kaydedilmiş projeleri en son güncellenen başta olacak şekilde sıralayıp
