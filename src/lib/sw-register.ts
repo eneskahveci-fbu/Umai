@@ -1,35 +1,59 @@
 import { useStore } from "./store";
+import { runAfterStreaming } from "./streamGate";
 
-/** Yeni SW devraldığında reload'u YÖNETİR — bağımlılıklar enjekte edilir ki
-    DOM/tarayıcı ortamı olmadan (bu proje testleri jsdom KULLANMAZ) saf birim
-    testiyle doğrulanabilsin. Akış devam ederken (`isStreaming()` true)
-    reload ERTELENİR: aksi halde yeni bir sürüm dağıtıldığı TAM O AN
-    kullanıcı bir yanıtın ortasındaysa sayfa aniden yenileniyor, henüz
-    kaydedilmemiş yanıt kayboluyor ve kullanıcıya "sohbetten aniden atıldım,
-    tarayıcı kendiliğinden yeniden başladı gibi" hissettiriyordu — canlı
-    deploy sıklığı yüksek bir uygulamada bu gerçek, tekrar eden bir risktir.
-    Akış bitince (ya da `safetyMs` sonra — streaming bayrağı bir hatadan
-    dolayı sonsuza dek takılı kalırsa diye güvenlik ağı) reload çalışır. */
-export function scheduleReloadAfterStreaming(opts: {
-  isStreaming: () => boolean;
-  subscribe: (listener: () => void) => () => void;
-  reload: () => void;
-  safetyMs?: number;
-}): void {
-  const { isStreaming, subscribe, reload, safetyMs = 120_000 } = opts;
-  if (!isStreaming()) { reload(); return; }
-  let done = false;
-  let unsub: (() => void) | null = null;
-  let safety: ReturnType<typeof setTimeout> | null = null;
-  const finish = () => {
-    if (done) return;
-    done = true;
-    unsub?.();
-    if (safety) clearTimeout(safety);
-    reload();
-  };
-  unsub = subscribe(() => { if (!isStreaming()) finish(); });
-  safety = setTimeout(finish, safetyMs);
+/** Her derlemede DEĞİŞEN sürüm damgası. `/sw.js?v=<BUILD_ID>` olarak
+    kaydedilir ve service worker bunu KENDİ URL'inden okuyup önbellek adı
+    yapar (bkz. public/sw.js). Böylece yeni dağıtımda `activate` eski
+    önbellekleri gerçekten siler.
+
+    Neden şart: önceden `sw.js` içindeki sürüm sabit bir literaldi
+    ("craft-v3"). Önbellek adları hiç değişmediği için `activate`'teki temizlik
+    HİÇBİR ŞEY silmiyordu; `/_next/static/*` cache-first olduğundan GEÇMİŞ TÜM
+    derlemelerin chunk'ları önbellekte kalıyordu. Tek bir başarısız gezinme
+    isteği (zayıf bağlantı, dağıtım anındaki 5xx) network-first'ün catch
+    dalını tetikleyip önbellekteki DAĞITIM ÖNCESİ HTML'i sunuyor, o HTML eski
+    chunk hash'lerini istiyor, o chunk'lar da hâlâ önbellekte olduğu için
+    ÖNCEKİ DERLEME bütünüyle ve sorunsuz açılıyordu — kullanıcının
+    "sanki eski commit'e geri dönüyor" dediği şey tam olarak buydu. */
+const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID || "dev";
+
+/** Yeni sürüm hazır olduğunda kullanıcıya SORAN bildirim. Sayfayı kendiliğinden
+    ASLA yenilemez.
+
+    Önceden yeni SW devralınca sayfa (akış bitiminde ya da 120 sn'lik güvenlik
+    ağı dolunca) otomatik yenileniyordu. Kullanıcı açısından bu "tarayıcı
+    kendini yeniden başlattı" demekti ve yenileme `persistCurrent()` çözülmeden
+    gerçekleşirse biten yanıt da kayboluyordu. Artık karar kullanıcınındır;
+    tıklarsa ÖNCE kayıt tamamlanır, SONRA yenilenir. */
+function promptForUpdate(): void {
+  runAfterStreaming({
+    isStreaming: () => useStore.getState().streaming,
+    subscribe: (cb) => useStore.subscribe(cb),
+    /* Akış sürerken bildirimi göstermeyi ertelemek yalnız gürültü içindir;
+       takılı kalan bir `streaming` bayrağı yüzünden hiç görünmemesin diye
+       güvenlik ağı bırakıldı — bu yol artık yalnız BİLDİRİM gösteriyor,
+       yıkıcı bir şey yapmıyor. */
+    safetyMs: 120_000,
+    run: () => {
+      useStore.getState().addToast("Yeni sürüm hazır.", "info", {
+        /* Uzun ömürlü: kullanıcı uygun bir anda tıklasın. Kaçırırsa da sorun
+           değil — sürüm damgası düzeltmesinden sonra bayat kabuk sunulamıyor,
+           bir sonraki normal yenilemede yeni sürüm zaten gelir. */
+        duration: 600_000,
+        action: {
+          label: "Yenile",
+          fn: () => {
+            /* Kaydetme YARIDA KESİLMESİN: reload persistCurrent() çözüldükten
+               sonra. Aksi halde yeniden yüklemede loadChats buluttaki ESKİ
+               kopyayı çekiyor ve biten yanıt kayboluyordu. */
+            void useStore.getState().persistCurrent()
+              .catch(() => { /* kayıt başarısız olsa da kullanıcı yenilemek istedi */ })
+              .then(() => window.location.reload());
+          },
+        },
+      });
+    },
+  });
 }
 
 /* PWA service worker'ını kaydeder (public/sw.js — network-first, bayat-bundle
@@ -39,42 +63,24 @@ export function registerServiceWorker() {
   if (typeof window === "undefined") return;
   if (!("serviceWorker" in navigator)) return;
 
-  /* Yeni sürüm dağıtıldığında OTOMATİK geç: yeni SW kontrolü devraldığında
-     sayfayı BİR KEZ yenile. Yalnızca sayfa zaten bir SW tarafından kontrol
-     ediliyorsa kurulur → ilk ziyarette gereksiz reload olmaz.
-     `refreshing` bayrağı TEK bir sayfa yüklemesi içinde ikinci bir reload'u
-     engeller ama reload'un KENDİSİ sayfayı sıfırdan çalıştırdığından bu
-     bayrak da sıfırlanır — art arda birden fazla controllerchange (ör. kısa
-     sürede birkaç dağıtımın üst üste yakalanması) reload'ları ARASINDA
-     hayatta kalan bir sessionStorage damgasıyla ek olarak sınırlanır, bu
-     yüzden hiçbir koşulda "saniyede bir yenilenme" döngüsü oluşamaz. */
-  const RELOAD_GUARD_KEY = "craftai_sw_reload_at";
-  const RELOAD_COOLDOWN_MS = 10_000;
-  let refreshing = false;
+  /* Yeni sürüm dağıtıldığında kullanıcıya SOR — sayfayı kendiliğinden yenileme.
+     Yalnızca sayfa zaten bir SW tarafından kontrol ediliyorsa kurulur → ilk
+     ziyarette gereksiz bildirim çıkmaz. `prompted` bayrağı art arda gelen
+     controllerchange olaylarında bildirimin tekrarlanmasını engeller. */
+  let prompted = false;
   if (navigator.serviceWorker.controller) {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (refreshing) return;
-      void (async () => {
-        try {
-          const last = Number(sessionStorage.getItem(RELOAD_GUARD_KEY) || 0);
-          if (Date.now() - last < RELOAD_COOLDOWN_MS) return;
-          sessionStorage.setItem(RELOAD_GUARD_KEY, String(Date.now()));
-        } catch { /* sessionStorage erişilemezse eski davranışa düş */ }
-        refreshing = true;
-        /* ÖNCEDEN reload KOŞULSUZDU (bkz. scheduleReloadAfterStreaming'in
-           üstündeki not) — artık akış bitene kadar ertelenir. */
-        scheduleReloadAfterStreaming({
-          isStreaming: () => useStore.getState().streaming,
-          subscribe: (cb) => useStore.subscribe(cb),
-          reload: () => window.location.reload(),
-        });
-      })();
+      if (prompted) return;
+      prompted = true;
+      promptForUpdate();
     });
   }
 
   const register = async () => {
     try {
-      const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+      /* `?v=` sürüm damgası: hem tarayıcıyı yeni script'i almaya zorlar hem de
+         SW'nin önbellek adlarını derlemeye özel yapmasını sağlar (bkz. BUILD_ID). */
+      const reg = await navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(BUILD_ID)}`, { scope: "/" });
       /* Güncellemeyi hemen ve sekme yeniden görünür olduğunda kontrol et →
          yeni dağıtım dakikalar içinde yakalanır. */
       reg.update().catch(() => { /* yok say */ });

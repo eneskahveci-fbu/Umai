@@ -12,7 +12,17 @@
 
    Böylece kurulabilir bir PWA elde edilir ama bayat paket sorunu geri gelmez. */
 
-const VERSION = "craft-v3";
+/* Sürüm damgası SW'nin KENDİ URL'inden okunur: sw-register.ts bunu
+   `/sw.js?v=<BUILD_ID>` olarak kaydeder ve BUILD_ID her derlemede değişir.
+
+   Neden sabit bir literal OLAMAZ: önbellek adları hiç değişmediğinde
+   aşağıdaki `activate` temizliği (`!k.startsWith(VERSION)`) HİÇBİR ŞEY
+   silmez. `/_next/static/*` cache-first olduğu için geçmiş TÜM derlemelerin
+   chunk'ları önbellekte kalır; tek bir başarısız gezinme isteği aşağıdaki
+   catch dalını tetikleyip DAĞITIM ÖNCESİ HTML'i sunar, o HTML eski chunk
+   hash'lerini ister, chunk'lar da önbellekte olduğu için ÖNCEKİ DERLEME
+   bütünüyle açılır — "sanki eski commit'e dönüyor" belirtisinin kök nedeni. */
+const VERSION = new URL(self.location.href).searchParams.get("v") || "craft-v3";
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL_CACHE = `${VERSION}-shell`;
 const OFFLINE_FALLBACK = "/app";

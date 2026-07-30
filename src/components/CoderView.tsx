@@ -78,6 +78,7 @@ const RealTerminal = dynamic(() => import("./RealTerminal").then((m) => m.RealTe
 });
 const CameraCaptureModal = dynamic(() => import("./CameraCapture").then((m) => m.CameraCaptureModal), { ssr: false });
 import { useStore } from "@/lib/store";
+import { runWhenNotStreaming } from "@/lib/streamGate";
 import { useModKey } from "@/lib/useModKey";
 import { isMobile as isMobileDevice, isSupported as isWebContainerSupported } from "@/lib/webcontainer";
 import { isAdminEmail } from "@/lib/admin";
@@ -571,7 +572,8 @@ function getExt(name: string) {
   return name.split(".").pop()?.toLowerCase() ?? "";
 }
 
-/* Akış SÜRERKEN sohbete `role:"user"` mesaj eklenmesini erteler.
+/* Akış SÜRERKEN sohbete `role:"user"` mesaj eklenmesini erteleyen kapı
+   `@/lib/streamGate`'ten gelir (service worker güncelleme bildirimiyle ORTAK).
 
    Terminal/kod çıktısı ajana gizli bir kullanıcı mesajı olarak geri beslenir.
    Bu, akışın ORTASINDA olursa akan metin o mesajın üzerine yazılıyor ve
@@ -579,19 +581,10 @@ function getExt(name: string) {
    store.ts tarafındaki `lastAssistantIndex` artık yanlış mesaja yazmayı
    imkânsız kılıyor; burada ayrıca mesajın DOĞRU SIRAYA girmesini sağlıyoruz.
 
-   Çıktı DÜŞÜRÜLMEZ, KUYRUĞA alınır: checklist yolundaki `if (store.streaming)
-   return;` orada doğru (kullanıcı tekrar tıklayabilir), ama burada vazgeçmek
-   ajanın çalıştırdığı komutun sonucunu kalıcı olarak kaybettirir. */
-function runWhenNotStreaming(fn: () => void): void {
-  if (!useStore.getState().streaming) { fn(); return; }
-  let done = false;
-  const unsub = useStore.subscribe(() => {
-    if (done || useStore.getState().streaming) return;
-    done = true;
-    unsub();
-    fn();
-  });
-}
+   Çıktı DÜŞÜRÜLMEZ, KUYRUĞA alınır (ve güvenlik ağı YOK): checklist yolundaki
+   `if (store.streaming) return;` orada doğru — kullanıcı tekrar tıklayabilir —
+   ama burada vazgeçmek ajanın çalıştırdığı komutun sonucunu kalıcı olarak
+   kaybettirir. */
 
 const EXT_COLOR: Record<string, string> = {
   ts: "text-blue-400", tsx: "text-blue-400",
@@ -1684,7 +1677,18 @@ export function CoderView() {
     if (f.type.startsWith("image/")) {
       if (f.size > 5_000_000) { addToast("Görsel 5MB'den büyük.", "error"); return; }
       const reader = new FileReader();
-      reader.onload = () => setPendingImages((prev) => [...prev, reader.result as string]);
+      /* Sıkıştırılmadan eklenirse 5MB'lık bir fotoğraf base64'te ~6.7MB olup
+         hem mesaj state'ini hem localStorage'ı şişiriyor, sekme donuyordu.
+         Görsel ÜRETİM yolu zaten compressDataUrl kullanıyor — aynısı eke de
+         uygulanır. Sıkıştırma başarısız olursa (canvas yok/CORS) ham veriye
+         düşülür: davranış en kötü ihtimalle eskisi kadar iyi. */
+      reader.onload = () => {
+        const raw = reader.result as string;
+        void import("@/lib/imageGen")
+          .then(({ compressDataUrl }) => compressDataUrl(raw))
+          .catch(() => raw)
+          .then((url) => setPendingImages((prev) => [...prev, url]));
+      };
       reader.readAsDataURL(f);
       return;
     }
