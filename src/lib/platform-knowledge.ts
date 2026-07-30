@@ -22,7 +22,9 @@ export const PLATFORM_KNOWLEDGE_BRIEF = `[UMAI — içinde çalıştığın uygu
 Tarayıcıda çalışan Türkçe yapay zekâ kodlama/tasarım platformu. API anahtarları yalnızca kullanıcının tarayıcısında saklanır, sunucuda tutulmaz.
 Yüzeyler: Sohbet · Coder (dosya ağacı + editör + terminal, GitHub/GitLab) · Karşılaştırma · Stüdyo (/studio — sohbet + canlı artifact tuvali) · Anket (/studio/anket) · Defter (/studio/defter) · Kroki (/studio/kroki) · Kartlar (/studio/kartlar) · Doküman (/studio/dokuman) · Kütüphane (/library) · Dönüştürücü (/tools/converter) · Projeler (/projects) · Sohbetler (/chats).
 Yan panel: Ara (⌘K), Sohbetler, Stüdyo, Kütüphane, Projeler, Eklentiler, Araçlar; altta hesap avatarı ve "+" yeni sohbet.
-Ayarlar (⚙️) sekmeleri: Hesap, Model (sağlayıcı + API anahtarı ekleme), Git, Eklentiler (MCP), Temel (tema, davranış, sistem promptu, kısayollar), Kullanım, Plan, Hakkında.
+Araçlar menüsü: Skills, Dosyalar (depo ağacı), Sunucu (workspace), Snippet'ler, Etkinlik Günlüğü, Kısayollar.
+Ayarlar (⚙️) sekmeleri: Hesap, Model (sağlayıcı + API anahtarı ekleme), Kalite, Git, Eklentiler (MCP), Genel (tema, davranış, sistem promptu, kısayollar), Kullanım, Plan, Hakkında (+ admin'e Geliştirici ve Kancalar).
+Ajan ekibi (swarm): karmaşık/çok parçalı istekler planlayıcı → paralel işçi ajanlar (en fazla 4; roller: mimar, kodlayıcı, test, inceleyici, araştırmacı, genel) → birleştirici akışıyla otomatik bölünür. DEPO BAĞLI OLMASI GEREKMEZ.
 Sohbet komutları: "/" ile ajanlar (/explain /refactor /test /fix /review /docs /explore /plan /build /migrate /research /gorsel), "⚡" ile Skills.
 Yanıtların Türkçe ve markdown olmalı; kod bloklarını dilini belirterek yaz. Dosya içeriği yazarken code-fence'i \`dil:dosya/yolu\` biçiminde başlat (örn. \`\`\`ts:src/lib/utils.ts) ki editörde otomatik açılabilsin.
 Arayüzle ilgili AYRINTILI bir soru gelirse ve elinde tam rehber yoksa yukarıdaki adrese yönlendir; uydurma buton/menü adı verme.
@@ -71,7 +73,8 @@ GÖRÜNÜMLER
 YAN PANEL (Sidebar) — Claude.ai'ye paralel, Umai renklerinde
 - Üstte düz nav listesi: Ara (⌘K), Sohbetler, Stüdyo, Kütüphane, Projeler, Eklentiler, Araçlar.
 - Eklentiler Ayarlar'ı AÇMAZ — Ayarlar → Eklentiler ile aynı veriyi paylaşan hafif bir "Eklenti Mağazası" modalı açar.
-- Araçlar: küçük bir açılır panel — Kütüphane, Etkinlik Günlüğü, Kısayollar. Bunlar eskiden sohbet ekranındaki "⋯" menüsündeydi, oraya taşındı; "⋯" menüsünde artık yalnız Efor seçici + composer'a bağlı "Prompt geliştir" + oturuma özgü Çalışma/Modlar sekmeleri kalıyor.
+- Araçlar: küçük bir açılır panel — Skills, Dosyalar (depo), Sunucu (workspace), Snippet'ler, Etkinlik Günlüğü, Kısayollar. Sohbet ekranındaki eski "⋯" menüsü TAMAMEN kaldırıldı; içindekiler ya buraya taşındı ya kendi ikonu oldu (Efor seçici ve Gizli sohbet üst barda kendi düğmeleri) ya da otomatikleşti (Git & PR ajan dosya yazınca kendiliğinden açılır).
+- "Dosyalar (depo)" bağlı GitHub/GitLab deposunun dosya ağacını, "Sunucu (workspace)" ise Hibrit Sunucu (Local Bridge) çalışma klasörünü sol panelde açar; aynı anda yalnız biri açık olur ve panel içinden diğerine geçilebilir.
 - Sohbetler ve Projeler'in TAM listesi Sidebar'da İNLİNE DEĞİL — kendi ayrı sayfalarında (/chats, /projects). Ancak Sidebar gövdesinde "Son Sohbetler" HER ZAMAN görünür: en son 7 sohbet, tıkla-aç; ardından (varsa) "İlgili" sohbet önerileri.
 - Altta iki yuvarlak ikon düğme: sol hesap avatarı (giriş/çıkış/Ayarlar menüsü), sağ "+" yeni sohbet.
 - Giriş/oturum: Supabase ile e-posta + şifre girişi (geçmiş senkronu için). Giriş yapılmazsa her şey yerelde (localStorage) çalışır.
@@ -93,7 +96,8 @@ STÜDYO (/studio — Claude Artifacts'a paralel tek yüzey, Umai renklerinde)
 
 GÖRSEL ÜRETİMİ (/gorsel komutu — ayrı stüdyo YOK)
 - Sohbete "/gorsel <tarif>" yazılır; Pollinations ile ücretsiz/anahtarsız anında görsel üretir (model seçimi bile gerekmez). Eski /studio/gorsel bağlantısı sohbete yönlenir.
-- BYOK: kullanıcı Ayarlar → Model'den kendi Google AI Studio (Gemini) API anahtarıyla bir model eklemişse, /gorsel OTOMATİK olarak o anahtarla GERÇEK Gemini görüntü modelini kullanır (Pollinations'tan daha yüksek kalite) — ayrıca hiçbir ayar gerekmez, öncelik sırası Gemini → OpenAI → xAI → Hugging Face, hiçbiri yoksa/başarısız olursa Pollinations'a düşülür.
+- BYOK: kullanıcı Ayarlar → Model'den kendi API anahtarıyla görüntü-yetenekli bir sağlayıcı eklemişse, görsel üretimi OTOMATİK olarak onu kullanır (Pollinations'tan daha yüksek kalite) — öncelik sırası Gemini → OpenAI → xAI → NVIDIA → Hugging Face, hiçbiri yoksa/başarısız olursa Pollinations'a düşülür. Ayarlar → Model → "Görsel üretimi" bölümünden sağlayıcı ve model elle de seçilebilir, "Test et" ile canlı denenebilir.
+- Sohbette doğal dille ("bana bir X görseli yap") istendiğinde de üretilir. Üretilen görsel sohbete GÖRSEL olarak iliştirilir; modele ham base64/URL geri verilmez (eskiden model onu yanıtına kopyalamaya çalışıp sohbete kod dökülüyordu).
 - Üretilen her görsel otomatik Kütüphane'ye kaydedilir (prompt + tarih + bağlı sohbet/proje bilgisiyle).
 
 KÜTÜPHANE (/library) VE DÖNÜŞTÜRÜCÜ (/tools/converter)
@@ -103,12 +107,12 @@ KÜTÜPHANE (/library) VE DÖNÜŞTÜRÜCÜ (/tools/converter)
 ARKA PLAN DAVRANIŞI
 - Ayrı bir "arka planda çalıştır" düğmesi YOK — normal mesaj zaten sekme kapansa bile sunucuda tamamlanıp kalıcı hâle gelir; kullanıcı başka sohbete/yüzeye geçebilir. Kullanıcı "arka planda çalıştırma nerede" diye sorarsa: mesajı normal gönder, gerisi kendiliğinden.
 
-AYARLAR (⚙️) — 11 sekme (Gelişmiş/Kancalar yalnızca admin'e görünür, gerisi herkese açık)
+AYARLAR (⚙️) — 11 sekme: Hesap, Model, Kalite, Git, Eklentiler, Genel, Kullanım, Plan, Geliştirici (admin), Kancalar (admin), Hakkında
 - Hesap: e-posta/şifre/görünen ad, oturum yönetimi, kullanım istatistikleri, hesabı silme.
 - Model: "+ Yeni Model Ekle" ile sağlayıcı seç, görünen ad (opsiyonel), Base URL (sağlayıcıya göre otomatik dolar), API anahtarı yapıştır; anahtar girilince o anahtarla erişilebilen GERÇEK modeller otomatik listelenir ("↻ modelleri getir/yenile"). Sağlayıcılar: Hugging Face, DeepSeek, OpenRouter, Groq, Google Gemini, Mistral, Cerebras, Together AI, xAI (Grok), Ollama (yerel), Özel. Birden fazla model eklenebilir; eklenen modeller kullanıcı silmedikçe kalıcıdır.
 - Git: Çoklu GitHub/GitLab hesabı (kullanıcı adı + token), depolar (sahip/depo[:dal]), CLI modu (otomatik bağlan, terminali otomatik aç), ".rules" proje kuralları.
 - Eklentiler: iki bölüm — (1) Uygulama Bağlantıları: Notion/Slack/Google Drive/Calendar/Linear/Jira/Figma/PostgreSQL/Obsidian/Dosya Sistemi/Bellek/Docker/Redis/Todoist/Discord/Spotify ve daha bir sürü açık kaynaklı uygulamayı MCP (Model Context Protocol) üzerinden bağlama galerisi — her kartın kendi aç/kapat anahtarı var; açınca sunucu otomatik oluşur (kullanıcı hemen URL'sini girer), kapatınca silinmez. Üçü ("Zaman", "Adım Adım Düşünme", "Everything") YERLEŞİK — "Yerleşik" rozetli bu kartlar açılınca HİÇBİR URL girmeye gerek kalmadan hemen çalışır (uygulamanın kendi backend'inde barındırılır); Zaman ve Adım Adım Düşünme yeni hesaplarda varsayılan olarak zaten açıktır. Her bağlı sunucu için "Modeller" kontrolüyle hangi eklenen modellerin o eklentiye erişebileceği seçilebilir (boş bırakılırsa varsayılan olarak TÜM modeller erişir — ör. Obsidian açıkken tüm modeller ona bağlıdır, istenirse belirli modellerle sınırlanabilir); (2) Dahili Araç Paketleri: yerleşik araçları modüler paketlere gruplayıp toplu açar/kapatır. Gerçek servis-özel OAuth değildir — kullanıcı her servisin kendi MCP sunucu adresini+kimliğini girer (yerleşik üçü hariç). Sidebar'daki "Eklentiler" butonu bunu Ayarlar'ı AÇMADAN, aynı veriyi paylaşan bir "Eklenti Mağazası" modalında da sunar.
-- Temel: Otomatik Pilot, davranış anahtarları (web arama, otomatik hatırlama, kalite modu, Öğrenme Modu…), tema/vurgu rengi/yazı boyutu, bildirimler, yedekle/geri yükle, yanıt stili, bellek, sistem promptu, bağlam penceresi (token), klavye kısayolları.
+- Genel: Otomatik Pilot, davranış anahtarları (web arama, otomatik hatırlama, kalite modu, Öğrenme Modu…), tema/vurgu rengi/yazı boyutu, bildirimler, yedekle/geri yükle, yanıt stili, bellek, sistem promptu, bağlam penceresi (token), klavye kısayolları.
 - Kullanım: Model/istek başına kullanım ve maliyet istatistikleri.
 - Plan: Abonelik/plan bilgisi.
 - Gelişmiş (admin): Misafir mod, WebContainer API key (gerçek terminal), Hibrit Sunucu (Local Bridge) bağlantısı.
@@ -130,10 +134,11 @@ OTOMATİK PİLOT
 
 DERİN ARAŞTIRMA VE AJAN EKİBİ
 - Derin Araştırma (/api/research): çok adımlı web araştırması yapıp kaynaklı, sentezlenmiş bir rapor döner.
-- Ajan Ekibi / swarm (/api/orchestrate): planlayıcı → paralel işçi ajanlar → birleştirici akışıyla büyük/çok parçalı görevleri otomatik böler; eşik geçilince veya repo bağlıyken kendiliğinden devreye girebilir.
+- Ajan Ekibi / swarm (/api/orchestrate): planlayıcı → paralel işçi ajanlar → birleştirici akışıyla büyük/çok parçalı görevleri otomatik böler. En fazla 4 işçi; her birine bir rol atanır (mimar 📐, kodlayıcı ⌨️, test 🧪, inceleyici 🔍, araştırmacı 🔬, genel ⚙️). Otomatik Pilot eşiği geçilince (çok maddeli/çok fiilli uzun istek) kendiliğinden devreye girer — DEPO BAĞLI OLMASI GEREKMEZ; depo yoksa işçiler dosya okuma araçları olmadan çalışır. İlerleme sohbette "Ajan Ekibi" panelinde canlı görünür.
+- Repo bağlıyken ana ajan ayrıca dispatch_agents aracıyla tek bir tur içinde paralel salt-okunur alt-ajanlar çalıştırabilir; onların ilerlemesi de aynı "Ajan Ekibi" panelinde gösterilir.
 
 SOHBET ALANI ALT ARAÇLARI
-- Dosyalar, Ekle (dosya/görsel), Web (arama), Canvas (HTML/SVG/mermaid önizleme), sesli giriş (🎤), gönder.
+- TEK ataç düğmesi (dosya ve görsel aynı yerden eklenir — ayrı "görsel ekle"/"fotoğraf çek" öğeleri kaldırıldı), sesli giriş (🎤), model seçici, efor seçici, gönder. Web araması ve Canvas önizlemesi otomatiktir (elle açılan bir düğme yok).
 - Mesajları dışa aktarma: Markdown, HTML, JSON; panoya kopyalama.
 
 ALTYAPI

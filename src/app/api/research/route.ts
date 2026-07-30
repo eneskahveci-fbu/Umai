@@ -1,3 +1,4 @@
+import { PLATFORM_KNOWLEDGE_BRIEF } from "@/lib/platform-knowledge";
 import { rateLimit } from "@/lib/rate-limit";
 import { isSafeRemoteUrl } from "@/lib/urlSafety";
 import { resolveModelAccess } from "@/lib/plan";
@@ -100,7 +101,9 @@ export async function POST(req: Request) {
       const done = () => { controller.enqueue(encoder.encode(`data: [DONE]\n\n`)); controller.close(); };
 
       try {
-        await runDeepResearch(cfg, String(topic), body.systemPrompt || DEFAULT_SYSTEM_PROMPT, {
+        /* Ö2: derin araştırma yolu da platform dizinini alır — rapor içinde
+           Umai'nin kendi yüzeylerinden söz edilirse doğru olsun. */
+        await runDeepResearch(cfg, String(topic), `${body.systemPrompt || DEFAULT_SYSTEM_PROMPT}\n\n${PLATFORM_KNOWLEDGE_BRIEF}`, {
           signal,
           onPhase: (phase, agents) => sendEvent({ swarm_event: { kind: "research", phase, agents } }),
           onSynthChunk: send,
