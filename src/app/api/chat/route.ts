@@ -25,7 +25,7 @@ import { isBuiltinMcpServerId } from "@/lib/mcpBuiltins";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendPushToUser } from "@/lib/push";
-import type { ChatMessage, MemoryItem, Provider, ResponseStyle } from "@/lib/types";
+import type { ChatMessage, MemoryItem, Provider, ResponseStyle, SwarmAgentState } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -2012,21 +2012,48 @@ export async function POST(req: Request) {
               safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: m } })}\n\n`));
               resultById.set(tc.id, m);
             };
-            if (!repoCtx) { fail("Hata: repo bağlı değil"); return; }
+            /* Depo şartı KALDIRILDI: alt-ajanlar depo yokken salt-okunur repo
+               araçları olmadan çalışır (bkz. runReadOnlyAgent'ın null ctx dalı),
+               tıpkı /api/orchestrate işçilerinin yaptığı gibi. Önceden hem burada
+               hem istemcideki autoPilot'ta kapı vardı ve ikisi birlikte "ajan
+               ekibi hiç çalışmıyor" belirtisini üretiyordu. */
             if (tasks.length === 0) { fail("Hata: en az 1 alt görev (tasks) gerekli"); return; }
             /* Alt-ajanlar seçili adayın (fallback'e geçilmişse onun) ucunu kullanır.
                apiKey de veriliyor (J1) — provider "anthropic" ise runReadOnlyAgent
                bunu anthropicUpstream'e (native uç) geçirmek için kullanır. */
             const sc = chosen ?? primary;
             const subCfg = { baseUrl: sc.baseUrl, model: sc.model, provider: sc.provider as Provider, headers: buildCandidateHeaders(sc, req), apiKey: sc.apiKey };
-            const results = await Promise.all(tasks.map(async (t) => {
-              try {
-                return await runReadOnlyAgent(subCfg, [
-                  { role: "system", content: "Sen uzman, son derece yetenekli bir alt-ajansın — ana modelin tüm kapasitesini kullan. Yöntem: (1) görevi kısaca planla, (2) gereken dosyaları read_file/list_files/grep ile KENDİN incele (varsayma, doğrula), (3) bulgularını dosya/satır kanıtına dayandır, (4) sonucu sunmadan önce kendi çıktını gözden geçir (öz-doğrulama). SADECE verilen alt göreve odaklan; NET, uygulanabilir, kanıtlı bir sonuç döndür. Uydurma — emin değilsen belirt. Türkçe yaz." },
-                  { role: "user", content: `ALT GÖREV: ${t.title || ""}\n${t.instruction}` },
-                ], repoCtx);
-              } catch (e) { return `(hata: ${(e as Error).message})`; }
+
+            /* "Ajan Ekibi" paneli deep_research ile AYNI swarm_event şemasını
+               dinliyor (SwarmPanel). Önceden dispatch_agents yalnız tool_event
+               yayıyordu → ajan ekibi çalışsa bile kullanıcı çalıştığını
+               GÖREMİYORDU. Artık planlama → çalışma → bitiş adımları yayılıyor. */
+            const agents: SwarmAgentState[] = tasks.map((t) => ({
+              title: t.title || "Alt görev",
+              role: "alt-ajan",
+              status: "running",
             }));
+            const emitSwarm = (phase: "planning" | "working" | "synthesizing" | "done") =>
+              safe.enqueue(encoder.encode(`data: ${JSON.stringify({ swarm_event: { kind: "swarm", phase, agents } })}\n\n`));
+            emitSwarm("working");
+
+            const results = await Promise.all(tasks.map(async (t, i) => {
+              try {
+                const out = await runReadOnlyAgent(subCfg, [
+                  { role: "system", content: "Sen uzman, son derece yetenekli bir alt-ajansın — ana modelin tüm kapasitesini kullan. Yöntem: (1) görevi kısaca planla, (2) gereken dosyaları read_file/list_files/grep ile KENDİN incele (varsayma, doğrula), (3) bulgularını dosya/satır kanıtına dayandır, (4) sonucu sunmadan önce kendi çıktını gözden geçir (öz-doğrulama). SADECE verilen alt göreve odaklan; NET, uygulanabilir, kanıtlı bir sonuç döndür. Uydurma — emin değilsen belirt. Türkçe yaz." + (repoCtx ? "" : " Bu görevde bağlı bir depo YOK; dosya araçların yok, kendi bilginle yanıtla ve dosya içeriği uydurma.") },
+                  { role: "user", content: `ALT GÖREV: ${t.title || ""}\n${t.instruction}` },
+                ], repoCtx ?? null);
+                agents[i] = { ...agents[i], status: "done", output: out };
+                emitSwarm("working");
+                return out;
+              } catch (e) {
+                const msg = `(hata: ${(e as Error).message})`;
+                agents[i] = { ...agents[i], status: "error", output: msg };
+                emitSwarm("working");
+                return msg;
+              }
+            }));
+            emitSwarm("done");
             const combined = tasks.map((t, i) => `### ${t.title || "Alt görev"}\n${results[i]}`).join("\n\n");
             safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: `${tasks.length} alt-ajan tamamlandı` } })}\n\n`));
             resultById.set(tc.id, combined);

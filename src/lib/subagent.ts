@@ -75,13 +75,15 @@ async function callTurn(
   messages: { role: string; content: string; tool_calls?: unknown[]; tool_call_id?: string }[],
   toolChoice: "auto" | "none",
   signal?: AbortSignal,
+  withTools = true,
 ): Promise<{ content: string; toolCalls: AccToolCall[] }> {
   const body: Record<string, unknown> = {
     model: cfg.model,
     messages,
     stream: true,
-    tools: READONLY_TOOLS,
-    tool_choice: toolChoice,
+    /* Depo bağlı değilken araç HİÇ gönderilmez: salt-okunur araçların hepsi
+       repoya bağlıdır, boş bir `tools` dizisi bazı sağlayıcılarda 400 verir. */
+    ...(withTools ? { tools: READONLY_TOOLS, tool_choice: toolChoice } : {}),
   };
   if (cfg.provider === "pollinations") body.referrer = "craft-coder";
   if (cfg.provider === "anthropic") {
@@ -99,11 +101,16 @@ async function callTurn(
 export async function runReadOnlyAgent(
   cfg: SubAgentCfg,
   messages: { role: string; content: string }[],
-  ctx: RepoReadCtx,
+  /* `null` = depo bağlı DEĞİL. Alt-ajan bu durumda salt-okunur repo araçları
+     olmadan, tek turda kendi bilgisiyle yanıtlar — /api/orchestrate'in
+     işçileri için zaten geçerli olan davranışın (repoCtx ? … : callModel)
+     buraya taşınmış hâli. Böylece "Ajan Ekibi" depo gerektirmeden çalışır. */
+  ctx: RepoReadCtx | null,
   signal?: AbortSignal,
 ): Promise<string> {
   type Msg = { role: string; content: string; tool_calls?: unknown[]; tool_call_id?: string };
   const convo: Msg[] = [...messages];
+  if (!ctx) return (await callTurn(cfg, convo, "none", signal, false)).content;
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const lastRound = round === MAX_TOOL_ROUNDS - 1;
     const { content, toolCalls } = await callTurn(cfg, convo, lastRound ? "none" : "auto", signal);
