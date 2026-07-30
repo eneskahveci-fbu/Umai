@@ -14,7 +14,6 @@ import {
   AlertTriangle,
   ArrowUp,
   Brain,
-  Camera,
   ChevronDown,
   ChevronRight,
   Code2,
@@ -29,7 +28,6 @@ import {
   Globe,
   MoreHorizontal,
   OctagonAlert,
-  Image as ImageIcon,
   Loader2 as Loader2Icon,
   MessageSquare,
   PanelLeft,
@@ -76,11 +74,10 @@ const RealTerminal = dynamic(() => import("./RealTerminal").then((m) => m.RealTe
     </div>
   ),
 });
-const CameraCaptureModal = dynamic(() => import("./CameraCapture").then((m) => m.CameraCaptureModal), { ssr: false });
 import { useStore } from "@/lib/store";
 import { runWhenNotStreaming } from "@/lib/streamGate";
 import { useModKey } from "@/lib/useModKey";
-import { isMobile as isMobileDevice, isSupported as isWebContainerSupported } from "@/lib/webcontainer";
+import { isSupported as isWebContainerSupported } from "@/lib/webcontainer";
 import { isAdminEmail } from "@/lib/admin";
 import { extractCheckedItems } from "@/lib/checklist";
 import { MessageBubble } from "./MessageBubble";
@@ -1026,9 +1023,6 @@ export function CoderView() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   };
   const fileRef = useRef<HTMLInputElement>(null);
-  const imgRef = useRef<HTMLInputElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
-  const [cameraModalOpen, setCameraModalOpen] = useState(false);
 
   const current = chats.find((c) => c.id === currentId) || null;
   const messages = current?.messages ?? [];
@@ -3864,15 +3858,17 @@ export function CoderView() {
                 </div>
               )}
 
-              <input ref={fileRef} type="file" multiple accept=".txt,.md,.markdown,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.json,.jsonl,.yaml,.yml,.toml,.html,.htm,.css,.scss,.sql,.sh,.bash,.go,.rs,.java,.kt,.swift,.dart,.c,.cpp,.h,.hpp,.rb,.php,.pdf,.docx,.xlsx,.pptx,.ipynb,.csv,.tsv,.xml,.svg,.log,.ini,.conf,.env,.tex,.srt,.vtt,.vue,.svelte,.lua,.pl,.r,.scala,.gradle,.properties,.bat,.ps1,text/plain" className="hidden"
+              {/* TEK dosya girişi (kullanıcı kararı, Tem 2026): önceden "Dosya
+                  ekle" / "Görsel ekle" / "Fotoğraf çek" diye üç ayrı öğe vardı,
+                  oysa üçü de zaten AYNI huniye (readFileIntoInput) giriyordu —
+                  ayrım kullanıcıya hiçbir şey kazandırmıyordu. accept listesine
+                  image/* eklendi; görsel/belge ayrımını huni zaten dosya
+                  türünden yapıyor. "Fotoğraf çek" kaldırıldı: tek bir input hem
+                  belge listesi sunup hem native kamerayı açamaz (`capture`
+                  yalnız media-only accept ile çalışır) ve mobilde OS dosya
+                  seçici zaten "Fotoğraf Çek" seçeneğini kendisi sunuyor. */}
+              <input ref={fileRef} type="file" multiple accept="image/*,.txt,.md,.markdown,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.json,.jsonl,.yaml,.yml,.toml,.html,.htm,.css,.scss,.sql,.sh,.bash,.go,.rs,.java,.kt,.swift,.dart,.c,.cpp,.h,.hpp,.rb,.php,.pdf,.docx,.xlsx,.pptx,.ipynb,.csv,.tsv,.xml,.svg,.log,.ini,.conf,.env,.tex,.srt,.vtt,.vue,.svelte,.lua,.pl,.r,.scala,.gradle,.properties,.bat,.ps1,text/plain" className="hidden"
                 onChange={(e) => { for (const f of Array.from(e.target.files ?? [])) readFileIntoInput(f); e.target.value = ""; }} />
-              <input ref={imgRef} type="file" multiple accept="image/*" className="hidden"
-                onChange={(e) => { for (const f of Array.from(e.target.files ?? [])) readFileIntoInput(f); e.target.value = ""; }} />
-              {/* Mobilde `capture` native kamera uygulamasını doğrudan açar;
-                  masaüstünde bu öznitelik yok sayılır (o yüzden orada
-                  CameraCaptureModal'ın canlı getUserMedia önizlemesine düşülür). */}
-              <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) readFileIntoInput(f); e.target.value = ""; }} />
 
               {/* Yüzen composer — camsı zemin, gölge odak halkasıyla vurgu rengini izler */}
               <div className="composer-glow flex items-end gap-2 bg-surface/85 backdrop-blur-xl border border-line rounded-[20px] pl-4 pr-2 py-2.5 sm:py-2">
@@ -3940,27 +3936,18 @@ export function CoderView() {
                     }}
                   />
                 )}
-                {/* Dosya & görsel ekleme — tek ikon (ataç). Web araması artık
-                    Otomatik Pilot ile kendiliğinden çalışır (manuel toggle yok).
-                    "Arka planda çalıştır" kaldırıldı (kullanıcı kararı): normal
-                    mesaj zaten sekme kapansa da sunucuda tamamlanıyor ve kuyruk
-                    ajanı araçsız/bağlamsız olduğundan sohbetten daha zayıftı. */}
-                <MoreMenu icon={<Paperclip size={16} />} title="Dosya veya görsel ekle">
-                  <MoreItem icon={<Paperclip size={14} />} label="Dosya ekle" desc="kod, metin, belge" onClick={() => fileRef.current?.click()} />
-                  <MoreItem icon={<ImageIcon size={14} />} label="Görsel ekle" desc="fotoğraf, ekran görüntüsü" onClick={() => imgRef.current?.click()} />
-                  <MoreItem
-                    icon={<Camera size={14} />}
-                    label="Fotoğraf çek"
-                    desc="kamerayla anında çek"
-                    onClick={() => { if (isMobileDevice()) cameraRef.current?.click(); else setCameraModalOpen(true); }}
-                  />
-                </MoreMenu>
-                {cameraModalOpen && (
-                  <CameraCaptureModal
-                    onCapture={(f) => { readFileIntoInput(f); setCameraModalOpen(false); }}
-                    onClose={() => setCameraModalOpen(false)}
-                  />
-                )}
+                {/* Dosya & görsel ekleme — TEK düğme, menü yok (kullanıcı kararı).
+                    Doğrudan dosya seçiciyi açar; görsel de belge de aynı yerden
+                    eklenir. Web araması Otomatik Pilot ile kendiliğinden çalışır
+                    (manuel toggle yok). */}
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl text-muted hover:text-ink hover:bg-hover active:scale-95 grid place-items-center transition-all"
+                  title="Dosya veya görsel ekle"
+                  aria-label="Dosya veya görsel ekle"
+                >
+                  <Paperclip size={16} />
+                </button>
                 {streaming ? (
                   <button onClick={stop} className="shrink-0 w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-red hover:bg-red/80 active:bg-red/70 text-white grid place-items-center transition-all hover:scale-105 active:scale-95" title="Durdur">
                     <Square size={13} />
