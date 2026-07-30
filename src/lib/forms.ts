@@ -27,6 +27,27 @@ export const OPTION_QTYPES: ReadonlySet<FormQuestionType> = new Set(["choice", "
 export const CONDITION_SOURCE_QTYPES: ReadonlySet<FormQuestionType> = new Set(["choice", "dropdown"]);
 
 export const MAX_FORM_QUESTIONS = 40;
+/** Bir soruda gösterilecek azami seçenek sayısı (parseOptionsDraft + normalize). */
+export const MAX_QUESTION_OPTIONS = 10;
+
+/* Çoktan seçmeli seçenek kutusunun metnini seçenek dizisine çevirir.
+
+   Neden ayrı ve SAF: FormsStudio'daki textarea kontrollü bir alandı ve
+   `onChange` içinde doğrudan `.split("\n").filter(o => o.trim())` yapıyordu.
+   Enter'a basınca sonda boş bir satır oluşuyor, `filter` onu hemen siliyor ve
+   geri yazılan değer bir öncekiyle AYNI kalıyordu — React aynı değeri render
+   edince yeni satır hiç açılmıyor, imleç geri sıçrıyordu. Yani amaçlanan
+   yoldan üçüncü bir seçenek eklemek İMKÂNSIZDI (kullanıcı hata raporu).
+
+   Ayrıştırma artık yalnız KAYDETME anında (blur/gönderim) uygulanır; kutu
+   yazarken ham metni tutar. Kural tek yerde ve testlidir. */
+export function parseOptionsDraft(text: string): string[] {
+  return text
+    .split("\n")
+    .map((o) => o.trim())
+    .filter(Boolean)
+    .slice(0, MAX_QUESTION_OPTIONS);
+}
 
 /* Token bütçesi — 40 soruya kadar bir anket JSON'u sunucu varsayılanı 8192'ye
    sığmayabiliyor (her soru: etiket + tip + seçenekler + koşul). */
@@ -123,6 +144,12 @@ function questionHtml(q: FormQuestion, i: number): string {
       body = `${label}${(q.options ?? []).map((o) =>
         `<label class="opt"><input type="radio" name="${name}" value="${escapeHtml(o)}"${req}> ${escapeHtml(o)}</label>`).join("")}`; break;
     case "multi":
+      /* DİKKAT: checkbox'a HTML `required` konmaz — o, grubun HER kutusunu
+         zorunlu kılar (yanlış davranış). "En az bir seçim" kuralı dışa
+         aktarılan formda setCustomValidity ile uygulanır (bkz. REQUIRED_MULTI
+         + syncMultiValidity). Böylece hem sayfalı "İleri" kapısı
+         (:invalid:not(:disabled)) hem de native submit doğrulaması
+         KENDİLİĞİNDEN çalışır. */
       body = `${label}${(q.options ?? []).map((o) =>
         `<label class="opt"><input type="checkbox" name="${name}" value="${escapeHtml(o)}"> ${escapeHtml(o)}</label>`).join("")}`; break;
     case "dropdown":
@@ -259,6 +286,9 @@ ${paged ? `<div class="navbtns">
   var QUESTION_IDS = ${JSON.stringify(form.questions.map((q) => q.id))};
   var LOGIC = ${JSON.stringify(logic)};
   var PAGES = ${JSON.stringify(pages)};
+  var REQUIRED_MULTI = ${JSON.stringify(
+    form.questions.map((q, i) => (q.type === "multi" && q.required ? i : -1)).filter((i) => i >= 0),
+  )};
   var COLLECT = ${JSON.stringify(collect)};
   var form = document.getElementById("f");
   var page = 0;
@@ -309,6 +339,19 @@ ${paged ? `<div class="navbtns">
     if (next) next.style.display = page === PAGES.length - 1 ? "none" : "";
     if (submitBtn) submitBtn.style.display = page === PAGES.length - 1 ? "" : "none";
   }
+  /* Zorunlu çoktan seçmeli: grubun İLK kutusuna özel geçersizlik mesajı yaz.
+     Devre dışı (gizli/mantıkla kapatılmış) alanlar kısıt doğrulamasından muaf
+     olduğu için gizli gruplar gönderimi bloklamaz. */
+  function syncMultiValidity() {
+    for (var mi = 0; mi < REQUIRED_MULTI.length; mi++) {
+      var boxes = form.querySelectorAll('input[type=checkbox][name=q' + REQUIRED_MULTI[mi] + ']');
+      if (!boxes.length) continue;
+      var any = false;
+      for (var bi = 0; bi < boxes.length; bi++) if (boxes[bi].checked) any = true;
+      boxes[0].setCustomValidity(any ? "" : "En az bir seçenek seç.");
+    }
+  }
+  if (REQUIRED_MULTI.length) { form.addEventListener("change", syncMultiValidity); syncMultiValidity(); }
   if (LOGIC.length || PAGES.length > 1) { form.addEventListener("change", refreshVisibility); refreshVisibility(); }
   if (PAGES.length > 1) {
     var prevBtn = document.getElementById("prevBtn");
