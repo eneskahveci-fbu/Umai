@@ -6,7 +6,7 @@ import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import type { ImageProvider } from "@/lib/imageGen";
 import { buildChainFor } from "@/lib/fallback";
 import { createReveal, type RevealController } from "@/lib/streamReveal";
-import { switchLeftPanel, type LeftPanel } from "@/lib/leftPanel";
+import { switchLeftPanel } from "@/lib/leftPanel";
 import { compactPlan } from "@/lib/contextWindow";
 import { filterMcpServersForModel } from "@/lib/mcpScope";
 import {
@@ -807,7 +807,12 @@ export function CoderView() {
      en fazla biri açık, geçiş saf bir fonksiyonla yapılır (bkz.
      lib/leftPanel.ts). filesOpen/wsOpen türetilmiş sabitler olarak kalıyor
      ki aşağıdaki render blokları değişmesin. */
-  const [leftPanel, setLeftPanel] = useState<LeftPanel>(null);
+  /* Ö8 (kullanıcı kararı, Tem 2026): durum STORE'a taşındı. Panelleri açan
+     tek giriş noktası artık Sidebar → "Araçlar" menüsü ve Sidebar bu
+     bileşenin KARDEŞİ — yerel useState ile oraya erişilemezdi. Geçiş mantığı
+     yine saf (lib/leftPanel.ts). */
+  const leftPanel = useStore((s) => s.leftPanel);
+  const setLeftPanel = useStore((s) => s.setLeftPanel);
   const filesOpen = leftPanel === "files";
   const wsOpen = leftPanel === "workspace";
   const [wsTree, setWsTree] = useState<TreeNode | null>(null);
@@ -3206,10 +3211,9 @@ export function CoderView() {
              ajan bir dosya yazdığında git bağlamı (bkz. aşağıdaki
              `setGitPanelOpen(true)` çağrısı, "AI'nın yazdığı dosyayı..."
              bloğunda) kendiliğinden açılıyor, elle "aç" denecek bir buton
-             yok. Dosyalar/Sunucu (workspace) da BİLEREK yok: kullanıcının
-             bu ikisi için ayrı bir erişim planı var — panel/state kodu
-             (leftPanel) dokunulmadan duruyor, yalnız üst-seviye giriş
-             noktası kaldırıldı. */}
+             yok. Dosyalar/Sunucu (workspace) burada değil ama artık
+             ERİŞİLEBİLİR: Sidebar → "Araçlar" menüsünden açılıyorlar
+             (Ö8, Tem 2026 kullanıcı isteği). Durum store'da (leftPanel). */}
           {isAdmin && (
             <button
               onClick={() => { setTerminalMounted(true); setTerminalOpen((v) => !v); }}

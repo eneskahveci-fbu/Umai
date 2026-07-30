@@ -502,3 +502,34 @@ describe("useStore — akış yazımları KULLANICI mesajına asla dokunmaz (H5)
     expect(msgs()).toHaveLength(1);
   });
 });
+
+/* Ö8/Ö9 (kullanıcı isteği, Tem 2026): "Dosyalar" (bağlı deponun ağacı) ve
+   "Sunucu (workspace)" panelleri kod olarak duruyordu ama ⋯ menüsü
+   kaldırılınca ÜST-SEVİYE GİRİŞ NOKTALARI da gitmişti — hiçbir yerden
+   açılamıyorlardı. Artık Sidebar → "Araçlar" menüsünden açılıyorlar; bu
+   ancak durum CoderView'ın yerel useState'inden STORE'a taşınarak mümkün
+   (Sidebar, CoderView'ın kardeşi). */
+describe("useStore — sol Alan paneli (Ö8)", () => {
+  it("varsayılan kapalı", () => {
+    expect(useStore.getState().leftPanel).toBeNull();
+  });
+
+  it("toggleLeftPanelState açar, aynı panele tekrar basınca kapatır", () => {
+    useStore.getState().toggleLeftPanelState("files");
+    expect(useStore.getState().leftPanel).toBe("files");
+    useStore.getState().toggleLeftPanelState("files");
+    expect(useStore.getState().leftPanel).toBeNull();
+  });
+
+  it("en fazla BİR panel açık kalır — diğerine geçince ilki kapanır", () => {
+    useStore.getState().toggleLeftPanelState("files");
+    useStore.getState().toggleLeftPanelState("workspace");
+    expect(useStore.getState().leftPanel).toBe("workspace");
+  });
+
+  it("setLeftPanel(null) kapatır", () => {
+    useStore.getState().toggleLeftPanelState("workspace");
+    useStore.getState().setLeftPanel(null);
+    expect(useStore.getState().leftPanel).toBeNull();
+  });
+});

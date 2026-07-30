@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Plus,
   Search,
+  Server,
   Settings,
   Sparkles,
   Wrench,
@@ -54,6 +55,13 @@ function SidebarToolsButton({ variant, onNavigate }: { variant: "rail" | "nav"; 
        bağlı değil, aynen Kütüphane/Etkinlik Günlüğü/Kısayollar gibi — bu
        yüzden en sık kullanılan öğe olarak listenin başına eklendi. */
     { icon: <Zap size={14} />, label: "Skills", onClick: () => useStore.getState().setSkillsOpen(true) },
+    /* Ö8/Ö9 (Tem 2026 kullanıcı isteği): "Dosyalar" (bağlı deponun ağacı) ve
+       "Sunucu" (Local Bridge workspace) panellerinin ÜST-SEVİYE GİRİŞİ yoktu —
+       ⋯ menüsü kaldırılınca tetikleyicileri de gitmiş, paneller kod olarak
+       duruyor ama açılamıyordu. Buraya taşındılar; durum store'da (leftPanel)
+       tutulduğu için Sidebar (CoderView'ın kardeşi) onları açabiliyor. */
+    { icon: <FolderOpen size={14} />, label: "Dosyalar (depo)", onClick: () => useStore.getState().toggleLeftPanelState("files") },
+    { icon: <Server size={14} />, label: "Sunucu (workspace)", onClick: () => useStore.getState().toggleLeftPanelState("workspace") },
     { icon: <BookOpen size={14} />, label: "Snippet'ler", onClick: () => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); } },
     { icon: <Activity size={14} />, label: "Etkinlik Günlüğü", onClick: () => useStore.getState().setActivityOpen(true) },
     { icon: <Keyboard size={14} />, label: "Kısayollar", onClick: () => useStore.getState().setShortcutsOpen(true) },
