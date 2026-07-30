@@ -396,3 +396,109 @@ describe("useStore — onboarding turu", () => {
     expect(useStore.getState().onboardingDone).toBe(false);
   });
 });
+
+/* H5 (Tem 2026 hata raporu): "bazen modelin cevabı ben yazmışım gibi
+   görünüyor". Akış sürerken araya gizli bir bağlam mesajı (role:"user" —
+   terminal/kod çıktısının ajana geri beslenmesi) girebiliyor. Tüm `*OnLast`
+   yazıcıları KONUMSAL olduğu için akan metin O mesajın üzerine yazılıyor,
+   önek silinince mesaj görünür oluyor ve rolü hâlâ "user" olduğundan modelin
+   cevabı kullanıcı balonunda çiziliyordu.
+
+   Aşağıdaki senaryo o pencereyi birebir kurar: asistan placeholder'ı açılır,
+   ARAYA kullanıcı mesajı girer, sonra akış yazmaya devam eder. */
+describe("useStore — akış yazımları KULLANICI mesajına asla dokunmaz (H5)", () => {
+  /** asistan placeholder + araya giren gizli bağlam mesajı. */
+  function raceSetup() {
+    useStore.getState().newChat();
+    useStore.getState().pushMessage({ role: "user", content: "merhaba" });
+    useStore.getState().pushMessage({ role: "assistant", content: "" });
+    useStore.getState().pushMessage({ role: "user", content: "**Terminal çıktısı** (`ls`):\nREADME.md" });
+  }
+  const msgs = () => useStore.getState().current()!.messages;
+
+  it("updateLastContent araya giren kullanıcı mesajını değil ASİSTANI günceller", () => {
+    raceSetup();
+    useStore.getState().updateLastContent("Merhaba! Nasıl yardımcı olabilirim?");
+    expect(msgs()[1].role).toBe("assistant");
+    expect(msgs()[1].content).toBe("Merhaba! Nasıl yardımcı olabilirim?");
+    /* Gizli bağlam mesajı olduğu gibi durmalı — öneki silinirse sohbette
+       modelin cevabı kullanıcı balonu olarak görünür (asıl belirti). */
+    expect(msgs()[2].role).toBe("user");
+    expect(msgs()[2].content).toContain("**Terminal çıktısı**");
+  });
+
+  it("thinking / plan / sources / finishReason asistana yazılır", () => {
+    raceSetup();
+    useStore.getState().updateLastThinking("düşünüyorum…");
+    useStore.getState().setPlanOnLast("1. adım\n2. adım");
+    useStore.getState().setSourcesOnLast([{ title: "kaynak", url: "https://x.dev" }]);
+    useStore.getState().setFinishReasonOnLast("length");
+    const a = msgs()[1];
+    expect(a.role).toBe("assistant");
+    expect(a.thinking).toBe("düşünüyorum…");
+    expect(a.plan).toBe("1. adım\n2. adım");
+    expect(a.sources).toHaveLength(1);
+    expect(a.finishReason).toBe("length");
+    const u = msgs()[2];
+    expect(u.thinking).toBeUndefined();
+    expect(u.plan).toBeUndefined();
+    expect(u.sources).toBeUndefined();
+    expect(u.finishReason).toBeUndefined();
+  });
+
+  it("üretilen görsel asistan mesajına iliştirilir", () => {
+    raceSetup();
+    useStore.getState().addImageToLast("https://img.example/a.png");
+    expect(msgs()[1].images).toEqual(["https://img.example/a.png"]);
+    expect(msgs()[2].images).toBeUndefined();
+  });
+
+  it("token sayaçları asistana yazılır, kullanıcı mesajına değil", () => {
+    raceSetup();
+    useStore.getState().updateLastTokens(120, 340);
+    expect(msgs()[1].tokenIn).toBe(120);
+    expect(msgs()[1].tokenOut).toBe(340);
+    expect(msgs()[2].tokenIn).toBeUndefined();
+    /* Sohbet toplamı yine de artmalı (davranış değişmedi). */
+    expect(useStore.getState().current()!.totalOutTokens).toBe(340);
+  });
+
+  it("araç çağrıları asistana eklenir", () => {
+    raceSetup();
+    useStore.getState().appendToolCallToLast({ id: "t1", name: "run_command", arguments: "{}", status: "pending" });
+    useStore.getState().updateToolCallOnLast("t1", { status: "done" });
+    expect(msgs()[1].toolCalls).toHaveLength(1);
+    expect(msgs()[1].toolCalls![0].status).toBe("done");
+    expect(msgs()[2].toolCalls).toBeUndefined();
+  });
+
+  it("popLastMessage ASİSTANI siler — kullanıcının yazdığını değil", () => {
+    raceSetup();
+    useStore.getState().popLastMessage();
+    const m = msgs();
+    expect(m).toHaveLength(2);
+    expect(m[0].content).toBe("merhaba");
+    expect(m[1].content).toContain("**Terminal çıktısı**");
+    expect(m.some((x) => x.role === "assistant")).toBe(false);
+  });
+
+  it("hiç asistan mesajı yoksa hiçbir şey yazılmaz/silinmez", () => {
+    useStore.getState().newChat();
+    useStore.getState().pushMessage({ role: "user", content: "tek mesaj" });
+    useStore.getState().updateLastContent("model cevabı");
+    useStore.getState().popLastMessage();
+    expect(msgs()).toHaveLength(1);
+    expect(msgs()[0].role).toBe("user");
+    expect(msgs()[0].content).toBe("tek mesaj");
+  });
+
+  it("normal akışta (araya mesaj girmeden) davranış aynı kalır", () => {
+    useStore.getState().newChat();
+    useStore.getState().pushMessage({ role: "user", content: "soru" });
+    useStore.getState().pushMessage({ role: "assistant", content: "" });
+    useStore.getState().updateLastContent("cevap");
+    expect(msgs()[1].content).toBe("cevap");
+    useStore.getState().popLastMessage();
+    expect(msgs()).toHaveLength(1);
+  });
+});
