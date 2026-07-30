@@ -139,7 +139,7 @@ import { autoEffort, autoSwarm, decidePilot, decidePilotAsync, type PilotDecisio
 import { pickDraftModels, buildBoostInstruction, generateDrafts, fillSelfConsistency, judgeDrafts } from "@/lib/boost";
 import { runCompare } from "@/lib/compare";
 import { fetchTextModels } from "@/lib/pollinations";
-import { importSkillFromUrl, skillFromText } from "@/lib/skillImport";
+import { importSkillFromUrl, parseSkillIntent, skillFromText } from "@/lib/skillImport";
 import { trackEvent } from "@/lib/analytics";
 import { retrieve } from "@/lib/retrieval";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
@@ -3032,31 +3032,51 @@ export function CoderView() {
       return;
     }
 
-    if (!store.activeModel()) { store.setSettingsOpen(true); return; }
-    if (!store.currentId) store.newChat(incognito);
-
-    /* "skill indir <url>" — LLM'e gitmeden ANINDA otomatik içe aktarma:
-       güvenli proxy'den çekilir, skill olarak eklenir, sohbete onay düşer. */
-    const skillCmd = text.match(/^skill\s+(?:indir|yükle|ekle)\s+(https?:\/\/\S+)\s*$/i);
-    if (skillCmd) {
-      const url = skillCmd[1];
+    /* Skill kaydetme — LLM'e HİÇ gitmez, bu yüzden "önce model seç" kapısının
+       ÜSTÜNDE (Ö4): model eklememiş bir kullanıcı da skill indirebilmeli,
+       eskiden Ayarlar açılıp komut sessizce düşüyordu. Artık URL cümlenin
+       içinde olabilir ve "bunu skill olarak kaydet" de anlaşılır
+       (parseSkillIntent — saf, testli). */
+    const skillIntent = parseSkillIntent(text);
+    if (skillIntent) {
+      if (!store.currentId) store.newChat(incognito);
       setInput("");
       store.pushMessage({ role: "user", content: text });
-      try {
-        const { title, chars } = await importSkillFromUrl(url);
-        store.pushMessage({
-          role: "assistant",
-          content: `✓ **"${title}"** skill'i eklendi (${chars.toLocaleString("tr-TR")} karakter).\n\nBundan sonra her yeni sohbette otomatik geçerli — Skills panelinden yönetebilirsin.`,
-        });
-      } catch (e) {
-        store.pushMessage({
-          role: "assistant",
-          content: `✗ Skill indirilemedi: ${friendlyError((e as Error).message)}\n\nİpucu: GitHub'da dosyanın **Raw** linkini kullan.`,
-        });
+      if (skillIntent.kind === "import") {
+        try {
+          const { title, chars } = await importSkillFromUrl(skillIntent.url);
+          store.pushMessage({
+            role: "assistant",
+            content: `✓ **"${title}"** skill'i eklendi (${chars.toLocaleString("tr-TR")} karakter).\n\nBundan sonra her yeni sohbette otomatik geçerli — Skills panelinden yönetebilirsin.`,
+          });
+        } catch (e) {
+          store.pushMessage({
+            role: "assistant",
+            content: `✗ Skill indirilemedi: ${friendlyError((e as Error).message)}\n\nİpucu: GitHub'da dosyanın **Raw** linkini kullan.`,
+          });
+        }
+      } else {
+        /* "bunu skill olarak kaydet" → son asistan yanıtı. Kırpma YOK:
+           eskiden mini-form içeriği 4000 karakterde kesiyordu, uzun bir
+           workflow yarım kaydediliyordu. */
+        const last = [...(store.current()?.messages ?? [])].reverse().find((m) => m.role === "assistant" && m.content.trim());
+        if (!last) {
+          store.pushMessage({ role: "assistant", content: "Kaydedilecek bir önceki yanıt bulamadım. Önce bir cevap üretmemi iste, sonra \"bunu skill olarak kaydet\" de." });
+        } else {
+          const skill = skillFromText(last.content, "sohbet", ["sohbet"]);
+          store.addSkill(skill);
+          store.pushMessage({
+            role: "assistant",
+            content: `✓ **"${skill.title}"** skill olarak kaydedildi (${skill.content.length.toLocaleString("tr-TR")} karakter).\n\nSkills panelinden düzenleyebilir, kapatabilirsin.`,
+          });
+        }
       }
       void store.persistCurrent();
       return;
     }
+
+    if (!store.activeModel()) { store.setSettingsOpen(true); return; }
+    if (!store.currentId) store.newChat(incognito);
 
     /* Karşılaştırma modu: normal tool-loop/akış yerine aynı mesajı 2-3
        modelle PARALEL çalıştırır (Fusion'ın pickDraftModels/fillSelfConsistency

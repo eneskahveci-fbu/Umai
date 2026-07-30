@@ -53,3 +53,44 @@ export async function importSkillFromUrl(url: string): Promise<{ title: string; 
   useStore.getState().addSkill(skill);
   return { title: skill.title, chars: skill.content.length };
 }
+
+/* ── Sohbetten skill kaydetme niyeti (Ö4) ──────────────────────────────────
+   Önceki regex URL'nin TÜM mesaj olmasını şart koşuyordu
+   (`^skill indir <url>$`), yani "şunu skill olarak indir: https://…" ya da
+   "bunu skill olarak kaydet" gibi doğal ifadeler LLM'e gidiyor ve hiçbir şey
+   kaydedilmiyordu. Ayrıştırma SAF tutuldu → birim testli. */
+
+export type SkillIntent =
+  /** URL'den indir (cümlenin herhangi bir yerinde olabilir). */
+  | { kind: "import"; url: string }
+  /** Sohbetteki SON asistan yanıtını skill olarak kaydet. */
+  | { kind: "saveLast" };
+
+const SKILL_WORD = String.raw`skill|beceri`;
+/* "indir/yükle/ekle/kaydet" — Türkçe ekler için \p{L}* toleranslı. */
+const SAVE_VERB = String.raw`indir\p{L}*|y[üu]kle\p{L}*|ekle\p{L}*|kaydet\p{L}*|olu[şs]tur\p{L}*`;
+
+/** Mesajdan skill niyeti çıkarır; yoksa null (mesaj normal akışa gider). */
+export function parseSkillIntent(text: string): SkillIntent | null {
+  const t = (text || "").trim();
+  if (!t) return null;
+  /* Skill sözcüğü GEÇMİYORSA hiç uğraşma — "şu dosyayı indir" gibi normal
+     istekleri kaçırmamak için kapı dar tutuluyor. */
+  if (!new RegExp(String.raw`(?<!\p{L})(?:${SKILL_WORD})(?!\p{L})`, "iu").test(t)) return null;
+  if (!new RegExp(String.raw`(?<!\p{L})(?:${SAVE_VERB})(?!\p{L})`, "iu").test(t)) return null;
+
+  /* Mesaj çok uzunsa bu bir komut değil, muhtemelen skill İÇERİĞİNİN kendisi
+     ya da uzun bir soru — yanlışlıkla yakalamayalım. */
+  if (t.length > 300) return null;
+
+  const url = t.match(/https?:\/\/\S+/)?.[0];
+  if (url) return { kind: "import", url: url.replace(/[.,;:)\]}"']+$/, "") };
+
+  /* URL yok → "bunu/şunu/yukarıdaki cevabı skill olarak kaydet". İşaret
+     zamiri şart: yalnız "skill ekle" tek başına neyi kaydedeceğimizi
+     söylemiyor, o durumda normal akışa bırakmak daha doğru. */
+  if (/(bunu|şunu|sunu|yukarıdaki|üstteki|ustteki|son (yanıt|cevap|mesaj)\p{L}*|cevab[ıi]|yan[ıi]t[ıi])/iu.test(t)) {
+    return { kind: "saveLast" };
+  }
+  return null;
+}

@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ChatMessage, CompareResult, FileCheckpoint, SwarmState } from "@/lib/types";
+import { skillFromText } from "@/lib/skillImport";
+import { looksLikeSkillMd } from "@/lib/odFormat";
 import { useStore } from "@/lib/store";
 import { CodeBlock } from "./CodeBlock";
 import { ALL_AGENTS } from "@/lib/agents";
@@ -799,16 +801,24 @@ function MessageBubbleImpl({
   const [skillTitle, setSkillTitle] = useState("");
   const [skillContent, setSkillContent] = useState("");
 
+  /* Ö4: başlık/içerik artık "skill indir" ve Sunucu panelindeki kaydetmeyle
+     AYNI dönüşümden geçiyor (skillFromText). Kazanç: yanıt SKILL.md
+     biçimindeyse (--- frontmatter) başlık gerçek `name` alanından gelir,
+     etiketler dolar; düz metinde ilk markdown başlığı kullanılır.
+     Eski hâli ilk SATIRI başlık yapıyor ve içeriği 4000 karakterde
+     KESİYORDU — uzun bir workflow yarım kaydediliyordu. */
+  const [skillTags, setSkillTags] = useState<string[]>([]);
   const openSkillSave = () => {
-    const firstLine = message.content.split("\n")[0].replace(/^#+\s*/, "").slice(0, 72);
-    setSkillTitle(firstLine || "AI Yanıtı");
-    setSkillContent(message.content.slice(0, 4000));
+    const parsed = skillFromText(message.content, "sohbet", ["sohbet"]);
+    setSkillTitle(parsed.title);
+    setSkillContent(parsed.content);
+    setSkillTags(parsed.tags);
     setSkillSaveOpen(true);
   };
 
   const saveSkill = () => {
     if (!skillTitle.trim()) return;
-    addSkill({ title: skillTitle.trim(), content: skillContent, tags: [], enabled: true, source: "manual" });
+    addSkill({ title: skillTitle.trim(), content: skillContent, tags: skillTags, enabled: true, source: "manual" });
     addToast("Skill kaydedildi", "success");
     setSkillSaveOpen(false);
   };
@@ -1334,6 +1344,25 @@ function MessageBubbleImpl({
               </>
             )}
           </div>
+        )}
+
+        {/* Ö4 — model bir SKILL.md ÜRETTİYSE (--- frontmatter + name:) bunu
+            TANI ve kaydetmeyi öner. Kullanıcının isteği "skill yaptırdığımda
+            … skills kısmına kaydedebilmek"ti; eskiden kaydetme eylemi diğer
+            ikonların arasında kayboluyordu, üretilen skill fark edilmiyordu.
+
+            Modelin KENDİ KENDİNE kaydetmesi (otomatik bir save_skill aracı)
+            bilerek YAPILMADI: kalıcı kullanıcı verisine onaysız yazmak bu
+            kod tabanındaki yazma-onayı desenine aykırı olurdu. Tek tık
+            uzaklıkta ama karar kullanıcının. */}
+        {!streamingNow && message.role === "assistant" && !skillSaveOpen && looksLikeSkillMd(message.content) && (
+          <button
+            onClick={openSkillSave}
+            className="mt-3 w-full flex items-center gap-2 rounded-xl border border-brand/30 bg-brand/5 px-3 py-2 text-[11px] text-brand/90 hover:bg-brand/10 transition-colors text-left"
+          >
+            <BookMarked size={12} className="shrink-0" />
+            <span className="flex-1">Bu bir <b>SKILL.md</b> — Skills&apos;e kaydet</span>
+          </button>
         )}
 
         {/* Skill save mini-form */}
