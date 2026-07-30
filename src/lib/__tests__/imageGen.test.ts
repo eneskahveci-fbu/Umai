@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickImageModel, pickImageProvider, buildImageFallbackChain, IMAGE_PROVIDERS } from "../imageGen";
+import { pickImageModel, pickImageProvider, buildImageFallbackChain, IMAGE_PROVIDERS, IMAGE_MODELS, defaultImageModel, resolveImageModel, isKnownImageModel } from "../imageGen";
 import type { Config, ModelProfile } from "../types";
 
 const mk = (provider: ModelProfile["provider"], id: string = provider): ModelProfile => ({
@@ -25,8 +25,9 @@ describe("pickImageModel — sağlayıcı önceliği", () => {
   it("öncelik listesi /api/image'ın desteklediği kümedir", () => {
     /* NVIDIA NIM eklendi: FLUX.1-schnell'i ücretsiz nvapi anahtarıyla sunuyor
        ve HF'nin aynı modelinden farklı olarak cold-start yaşatmıyor, bu yüzden
-       HF'nin ÖNÜNDE. */
-    expect([...IMAGE_PROVIDERS]).toEqual(["gemini", "openai", "xai", "nvidia", "hf"]);
+       HF'nin ÖNÜNDE. Agnes AI de canlı test edildi (~20 sn) — NVIDIA'dan yavaş,
+       HF'den güvenilir olduğu için aralarına girdi. */
+    expect([...IMAGE_PROVIDERS]).toEqual(["gemini", "openai", "xai", "nvidia", "agnes", "hf"]);
   });
 });
 
@@ -72,10 +73,13 @@ describe("pickImageProvider — Ayarlar → Görsel üretimi tercihi (bkz. image
       expect((await pickImageProvider(cfg))?.provider).toBe("hf");
     });
 
-    it("aktif model görüntü-yeteneksizse (ör. agnes) öncelik sıralı listeye düşer", async () => {
+    it("aktif model görüntü-yeteneksizse (ör. groq) öncelik sıralı listeye düşer", async () => {
+      /* Örnek sağlayıcı agnes'ten groq'a çevrildi: Agnes AI artık görsel
+         üretebiliyor (IMAGE_PROVIDERS'a eklendi), yani "yeteneksiz aktif
+         model" senaryosunu artık temsil etmiyor. */
       const cfg = mkConfig({
-        models: [mk("agnes", "agnes-active"), mk("hf"), mk("openai")],
-        activeModelId: "agnes-active",
+        models: [mk("groq", "groq-active"), mk("hf"), mk("openai")],
+        activeModelId: "groq-active",
       });
       expect((await pickImageProvider(cfg))?.provider).toBe("openai");
     });
@@ -136,10 +140,10 @@ describe("NVIDIA NIM görsel sağlayıcısı (kullanıcı isteği)", () => {
   });
 
   it("aktif model görüntü üretemiyorsa bağlı en iyi görsel modeline düşer", async () => {
-    /* Agnes AI gibi görüntü-yeteneksiz bir model aktifken zincir devreye girer. */
+    /* Groq gibi görüntü-yeteneksiz bir model aktifken zincir devreye girer. */
     const cfg = mkConfig({
-      models: [mk("agnes", "agnes-active"), mk("nvidia")],
-      activeModelId: "agnes-active",
+      models: [mk("groq", "groq-active"), mk("nvidia")],
+      activeModelId: "groq-active",
     });
     expect((await pickImageProvider(cfg))?.provider).toBe("nvidia");
   });
@@ -225,5 +229,66 @@ describe("addMediaAsset — Kütüphane kotası", () => {
     const { addMediaAsset, MAX_MEDIA_ASSETS } = await import("../imageGen");
     const existing = Array.from({ length: 250 }, (_, i) => asset(`u${i}`, `https://x/${i}.png`));
     expect(addMediaAsset(existing, asset("yeni", "https://x/new.png")).length).toBe(MAX_MEDIA_ASSETS);
+  });
+});
+
+/* Ö1 (kullanıcı isteği): "bağlı olan sağlayıcıların TÜM görsel modellerini
+   ayarlar görsel model seçme alanına ekle". Katalog ve seçicinin sözleşmesi
+   burada kilitleniyor.
+
+   NOT (dürüstlük): Agnes AI görsel modelleri bu oturumda GERÇEK bir anahtarla
+   canlı doğrulandı (standart OpenAI /images/generations ucu, base64 değil URL
+   döndürüyor, ~20 sn). Doğrulanamayan ID'ler bilerek katalogda YOK —
+   NVIDIA flux.1-schnell (steps=4 ile 60 sn yanıtsız) ve sdxl-turbo /
+   stable-diffusion-xl / bria-2.3 (404) gibi. */
+describe("görsel model kataloğu (Ö1)", () => {
+  it("her sağlayıcının en az bir modeli var", () => {
+    for (const p of IMAGE_PROVIDERS) {
+      expect(IMAGE_MODELS[p].length).toBeGreaterThan(0);
+    }
+  });
+
+  it("model kimlikleri benzersiz ve boş değil", () => {
+    for (const p of IMAGE_PROVIDERS) {
+      const ids = IMAGE_MODELS[p].map((m) => m.id);
+      expect(ids.every((id) => id.trim().length > 0)).toBe(true);
+      expect(new Set(ids).size).toBe(ids.length);
+    }
+  });
+
+  it("çalışmadığı doğrulanan NVIDIA modelleri katalogda YOK", () => {
+    const ids = IMAGE_MODELS.nvidia.map((m) => m.id);
+    for (const bad of ["black-forest-labs/flux.1-schnell", "stabilityai/sdxl-turbo", "briaai/bria-2.3"]) {
+      expect(ids).not.toContain(bad);
+    }
+  });
+
+  it("Agnes AI görsel modelleri katalogda", () => {
+    expect(IMAGE_MODELS.agnes.map((m) => m.id)).toEqual([
+      "agnes-image-2.1-flash",
+      "agnes-image-2.0-flash",
+    ]);
+  });
+
+  it("defaultImageModel listedeki İLK modeli verir, bilinmeyen sağlayıcıda boş", () => {
+    for (const p of IMAGE_PROVIDERS) {
+      expect(defaultImageModel(p)).toBe(IMAGE_MODELS[p][0].id);
+    }
+    expect(defaultImageModel("bilinmeyen")).toBe("");
+  });
+
+  it("resolveImageModel geçersiz/silinmiş seçimde varsayılana düşer (kilitlenme yok)", () => {
+    expect(resolveImageModel("openai", { openai: "dall-e-3" })).toBe("dall-e-3");
+    expect(resolveImageModel("openai", { openai: "artik-yok" })).toBe(defaultImageModel("openai"));
+    expect(resolveImageModel("openai", undefined)).toBe(defaultImageModel("openai"));
+  });
+
+  /* Model adı NVIDIA'da URL YOLUNA giriyor → allowlist bir GÜVENLİK şartı,
+     kozmetik değil. */
+  it("isKnownImageModel yalnız katalogdaki kimlikleri kabul eder", () => {
+    expect(isKnownImageModel("nvidia", "black-forest-labs/flux.1-dev")).toBe(true);
+    expect(isKnownImageModel("nvidia", "../../etc/passwd")).toBe(false);
+    expect(isKnownImageModel("nvidia", "başka/model")).toBe(false);
+    expect(isKnownImageModel("bilinmeyen", "x")).toBe(false);
   });
 });

@@ -53,6 +53,10 @@ function nvidiaErrorText(j: NvidiaImg, status: number): string {
 const OPENAI_COMPAT: Record<string, { base: string; model: string; size: boolean }> = {
   openai: { base: "https://api.openai.com/v1", model: "gpt-image-1", size: true },
   xai: { base: "https://api.x.ai/v1", model: "grok-2-image", size: false },
+  /* Agnes AI — standart OpenAI /images/generations ucu. `size` DESTEKLENMİYOR
+     (canlı testte parametre yok sayılıyor, göndermenin faydası yok) ve yanıt
+     base64 değil URL dönüyor; aşağıdaki ortak dal ikisini de zaten karşılıyor. */
+  agnes: { base: "https://apihub.agnes-ai.com/v1", model: "agnes-image-2.1-flash", size: false },
 };
 
 export async function POST(req: Request) {
