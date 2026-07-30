@@ -2478,7 +2478,15 @@ function ImageModelPicker({ config, saveConfig }: {
   const [testing, setTesting] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, { url?: string; error?: string; ms?: number }>>({});
 
-  const connected = IMAGE_PROVIDERS.filter((p) => config.models.some((m) => m.provider === p));
+  /* "Bağlı sağlayıcı" = ANAHTARI olan sağlayıcı. Önceden yalnız
+     `config.models` taranıyordu; Ayarlar'da ham `providerKeys` girmiş ama
+     henüz bir SOHBET modeli eklememiş kullanıcının görsel modelleri hiç
+     görünmüyordu (kullanıcı isteği: "bağlı olan sağlayıcıların tüm görsel
+     modellerini ekle"). Anahtar çözümü zaten iki kaynaktan da bakıyor
+     (resolveModelApiKey → profil anahtarı ya da providerKeys). */
+  const connected = IMAGE_PROVIDERS.filter(
+    (p) => config.models.some((m) => m.provider === p) || !!config.providerKeys?.[p],
+  );
   if (connected.length === 0) return null;
 
   const runTest = async (provider: ImageProvider) => {
@@ -2488,7 +2496,12 @@ function ImageModelPicker({ config, saveConfig }: {
     try {
       const { resolveModelApiKey } = await import("@/lib/secureKeys");
       const profile = config.models.find((m) => m.provider === provider);
-      const apiKey = profile ? await resolveModelApiKey(profile, config.providerKeys) : "";
+      /* Profil yoksa (yalnız ham providerKeys girilmiş) sahte bir profille
+         aynı çözücüyü kullan — anahtar şifreliyse çözülmesi gerekiyor. */
+      const apiKey = await resolveModelApiKey(
+        profile ?? { id: "", label: "", provider, baseUrl: "", model: "", apiKey: "" },
+        config.providerKeys,
+      );
       if (!apiKey) throw new Error("Bu sağlayıcı için anahtar çözülemedi (Ayarlar → Modeller).");
       const res = await fetch("/api/image", {
         method: "POST",

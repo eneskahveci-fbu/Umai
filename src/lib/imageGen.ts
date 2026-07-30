@@ -10,8 +10,9 @@ import { resolveModelApiKey } from "./secureKeys";
 
 /* Öncelik sırası: kalite/hız dengesi — Gemini (native, hızlı) → OpenAI
    (gpt-image-1) → xAI (grok-2-image) → NVIDIA NIM (flux.1-dev; canlı test
-   edilmiş, ~5 sn) → HF (FLUX.1-schnell, cold-start'ta 503 dönebilir). */
-export const IMAGE_PROVIDERS = ["gemini", "openai", "xai", "nvidia", "hf"] as const;
+   edilmiş, ~5 sn) → Agnes AI (~20 sn) → HF (FLUX.1-schnell, cold-start'ta
+   503 dönebilir). */
+export const IMAGE_PROVIDERS = ["gemini", "openai", "xai", "nvidia", "agnes", "hf"] as const;
 export type ImageProvider = (typeof IMAGE_PROVIDERS)[number];
 
 export const IMAGE_PROVIDER_LABEL: Record<ImageProvider, string> = {
@@ -19,6 +20,7 @@ export const IMAGE_PROVIDER_LABEL: Record<ImageProvider, string> = {
   openai: "OpenAI",
   xai: "xAI",
   nvidia: "NVIDIA NIM",
+  agnes: "Agnes AI",
   hf: "Hugging Face",
 };
 
@@ -200,6 +202,10 @@ export const IMAGE_MODELS: Record<ImageProvider, ImageModelOption[]> = {
   ],
   nvidia: [
     { id: "black-forest-labs/flux.1-dev", label: "FLUX.1 dev", note: "Canlı test edildi — ~5 sn", steps: 25 },
+  ],
+  agnes: [
+    { id: "agnes-image-2.1-flash", label: "Agnes Image 2.1 Flash", note: "Canlı test edildi — ~20 sn" },
+    { id: "agnes-image-2.0-flash", label: "Agnes Image 2.0 Flash" },
   ],
   hf: [
     { id: "black-forest-labs/FLUX.1-schnell", label: "FLUX.1 schnell", note: "Ücretsiz; ilk istekte ısınma gerekebilir" },

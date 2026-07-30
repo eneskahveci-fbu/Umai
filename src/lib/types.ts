@@ -672,7 +672,7 @@ export interface Config {
       "pollinations" — anahtar gerektirmeyen ücretsiz tabanı ZORLA kullan (BYOK
       anahtarı olsa bile), ya da belirli bir sağlayıcıyı SABİTLE. Sabitlenen
       sağlayıcı için model/anahtar artık yoksa sessizce "auto" davranışına döner. */
-  imageModelProvider?: "auto" | "pollinations" | "gemini" | "openai" | "xai" | "nvidia" | "hf";
+  imageModelProvider?: "auto" | "pollinations" | "gemini" | "openai" | "xai" | "nvidia" | "agnes" | "hf";
   /** Sağlayıcı başına seçilen görsel modeli (bkz. IMAGE_MODELS, imageGen.ts).
       Seçilmemişse o sağlayıcının katalogdaki ilk modeli kullanılır. */
   imageModelIds?: Partial<Record<string, string>>;
