@@ -269,8 +269,12 @@ async function getAllPaths(ctx: RepoCtx): Promise<string[]> {
 }
 
 /* Repo dosya haritası: gürültüyü (node_modules/dist/binary) ayıklar, kaynak
-   dosyaları öne alır, ~250 yolla sınırlar → büyük projelerde ajan yapıyı kompakt
-   görür, list_files'a gerek kalmadan doğru dosyayı hedefler. */
+   dosyaları öne alır, ~120 yolla sınırlar → büyük projelerde ajan yapıyı kompakt
+   görür, list_files'a gerek kalmadan doğru dosyayı hedefler.
+   Önceden CAP=250'ydi (~3.250 token) — her mesajda (repo bağlıyken) sabit bir
+   ön-yük olarak gönderiliyordu; kullanıcı geri bildirimi üzerine (Tem 2026)
+   yarıya indirildi. 250'yi aşan repolarda zaten glob/grep'e düşülüyordu, bu
+   sınırın altında da aynı yol çalışır — yalnız gecikme/token maliyeti azalır. */
 const REPO_MAP_NOISE = /(^|\/)(node_modules|\.git|\.next|dist|build|coverage|vendor|out|\.turbo|__pycache__)\//;
 const REPO_MAP_BINARY = /\.(png|jpe?g|gif|svg|ico|webp|avif|woff2?|ttf|eot|mp[34]|wav|pdf|zip|gz|tgz|map|lock)$|\.min\.(js|css)$/i;
 const REPO_MAP_SRC = /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|php|c|cc|cpp|h|hpp|cs|swift|kt|vue|svelte|sql|sh|css|scss|less|html|json|md|ya?ml|toml|prisma)$/i;
@@ -279,7 +283,7 @@ function buildRepoMap(paths: string[]): string {
   const src = clean.filter((p) => REPO_MAP_SRC.test(p)).sort();
   const rest = clean.filter((p) => !REPO_MAP_SRC.test(p)).sort();
   const ordered = [...src, ...rest];
-  const CAP = 250;
+  const CAP = 120;
   const shown = ordered.slice(0, CAP).join("\n");
   return ordered.length > CAP
     ? `${shown}\n[+${ordered.length - CAP} dosya daha — glob/grep ile bul]`
