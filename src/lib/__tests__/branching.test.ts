@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyEditBranch, applySwitchBranch, mergeRegeneratedBranches, stashAsPendingBranches } from "../branching";
+import { applyEditBranch, applySwitchBranch, lastAssistantIndex, mergeRegeneratedBranches, stashAsPendingBranches } from "../branching";
 import type { ChatMessage } from "../types";
 
 const u = (c: string): ChatMessage => ({ role: "user", content: c });
@@ -100,5 +100,56 @@ describe("stashAsPendingBranches + mergeRegeneratedBranches", () => {
 
   it("boş mesaj dizisinde değişmez", () => {
     expect(mergeRegeneratedBranches([], [[a("x")]])).toEqual([]);
+  });
+});
+
+/* B4 (hata taraması) — H5'te store'daki tüm akış yazıcıları rol-farkında
+   yapıldı ama dal birleştirme konumsal kalmıştı. Akış sırasında araya gizli
+   bir bağlam mesajı (terminal/kod çıktısı, role:"user") girebiliyor. */
+describe("lastAssistantIndex (B4)", () => {
+  const m = (role: "user" | "assistant", content: string) => ({ role, content }) as ChatMessage;
+
+  it("araya kullanıcı mesajı girse de son ASİSTANI bulur", () => {
+    const msgs = [m("user", "a"), m("assistant", "b"), m("user", "**Terminal çıktısı**")];
+    expect(lastAssistantIndex(msgs)).toBe(1);
+  });
+
+  it("asistan yoksa -1", () => {
+    expect(lastAssistantIndex([m("user", "a")])).toBe(-1);
+    expect(lastAssistantIndex([])).toBe(-1);
+  });
+});
+
+describe("mergeRegeneratedBranches — dal meta'sı KULLANICI mesajına yazılmaz (B4)", () => {
+  const m = (role: "user" | "assistant", content: string) => ({ role, content }) as ChatMessage;
+
+  it("araya bağlam mesajı girmişse dallar ASİSTANA işlenir", () => {
+    const msgs = [m("user", "soru"), m("assistant", "yeni cevap"), m("user", "**Terminal çıktısı**")];
+    const pending = [[m("assistant", "eski cevap")]];
+    const out = mergeRegeneratedBranches(msgs, pending);
+
+    /* Dal meta'sı asistanda. */
+    expect(out[1].role).toBe("assistant");
+    expect(out[1].branches).toHaveLength(2);
+    expect(out[1].branches![0][0].content).toBe("eski cevap");
+    expect(out[1].branchIndex).toBe(1);
+
+    /* Kullanıcı mesajı hiç değişmedi ve SİLİNMEDİ (eski kod onu kesiyordu). */
+    expect(out).toHaveLength(3);
+    expect(out[2].role).toBe("user");
+    expect(out[2].branches).toBeUndefined();
+  });
+
+  it("normal akışta (asistan sonda) davranış aynı kalır", () => {
+    const msgs = [m("user", "soru"), m("assistant", "yeni")];
+    const out = mergeRegeneratedBranches(msgs, [[m("assistant", "eski")]]);
+    expect(out).toHaveLength(2);
+    expect(out[1].branches).toHaveLength(2);
+    expect(out[1].branchIndex).toBe(1);
+  });
+
+  it("hiç asistan yoksa mesajlar olduğu gibi döner", () => {
+    const msgs = [m("user", "a")];
+    expect(mergeRegeneratedBranches(msgs, [[m("assistant", "x")]])).toBe(msgs);
   });
 });

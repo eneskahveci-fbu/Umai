@@ -26,7 +26,7 @@ import type {
 import { deriveJobTitle, type BackgroundJob } from "./jobs";
 import { DEFAULT_CONFIG, DEFAULT_REPO, DEFAULT_SKILLS, POLLINATIONS_DEFAULT_MODEL } from "./constants";
 import { encryptConfigSecrets, decryptConfigSecrets, isCryptoAvailable, hasPlaintextSecret, resolveGitToken } from "./secureKeys";
-import { applyEditBranch, applySwitchBranch, mergeRegeneratedBranches } from "./branching";
+import { applyEditBranch, applySwitchBranch, lastAssistantIndex, mergeRegeneratedBranches } from "./branching";
 import { toggleLeftPanel, type LeftPanel } from "./leftPanel";
 import { modelQualityRank } from "./modelQuality";
 import { createClient } from "./supabase/client";
@@ -390,29 +390,6 @@ function pushCloudConfig(get: () => StoreState, userId: string, config: Config) 
         cloudPushFailed = false;
       }
     });
-}
-
-/* Akış sırasında yazılacak mesajı ROLE göre bulur — konuma göre DEĞİL.
-   (Tem 2026 hata raporu: "bazen modelin cevabı ben yazmışım gibi görünüyor".)
-
-   Kök neden: aşağıdaki tüm `*OnLast` yardımcıları körlemesine
-   `messages[messages.length - 1]`'e yazıyordu. Akış SÜRERKEN araya bir
-   `role:"user"` mesajı girerse (ör. terminal/kod çıktısının ajana geri
-   beslenmesi) akan metin O mesajın içeriğini eziyordu. Belirti şuydu: gizli
-   bağlam mesajları içeriği `**Terminal çıktısı**` ile başladığı için
-   gizleniyor; içerik ezilince önek kayboluyor, mesaj GÖRÜNÜR hâle geliyor ve
-   `role` hâlâ `"user"` olduğu için modelin cevabı sağa hizalı KULLANICI
-   balonunda çiziliyordu. Ayrıca `popLastMessage` kullanıcının mesajını
-   siliyordu.
-
-   Doğru desen zaten kodda vardı (`addCommandRun` geriye doğru asistan arıyor);
-   burada tek kaynağa çıkarıldı. Asistan yoksa çağıranlar HİÇBİR ŞEY yazmaz —
-   kullanıcı mesajına düşmek bu hatanın ta kendisiydi. */
-function lastAssistantIndex(messages: readonly ChatMessage[]): number {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === "assistant") return i;
-  }
-  return -1;
 }
 
 interface StoreState {

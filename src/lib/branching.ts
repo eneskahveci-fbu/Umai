@@ -5,6 +5,21 @@ import type { ChatMessage } from "./types";
    sürümler arasında gezilebilir. Her dal, o mesajdan SONRAKİ mesajların anlık
    görüntüsüdür. Dal meta'sı yalnızca düzenlenen (üst) mesajda tutulur. */
 
+/* Akış/dallandırma yazımlarında hedef mesajı ROLE göre bulur — konuma göre
+   DEĞİL. (Tem 2026: "modelin cevabı ben yazmışım gibi görünüyor" hatası.)
+
+   Akış SÜRERKEN araya bir `role:"user"` mesajı girebiliyor (terminal/kod
+   çıktısının ajana geri beslenmesi). Konumsal "son mesaj" o zaman yanlış
+   mesajı gösteriyor. store.ts'teki tüm `*OnLast` yazıcıları bunu kullanıyor;
+   dal birleştirme de kullanmalı — aksi halde dal meta'sı bir KULLANICI
+   mesajına işlenir. Asistan yoksa -1. */
+export function lastAssistantIndex(messages: readonly ChatMessage[]): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "assistant") return i;
+  }
+  return -1;
+}
+
 function stripMeta(m: ChatMessage): ChatMessage {
   const copy = { ...m };
   delete copy.branches;
@@ -63,10 +78,15 @@ export function stashAsPendingBranches(message: ChatMessage): ChatMessage[][] {
     biten yeni son mesajı birleştirip dal meta'sını ona işler. */
 export function mergeRegeneratedBranches(messages: ChatMessage[], pendingBranches: ChatMessage[][]): ChatMessage[] {
   if (messages.length === 0 || pendingBranches.length === 0) return messages;
-  const lastIdx = messages.length - 1;
+  /* Konumsal `messages.length - 1` DEĞİL: yeni yanıt üretilirken araya gizli
+     bir bağlam mesajı (terminal/kod çıktısı, role:"user") girmişse dal
+     meta'sı o KULLANICI mesajına işleniyordu — sürüm okları yanlış balonda
+     çıkar, asistanın dal geçmişi kaybolurdu. */
+  const lastIdx = lastAssistantIndex(messages);
+  if (lastIdx < 0) return messages;
   const target = messages[lastIdx];
   const branches = [...pendingBranches, [stripMeta(target)]];
   const newIndex = branches.length - 1;
   const newTarget: ChatMessage = { ...stripMeta(target), branches, branchIndex: newIndex };
-  return [...messages.slice(0, lastIdx), newTarget];
+  return [...messages.slice(0, lastIdx), newTarget, ...messages.slice(lastIdx + 1)];
 }
