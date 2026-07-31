@@ -18,41 +18,61 @@ export interface StreamGateOptions {
   isStreaming: () => boolean;
   subscribe: (listener: () => void) => () => void;
   run: () => void;
-  /** Güvenlik ağı (ms). Verilmezse zamanlayıcı KURULMAZ — akış bitene kadar
-   *  süresiz beklenir.
+  /** Güvenlik ağı (ms): süre dolunca `run` YİNE DE çalıştırılır.
    *
-   *  Neden varsayılan yok: `streaming` bayrağı bir hatadan ötürü takılı
-   *  kalırsa bir bildirimi yine de göstermek zararsızdır, ama sohbete mesaj
-   *  eklemek/sayfayı yenilemek tam da düzeltmeye çalıştığımız hatayı geri
-   *  getirir. Bu yüzden karar çağırana bırakıldı. */
+   *  Yalnız YIKICI OLMAYAN işler için verilmeli (ör. bir bildirim göstermek).
+   *  Sohbete mesaj eklemek gibi işlerde verilmemeli — akışın ortasına düşmek
+   *  tam da bu kapının önlediği hatadır. */
   safetyMs?: number;
+  /** Vazgeçme sınırı (ms): süre dolunca `run` ÇALIŞTIRILMADAN abonelik çözülür
+   *  ve varsa `onGiveUp` çağrılır.
+   *
+   *  Neden gerekli: `safetyMs` verilmediğinde abonelik yalnız akış bitince
+   *  çözülüyordu. `streaming` bayrağı bir hata yüzünden takılı kalırsa
+   *  (setStreaming(false) bir finally'de olduğu için nadir ama mümkün)
+   *  abonelik hiç çözülmüyor; art arda komut çalıştıran bir ajan turunda
+   *  abonelikler sınırsız birikiyordu. */
+  giveUpMs?: number;
+  /** `giveUpMs` dolduğunda çağrılır — kullanıcıya durumu bildirmek için. */
+  onGiveUp?: () => void;
 }
 
+/** Ajan çıktısını beklerken makul üst sınır. Bu süreyi aşan bir "akış"
+    gerçekte takılmış demektir; beklemeye devam etmek yalnız abonelik
+    biriktirir. */
+const DEFAULT_GIVE_UP_MS = 10 * 60_000;
+
 /** `run`'ı akış BİTTİKTEN sonra çalıştırır; akış yoksa hemen çalıştırır.
- *  `run` en fazla BİR KEZ çağrılır (dinleyici ile güvenlik ağı yarışsa bile). */
+ *  `run` en fazla BİR KEZ çağrılır (dinleyici, güvenlik ağı ve vazgeçme
+ *  sınırı birbiriyle yarışsa bile) ve her yolda abonelik çözülür. */
 export function runAfterStreaming(opts: StreamGateOptions): void {
-  const { isStreaming, subscribe, run, safetyMs } = opts;
+  const { isStreaming, subscribe, run, safetyMs, giveUpMs, onGiveUp } = opts;
   if (!isStreaming()) { run(); return; }
   let done = false;
   let unsub: (() => void) | null = null;
-  let safety: ReturnType<typeof setTimeout> | null = null;
-  const finish = () => {
+  const timers: ReturnType<typeof setTimeout>[] = [];
+  /** `execute=false` → yalnız temizle (vazgeçme yolu). */
+  const finish = (execute: boolean) => {
     if (done) return;
     done = true;
     unsub?.();
-    if (safety) clearTimeout(safety);
-    run();
+    for (const t of timers) clearTimeout(t);
+    if (execute) run();
+    else onGiveUp?.();
   };
-  unsub = subscribe(() => { if (!isStreaming()) finish(); });
-  if (safetyMs !== undefined) safety = setTimeout(finish, safetyMs);
+  unsub = subscribe(() => { if (!isStreaming()) finish(true); });
+  if (safetyMs !== undefined) timers.push(setTimeout(() => finish(true), safetyMs));
+  if (giveUpMs !== undefined) timers.push(setTimeout(() => finish(false), giveUpMs));
 }
 
-/** Store'a bağlı kısa yol — güvenlik ağı YOK (bkz. `safetyMs` notu). */
-export function runWhenNotStreaming(run: () => void, safetyMs?: number): void {
+/** Store'a bağlı kısa yol. Güvenlik ağı YOK (akışın ortasına düşmemek için),
+ *  ama sızıntıyı önleyen bir vazgeçme sınırı VAR. */
+export function runWhenNotStreaming(run: () => void, onGiveUp?: () => void): void {
   runAfterStreaming({
     isStreaming: () => useStore.getState().streaming,
     subscribe: (cb) => useStore.subscribe(cb),
     run,
-    safetyMs,
+    giveUpMs: DEFAULT_GIVE_UP_MS,
+    onGiveUp,
   });
 }
