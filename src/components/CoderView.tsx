@@ -126,7 +126,7 @@ import {
   parseGitLabRepo,
 } from "@/lib/gitlab";
 import type { ChatMessage, TreeFile, TreeNode } from "@/lib/types";
-import { stashAsPendingBranches } from "@/lib/branching";
+import { lastAssistantIndex, stashAsPendingBranches } from "@/lib/branching";
 import { ALL_AGENTS, findAgentByCommand, stripCommand, type Agent } from "@/lib/agents";
 import { pollinationsImageUrl } from "@/lib/pollinations";
 import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/pricing";
@@ -3178,9 +3178,16 @@ export function CoderView() {
        liste son mesaja işlenir — MessageBubble'daki "‹ n/m ›" sürüm okları
        kullanıcı mesajı düzenlemesinde olduğu gibi asistan yanıtında da çalışır. */
     let pendingBranches: ChatMessage[][] | null = null;
-    const last = chat.messages[chat.messages.length - 1];
-    if (last.role === "assistant") {
-      pendingBranches = stashAsPendingBranches(last);
+    /* Konumsal "son mesaj" DEĞİL: akış sırasında araya gizli bir bağlam
+       mesajı (terminal/kod çıktısı, role:"user") girmişse `last.role` asistan
+       olmuyordu → dal saklanmadan ve pop edilmeden devam ediliyor, ardından
+       akış mevcut asistan yanıtının ÜZERİNE yazıyordu: eski cevap sürüm
+       geçmişine alınmadan kayboluyordu (‹1/2› okları hiç çıkmıyordu).
+       popLastMessage zaten son ASİSTANI siliyor; hedef seçimi de onunla
+       aynı kuralı kullanmalı. */
+    const li = lastAssistantIndex(chat.messages);
+    if (li >= 0) {
+      pendingBranches = stashAsPendingBranches(chat.messages[li]);
       store.popLastMessage();
     }
     await callApi(undefined, modelId ? { modelId } : undefined);
