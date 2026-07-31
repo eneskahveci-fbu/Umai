@@ -54,6 +54,7 @@ function useJobRunner() {
               baseUrl: resolved.baseUrl, model: resolved.model,
               apiKey: resolved.apiKey, provider: resolved.provider,
               fallbacks: buildChainFor(cfg),
+              strictModel: cfg.strictModel,
             }),
           });
           const d = await r.json().catch(() => ({} as { server?: boolean }));

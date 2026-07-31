@@ -2268,7 +2268,10 @@ export function CoderView() {
        hafif, ekstra API çağrısı gerektirmeyen tek-geçişli talimata etki eder
        (bkz. finalSystemPrompt). Kullanıcı Ayarlar → Kalite'de "Kapalı" ya da
        "Standart" seçtiyse bu ağır hat hiç çalışmaz — yalnız "Yüksek" tetikler. */
-    if (qualityTier === "high" && pilot?.fusion && !useSwarm && !useResearch && !toolsWanted && !isContinuation) {
+    /* Kesin model modu (strictModel): Fusion doğası gereği birden fazla modeli
+       (3. taslak her zaman Pollinations'tan) birleştirir — "yalnızca seçtiğim
+       model cevap versin" isteğiyle doğrudan çelişir, bu yüzden hiç tetiklenmez. */
+    if (qualityTier === "high" && pilot?.fusion && !useSwarm && !useResearch && !toolsWanted && !isContinuation && !store.config.strictModel) {
       try {
         useStore.getState().updateLastThinking("✦ Füzyon: 3 iç taslak hazırlanıyor…");
         const freeModelNames = await fetchTextModels();
@@ -2467,6 +2470,7 @@ export function CoderView() {
              "kalite öncelikli" seçeneği açıksa ücretli/ücretsiz ayrımı yapmadan
              en güçlüden en zayıfa sıralanır. */
           fallbacks: buildChainFor(store.config, active.id),
+          strictModel: store.config.strictModel,
           style: store.config.style,
           memories: store.config.memories,
           skills: activeSkills.map((s) => ({

@@ -682,6 +682,14 @@ export interface Config {
       buildQualityFallbackChain, ücretli/ücretsiz ayrımı yapmadan yalnız bilinen
       model gücüne göre (modelQuality.ts) en iyiden en kötüye dizer. */
   qualityFallbackChain?: boolean;
+  /** Kesin model modu (Ayarlar → Model). Varsayılan (false/yok): aktif model
+      kota/erişim/sunucu hatası verirse ya da anahtarsızsa sırayla yedek
+      modellere (Pollinations dahil) sessizce geçilir — "istek asla düşmez".
+      true: HİÇBİR yedek denenmez — ne sohbet yedek zinciri, ne Fusion'ın
+      Pollinations son-çare taslağı, ne de anahtarsız istekte sessiz
+      Pollinations geçişi. Aktif model yanıt vermezse kullanıcı NET bir hata
+      görür; başka bir model onun yerine geçip kimliğini üstlenmez. */
+  strictModel?: boolean;
   /** Görsel üretimi yedek zinciri (Ayarlar → Model). Varsayılan (false/yok):
       yalnız pickImageProvider'ın seçtiği TEK aday denenir, başarısızsa doğrudan
       Pollinations'a düşülür. true: o aday başarısız olursa kalan görüntü-

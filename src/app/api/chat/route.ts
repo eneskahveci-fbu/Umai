@@ -139,6 +139,11 @@ interface ChatRequest {
   /** Çok-sağlayıcılı otomatik fallback: birincil model hata verirse sırayla
       bu adaylar denenir. İstemci ücretsiz/güvenilir sağlayıcılardan kurar. */
   fallbacks?: { provider?: Provider; baseUrl?: string; model?: string; apiKey?: string }[];
+  /** Kesin model modu (Ayarlar → Model → Kesin model). true ise HİÇBİR yedek
+      denenmez: `fallbacks` yok sayılır (savunma amaçlı — istemci zaten boş
+      gönderir, bkz. fallback.ts buildChainFor) ve anahtarsız istekte
+      "free-fallback" (sessiz Pollinations geçişi) yerine net bir hata döner. */
+  strictModel?: boolean;
 }
 
 /** Tek bir LLM ucu (birincil veya fallback). */
@@ -1239,6 +1244,14 @@ export async function POST(req: Request) {
     baseUrl = (body.baseUrl || process.env.LLM_BASE_URL || "https://router.huggingface.co/v1").replace(/\/$/, "");
     model = body.model || process.env.LLM_MODEL || model;
     apiKey = process.env.LLM_API_KEY || "";
+  } else if (access === "free-fallback" && body.strictModel) {
+    /* Kesin model modu: anahtarsız sessiz Pollinations geçişi YOK — kullanıcı
+       net bir hata görsün ve seçtiği modelin neden çalışmadığını anlasın. */
+    return new Response(
+      `Seçili model (${requestedProvider ?? provider} / ${requestedModel ?? model}) için kullanılabilir bir API anahtarı yok. ` +
+      `Kesin model modu açık olduğundan başka bir modele geçilmedi. Ayarlar → Modeller'den anahtar ekle ya da Kesin model modunu kapat.`,
+      { status: 400 },
+    );
   } else if (access === "free-fallback") {
     /* Anahtarsız istek → ücretsiz Pollinations (yine yanıt alır, kırılma yok).
        Seçili model BAŞKA sağlayıcıya ait (ör. deepseek/...:free) — Pollinations'ta
@@ -1290,7 +1303,9 @@ export async function POST(req: Request) {
   const primary: Candidate = { provider, baseUrl, model, apiKey };
   const seenCand = new Set<string>([`${provider}|${baseUrl}|${model}`]);
   const candidates: Candidate[] = [primary];
-  for (const f of body.fallbacks ?? []) {
+  /* Kesin model modu: `fallbacks` gönderilmiş olsa bile yok say — savunma
+     amaçlı (istemci zaten boş gönderir, bkz. fallback.ts buildChainFor). */
+  for (const f of body.strictModel ? [] : body.fallbacks ?? []) {
     const cp = f.provider ?? "custom";
     const cb = (f.baseUrl ?? "").replace(/\/$/, "");
     const cm = f.model ?? "";

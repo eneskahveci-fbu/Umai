@@ -217,10 +217,15 @@ export function buildChainFor(
     models: ModelProfile[];
     activeModelId?: string | null;
     qualityFallbackChain?: boolean;
+    strictModel?: boolean;
   },
   activeId?: string | null,
   opts: BuildChainOptions = {},
 ): FallbackCandidate[] {
+  /* Kesin model modu: hiçbir yedek (Pollinations/OVH son-çare dahil) kurulmaz —
+     aktif model hata verirse kullanıcı net bir hata görür, başka model onun
+     kimliğine bürünüp cevap vermez (bkz. types.ts strictModel). */
+  if (config.strictModel) return [];
   const build = config.qualityFallbackChain ? buildQualityFallbackChain : buildFallbackChain;
   return build(config.models, activeId ?? config.activeModelId ?? null, opts);
 }

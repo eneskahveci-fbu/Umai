@@ -214,4 +214,14 @@ describe("buildChainFor — 'kalite öncelikli' tercihi TEK yerden okunur", () =
     );
     expect(chain.every((c) => c.provider !== "gemini")).toBe(true);
   });
+
+  it("strictModel AÇIKKEN boş zincir döner — Pollinations dahil hiçbir yedek kurulmaz", () => {
+    const chain = buildChainFor({ models, activeModelId: "active", strictModel: true });
+    expect(chain).toEqual([]);
+  });
+
+  it("strictModel, qualityFallbackChain'den ÖNCE kontrol edilir (ikisi de açık olsa bile boş döner)", () => {
+    const chain = buildChainFor({ models, activeModelId: "active", strictModel: true, qualityFallbackChain: true });
+    expect(chain).toEqual([]);
+  });
 });
