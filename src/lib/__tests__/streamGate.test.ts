@@ -98,3 +98,75 @@ describe("runAfterStreaming", () => {
     }
   });
 });
+
+/* B5 (hata taraması) — `safetyMs` verilmediğinde abonelik YALNIZ akış bitince
+   çözülüyordu. `streaming` bayrağı bir hata yüzünden takılı kalırsa abonelik
+   hiç çözülmüyor; art arda komut çalıştıran bir ajan turunda abonelikler
+   sınırsız birikiyordu. Çözüm: yıkıcı OLMAYAN bir vazgeçme sınırı. */
+describe("runAfterStreaming — vazgeçme sınırı (B5)", () => {
+  it("giveUpMs dolunca `run` ÇALIŞTIRILMAZ ama abonelik çözülür", () => {
+    vi.useFakeTimers();
+    try {
+      const run = vi.fn();
+      const onGiveUp = vi.fn();
+      const unsub = vi.fn();
+      runAfterStreaming({ isStreaming: () => true, subscribe: () => unsub, run, giveUpMs: 1000, onGiveUp });
+      vi.advanceTimersByTime(1000);
+      expect(run).not.toHaveBeenCalled();      // yıkıcı iş akışın ortasına DÜŞMEZ
+      expect(unsub).toHaveBeenCalledTimes(1);  // sızıntı kapandı
+      expect(onGiveUp).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("akış sınırdan ÖNCE biterse normal çalışır, vazgeçme tetiklenmez", () => {
+    vi.useFakeTimers();
+    try {
+      const run = vi.fn();
+      const onGiveUp = vi.fn();
+      let listener: (() => void) | null = null;
+      let streaming = true;
+      runAfterStreaming({
+        isStreaming: () => streaming,
+        subscribe: (cb: () => void) => { listener = cb; return () => {}; },
+        run, giveUpMs: 1000, onGiveUp,
+      });
+      streaming = false;
+      listener!();
+      vi.advanceTimersByTime(5000);
+      expect(run).toHaveBeenCalledTimes(1);
+      expect(onGiveUp).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("safetyMs ile giveUpMs yarışırsa yalnız BİRİ kazanır", () => {
+    vi.useFakeTimers();
+    try {
+      const run = vi.fn();
+      const onGiveUp = vi.fn();
+      /* safetyMs daha kısa → çalıştırma kazanır, vazgeçme hiç tetiklenmez. */
+      runAfterStreaming({ isStreaming: () => true, subscribe: () => () => {}, run, safetyMs: 500, giveUpMs: 1000, onGiveUp });
+      vi.advanceTimersByTime(2000);
+      expect(run).toHaveBeenCalledTimes(1);
+      expect(onGiveUp).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("onGiveUp verilmese de sınır abonelği çözer (çökmez)", () => {
+    vi.useFakeTimers();
+    try {
+      const unsub = vi.fn();
+      runAfterStreaming({ isStreaming: () => true, subscribe: () => unsub, run: vi.fn(), giveUpMs: 100 });
+      vi.advanceTimersByTime(100);
+      expect(unsub).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

@@ -1326,12 +1326,17 @@ export function CoderView() {
       const msg = `**Terminal çıktısı** (\`${command}\`):\n\`\`\`\n${output}\n\`\`\``;
       /* Akış sürüyorsa bitene kadar bekle — yoksa akan metin bu mesajın
          üzerine yazılır (bkz. runWhenNotStreaming). */
-      runWhenNotStreaming(() => {
-        useStore.getState().pushMessage({ role: "user", content: msg });
-        /* callApi is a stable useCallback defined below; it's only invoked here
-           from an event handler that fires after mount, so the forward ref is safe. */
-        void callApi();
-      });
+      runWhenNotStreaming(
+        () => {
+          useStore.getState().pushMessage({ role: "user", content: msg });
+          /* callApi is a stable useCallback defined below; it's only invoked here
+             from an event handler that fires after mount, so the forward ref is safe. */
+          void callApi();
+        },
+        /* Akış hiç bitmezse (takılı `streaming` bayrağı) sessizce kaybolmasın:
+           çıktı zaten Terminal kutusunda görünüyor, yalnız ajana beslenemedi. */
+        () => addToast("Komut çıktısı ajana iletilemedi — yanıt akışı bitmedi. Çıktı Terminal kutusunda duruyor.", "error"),
+      );
     };
     window.addEventListener("craftai:terminal-output", handler);
     return () => window.removeEventListener("craftai:terminal-output", handler);
@@ -1348,10 +1353,13 @@ export function CoderView() {
       const { language, code, output } = (e as CustomEvent<{ language: string; code: string; output: string }>).detail ?? {};
       if (!output) return;
       const msg = `**Kod çıktısı** (${language}):\n\`\`\`${language}\n${code}\n\`\`\`\nÇıktı:\n\`\`\`\n${output}\n\`\`\``;
-      runWhenNotStreaming(() => {
-        useStore.getState().pushMessage({ role: "user", content: msg });
-        void callApi();
-      });
+      runWhenNotStreaming(
+        () => {
+          useStore.getState().pushMessage({ role: "user", content: msg });
+          void callApi();
+        },
+        () => addToast("Kod çıktısı ajana iletilemedi — yanıt akışı bitmedi. Çıktı 'Kod çalıştırma' kutusunda duruyor.", "error"),
+      );
     };
     window.addEventListener("craftai:code-output", handler);
     return () => window.removeEventListener("craftai:code-output", handler);
