@@ -1234,13 +1234,14 @@ export const DEFAULT_CONFIG: Config = {
   autoTheme: false,
   autoMemory: true,
   autoContinue: true,
-  /* Görünmez süpervizör (Tem 2026 kullanıcı kararı): sohbette taslak→
-     öz-eleştiri→düzeltme akışı varsayılan olarak açık — kullanıcı hiçbir
-     şeye dokunmadan en kaliteli/hatasız yanıtı ister. "standard" kademesi bu
-     davranış; Ayarlar → Kalite'den "Kapalı"ya (hız/maliyet için) ya da "Yüksek"e
-     (Fusion — çoklu-model+hakem) değiştirilebilir. Kapsam bilinçli olarak
-     yalnız ana sohbet — Stüdyolara henüz genişletilmedi. */
-  qualityTier: "standard",
+  /* Hız öncelikli (Tem 2026 kullanıcı kararı — GÜNCELLENDİ): önceden "standard"
+     kademesi varsayılan açıktı ve her mesaja görünmez taslak→öz-eleştiri→
+     düzeltme talimatı ekliyordu — tek geçişli bir istekte bile modelin daha
+     fazla "düşünmesine" (ve gözle görülür şekilde yavaşlamasına) yol açıyordu.
+     Kullanıcı geri bildirimi: varsayılan olarak HIZ önceliklidir. "Kapalı" artık
+     varsayılan; isteyen Ayarlar → Kalite'den "Standart" ya da "Yüksek"e
+     (Fusion — çoklu-model+hakem) kendi seçimiyle geçebilir. */
+  qualityTier: "off",
   learningMode: false,
   webSearch: true,
   agentsUseStrongestModel: true,
