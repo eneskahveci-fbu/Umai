@@ -30,6 +30,7 @@ interface JobRequest {
   apiKey?: string;
   provider?: Provider;
   fallbacks?: { provider?: Provider; baseUrl?: string; model?: string; apiKey?: string }[];
+  strictModel?: boolean;
 }
 
 const KEYLESS = new Set<string>(["pollinations", "ollama"]);
@@ -72,9 +73,19 @@ export async function POST(req: Request) {
     candList.push({ provider: cp, baseUrl: cb, model: cm, apiKey: ck });
   };
   push(body.provider, body.baseUrl, body.model, body.apiKey);
-  for (const f of body.fallbacks ?? []) push(f.provider, f.baseUrl, f.model, f.apiKey);
+  /* Kesin model modu: ne istemcinin yolladığı yedekler ne de anahtarsız
+     Pollinations son-çaresi eklenir — yalnızca birincil aday denenir. */
+  if (!body.strictModel) {
+    for (const f of body.fallbacks ?? []) push(f.provider, f.baseUrl, f.model, f.apiKey);
+    if (!candList.length) {
+      push("pollinations" as Provider, "https://text.pollinations.ai/openai", "openai", "");
+    }
+  }
   if (!candList.length) {
-    push("pollinations" as Provider, "https://text.pollinations.ai/openai", "openai", "");
+    return Response.json(
+      { error: "Seçili model için kullanılabilir bir API anahtarı yok. Kesin model modu açık olduğundan başka bir modele geçilmedi." },
+      { status: 400 },
+    );
   }
   if (process.env.NODE_ENV === "production") {
     for (const c of candList) {

@@ -25,6 +25,7 @@ export async function quickComplete(prompt: string, systemPrompt: string, signal
       baseUrl: active.baseUrl, model: active.model, apiKey, provider: active.provider,
       systemPrompt,
       fallbacks: buildChainFor(store.config),
+      strictModel: store.config.strictModel,
       tools: false, webSearch: false, temperature: 0.6,
     }),
   });

@@ -46,6 +46,7 @@ export async function streamChat(opts: GenChatOptions): Promise<string> {
       baseUrl: resolved.baseUrl, model: resolved.model, apiKey: resolved.apiKey, provider: resolved.provider,
       systemPrompt: system,
       fallbacks: buildChainFor(cfg),
+      strictModel: cfg.strictModel,
       tools: false, webSearch: false, temperature: opts.temperature ?? 0.7,
       ...(opts.maxTokens ? { maxTokens: opts.maxTokens } : {}),
       ...(opts.jsonMode ? { jsonMode: true } : {}),

@@ -1089,6 +1089,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               const activeM = config.models.find((m) => m.id === config.activeModelId);
               if (!activeM) return null;
               const qualityMode = config.qualityFallbackChain ?? false;
+              const strictMode = config.strictModel ?? false;
               /* Önizleme, isteğin GERÇEKTEN kuracağı zincirle aynı fonksiyondan gelir
                  (buildChainFor) → kullanıcı ne görüyorsa o denenir. */
               const chain = buildChainFor(config);
@@ -1096,46 +1097,78 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50 mb-4">
                   <div className="flex items-center justify-between gap-2 mb-1.5">
                     <div className="flex items-center gap-1.5">
-                      <Layers size={13} className="text-yellow shrink-0" />
-                      <span className="text-xs font-bold text-muted uppercase tracking-wide">Otomatik yedek zinciri</span>
+                      <Lock size={13} className="text-brand shrink-0" />
+                      <span className="text-xs font-bold text-muted uppercase tracking-wide">Kesin model</span>
                     </div>
                     <button
-                      onClick={() => saveConfig({ ...config, qualityFallbackChain: !qualityMode })}
+                      onClick={() => saveConfig({ ...config, strictModel: !strictMode })}
                       className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-semibold transition-colors shrink-0 ${
-                        qualityMode ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink hover:border-brand/40"
+                        strictMode ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink hover:border-brand/40"
                       }`}
-                      title="Açıkken ücretli/ücretsiz farketmeksizin en güçlü modelden en zayıfa sıralanır"
+                      title="Açıkken yalnızca seçtiğin model cevap verir — başka modele (Pollinations dahil) hiç geçilmez"
                     >
-                      <TrendingUp size={12} />
-                      Kalite öncelikli
+                      <Lock size={12} />
+                      {strictMode ? "Açık" : "Kapalı"}
                     </button>
                   </div>
                   <p className="text-xs text-muted leading-relaxed mb-2.5">
-                    {qualityMode
-                      ? "Aktif model hata verirse ücretli/ücretsiz farketmeksizin en güçlü modelden en zayıfa sırayla dener."
-                      : "Aktif model kota/erişim hatası verirse istek düşmez; soldan sağa sırayla denenir. Her ücretsiz katmanın ayrı kotası birleşince kesintisiz kullanım sağlar."}
+                    {strictMode
+                      ? "Açık: yalnızca yukarıda seçtiğin model cevap verir. Hata verirse (kota/anahtar/bağlantı) başka bir modele — Pollinations dahil — hiç geçilmez, ne sohbette ne Fusion'da; net bir hata mesajı görürsün."
+                      : "Kapalı: aktif model hata verirse (kota/erişim/bağlantı) veya anahtarsızsa, aşağıdaki gibi bir yedek modele (gerekirse ücretsiz Pollinations'a) sessizce geçilir."}
                   </p>
-                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                    <span className="px-2 py-1 rounded-lg border border-branddim bg-brand/10 text-brand font-semibold font-mono" title={cleanLabel(activeM.provider)}>
-                      {activeM.model}
-                    </span>
-                    {chain.map((c, i) => (
-                      <Fragment key={`${c.provider}-${c.model}-${i}`}>
-                        <ChevronRight size={12} className="text-muted shrink-0" />
-                        <span
-                          className="px-2 py-1 rounded-lg border border-line bg-bgsoft text-muted font-mono"
-                          title={`${cleanLabel(c.provider)}${c.apiKey === "" ? " · anahtarsız" : ""}`}
+                  {strictMode ? (
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                      <span className="px-2 py-1 rounded-lg border border-branddim bg-brand/10 text-brand font-semibold font-mono" title={cleanLabel(activeM.provider)}>
+                        {activeM.model}
+                      </span>
+                      <span className="text-muted">— yedek yok</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between gap-2 mb-1.5 mt-3">
+                        <div className="flex items-center gap-1.5">
+                          <Layers size={13} className="text-yellow shrink-0" />
+                          <span className="text-xs font-bold text-muted uppercase tracking-wide">Otomatik yedek zinciri</span>
+                        </div>
+                        <button
+                          onClick={() => saveConfig({ ...config, qualityFallbackChain: !qualityMode })}
+                          className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-semibold transition-colors shrink-0 ${
+                            qualityMode ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink hover:border-brand/40"
+                          }`}
+                          title="Açıkken ücretli/ücretsiz farketmeksizin en güçlü modelden en zayıfa sıralanır"
                         >
-                          {c.model}{c.apiKey === "" ? " 🆓" : ""}
+                          <TrendingUp size={12} />
+                          Kalite öncelikli
+                        </button>
+                      </div>
+                      <p className="text-xs text-muted leading-relaxed mb-2.5">
+                        {qualityMode
+                          ? "Aktif model hata verirse ücretli/ücretsiz farketmeksizin en güçlü modelden en zayıfa sırayla dener."
+                          : "Aktif model kota/erişim hatası verirse istek düşmez; soldan sağa sırayla denenir. Her ücretsiz katmanın ayrı kotası birleşince kesintisiz kullanım sağlar."}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                        <span className="px-2 py-1 rounded-lg border border-branddim bg-brand/10 text-brand font-semibold font-mono" title={cleanLabel(activeM.provider)}>
+                          {activeM.model}
                         </span>
-                      </Fragment>
-                    ))}
-                  </div>
-                  {chain.length === 0 && (
-                    <p className="text-xs text-yellow/90 mt-2 leading-relaxed">
-                      Henüz yedek yok. Ücretsiz bir sağlayıcı (Google Gemini / Groq / OpenRouter) eklersen
-                      otomatik olarak bu zincire katılır.
-                    </p>
+                        {chain.map((c, i) => (
+                          <Fragment key={`${c.provider}-${c.model}-${i}`}>
+                            <ChevronRight size={12} className="text-muted shrink-0" />
+                            <span
+                              className="px-2 py-1 rounded-lg border border-line bg-bgsoft text-muted font-mono"
+                              title={`${cleanLabel(c.provider)}${c.apiKey === "" ? " · anahtarsız" : ""}`}
+                            >
+                              {c.model}{c.apiKey === "" ? " 🆓" : ""}
+                            </span>
+                          </Fragment>
+                        ))}
+                      </div>
+                      {chain.length === 0 && (
+                        <p className="text-xs text-yellow/90 mt-2 leading-relaxed">
+                          Henüz yedek yok. Ücretsiz bir sağlayıcı (Google Gemini / Groq / OpenRouter) eklersen
+                          otomatik olarak bu zincire katılır.
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               );
