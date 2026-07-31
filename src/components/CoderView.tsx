@@ -985,13 +985,23 @@ export function CoderView() {
   }, [input]);
   const endRef = useRef<HTMLDivElement>(null);
   /* Sayfa gizlenirken (uygulama/sekme değişimi) akan kısmi yanıtı kalıcılaştır —
-     tarayıcı sekmeyi dondurup yeniden yüklerse bile o ana kadarki yanıt durur. */
+     tarayıcı sekmeyi dondurup yeniden yüklerse bile o ana kadarki yanıt durur.
+     `pagehide` ayrıca dinlenir: iOS Safari'de (özellikle ana ekrana eklenmiş
+     "standalone" PWA'da) sekme arka plana alınıp belleği geri kazanmak için
+     süreç sonlandırıldığında bazı durumlarda `visibilitychange` yerine/ek
+     olarak `pagehide` tetiklenir — ikisi de olmadan tek başına eksik kalırsa
+     akan yanıt hiç kaydedilmeden kaybolur ("sanki eski cevaba dönüyor" hissi). */
   useEffect(() => {
-    const onVis = () => {
-      if (document.hidden && useStore.getState().streaming) void useStore.getState().persistCurrent();
+    const persistIfStreaming = () => {
+      if (useStore.getState().streaming) void useStore.getState().persistCurrent();
     };
+    const onVis = () => { if (document.hidden) persistIfStreaming(); };
     document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
+    window.addEventListener("pagehide", persistIfStreaming);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pagehide", persistIfStreaming);
+    };
   }, []);
   /* Sekme başlığında canlı durum: yanıt yazılırken ● göstergesi (Claude gibi). */
   useEffect(() => {
