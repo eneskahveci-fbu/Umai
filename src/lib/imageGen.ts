@@ -27,6 +27,23 @@ export const IMAGE_PROVIDER_LABEL: Record<ImageProvider, string> = {
 /** Çözülmüş görsel sağlayıcısı: hangi sağlayıcı, hangi anahtar, hangi MODEL. */
 export interface ImagePick { provider: ImageProvider; apiKey: string; model: string }
 
+/** Kullanıcının "bağlı" saydığımız görsel sağlayıcıları: bir sohbet MODELİ
+ *  eklemiş VEYA yalnızca ham API ANAHTARI girmiş olması yeter.
+ *
+ *  Tek kaynak olması şart: Ayarlar → Görsel üretimi ekranında iki ayrı liste
+ *  var (sağlayıcı çipleri ve model seçicisi) ve bunlar farklı tanımlar
+ *  kullanınca aynı ekranda çelişki çıkıyordu — ham providerKeys girmiş
+ *  kullanıcı modelleri görüp test edebiliyor ama sağlayıcıyı varsayılan
+ *  olarak SEÇEMİYORDU. Anahtar çözümü (resolveModelApiKey) zaten iki kaynağa
+ *  da bakıyor; bu yardımcı arayüzü onunla hizalar. SAF → birim testli. */
+export function connectedImageProviders(
+  config: Pick<Config, "models" | "providerKeys">,
+): ImageProvider[] {
+  return IMAGE_PROVIDERS.filter(
+    (p) => config.models.some((m) => m.provider === p) || !!config.providerKeys?.[p],
+  );
+}
+
 /** Kullanıcının modelleri arasından görüntü-yetenekli ilk sağlayıcının modelini
     seçer (öncelik sırasıyla). SAF — anahtar çözümü çağıranda. */
 export function pickImageModel(models: ModelProfile[]): ModelProfile | null {

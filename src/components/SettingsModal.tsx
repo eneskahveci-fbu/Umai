@@ -60,7 +60,7 @@ import { AdminUsers } from "@/components/AdminUsers";
 import { createClient } from "@/lib/supabase/client";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, ALL_TOOL_CATALOG } from "@/lib/constants";
 import { buildChainFor, KEYLESS_PROVIDERS } from "@/lib/fallback";
-import { IMAGE_PROVIDERS, IMAGE_PROVIDER_LABEL, IMAGE_MODELS, resolveImageModel, type ImageProvider } from "@/lib/imageGen";
+import { IMAGE_PROVIDERS, IMAGE_PROVIDER_LABEL, IMAGE_MODELS, resolveImageModel, connectedImageProviders, type ImageProvider } from "@/lib/imageGen";
 import { calculateCost, formatCost } from "@/lib/pricing";
 import { quickComplete } from "@/lib/quickComplete";
 import { fetchUserRepos } from "@/lib/github";
@@ -1177,7 +1177,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               <p className="text-xs text-muted leading-relaxed mb-2.5">
                 Sohbette bir görsel istediğinde hangi sağlayıcı kullanılsın? <b>Otomatik</b>, önce o an
                 aktif sohbet modelin görüntü-yetenekliyse ONU kullanır; değilse eklediğin modeller
-                arasından uygun olanı önceliğe göre (Gemini → OpenAI → xAI → NVIDIA NIM → Hugging Face) kendi seçer.
+                arasından uygun olanı önceliğe göre (Gemini → OpenAI → xAI → NVIDIA NIM → Agnes AI → Hugging Face) kendi seçer.
                 İstersen ücretsiz Pollinations&apos;ı ya da belirli bir sağlayıcıyı sabitleyebilirsin.
                 {(config.imageFallbackChain ?? false)
                   ? " Yedek zinciri açık: seçilen sağlayıcı başarısız olursa aşağıdaki sırayla diğerleri de denenir."
@@ -1205,8 +1205,11 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 {([
                   { value: "auto" as const, label: "Otomatik (en iyisi)" },
                   { value: "pollinations" as const, label: "Pollinations · ücretsiz" },
-                  ...IMAGE_PROVIDERS
-                    .filter((p) => config.models.some((m) => m.provider === p))
+                  /* Aşağıdaki model seçicisiyle AYNI "bağlı" tanımı
+                     (connectedImageProviders): ikisi farklı olunca ham
+                     providerKeys girmiş kullanıcı modelleri görüp test
+                     edebiliyor ama sağlayıcıyı buradan seçemiyordu. */
+                  ...connectedImageProviders(config)
                     .map((p) => ({ value: p, label: IMAGE_PROVIDER_LABEL[p] })),
                 ]).map((opt) => {
                   const active = (config.imageModelProvider ?? "auto") === opt.value;
@@ -1223,10 +1226,12 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   );
                 })}
               </div>
-              {IMAGE_PROVIDERS.every((p) => !config.models.some((m) => m.provider === p)) && (
+              {/* Aynı "bağlı" tanımı: yalnız ham anahtar girmiş kullanıcıya
+                  "hiç model yok" demek yanlıştı — çipler zaten görünüyordu. */}
+              {connectedImageProviders(config).length === 0 && (
                 <p className="text-xs text-muted/60 leading-relaxed mt-2.5">
-                  Gemini/OpenAI/xAI/NVIDIA NIM/Hugging Face gibi görsel-yetenekli bir model eklersen
-                  burada sabitleyebileceğin bir seçenek olarak görünür.
+                  Gemini/OpenAI/xAI/NVIDIA NIM/Agnes AI/Hugging Face gibi görsel-yetenekli bir
+                  sağlayıcı eklersen burada sabitleyebileceğin bir seçenek olarak görünür.
                 </p>
               )}
 
@@ -2478,15 +2483,9 @@ function ImageModelPicker({ config, saveConfig }: {
   const [testing, setTesting] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, { url?: string; error?: string; ms?: number }>>({});
 
-  /* "Bağlı sağlayıcı" = ANAHTARI olan sağlayıcı. Önceden yalnız
-     `config.models` taranıyordu; Ayarlar'da ham `providerKeys` girmiş ama
-     henüz bir SOHBET modeli eklememiş kullanıcının görsel modelleri hiç
-     görünmüyordu (kullanıcı isteği: "bağlı olan sağlayıcıların tüm görsel
-     modellerini ekle"). Anahtar çözümü zaten iki kaynaktan da bakıyor
-     (resolveModelApiKey → profil anahtarı ya da providerKeys). */
-  const connected = IMAGE_PROVIDERS.filter(
-    (p) => config.models.some((m) => m.provider === p) || !!config.providerKeys?.[p],
-  );
+  /* "Bağlı sağlayıcı" = ANAHTARI olan sağlayıcı — tanım tek kaynakta
+     (connectedImageProviders), yukarıdaki sağlayıcı çipleriyle paylaşılıyor. */
+  const connected = connectedImageProviders(config);
   if (connected.length === 0) return null;
 
   const runTest = async (provider: ImageProvider) => {

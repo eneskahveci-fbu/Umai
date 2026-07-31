@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickImageModel, pickImageProvider, buildImageFallbackChain, IMAGE_PROVIDERS, IMAGE_MODELS, defaultImageModel, resolveImageModel, isKnownImageModel } from "../imageGen";
+import { pickImageModel, pickImageProvider, buildImageFallbackChain, IMAGE_PROVIDERS, IMAGE_MODELS, defaultImageModel, resolveImageModel, isKnownImageModel, connectedImageProviders } from "../imageGen";
 import type { Config, ModelProfile } from "../types";
 
 const mk = (provider: ModelProfile["provider"], id: string = provider): ModelProfile => ({
@@ -290,5 +290,42 @@ describe("görsel model kataloğu (Ö1)", () => {
     expect(isKnownImageModel("nvidia", "../../etc/passwd")).toBe(false);
     expect(isKnownImageModel("nvidia", "başka/model")).toBe(false);
     expect(isKnownImageModel("bilinmeyen", "x")).toBe(false);
+  });
+});
+
+/* B3 (hata taraması) — Ayarlar → Görsel üretimi ekranında İKİ ayrı liste var
+   (sağlayıcı çipleri ve model seçicisi) ve farklı "bağlı" tanımı
+   kullanıyorlardı: model seçicisi anahtar-tabanlıydı, çipler ise yalnız
+   config.models'e bakıyordu. Ham providerKeys girmiş kullanıcı aynı ekranda
+   modelleri görüp test edebiliyor ama sağlayıcıyı SEÇEMİYORDU. */
+describe("connectedImageProviders — tek 'bağlı' tanımı (B3)", () => {
+  const cfg = (models: ModelProfile[], providerKeys?: Record<string, string>) =>
+    ({ models, providerKeys }) as Pick<Config, "models" | "providerKeys">;
+
+  it("sohbet modeli eklenmiş sağlayıcıyı içerir", () => {
+    expect(connectedImageProviders(cfg([mk("openai")]))).toEqual(["openai"]);
+  });
+
+  it("YALNIZCA ham anahtar girilmiş sağlayıcıyı da içerir", () => {
+    expect(connectedImageProviders(cfg([], { agnes: "sk-x" }))).toEqual(["agnes"]);
+    expect(connectedImageProviders(cfg([], { nvidia: "nvapi-x" }))).toEqual(["nvidia"]);
+  });
+
+  it("iki kaynak birleşir ve tekrar etmez", () => {
+    const out = connectedImageProviders(cfg([mk("openai")], { openai: "sk-a", hf: "hf-b" }));
+    expect(out).toEqual(["openai", "hf"]);
+  });
+
+  it("görüntü-yeteneksiz sağlayıcılar (ör. groq) listeye girmez", () => {
+    expect(connectedImageProviders(cfg([mk("groq")], { groq: "gsk-x" }))).toEqual([]);
+  });
+
+  it("boş anahtar 'bağlı' saymaz", () => {
+    expect(connectedImageProviders(cfg([], { agnes: "" }))).toEqual([]);
+  });
+
+  it("çıktı IMAGE_PROVIDERS önceliğini korur", () => {
+    const out = connectedImageProviders(cfg([], { hf: "a", openai: "b", gemini: "c" }));
+    expect(out).toEqual(["gemini", "openai", "hf"]);
   });
 });
