@@ -91,3 +91,32 @@ describe("parseSkillIntent (Ö4)", () => {
     expect(parseSkillIntent("   ")).toBeNull();
   });
 });
+
+/* B1 (hata taraması, Tem 2026) — parseSkillIntent YANLIŞ YAKALIYORDU.
+   Kesişme send()'de model kapısının da üstünde olduğu için erken return
+   ediyor: kullanıcı ne cevap alıyor ne de ne olduğunu anlıyordu. */
+describe("parseSkillIntent — yanlış yakalama regresyonları (B1)", () => {
+  it("'skill oluştur' bir ÜRETİM isteğidir, kaydetme değil", () => {
+    /* skill ✓ + oluştur ✓ + "bunu" ✓ → eskiden saveLast'a düşüyor, mesaj
+       LLM'e hiç gitmiyor ve önceki asistan yanıtı kaydediliyordu. */
+    expect(parseSkillIntent("bana bir skill oluştur, bunu sık kullanacağım")).toBeNull();
+    expect(parseSkillIntent("şunu yapan bir skill oluştur")).toBeNull();
+  });
+
+  it("SORU cümlesi komut sayılmaz — cevaplanmalı", () => {
+    expect(parseSkillIntent("yukarıdaki skill'i nasıl yüklerim?")).toBeNull();
+    expect(parseSkillIntent("bu skill'i nereden indirebilirim")).toBeNull();
+    expect(parseSkillIntent("bunu skill olarak kaydetmeli miyim?")).toBeNull();
+  });
+
+  it("soru içinde URL geçse bile indirme emri sayılmaz", () => {
+    expect(parseSkillIntent("bu skill'i nereden indirebilirim https://x.dev/a.md")).toBeNull();
+  });
+
+  it("gerçek komutlar ETKİLENMEDİ", () => {
+    expect(parseSkillIntent("skill indir https://x.dev/SKILL.md"))
+      .toEqual({ kind: "import", url: "https://x.dev/SKILL.md" });
+    expect(parseSkillIntent("bunu skill olarak kaydet")).toEqual({ kind: "saveLast" });
+    expect(parseSkillIntent("yukarıdakini skill olarak ekle")).toEqual({ kind: "saveLast" });
+  });
+});

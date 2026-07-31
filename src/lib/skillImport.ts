@@ -67,10 +67,32 @@ export type SkillIntent =
   | { kind: "saveLast" };
 
 const SKILL_WORD = String.raw`skill|beceri`;
-/* "indir/yükle/ekle/kaydet" — Türkçe ekler için \p{L}* toleranslı. */
-const SAVE_VERB = String.raw`indir\p{L}*|y[üu]kle\p{L}*|ekle\p{L}*|kaydet\p{L}*|olu[şs]tur\p{L}*`;
+/* KAYDETME fiilleri — Türkçe ekler için \p{L}* toleranslı.
 
-/** Mesajdan skill niyeti çıkarır; yoksa null (mesaj normal akışa gider). */
+   "oluştur" BİLEREK YOK: o bir ÜRETİM fiili, kaydetme fiili değil. Listede
+   olduğu sürece "bana bir skill oluştur, bunu sık kullanacağım" cümlesi
+   (skill ✓ + oluştur ✓ + "bunu" ✓) `saveLast` olarak yorumlanıyor, mesaj
+   LLM'e hiç gitmiyor ve kullanıcının istediği skill üretilmek yerine önceki
+   asistan yanıtı kaydediliyordu. autoStudioSkill/autoImageGen de "oluştur"u
+   üretim sinyali sayıyor — bu liste artık onlarla tutarlı. */
+const SAVE_VERB = String.raw`indir\p{L}*|y[üu]kle\p{L}*|ekle\p{L}*|kaydet\p{L}*`;
+
+/* Soru kalıpları. "yukarıdaki skill'i nasıl yüklerim?" cümlesi tüm kelime
+   koşullarını sağlıyor ama bir KOMUT değil, bir SORU — cevaplanması gerekir.
+   Soruyu sessizce bir kayıt işlemine çevirmek en kötü yanlış-pozitif. */
+const QUESTION_RE = new RegExp(
+  String.raw`\?\s*$|(?<!\p{L})(?:nas[ıi]l|nerede|nereden|neden|niçin|ni[çc]in|hangi|ne zaman|mi|m[ıi]|mu|m[üu])(?!\p{L})`,
+  "iu",
+);
+
+/** İşaret zamiri / "son yanıt" göndermesi — neyin kaydedileceğini söyler. */
+const TARGET_RE = /(?<!\p{L})(bunu|şunu|sunu|yukar[ıi]daki(?:ni)?|[üu]stteki(?:ni)?|son (?:yan[ıi]t|cevap|mesaj)\p{L}*|cevab[ıi]|yan[ıi]t[ıi])(?!\p{L})/iu;
+
+/** Mesajdan skill niyeti çıkarır; yoksa null (mesaj normal akışa gider).
+ *
+ *  Tasarım ilkesi: ŞÜPHEDE KAL, normal akışa bırak. Yanlış-negatifin bedeli
+ *  kullanıcının komutu tekrar yazması; yanlış-pozitifin bedeli isteğinin hiç
+ *  cevaplanmaması ve yerine alakasız bir şeyin kaydedilmesi. */
 export function parseSkillIntent(text: string): SkillIntent | null {
   const t = (text || "").trim();
   if (!t) return null;
@@ -83,14 +105,15 @@ export function parseSkillIntent(text: string): SkillIntent | null {
      ya da uzun bir soru — yanlışlıkla yakalamayalım. */
   if (t.length > 300) return null;
 
+  /* Soru → komut değil. URL'li hâli de dahil: "bu skill'i nereden indirebilirim
+     https://…" bir bilgi sorusudur, indirme emri değil. */
+  if (QUESTION_RE.test(t)) return null;
+
   const url = t.match(/https?:\/\/\S+/)?.[0];
   if (url) return { kind: "import", url: url.replace(/[.,;:)\]}"']+$/, "") };
 
-  /* URL yok → "bunu/şunu/yukarıdaki cevabı skill olarak kaydet". İşaret
-     zamiri şart: yalnız "skill ekle" tek başına neyi kaydedeceğimizi
-     söylemiyor, o durumda normal akışa bırakmak daha doğru. */
-  if (/(bunu|şunu|sunu|yukarıdaki|üstteki|ustteki|son (yanıt|cevap|mesaj)\p{L}*|cevab[ıi]|yan[ıi]t[ıi])/iu.test(t)) {
-    return { kind: "saveLast" };
-  }
+  /* URL yok → "bunu/şunu/yukarıdakini skill olarak kaydet". Hedef göndermesi
+     ŞART: yalnız "skill ekle" neyi kaydedeceğimizi söylemiyor. */
+  if (TARGET_RE.test(t)) return { kind: "saveLast" };
   return null;
 }
