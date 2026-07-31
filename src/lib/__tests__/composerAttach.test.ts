@@ -56,13 +56,41 @@ describe("Araçlar menüsü — Dosyalar/Sunucu girişleri (Ö8)", () => {
     expect(sidebar).toContain('label: "Sunucu (workspace)"');
   });
 
+  /* B2'den sonra öğeler store'u DOĞRUDAN değil, yönlendirmeyi bilen
+     openLeftPanel üzerinden çağırıyor; o da /app'teyken mevcut saf yardımcıyı
+     (toggleLeftPanel) kullanan store eylemine düşüyor. Zincir korunuyor. */
   it("mevcut saf yardımcıyı kullanan store eylemine bağlılar", () => {
-    expect(sidebar).toContain('toggleLeftPanelState("files")');
-    expect(sidebar).toContain('toggleLeftPanelState("workspace")');
+    expect(sidebar).toContain("toggleLeftPanelState(which)");
+    expect(sidebar).toContain('openLeftPanel("files")');
+    expect(sidebar).toContain('openLeftPanel("workspace")');
   });
 
   it("CoderView paneli artık yerel state'te değil, store'dan okuyor", () => {
     expect(src).toContain("useStore((s) => s.leftPanel)");
     expect(src).not.toMatch(/useState<LeftPanel>/);
+  });
+});
+
+/* B2 (hata taraması) — "Dosyalar (depo)" ve "Sunucu (workspace)" öğeleri
+   koşulsuzdu. Sidebar /app, /chats, /projects, /settings sayfalarının
+   hepsinde render ediliyor ama panelleri ÇİZEN CoderView yalnız /app'te:
+   /app dışında tıklama sessiz bir no-op'tu ve kullanıcı sonradan /app'e
+   geçtiğinde hiç açmadığını sandığı panel açık geliyordu. */
+describe("Araçlar panelleri — /app dışında sessiz no-op değil (B2)", () => {
+  const sidebar = readFileSync(join(process.cwd(), "src/components/Sidebar.tsx"), "utf8");
+
+  it("öğeler doğrudan store'u değil, yönlendirmeyi bilen yardımcıyı çağırır", () => {
+    expect(sidebar).toContain('label: "Dosyalar (depo)", onClick: () => openLeftPanel("files")');
+    expect(sidebar).toContain('label: "Sunucu (workspace)", onClick: () => openLeftPanel("workspace")');
+  });
+
+  it("yardımcı /app dışındaysa önce /app'e yönlendirir", () => {
+    const fn = sidebar.slice(sidebar.indexOf("const openLeftPanel"), sidebar.indexOf("const items = ["));
+    expect(fn).toContain('toolsPath !== "/app"');
+    expect(fn).toContain('toolsRouter.push("/app")');
+    /* Gezinmeden gelen istek her zaman "aç" demektir — toggle DEĞİL. */
+    expect(fn).toContain("setLeftPanel(which)");
+    /* /app'teyken eski davranış (aç/kapat) korunur. */
+    expect(fn).toContain("toggleLeftPanelState(which)");
   });
 });

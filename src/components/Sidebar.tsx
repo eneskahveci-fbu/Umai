@@ -36,6 +36,28 @@ import { useModKey } from "@/lib/useModKey";
 function SidebarToolsButton({ variant, onNavigate }: { variant: "rail" | "nav"; onNavigate?: () => void }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const toolsRouter = useRouter();
+  const toolsPath = usePathname() ?? "";
+
+  /* Sol "Alan" panellerini (Dosyalar/Sunucu) açar.
+
+     Sidebar /app, /chats, /projects, /settings sayfalarının HEPSİNDE render
+     ediliyor, ama panelleri ÇİZEN CoderView yalnız /app'te. Doğrudan
+     toggleLeftPanelState çağırmak, /app dışında sessiz bir no-op'a yol
+     açıyordu: menü kapanıyor, store değişiyor, ekranda hiçbir şey olmuyordu —
+     üstelik kullanıcı sonradan /app'e geçtiğinde hiç açmadığını sandığı panel
+     açık geliyordu. Artık gerekirse önce /app'e gidilir. */
+  const openLeftPanel = (which: "files" | "workspace") => {
+    if (toolsPath !== "/app") {
+      /* Panel /app'te mount olunca doğru durumda olsun diye state ÖNCE
+         ayarlanır; toggle yerine doğrudan set — gezinmeden gelen istek her
+         zaman "aç" demektir, "kapat" değil. */
+      useStore.getState().setLeftPanel(which);
+      toolsRouter.push("/app");
+      return;
+    }
+    useStore.getState().toggleLeftPanelState(which);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -60,8 +82,8 @@ function SidebarToolsButton({ variant, onNavigate }: { variant: "rail" | "nav"; 
        ⋯ menüsü kaldırılınca tetikleyicileri de gitmiş, paneller kod olarak
        duruyor ama açılamıyordu. Buraya taşındılar; durum store'da (leftPanel)
        tutulduğu için Sidebar (CoderView'ın kardeşi) onları açabiliyor. */
-    { icon: <FolderOpen size={14} />, label: "Dosyalar (depo)", onClick: () => useStore.getState().toggleLeftPanelState("files") },
-    { icon: <Server size={14} />, label: "Sunucu (workspace)", onClick: () => useStore.getState().toggleLeftPanelState("workspace") },
+    { icon: <FolderOpen size={14} />, label: "Dosyalar (depo)", onClick: () => openLeftPanel("files") },
+    { icon: <Server size={14} />, label: "Sunucu (workspace)", onClick: () => openLeftPanel("workspace") },
     { icon: <BookOpen size={14} />, label: "Snippet'ler", onClick: () => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); } },
     { icon: <Activity size={14} />, label: "Etkinlik Günlüğü", onClick: () => useStore.getState().setActivityOpen(true) },
     { icon: <Keyboard size={14} />, label: "Kısayollar", onClick: () => useStore.getState().setShortcutsOpen(true) },
