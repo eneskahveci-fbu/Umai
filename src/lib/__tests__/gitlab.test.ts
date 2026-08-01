@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchGitLabRepoTree } from "../gitlab";
+import { fetchGitLabRepoTree, resolveRepoProvider } from "../gitlab";
 
 describe("fetchGitLabRepoTree", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -24,5 +24,27 @@ describe("fetchGitLabRepoTree", () => {
 
     const { branch } = await fetchGitLabRepoTree("ns", "repo");
     expect(branch).toBe("master");
+  });
+});
+
+describe("resolveRepoProvider", () => {
+  it("bağlantıyı kuran tarafın yazdığı provider'ı metne TERCİH eder", () => {
+    /* Asıl regresyon: "namespace/repo" GitHub'da bulunamayıp GitLab'a
+       düşünce metin hâlâ öneksizdir; metne bakılırsa GitHub sanılır, ajana
+       GitHub token'ı gider ve her araç çağrısı 404 alır. */
+    expect(resolveRepoProvider({ provider: "gitlab" }, "eneskahveci.bs/craft-coder")).toBe("gitlab");
+    expect(resolveRepoProvider({ provider: "github" }, "gitlab.com/ns/repo")).toBe("github");
+  });
+
+  it("provider yoksa (eski kalıcı kayıt) metin sezgisine düşer", () => {
+    expect(resolveRepoProvider({}, "gitlab.com/ns/repo")).toBe("gitlab");
+    expect(resolveRepoProvider({}, "gl:ns/repo")).toBe("gitlab");
+    expect(resolveRepoProvider({}, "owner/repo")).toBe("github");
+  });
+
+  it("repo henüz bağlanmamışken (null/undefined) metne bakar", () => {
+    expect(resolveRepoProvider(null, "gitlab.com/ns/repo")).toBe("gitlab");
+    expect(resolveRepoProvider(undefined, "owner/repo")).toBe("github");
+    expect(resolveRepoProvider(null, "")).toBe("github");
   });
 });

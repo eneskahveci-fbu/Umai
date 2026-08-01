@@ -698,10 +698,24 @@ export interface Config {
   imageFallbackChain?: boolean;
 }
 
+/** Bağlı deponun barındırıcısı. Yerel Mod ayrı bir yoldan (localBridge)
+    yürüdüğü için burada yalnız uzak sağlayıcılar yer alır. */
+export type GitProvider = "github" | "gitlab";
+
 export interface RepoState {
   owner: string;
   repo: string;
   branch: string;
+  /** Bağlantının GERÇEKTEN kurulduğu sağlayıcı — `config.activeRepo`
+      metninden TÜRETİLMEZ. connectRepo, "namespace/repo" gibi öneksiz bir
+      girdiyi önce GitHub'da arar, bulamazsa GitLab'a düşer; o durumda metin
+      hâlâ "gitlab.com/" öneki taşımadığı için isGitLabRepo(metin) false döner,
+      ajana `provider: "github"` + GitHub token'ı gönderilir ve her araç
+      çağrısı 404 alırdı — kullanıcı repoyu ağaçta GÖRÜR ama model "bağlı depo
+      yok" derdi. Bağlantıyı kuran taraf sonucu buraya yazar; okuyan taraf
+      resolveRepoProvider ile bunu kullanır.
+      Opsiyonel: bu alanı içermeyen eski kalıcı kayıtlar metin sezgisine düşer. */
+  provider?: GitProvider;
 }
 
 export interface TreeFile {
