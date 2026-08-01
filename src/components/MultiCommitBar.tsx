@@ -8,7 +8,7 @@ import { quickComplete } from "@/lib/quickComplete";
 import { cleanCommitMessage, COMMIT_MSG_SYSTEM } from "@/lib/commitMsg";
 import { getMountedHandle, getMountedName, writeBackToDir } from "@/lib/localfs";
 import { getWebContainer, isSupported as wcSupported, needsApiKey, writeFile as wcWriteFile } from "@/lib/webcontainer";
-import { isGitLabRepo } from "@/lib/gitlab";
+import { resolveRepoProvider } from "@/lib/gitlab";
 
 export function MultiCommitBar({
   files,
@@ -104,7 +104,7 @@ export function MultiCommitBar({
     if (toCommit.length === 0) { addToast("Hiç dosya seçilmedi", "error"); return; }
     const store = useStore.getState();
     const activeRepo = store.config.activeRepo || "";
-    const gitLab = isGitLabRepo(activeRepo);
+    const gitLab = resolveRepoProvider(repo, activeRepo) === "gitlab";
     const commitMsg = message.trim() || `Update ${toCommit.length} files`;
 
     setCommitting(true);

@@ -124,6 +124,7 @@ import {
   fetchGitLabRepoTree,
   isGitLabRepo,
   parseGitLabRepo,
+  resolveRepoProvider,
 } from "@/lib/gitlab";
 import type { ChatMessage, TreeFile, TreeNode } from "@/lib/types";
 import { lastAssistantIndex, stashAsPendingBranches } from "@/lib/branching";
@@ -1066,7 +1067,9 @@ export function CoderView() {
   }
   const enterFrom = enterState.chatId === currentId ? enterState.from : messages.length;
   const activeRepoStr = config.activeRepo || "";
-  const repoIsGitLab = isGitLabRepo(activeRepoStr);
+  /* Sağlayıcı, bağlantıyı KURAN taraftan gelir (repo.provider); metin sezgisi
+     yalnız henüz bağlanmamışken/eski kayıtlarda yedek. Bkz. resolveRepoProvider. */
+  const repoIsGitLab = resolveRepoProvider(repo, activeRepoStr) === "gitlab";
 
   /* Sohbet değişince / sayfa yenilenince: son asistan mesajına kalıcı yazılmış
      geri-al noktalarını yerel duruma geri yükle (Geri Al kaybolmasın). */
@@ -1162,7 +1165,7 @@ export function CoderView() {
         if (!parsed) { addToast("Geçersiz GitLab deposu. Örnek: gitlab.com/namespace/repo", "error"); return; }
         const token = await store.activeGitlabToken();
         const { branch, items } = await fetchGitLabRepoTree(parsed.namespace, parsed.repo, token, branchOverride ?? undefined);
-        setRepo({ owner: parsed.namespace, repo: parsed.repo, branch });
+        setRepo({ owner: parsed.namespace, repo: parsed.repo, branch, provider: "gitlab" });
         setTree(buildGitLabTree(items));
       } else {
         const parsed = parseRepo(repoStr);
@@ -1170,7 +1173,7 @@ export function CoderView() {
         const token = await store.activeGithubToken();
         try {
           const { branch, items } = await fetchRepoTree(parsed.owner, parsed.repo, token, branchOverride ?? undefined);
-          setRepo({ ...parsed, branch });
+          setRepo({ ...parsed, branch, provider: "github" });
           setTree(buildTree(items));
         } catch (ghErr) {
           /* GitHub'da bulunamadı → aynı namespace/repo'yu GitLab'da dene. Repolar
@@ -1181,8 +1184,24 @@ export function CoderView() {
           try {
             const gtoken = await store.activeGitlabToken();
             const { branch, items } = await fetchGitLabRepoTree(gl.namespace, gl.repo, gtoken, branchOverride ?? undefined);
-            setRepo({ owner: gl.namespace, repo: gl.repo, branch });
+            /* Sağlayıcıyı AÇIKÇA işaretle: bu dala girildiğinde `activeRepo`
+               metni hâlâ "namespace/repo" (gitlab.com öneki YOK), yani metne
+               bakan her yer burayı GitHub sanardı — ajana GitHub token'ı ile
+               `provider:"github"` gider, tüm araç çağrıları 404 alırdı. */
+            setRepo({ owner: gl.namespace, repo: gl.repo, branch, provider: "gitlab" });
             setTree(buildGitLabTree(items));
+            /* Girdiyi kanonik biçime çek: bir sonraki açılışta boşuna GitHub'a
+               sorulup 404 beklenmesin, Ayarlar da depoyu doğru göstersin. */
+            const canonical = `gitlab.com/${gl.namespace}/${gl.repo}${branchOverride ? `:${branchOverride}` : ""}`;
+            const st = useStore.getState();
+            if (st.config.activeRepo !== canonical) {
+              /* Aşağıdaki "activeRepo değişti → yeniden bağlan" efektine bunun
+                 bir depo DEĞİŞİKLİĞİ değil, aynı deponun kanonik yazımı
+                 olduğunu bildir; yoksa ağaç hemen silinip aynı repo ikinci kez
+                 çekilirdi (gereksiz istek + görünür titreme). */
+              prevActiveRepoRef.current = canonical;
+              st.saveConfig({ ...st.config, activeRepo: canonical });
+            }
           } catch {
             /* İkisi de başarısız → token durumuna göre eyleme dönük hata. */
             if (!token) {
@@ -1388,7 +1407,7 @@ export function CoderView() {
       const store = useStore.getState();
       const activeRepo = store.config.activeRepo || "";
       let content: string;
-      if (isGitLabRepo(activeRepo)) {
+      if (resolveRepoProvider(store.repo, activeRepo) === "gitlab") {
         const token = await store.activeGitlabToken();
         content = await fetchGitLabFileContent(repo.owner, repo.repo, repo.branch, file.path, token);
       } else {
@@ -1535,7 +1554,7 @@ export function CoderView() {
     try {
       const store = useStore.getState();
       const activeRepo = store.config.activeRepo || "";
-      const content = isGitLabRepo(activeRepo)
+      const content = resolveRepoProvider(store.repo, activeRepo) === "gitlab"
         ? await fetchGitLabFileContent(repo.owner, repo.repo, repo.branch, file.path, await store.activeGitlabToken())
         : await fetchFileContent(repo.owner, repo.repo, repo.branch, file.path, await store.activeGithubToken());
       openInEditor({ path: file.path, content, language: detectLanguage(file.path) });
@@ -1556,7 +1575,7 @@ export function CoderView() {
     try {
       const activeRepo = store.config.activeRepo || "";
       let content: string;
-      if (isGitLabRepo(activeRepo)) {
+      if (resolveRepoProvider(r, activeRepo) === "gitlab") {
         content = await fetchGitLabFileContent(r.owner, r.repo, r.branch, path, await store.activeGitlabToken());
       } else {
         content = await fetchFileContent(r.owner, r.repo, r.branch, path, await store.activeGithubToken());
@@ -1580,7 +1599,7 @@ export function CoderView() {
     const { SemanticIndex, chunkText } = await import("@/lib/rag");
     const index = new SemanticIndex();
     const activeRepo = store.config.activeRepo || "";
-    const gitlab = isGitLabRepo(activeRepo);
+    const gitlab = resolveRepoProvider(r, activeRepo) === "gitlab";
     const token = gitlab ? await store.activeGitlabToken() : await store.activeGithubToken();
 
     const files = getAllFiles(tree)
@@ -1972,7 +1991,7 @@ export function CoderView() {
       const r = store.repo;
       if (r) {
         const activeRepo = store.config.activeRepo || "";
-        const pkgRaw = isGitLabRepo(activeRepo)
+        const pkgRaw = resolveRepoProvider(r, activeRepo) === "gitlab"
           ? await fetchGitLabFileContent(r.owner, r.repo, r.branch, "package.json", await store.activeGitlabToken())
           : await fetchFileContent(r.owner, r.repo, r.branch, "package.json", await store.activeGithubToken());
         const pkg = JSON.parse(pkgRaw) as { scripts?: Record<string, string>; devDependencies?: Record<string, string>; dependencies?: Record<string, string> };
@@ -2374,7 +2393,7 @@ export function CoderView() {
     const localActive = !!(store.config.localMode && store.config.localBridgeUrl?.trim());
     const toolsEnabled = store.toolsEnabled && (!!repo || localActive);
     const activeRepo = store.config.activeRepo || "";
-    const repoIsGitLab = isGitLabRepo(activeRepo);
+    const repoIsGitLab = resolveRepoProvider(store.repo, activeRepo) === "gitlab";
 
     /* Web search pre-fetch: when searchOn, fetch Jina results before sending to AI */
     let webSearchContext = "";
@@ -3399,7 +3418,7 @@ export function CoderView() {
                         const activeRepo = store.config.activeRepo || "";
                         const treeItems = store.tree ? getTreeItems(store.tree) : [];
                         let allItems: { path: string; content: string }[] = [];
-                        if (isGitLabRepo(activeRepo)) {
+                        if (resolveRepoProvider(store.repo, activeRepo) === "gitlab") {
                           const token = await store.activeGitlabToken();
                           allItems = await fetchAllGitLabFiles(repo.owner, repo.repo, repo.branch, treeItems, token);
                         } else {

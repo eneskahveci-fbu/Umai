@@ -1,4 +1,4 @@
-import type { TreeNode } from "./types";
+import type { GitProvider, RepoState, TreeNode } from "./types";
 
 interface GitLabTreeItem {
   id: string;
@@ -176,4 +176,21 @@ export function isGitLabRepo(repoStr: string): boolean {
     repoStr.includes("gitlab.com") ||
     repoStr.startsWith("gl:")
   );
+}
+
+/** Bağlı deponun sağlayıcısını belirler — TEK doğruluk kaynağı.
+ *
+ * Sıra ÖNEMLİ: bağlantıyı gerçekten kuran taraf (connectRepo) sonucu
+ * `repo.provider`'a yazar; metin sezgisi (isGitLabRepo) yalnızca henüz repo
+ * bağlanmamışken ya da bu alanı taşımayan ESKİ kalıcı kayıtlarda devreye
+ * girer. Metni tek başına kullanmak, "namespace/repo" biçiminde girilip
+ * GitHub'da bulunamayınca GitLab'a düşen depolarda yanlış sağlayıcı (ve
+ * yanlış token) seçilmesine yol açıyordu; ajan bu yüzden bağlı repoyu
+ * göremiyordu (bkz. RepoState.provider). */
+export function resolveRepoProvider(
+  repo: Pick<RepoState, "provider"> | null | undefined,
+  activeRepoStr: string,
+): GitProvider {
+  if (repo?.provider) return repo.provider;
+  return isGitLabRepo(activeRepoStr) ? "gitlab" : "github";
 }
