@@ -528,6 +528,15 @@ export interface Config {
   activeGitlabId: string | null;
   repos: string[];
   activeRepo: string | null;
+  /** Hangi deponun hangi bağlı hesapla açılacağı: depo dizesi → hesap id'si.
+      Birden çok GitHub/GitLab hesabı bağlıyken "aktif hesap" tek başına
+      yetmiyordu — B hesabının deposu, A hesabının token'ıyla açılmaya
+      çalışılıp 404/401 alıyordu. Depo eklenirken onu SAĞLAYAN hesap burada
+      işaretlenir; kayıt yoksa o sağlayıcının aktif hesabına düşülür. */
+  repoAccounts?: Record<string, string>;
+  /** Silinen depoların "mezar taşı" listesi — bulut birleşmesinde silinen bir
+      deponun başka bir cihazın bayat kopyasından geri gelmesini önler. */
+  deletedRepos?: string[];
   /** Silinmiş model/hesap/proje/skill/mcp/hook id'lerinin "mezar taşı" listesi
       — cihazlar arası config merge'inde silinen bir öğenin başka bir cihazın
       bayat kopyasından geri gelmesini önler (bkz. store.ts mergeConfigs). */

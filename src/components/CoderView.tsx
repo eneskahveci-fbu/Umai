@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { decryptField, isEncrypted } from "@/lib/secureKeys";
 import type { ImageProvider } from "@/lib/imageGen";
@@ -413,12 +413,36 @@ function useHeaderDropdown(open: boolean, onClose: () => void) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ right: number; top: number } | null>(null);
 
+  /* Panel butonun SAĞ kenarına sabitlenir. Eskiden `right` yalnız buton
+     dikdörtgeninden hesaplanıyor, viewport'a KIRPILMIYORDU: dar ekranda
+     (ör. 375px) buton ortada olduğunda 288px'lik panelin sol kenarı eksiye
+     düşüyor ve menü ekranın SOLUNDAN taşıp kesiliyordu (mobil hata raporu).
+     Panelin ölçülen genişliğine göre `right`i sınırla → panel her zaman
+     ekranın içinde kalsın. */
+  const MARGIN = 8;
+  const update = useCallback(() => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const vw = window.innerWidth;
+    const menuW = menuRef.current?.offsetWidth ?? 0;
+    let right = vw - r.right;
+    /* Genişlik ancak panel DOM'a girdikten SONRA bilinir; ilk geçişte 0 olur
+       ve aşağıdaki layout efekti ikinci bir geçişle düzeltir. */
+    if (menuW > 0) right = Math.min(right, Math.max(MARGIN, vw - menuW - MARGIN));
+    right = Math.max(MARGIN, right);
+    const top = r.bottom + 6;
+    /* Aynı değerde setState yapma — layout efekti her render'da çalıştığı için
+       döngüye girmemesi buna bağlı. */
+    setPos((prev) => (prev && prev.right === right && prev.top === top ? prev : { right, top }));
+  }, []);
+
+  /* Panel render edildikten sonra genişliğiyle bir kez daha ölç. */
+  useLayoutEffect(() => {
+    if (open && pos) update();
+  });
+
   useEffect(() => {
     if (!open) return;
-    const update = () => {
-      const r = btnRef.current?.getBoundingClientRect();
-      if (r) setPos({ right: window.innerWidth - r.right, top: r.bottom + 6 });
-    };
     update();
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node;
@@ -435,7 +459,7 @@ function useHeaderDropdown(open: boolean, onClose: () => void) {
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
-  }, [open, onClose]);
+  }, [open, onClose, update]);
 
   return { btnRef, menuRef, pos };
 }
@@ -1163,14 +1187,14 @@ export function CoderView() {
       if (isGitLabRepo(repoStr)) {
         const parsed = parseGitLabRepo(repoStr);
         if (!parsed) { addToast("Geçersiz GitLab deposu. Örnek: gitlab.com/namespace/repo", "error"); return; }
-        const token = await store.activeGitlabToken();
+        const token = await store.tokenForRepo(activeRepo, "gitlab");
         const { branch, items } = await fetchGitLabRepoTree(parsed.namespace, parsed.repo, token, branchOverride ?? undefined);
         setRepo({ owner: parsed.namespace, repo: parsed.repo, branch, provider: "gitlab" });
         setTree(buildGitLabTree(items));
       } else {
         const parsed = parseRepo(repoStr);
         if (!parsed) { addToast("Ayarlar'dan bir GitHub veya GitLab deposu ekle.", "error"); return; }
-        const token = await store.activeGithubToken();
+        const token = await store.tokenForRepo(activeRepo, "github");
         try {
           const { branch, items } = await fetchRepoTree(parsed.owner, parsed.repo, token, branchOverride ?? undefined);
           setRepo({ ...parsed, branch, provider: "github" });
@@ -1182,7 +1206,7 @@ export function CoderView() {
           const gl = parseGitLabRepo(repoStr);
           if (!gl) throw ghErr;
           try {
-            const gtoken = await store.activeGitlabToken();
+            const gtoken = await store.tokenForRepo(activeRepo, "gitlab");
             const { branch, items } = await fetchGitLabRepoTree(gl.namespace, gl.repo, gtoken, branchOverride ?? undefined);
             /* Sağlayıcıyı AÇIKÇA işaretle: bu dala girildiğinde `activeRepo`
                metni hâlâ "namespace/repo" (gitlab.com öneki YOK), yani metne
@@ -1221,6 +1245,11 @@ export function CoderView() {
         useStore.getState().setToolsEnabled(true);
       }
     } catch (e) {
+      /* Bağlanamadıysak YARIM bir durum bırakma: eski repo/ağaç state'i asılı
+         kalırsa arayüz "bağlı" görünür ama ajan hiçbir dosya göremez — tam da
+         "repo bağlı görünüyor, model göremiyor" şikayeti budur. */
+      setRepo(null);
+      setTree(null);
       /* Açılıştaki otomatik bağlanmada sessiz kal; sadece elle bağlanınca hata göster. */
       if (!silent) addToast(`Depo bağlantısı başarısız: ${(e as Error).message}`, "error");
     } finally {
@@ -1231,7 +1260,18 @@ export function CoderView() {
 
   const prevActiveRepoRef = useRef(config.activeRepo);
   useEffect(() => {
-    if (!config.activeRepo) return;
+    if (!config.activeRepo) {
+      /* Aktif depo KALMADI (son depo kaldırıldı vb.). Eskiden burada koşulsuz
+         `return` vardı: canlı repo/ağaç state'i temizlenmiyor, kullanıcı
+         depoyu sildiği halde arayüzde bağlı görünüyor ve ajan bağlamına eski
+         depo gitmeye devam ediyordu. */
+      prevActiveRepoRef.current = null;
+      if (useStore.getState().repo || useStore.getState().tree) {
+        setRepo(null);
+        setTree(null);
+      }
+      return;
+    }
     const repoChanged = prevActiveRepoRef.current !== config.activeRepo;
     prevActiveRepoRef.current = config.activeRepo;
     // Clear stale tree when repo switches, then always reconnect
@@ -1406,14 +1446,11 @@ export function CoderView() {
     try {
       const store = useStore.getState();
       const activeRepo = store.config.activeRepo || "";
-      let content: string;
-      if (resolveRepoProvider(store.repo, activeRepo) === "gitlab") {
-        const token = await store.activeGitlabToken();
-        content = await fetchGitLabFileContent(repo.owner, repo.repo, repo.branch, file.path, token);
-      } else {
-        const token = await store.activeGithubToken();
-        content = await fetchFileContent(repo.owner, repo.repo, repo.branch, file.path, token);
-      }
+      const prov = resolveRepoProvider(store.repo, activeRepo);
+      const token = await store.tokenForRepo(activeRepo, prov);
+      const content = prov === "gitlab"
+        ? await fetchGitLabFileContent(repo.owner, repo.repo, repo.branch, file.path, token)
+        : await fetchFileContent(repo.owner, repo.repo, repo.branch, file.path, token);
       setAttachedFiles((prev) => [...prev, { path: file.path, content }]);
       openInEditor({ path: file.path, content, language: detectLanguage(file.path) });
     } catch (e) {
@@ -1554,9 +1591,11 @@ export function CoderView() {
     try {
       const store = useStore.getState();
       const activeRepo = store.config.activeRepo || "";
-      const content = resolveRepoProvider(store.repo, activeRepo) === "gitlab"
-        ? await fetchGitLabFileContent(repo.owner, repo.repo, repo.branch, file.path, await store.activeGitlabToken())
-        : await fetchFileContent(repo.owner, repo.repo, repo.branch, file.path, await store.activeGithubToken());
+      const prov = resolveRepoProvider(store.repo, activeRepo);
+      const tok = await store.tokenForRepo(activeRepo, prov);
+      const content = prov === "gitlab"
+        ? await fetchGitLabFileContent(repo.owner, repo.repo, repo.branch, file.path, tok)
+        : await fetchFileContent(repo.owner, repo.repo, repo.branch, file.path, tok);
       openInEditor({ path: file.path, content, language: detectLanguage(file.path) });
     } catch (e) {
       addToast(`Dosya okunamadı: ${(e as Error).message}`, "error");
@@ -1574,12 +1613,11 @@ export function CoderView() {
     if (!r) return;
     try {
       const activeRepo = store.config.activeRepo || "";
-      let content: string;
-      if (resolveRepoProvider(r, activeRepo) === "gitlab") {
-        content = await fetchGitLabFileContent(r.owner, r.repo, r.branch, path, await store.activeGitlabToken());
-      } else {
-        content = await fetchFileContent(r.owner, r.repo, r.branch, path, await store.activeGithubToken());
-      }
+      const prov = resolveRepoProvider(r, activeRepo);
+      const tok = await store.tokenForRepo(activeRepo, prov);
+      const content = prov === "gitlab"
+        ? await fetchGitLabFileContent(r.owner, r.repo, r.branch, path, tok)
+        : await fetchFileContent(r.owner, r.repo, r.branch, path, tok);
       openInEditor({ path, content, language: detectLanguage(path) });
     } catch { /* dosya henüz okunamadıysa sessiz geç */ }
   }, [openInEditor]);
@@ -1600,7 +1638,7 @@ export function CoderView() {
     const index = new SemanticIndex();
     const activeRepo = store.config.activeRepo || "";
     const gitlab = resolveRepoProvider(r, activeRepo) === "gitlab";
-    const token = gitlab ? await store.activeGitlabToken() : await store.activeGithubToken();
+    const token = await store.tokenForRepo(activeRepo, gitlab ? "gitlab" : "github");
 
     const files = getAllFiles(tree)
       .filter((f) => RAG_TEXT_EXT.test(f.path))
@@ -1725,7 +1763,7 @@ export function CoderView() {
     setUndoing(true);
     const store = useStore.getState();
     try {
-      const token = repoIsGitLab ? await store.activeGitlabToken() : await store.activeGithubToken();
+      const token = await store.tokenForRepo(activeRepoStr, repoIsGitLab ? "gitlab" : "github");
       const idField = repoIsGitLab ? { namespace: repo.owner } : { owner: repo.owner };
       const base = { ...idField, repo: repo.repo, branch: repo.branch, token };
       for (const cp of checkpoints) {
@@ -1766,7 +1804,7 @@ export function CoderView() {
     setResolvingAction(action.id);
     const store = useStore.getState();
     const isGL = repoIsGitLab;
-    const token = isGL ? await store.activeGitlabToken() : await store.activeGithubToken();
+    const token = await store.tokenForRepo(activeRepoStr, isGL ? "gitlab" : "github");
     const idField = isGL ? { namespace: repo.owner } : { owner: repo.owner };
     const jbody = (extra: Record<string, unknown>) => JSON.stringify({ ...idField, repo: repo.repo, branch: repo.branch, token, ...extra });
     const post = async (url: string, extra: Record<string, unknown>) => {
@@ -1991,9 +2029,11 @@ export function CoderView() {
       const r = store.repo;
       if (r) {
         const activeRepo = store.config.activeRepo || "";
-        const pkgRaw = resolveRepoProvider(r, activeRepo) === "gitlab"
-          ? await fetchGitLabFileContent(r.owner, r.repo, r.branch, "package.json", await store.activeGitlabToken())
-          : await fetchFileContent(r.owner, r.repo, r.branch, "package.json", await store.activeGithubToken());
+        const prov = resolveRepoProvider(r, activeRepo);
+        const tok = await store.tokenForRepo(activeRepo, prov);
+        const pkgRaw = prov === "gitlab"
+          ? await fetchGitLabFileContent(r.owner, r.repo, r.branch, "package.json", tok)
+          : await fetchFileContent(r.owner, r.repo, r.branch, "package.json", tok);
         const pkg = JSON.parse(pkgRaw) as { scripts?: Record<string, string>; devDependencies?: Record<string, string>; dependencies?: Record<string, string> };
         const scripts = pkg.scripts ?? {};
         const hasTs = !!(pkg.devDependencies?.typescript || pkg.dependencies?.typescript || scripts.typecheck);
@@ -2382,18 +2422,18 @@ export function CoderView() {
     }
 
     const repo = store.repo;
-    /* ÇÖZÜLMÜŞ token — depodaki 'enc:1:…' blob'u sunucuya gitmemeli, yoksa
-       ajanın TÜM repo araçları 401 alır ("repo bağlı ama model tanımıyor"). */
-    const [githubToken, gitlabToken] = await Promise.all([
-      store.activeGithubToken(),
-      store.activeGitlabToken(),
-    ]);
     /* Yerel Mod: köprü tanımlı ve açıksa, github/gitlab repo'ya gerek kalmadan
        araçlar gerçek dosya sistemine + kabuğa erişir. */
     const localActive = !!(store.config.localMode && store.config.localBridgeUrl?.trim());
     const toolsEnabled = store.toolsEnabled && (!!repo || localActive);
     const activeRepo = store.config.activeRepo || "";
     const repoIsGitLab = resolveRepoProvider(store.repo, activeRepo) === "gitlab";
+    /* ÇÖZÜLMÜŞ token — depodaki 'enc:1:…' blob'u sunucuya gitmemeli, yoksa
+       ajanın TÜM repo araçları 401 alır ("repo bağlı ama model tanımıyor").
+       Eskiden HER İKİ sağlayıcının AKTİF hesabının token'ı çekilip aralarından
+       seçiliyordu; artık deponun kendi hesabına bağlı token alınır (bkz.
+       tokenForRepo) — birden çok hesap bağlıyken doğru olan budur. */
+    const repoToken = await store.tokenForRepo(activeRepo, repoIsGitLab ? "gitlab" : "github");
 
     /* Web search pre-fetch: when searchOn, fetch Jina results before sending to AI */
     let webSearchContext = "";
@@ -2529,7 +2569,7 @@ export function CoderView() {
                       owner: repo.owner,
                       repo: repo.repo,
                       branch: repo.branch,
-                      token: repoIsGitLab ? gitlabToken : githubToken,
+                      token: repoToken,
                       provider: repoIsGitLab ? "gitlab" : "github",
                     }
                   : undefined)
@@ -3418,13 +3458,11 @@ export function CoderView() {
                         const activeRepo = store.config.activeRepo || "";
                         const treeItems = store.tree ? getTreeItems(store.tree) : [];
                         let allItems: { path: string; content: string }[] = [];
-                        if (resolveRepoProvider(store.repo, activeRepo) === "gitlab") {
-                          const token = await store.activeGitlabToken();
-                          allItems = await fetchAllGitLabFiles(repo.owner, repo.repo, repo.branch, treeItems, token);
-                        } else {
-                          const token = await store.activeGithubToken();
-                          allItems = await fetchAllFiles(repo.owner, repo.repo, repo.branch, treeItems, token);
-                        }
+                        const prov = resolveRepoProvider(store.repo, activeRepo);
+                        const token = await store.tokenForRepo(activeRepo, prov);
+                        allItems = prov === "gitlab"
+                          ? await fetchAllGitLabFiles(repo.owner, repo.repo, repo.branch, treeItems, token)
+                          : await fetchAllFiles(repo.owner, repo.repo, repo.branch, treeItems, token);
                         if (allItems.length > 0) {
                           setAttachedFiles(allItems.map(f => ({ path: f.path, content: f.content })));
                           addToast(`${allItems.length} dosya yüklendi`, "success");
@@ -4335,7 +4373,7 @@ export function CoderView() {
     setPrLoading(true);
     try {
       const store = useStore.getState();
-      const token = repoIsGitLab ? await store.activeGitlabToken() : await store.activeGithubToken();
+      const token = await store.tokenForRepo(activeRepoStr, repoIsGitLab ? "gitlab" : "github");
       const res = await fetch("/api/pr-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -4373,7 +4411,7 @@ export function CoderView() {
     setPostPrLoading(true);
     try {
       const store = useStore.getState();
-      const token = repoIsGitLab ? await store.activeGitlabToken() : await store.activeGithubToken();
+      const token = await store.tokenForRepo(activeRepoStr, repoIsGitLab ? "gitlab" : "github");
       if (!token) { store.addToast("Önce bir GitHub/GitLab hesabı bağla.", "error"); return; }
       const res = await fetch("/api/pr-review/comment", {
         method: "POST",

@@ -22,7 +22,7 @@ export function GitPanel({ onClose, onReviewPr }: { onClose: () => void; onRevie
   /* ÇÖZÜLMÜŞ token (depoda AES-GCM şifreli durur) — şifreli blob uca giderse
      her Git işlemi 401 alır. Bkz. secureKeys.resolveGitToken. */
   const getToken = () =>
-    repoIsGitLab ? useStore.getState().activeGitlabToken() : useStore.getState().activeGithubToken();
+    useStore.getState().tokenForRepo(activeRepo, repoIsGitLab ? "gitlab" : "github");
 
   const createBranch = async () => {
     if (!repo || !branchName.trim()) return;

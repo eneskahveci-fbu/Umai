@@ -111,7 +111,7 @@ export function MultiCommitBar({
     try {
       if (gitLab) {
         /* ÇÖZÜLMÜŞ token — depodaki 'enc:1:…' blob'u uca giderse 401 alınır. */
-        const gitlabToken = await store.activeGitlabToken();
+        const gitlabToken = await store.tokenForRepo(activeRepo, "gitlab");
         if (!gitlabToken) throw new Error("GitLab token yok — Ayarlar → Depolar'dan ekle");
         // GitLab: tüm dosyalar TEK atomik commit'te (paralel var/yok kontrolü + commits API)
         const res = await fetch("/api/gitlab/batch-write", {
@@ -132,7 +132,7 @@ export function MultiCommitBar({
         }
         addToast(`✓ ${toCommit.length} dosya GitLab'a tek commit'te yazıldı`, "success");
       } else {
-        const githubToken = await store.activeGithubToken();
+        const githubToken = await store.tokenForRepo(activeRepo, "github");
         if (!githubToken) throw new Error("GitHub token yok — Ayarlar → Depolar'dan ekle");
         const res = await fetch("/api/github/batch-write", {
           method: "POST",

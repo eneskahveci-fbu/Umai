@@ -533,3 +533,87 @@ describe("useStore — sol Alan paneli (Ö8)", () => {
     expect(useStore.getState().leftPanel).toBeNull();
   });
 });
+
+describe("useStore — depo/hesap bağlama (çok hesaplı)", () => {
+  const gh = (id: string, username: string, token: string) => ({ id, username, token });
+
+  it("tokenForRepo: depo hangi hesapla eklendiyse ONUN token'ını verir", async () => {
+    /* Regresyon: yalnız "aktif" hesabın token'ı kullanılıyordu; ikinci
+       hesabın deposu, birinci hesabın token'ıyla açılmaya çalışılıp 404/401
+       alıyordu. */
+    const st = useStore.getState();
+    st.saveConfig({
+      ...st.config,
+      githubAccounts: [gh("a1", "kisisel", "TOKEN_A"), gh("a2", "is", "TOKEN_B")],
+      activeGithubId: "a1",
+      repos: ["is/proje"],
+      repoAccounts: { "is/proje": "a2" },
+    });
+    expect(await useStore.getState().tokenForRepo("is/proje")).toBe("TOKEN_B");
+  });
+
+  it("tokenForRepo: bağlı hesap yoksa o sağlayıcının aktif hesabına düşer", async () => {
+    const st = useStore.getState();
+    st.saveConfig({
+      ...st.config,
+      githubAccounts: [gh("a1", "kisisel", "TOKEN_A")],
+      activeGithubId: "a1",
+      repos: ["baska/proje"],
+    });
+    expect(await useStore.getState().tokenForRepo("baska/proje")).toBe("TOKEN_A");
+  });
+
+  it("tokenForRepo: provider parametresi dize sezgisini EZER", async () => {
+    /* "namespace/repo" GitHub'a benzer ama GitLab'a düşen depolarda sağlayıcı
+       dizeden anlaşılamaz — çağıran taraf kesin bilgiyi geçebilmeli. */
+    const st = useStore.getState();
+    st.saveConfig({
+      ...st.config,
+      githubAccounts: [gh("g1", "gh", "GH_TOKEN")],
+      activeGithubId: "g1",
+      gitlabAccounts: [gh("l1", "gl", "GL_TOKEN")],
+      activeGitlabId: "l1",
+    });
+    const s = useStore.getState();
+    expect(await s.tokenForRepo("ns/repo")).toBe("GH_TOKEN");
+    expect(await s.tokenForRepo("ns/repo", "gitlab")).toBe("GL_TOKEN");
+  });
+
+  it("addRepo: hesabı işaretler ve mezar taşını kaldırır", () => {
+    const st = useStore.getState();
+    st.saveConfig({ ...st.config, repos: [], deletedRepos: ["geri/gelen"] });
+    useStore.getState().addRepo("geri/gelen", "acc9");
+    const c = useStore.getState().config;
+    expect(c.repos).toContain("geri/gelen");
+    expect(c.deletedRepos ?? []).not.toContain("geri/gelen");
+    expect(c.repoAccounts?.["geri/gelen"]).toBe("acc9");
+  });
+
+  it("removeRepo: mezar taşı bırakır, bağlamayı siler", () => {
+    const st = useStore.getState();
+    st.saveConfig({
+      ...st.config,
+      repos: ["a/b", "c/d"],
+      activeRepo: "a/b",
+      repoAccounts: { "a/b": "acc1" },
+    });
+    useStore.getState().removeRepo("a/b");
+    const c = useStore.getState().config;
+    expect(c.repos).toEqual(["c/d"]);
+    expect(c.activeRepo).toBe("c/d");
+    expect(c.deletedRepos).toContain("a/b");
+    expect(c.repoAccounts?.["a/b"]).toBeUndefined();
+  });
+
+  it("removeRepo: son depo silinince canlı bağlantı da düşer", () => {
+    /* Aksi halde arayüz "bir depo bağlı" gösterirken ajan bağlamına silinmiş
+       depo gitmeye devam ediyordu. */
+    const st = useStore.getState();
+    st.saveConfig({ ...st.config, repos: ["a/b"], activeRepo: "a/b" });
+    useStore.setState({ repo: { owner: "a", repo: "b", branch: "main", provider: "github" }, tree: { dirs: {}, files: [] } });
+    useStore.getState().removeRepo("a/b");
+    expect(useStore.getState().config.activeRepo).toBeNull();
+    expect(useStore.getState().repo).toBeNull();
+    expect(useStore.getState().tree).toBeNull();
+  });
+});
