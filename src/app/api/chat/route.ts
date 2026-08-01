@@ -243,22 +243,45 @@ function encodeGlProject(owner: string, repo: string) {
   return encodeURIComponent(`${owner}/${repo}`);
 }
 
+/* GitLab ağaç uç noktası GitHub'ın `recursive=1`'i gibi TEK yanıtta her şeyi
+   dönmez — sayfa başına en çok 100 kayıt verir ve gerisini `x-next-page`
+   başlığıyla bildirir. Sayfalama yapılmadığı için ajan, GitLab'a bağlı
+   depolarda yalnız İLK 100 dosyayı görüyordu: list_files/glob/grep/repo
+   haritası sessizce kırpılıyor, model var olan dosyaları "yok" sanıyordu
+   (aynı hata GitHub'da görünmez, çünkü orada tek çağrı yeter).
+   İstemcideki fetchGitLabRepoTree zaten sayfalıyordu — bu yüzden dosya ağacı
+   ARAYÜZDE eksiksiz görünürken ajan aynı depoyu eksik görüyordu.
+   MAX_PAGES, lib/gitlab.ts'teki sınırla aynı tutulur (10 × 100 = 10.000 yol). */
+const GL_TREE_MAX_PAGES = 10;
+async function getAllGitLabPaths(ctx: RepoCtx): Promise<string[]> {
+  const proj = encodeGlProject(ctx.owner, ctx.repo);
+  const paths: string[] = [];
+  let page = 1;
+  while (page <= GL_TREE_MAX_PAGES) {
+    const res = await fetch(
+      `https://gitlab.com/api/v4/projects/${proj}/repository/tree?recursive=true&ref=${encodeURIComponent(ctx.branch)}&per_page=100&page=${page}`,
+      { headers: glHeaders(ctx.token) },
+    );
+    if (!res.ok) throw new Error(`${res.status} ${(await res.text().catch(() => "")).slice(0, 120)}`);
+    const data = await res.json() as { path: string; type: string }[];
+    if (!Array.isArray(data) || data.length === 0) break;
+    for (const t of data) if (t.type === "blob") paths.push(t.path);
+    const nextPage = res.headers.get("x-next-page");
+    if (!nextPage) break;
+    const parsed = parseInt(nextPage, 10);
+    if (!Number.isFinite(parsed) || parsed <= page) break;
+    page = parsed;
+  }
+  return paths;
+}
+
 /* Repo'daki tüm dosya yollarını döndürür (glob/grep/list_files ortak kullanır). */
 async function getAllPaths(ctx: RepoCtx): Promise<string[]> {
   if (ctx.provider === "local") {
     const data = await bridgeCall(ctx, "/fs/list", {});
     return Array.isArray(data.paths) ? data.paths as string[] : [];
   }
-  if (ctx.provider === "gitlab") {
-    const proj = encodeGlProject(ctx.owner, ctx.repo);
-    const res = await fetch(
-      `https://gitlab.com/api/v4/projects/${proj}/repository/tree?recursive=true&ref=${encodeURIComponent(ctx.branch)}&per_page=100`,
-      { headers: glHeaders(ctx.token) },
-    );
-    if (!res.ok) throw new Error(`${res.status} ${(await res.text().catch(() => "")).slice(0, 120)}`);
-    const data = await res.json() as { path: string; type: string }[];
-    return data.filter((t) => t.type === "blob").map((t) => t.path);
-  }
+  if (ctx.provider === "gitlab") return await getAllGitLabPaths(ctx);
   const res = await fetch(
     `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/trees/${encodeURIComponent(ctx.branch)}?recursive=1`,
     { headers: ghHeaders(ctx.token) },
@@ -558,19 +581,12 @@ async function execSearchFiles(ctx: RepoCtx, args: { query: string }): Promise<s
     return matches.length ? matches.join("\n") : "(eşleşme yok)";
   }
   if (ctx.provider === "gitlab") {
-    const proj = encodeGlProject(ctx.owner, ctx.repo);
-    const res = await fetch(
-      `https://gitlab.com/api/v4/projects/${proj}/repository/tree?recursive=true&ref=${encodeURIComponent(ctx.branch)}&per_page=100`,
-      { headers: glHeaders(ctx.token) },
-    );
-    if (!res.ok) return `Hata: ${res.status}`;
-    const data = await res.json();
-    if (!Array.isArray(data)) return `Hata: beklenmeyen yanıt (ağaç alınamadı).`;
+    /* getAllGitLabPaths üzerinden: buradaki tek sayfalık çekim de ilk 100
+       dosyayla sınırlıydı, yani ajan "dosya yok" sanıyordu (bkz. getAllPaths). */
+    let items: string[];
+    try { items = await getAllGitLabPaths(ctx); } catch (e) { return `Hata: ${(e as Error).message}`; }
     const q = args.query.toLowerCase();
-    const matches = (data as { path: string; type: string }[])
-      .filter((t) => t.type === "blob" && t.path.toLowerCase().includes(q))
-      .map((t) => t.path)
-      .slice(0, 50);
+    const matches = items.filter((p) => p.toLowerCase().includes(q)).slice(0, 50);
     return matches.length ? matches.join("\n") : "(eşleşme yok)";
   }
   const res = await fetch(

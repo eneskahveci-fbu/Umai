@@ -81,3 +81,53 @@ describe("executeReadTool — search_code (J2: alt-ajan içerik araması)", () =
     expect(sentBody.glob).toBe("**/*.ts");
   });
 });
+
+describe("executeReadTool — list_files GitLab sayfalaması", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  /* GitLab ağacı sayfa başına en çok 100 kayıt döner ve gerisini
+     `x-next-page` ile bildirir. Sayfalama yokken ajan GitLab depolarında
+     yalnız ilk 100 dosyayı görüyor, var olan dosyaları "yok" sanıyordu. */
+  const page = (paths: string[], next: string | null) =>
+    new Response(JSON.stringify(paths.map((p) => ({ path: p, type: "blob" }))), {
+      status: 200,
+      headers: next ? { "x-next-page": next } : {},
+    });
+
+  it("x-next-page varken sonraki sayfaları da çeker", async () => {
+    const first = Array.from({ length: 100 }, (_, i) => `src/a${i}.ts`);
+    const second = ["src/zz-son-dosya.ts"];
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(page(first, "2"))
+      .mockResolvedValueOnce(page(second, null));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const out = await executeReadTool("list_files", {}, { owner: "ns", repo: "r", branch: "main", provider: "gitlab" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1]![0])).toContain("page=2");
+    /* Sayfalama öncesi bu dosya listede HİÇ görünmüyordu. */
+    expect(out).toContain("src/zz-son-dosya.ts");
+    expect(out.split("\n")).toHaveLength(101);
+  });
+
+  it("x-next-page yoksa tek sayfada durur (gereksiz istek yok)", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(page(["a.ts", "b.ts"], null));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const out = await executeReadTool("list_files", {}, { owner: "ns", repo: "r", branch: "main", provider: "gitlab" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(out).toBe("a.ts\nb.ts");
+  });
+
+  it("x-next-page ilerlemiyorsa döngüye girmez", async () => {
+    /* Bozuk/yinelenen başlık sonsuz döngü yapmamalı. */
+    const fetchMock = vi.fn().mockResolvedValue(page(["a.ts"], "1"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await executeReadTool("list_files", {}, { owner: "ns", repo: "r", branch: "main", provider: "gitlab" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
