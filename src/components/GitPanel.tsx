@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { GitPullRequest, Loader2, Plus, X } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { isGitLabRepo } from "@/lib/gitlab";
+import { resolveRepoProvider } from "@/lib/gitlab";
 
 export function GitPanel({ onClose, onReviewPr }: { onClose: () => void; onReviewPr?: () => void }) {
   const repo = useStore((s) => s.repo);
   const addToast = useStore((s) => s.addToast);
   const activeRepo = useStore((s) => s.config.activeRepo) ?? "";
-  const repoIsGitLab = isGitLabRepo(activeRepo);
+  const repoIsGitLab = resolveRepoProvider(repo, activeRepo) === "gitlab";
   const prLabel = repoIsGitLab ? "MR" : "PR";
   const [tab, setTab] = useState<"branch" | "pr">("branch");
   const [branchName, setBranchName] = useState("");

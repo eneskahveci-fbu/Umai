@@ -102,14 +102,27 @@ async function listFiles(ctx: RepoReadCtx, filter?: string): Promise<string> {
     return paths.join("\n") || "(dosya yok)";
   }
   if (ctx.provider === "gitlab") {
+    /* GitLab ağacı sayfa başına en çok 100 kayıt döner (GitHub'ın
+       `recursive=1`'i gibi tek seferde değil). Sayfalama yokken alt-ajanlar
+       GitLab depolarında yalnız ilk 100 dosyayı görüyordu — büyük repolarda
+       var olan dosyalar "yok" görünüyordu. `x-next-page` ile devam et. */
     const proj = encodeURIComponent(`${ctx.owner}/${ctx.repo}`);
-    const res = await fetch(
-      `https://gitlab.com/api/v4/projects/${proj}/repository/tree?recursive=true&per_page=100&ref=${encodeURIComponent(ctx.branch)}`,
-      { headers: glHeaders(ctx.token) },
-    );
-    if (!res.ok) return `Hata: ${res.status} — ağaç alınamadı`;
-    const data = (await res.json()) as { path: string; type: string }[];
-    paths = data.filter((d) => d.type === "blob").map((d) => d.path);
+    let page = 1;
+    while (page <= 10) {
+      const res = await fetch(
+        `https://gitlab.com/api/v4/projects/${proj}/repository/tree?recursive=true&per_page=100&page=${page}&ref=${encodeURIComponent(ctx.branch)}`,
+        { headers: glHeaders(ctx.token) },
+      );
+      if (!res.ok) return `Hata: ${res.status} — ağaç alınamadı`;
+      const data = (await res.json()) as { path: string; type: string }[];
+      if (!Array.isArray(data) || data.length === 0) break;
+      for (const d of data) if (d.type === "blob") paths.push(d.path);
+      const nextPage = res.headers.get("x-next-page");
+      if (!nextPage) break;
+      const parsed = parseInt(nextPage, 10);
+      if (!Number.isFinite(parsed) || parsed <= page) break;
+      page = parsed;
+    }
   } else {
     const res = await fetch(
       `https://api.github.com/repos/${ctx.owner}/${ctx.repo}/git/trees/${encodeURIComponent(ctx.branch)}?recursive=1`,

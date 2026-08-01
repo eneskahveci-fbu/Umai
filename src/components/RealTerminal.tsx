@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Cloud, ExternalLink, FolderOpen, Loader2, Power, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
 import { getUnsupportedReason, getWebContainer, isSupported, mountDefaults, mountFiles, needsApiKey } from "@/lib/webcontainer";
 import { fetchAllFiles } from "@/lib/github";
-import { fetchAllGitLabFiles, isGitLabRepo } from "@/lib/gitlab";
+import { fetchAllGitLabFiles, resolveRepoProvider } from "@/lib/gitlab";
 import type { TreeNode } from "@/lib/types";
 import {
   dirHandleToTree,
@@ -389,7 +389,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
               if (!r || !store.tree) return [];
               const treeItems = treeBlobs(store.tree);
               const activeRepo = store.config.activeRepo || "";
-              if (isGitLabRepo(activeRepo)) {
+              if (resolveRepoProvider(r, activeRepo) === "gitlab") {
                 return await fetchAllGitLabFiles(r.owner, r.repo, r.branch, treeItems, await store.activeGitlabToken());
               }
               return await fetchAllFiles(r.owner, r.repo, r.branch, treeItems, await store.activeGithubToken());
