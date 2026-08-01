@@ -16,6 +16,7 @@ import type {
   MemoryItem,
   ModelProfile,
   Project,
+  GitProvider,
   RepoState,
   Skill,
   Snippet,
@@ -24,11 +25,12 @@ import type {
   TreeNode,
 } from "./types";
 import { deriveJobTitle, type BackgroundJob } from "./jobs";
-import { DEFAULT_CONFIG, DEFAULT_REPO, DEFAULT_SKILLS, POLLINATIONS_DEFAULT_MODEL } from "./constants";
+import { DEAD_DEFAULT_REPOS, DEFAULT_CONFIG, DEFAULT_SKILLS, POLLINATIONS_DEFAULT_MODEL } from "./constants";
 import { encryptConfigSecrets, decryptConfigSecrets, isCryptoAvailable, hasPlaintextSecret, resolveGitToken } from "./secureKeys";
 import { applyEditBranch, applySwitchBranch, lastAssistantIndex, mergeRegeneratedBranches } from "./branching";
 import { toggleLeftPanel, type LeftPanel } from "./leftPanel";
 import { modelQualityRank } from "./modelQuality";
+import { isGitLabRepo } from "./gitlab";
 import { createClient } from "./supabase/client";
 
 /* Config yazımları için monotonik sıra: async şifreli yazımların sırasını korur
@@ -278,13 +280,20 @@ function applyTheme(theme: "dark" | "light") {
   document.documentElement.classList.toggle("light", theme === "light");
 }
 
-/* Eski/ölü varsayılan GitHub depolarını canlı GitLab deposuna migrate eder.
-   Hesap GitLab'a taşındığından, kayıtlı eski repo'lar artık 404 veriyordu. */
-const DEAD_REPOS = new Set(["eneskahveci-sdo/craft-ai"]);
+/* Ölü/gömülü varsayılan depoları kayıtlı listeden TEMİZLER.
+   Eskiden bunlar başka bir sabit depoya (DEFAULT_REPO) yeniden yönlendiriliyordu
+   — ama o hedef de artık yok (GitLab 301 → 404), yani kullanıcı hiç seçmediği,
+   erişilemeyen bir depoya "bağlı" kalıyordu. Doğrusu: sil, yerine bir şey koyma.
+   Aktif depo silinenlerden biriyse kalan ilk depoya, o da yoksa null'a düşer. */
+const DEAD_REPOS = new Set(DEAD_DEFAULT_REPOS);
 export function migrateRepos(cfg: Config): Config {
-  if (!Array.isArray(cfg.repos) || !cfg.repos.some((r) => DEAD_REPOS.has(r))) return cfg;
-  const repos = [...new Set(cfg.repos.map((r) => (DEAD_REPOS.has(r) ? DEFAULT_REPO : r)))];
-  const activeRepo = cfg.activeRepo && DEAD_REPOS.has(cfg.activeRepo) ? DEFAULT_REPO : cfg.activeRepo;
+  const hasDead =
+    (Array.isArray(cfg.repos) && cfg.repos.some((r) => DEAD_REPOS.has(r))) ||
+    (!!cfg.activeRepo && DEAD_REPOS.has(cfg.activeRepo));
+  if (!hasDead) return cfg;
+  const repos = [...new Set((cfg.repos ?? []).filter((r) => !DEAD_REPOS.has(r)))];
+  const activeRepo =
+    cfg.activeRepo && DEAD_REPOS.has(cfg.activeRepo) ? (repos[0] ?? null) : cfg.activeRepo;
   return { ...cfg, repos, activeRepo };
 }
 
@@ -338,7 +347,17 @@ export function mergeConfigs(local: Config, remote: Partial<Config>): Config {
   base.projects = mergeById(local.projects, remote.projects ?? [], undefined, deletedIds);
   base.mcpServers = mergeById(local.mcpServers ?? [], remote.mcpServers ?? [], undefined, deletedIds);
   base.hooks = mergeById(local.hooks ?? [], remote.hooks ?? [], undefined, deletedIds);
-  base.repos = [...new Set([...(remote.repos ?? []), ...(local.repos ?? [])])];
+  /* Depolar: id'li varlıklar gibi mezar-taşı (tombstone) kullanır.
+     Eskiden burada KOŞULSUZ birleşim vardı — kullanıcı bir depoyu silse bile
+     bir sonraki bulut senkronunda `remote.repos` içinden geri geliyordu
+     ("kaldırdığım halde hâlâ bağlı" raporu). Silinenler `deletedRepos`'ta
+     tutulur ve birleşimden sonra elenir; böylece silme cihazlar arasında
+     kalıcıdır. Bir depo tekrar EKLENİRSE addRepo mezar taşını kaldırır. */
+  const deletedRepos = new Set([...(local.deletedRepos ?? []), ...(remote.deletedRepos ?? [])]);
+  base.repos = [...new Set([...(remote.repos ?? []), ...(local.repos ?? [])])].filter(
+    (r) => !deletedRepos.has(r),
+  );
+  base.deletedRepos = [...deletedRepos].slice(-200);
   base.deletedIds = [...deletedIds].slice(-500);
   /* Aktif id'ler hâlâ listede mevcutsa korunur, değilse ilk öğeye düşülür. */
   const has = <T extends { id: string }>(arr: T[], id: string | null) => !!id && arr.some((x) => x.id === id);
@@ -425,7 +444,14 @@ interface StoreState {
      doğrudan Authorization başlığına gitmesin diye (bkz. resolveGitToken). */
   activeGithubToken: () => Promise<string>;
   activeGitlabToken: () => Promise<string>;
-  addRepo: (repo: string) => void;
+  /** BELİRLİ bir deponun token'ı — depo hangi hesapla eklendiyse onunla
+      (bkz. Config.repoAccounts); kayıt yoksa o sağlayıcının aktif hesabına
+      düşer. Çok hesaplı kurulumlarda doğru olan budur.
+      `provider` verilirse depo dizesinden türetme yerine O kullanılır —
+      "namespace/repo" biçiminde girilip GitLab'a düşen depolarda dize
+      GitHub'a benzediği için sezgi yanlış sonuç verirdi. */
+  tokenForRepo: (repoStr: string, provider?: GitProvider) => Promise<string>;
+  addRepo: (repo: string, accountId?: string) => void;
   setActiveRepo: (repo: string) => void;
   removeRepo: (repo: string) => void;
   toggleTheme: () => void;
@@ -935,17 +961,48 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
   activeGithubToken: () => resolveGitToken(get().activeGithub()),
   activeGitlabToken: () => resolveGitToken(get().activeGitlab()),
-  addRepo: (repo) => {
+  tokenForRepo: (repoStr, provider) => {
+    const config = get().config;
+    const gitlab = provider ? provider === "gitlab" : isGitLabRepo(repoStr);
+    /* 1) Depo belirli bir hesapla eklendiyse ONU kullan — aktif hesap başka
+          biri olsa bile. Çok hesaplı kurulumda "B hesabının deposu, A'nın
+          token'ıyla açılmaya çalışılıyor" hatasını bu önler. */
+    const boundId = config.repoAccounts?.[repoStr];
+    if (boundId) {
+      const pool = gitlab ? (config.gitlabAccounts ?? []) : config.githubAccounts;
+      const bound = pool.find((a) => a.id === boundId);
+      if (bound) return resolveGitToken(bound);
+    }
+    /* 2) Kayıt yoksa/hesap silinmişse o sağlayıcının aktif hesabına düş. */
+    return resolveGitToken(gitlab ? get().activeGitlab() : get().activeGithub());
+  },
+  addRepo: (repo, accountId) => {
     const config = get().config;
     const repos = [repo, ...config.repos.filter((r) => r !== repo)].slice(0, 12);
-    get().saveConfig({ ...config, repos, activeRepo: repo });
+    /* Yeniden eklenen depo mezar taşından çıkarılmalı, yoksa bir sonraki
+       bulut birleşmesinde tekrar silinirdi. */
+    const deletedRepos = (config.deletedRepos ?? []).filter((r) => r !== repo);
+    /* Depoyu sağlayan hesabı işaretle → çok hesaplı kurulumda doğru token. */
+    const repoAccounts = { ...(config.repoAccounts ?? {}) };
+    if (accountId) repoAccounts[repo] = accountId;
+    get().saveConfig({ ...config, repos, activeRepo: repo, deletedRepos, repoAccounts });
   },
   setActiveRepo: (repo) => get().saveConfig({ ...get().config, activeRepo: repo }),
   removeRepo: (repo) => {
     const config = get().config;
     const repos = config.repos.filter((r) => r !== repo);
     const activeRepo = config.activeRepo === repo ? (repos[0] ?? null) : config.activeRepo;
-    get().saveConfig({ ...config, repos, activeRepo });
+    /* Mezar taşı bırak — aksi halde silinen depo buluttan geri gelir. */
+    const deletedRepos = [...new Set([...(config.deletedRepos ?? []), repo])].slice(-200);
+    const repoAccounts = { ...(config.repoAccounts ?? {}) };
+    delete repoAccounts[repo];
+    get().saveConfig({ ...config, repos, activeRepo, deletedRepos, repoAccounts });
+    /* Bağlı depo KALMADIYSA canlı bağlantıyı da düşür. CoderView'in yeniden
+       bağlanma efekti `if (!config.activeRepo) return;` ile erken çıkıyor,
+       yani eski ağaç/repo state'i ekranda ve ajanın bağlamında asılı kalıyordu
+       — kullanıcı depoyu kaldırdığı halde "bir depo bağlı" görünmesinin
+       ikinci nedeni buydu. */
+    if (!activeRepo) set({ repo: null, tree: null });
   },
   toggleTheme: () => {
     const config = get().config;
