@@ -64,7 +64,7 @@ import { IMAGE_PROVIDERS, IMAGE_PROVIDER_LABEL, IMAGE_MODELS, resolveImageModel,
 import { calculateCost, formatCost } from "@/lib/pricing";
 import { quickComplete } from "@/lib/quickComplete";
 import { fetchUserRepos } from "@/lib/github";
-import { fetchGitLabUserRepos } from "@/lib/gitlab";
+import { fetchGitLabUserRepos, isGitLabRepo } from "@/lib/gitlab";
 import { friendlyError } from "@/lib/friendlyError";
 import { decryptField, isEncrypted, resolveGitToken } from "@/lib/secureKeys";
 
@@ -258,8 +258,14 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   const [glUser, setGlUser] = useState("");
   const [glToken, setGlToken] = useState("");
   const [repoInput, setRepoInput] = useState("");
-  /* Hesaba bağlı otomatik gelen depolar (henüz eklenmemiş olanlar) */
-  const [accountRepos, setAccountRepos] = useState<string[]>([]);
+  /* Hesaba bağlı otomatik gelen depolar (henüz eklenmemiş olanlar).
+     Depo + onu SAĞLAYAN hesap tutulur. Eskiden düz `string[]` idi ve yalnız
+     AKTİF hesaptan doldurulurdu: birden çok GitHub/GitLab hesabı bağlıyken
+     diğerlerinin depoları listede HİÇ görünmüyordu, eklenen depo da hangi
+     hesaba ait olduğunu unutup yanlış token'la açılmaya çalışıyordu. */
+  const [accountRepos, setAccountRepos] = useState<
+    { repo: string; accountId: string; accountLabel: string }[]
+  >([]);
   const [loadingAccountRepos, setLoadingAccountRepos] = useState(false);
   const [testing, setTesting] = useState(false);
   /* Birleşik model ekleme: ekle + aktif yap + test durumu ve Gelişmiş bölümü. */
@@ -355,29 +361,50 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
      eklenebilir. Token varsa özel depolar da gelir. */
   useEffect(() => {
     if (!open || tab !== "github") return;
-    const gh = config.githubAccounts.find((a) => a.id === config.activeGithubId);
-    const gl = (config.gitlabAccounts ?? []).find((a) => a.id === config.activeGitlabId);
+    /* TÜM bağlı hesaplardan depo çek — yalnız "aktif" olandan değil.
+       Kullanıcı birden çok GitHub/GitLab hesabı bağlayabilir (ör. iş + kişisel,
+       ya da başka bir hesapta bağlı olan depolar); hepsinin depoları listelenip
+       istenilen aktif edilebilmeli. */
+    const ghAccounts = config.githubAccounts ?? [];
+    const glAccounts = config.gitlabAccounts ?? [];
     let cancelled = false;
     (async () => {
-      if (!gh && !gl) { if (!cancelled) setAccountRepos([]); return; }
+      if (ghAccounts.length === 0 && glAccounts.length === 0) {
+        if (!cancelled) setAccountRepos([]);
+        return;
+      }
       setLoadingAccountRepos(true);
-      const results: string[] = [];
       /* ÇÖZÜLMÜŞ token — hesap token'ları depoda AES-GCM ile şifreli durur;
          ham 'enc:1:…' blob'u gönderilirse GitHub/GitLab 401 döner ve aşağıdaki
          sessiz catch yüzünden liste sebepsizce boş görünürdü. */
-      try {
-        if (gh) results.push(...(await fetchUserRepos(await resolveGitToken(gh), gh.username)));
-      } catch { /* sessiz */ }
-      try {
-        if (gl) results.push(...(await fetchGitLabUserRepos(await resolveGitToken(gl), gl.username)));
-      } catch { /* sessiz */ }
+      const fetched = await Promise.all([
+        ...ghAccounts.map(async (a) => {
+          try {
+            const repos = await fetchUserRepos(await resolveGitToken(a), a.username);
+            return repos.map((repo) => ({ repo, accountId: a.id, accountLabel: `GitHub · ${a.username}` }));
+          } catch { return []; }
+        }),
+        ...glAccounts.map(async (a) => {
+          try {
+            const repos = await fetchGitLabUserRepos(await resolveGitToken(a), a.username);
+            return repos.map((repo) => ({ repo, accountId: a.id, accountLabel: `GitLab · ${a.username}` }));
+          } catch { return []; }
+        }),
+      ]);
       if (cancelled) return;
       const have = new Set(config.repos);
-      setAccountRepos([...new Set(results)].filter((r) => !have.has(r)));
+      const seen = new Set<string>();
+      const merged: { repo: string; accountId: string; accountLabel: string }[] = [];
+      for (const entry of fetched.flat()) {
+        if (have.has(entry.repo) || seen.has(entry.repo)) continue;
+        seen.add(entry.repo);
+        merged.push(entry);
+      }
+      setAccountRepos(merged);
       setLoadingAccountRepos(false);
     })();
     return () => { cancelled = true; };
-  }, [open, tab, config.activeGithubId, config.activeGitlabId, config.githubAccounts, config.gitlabAccounts, config.repos]);
+  }, [open, tab, config.githubAccounts, config.gitlabAccounts, config.repos]);
 
   /* Aktif sekme göstergesi — TÜM hook'lar erken `return null`'dan ÖNCE
      çağrılmalı, yoksa React "hook sırası değişti" hatası verir. */
@@ -1332,17 +1359,30 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 <div className="flex flex-col gap-2 mb-3">
                   {config.repos.map((r) => {
                     const isActive = config.activeRepo === r;
+                    /* Hangi sağlayıcı ve hangi hesapla açılacağı — çok hesaplı
+                       kurulumda "bu depo hangi hesaba ait?" sorusunu görünür
+                       kılar (bkz. Config.repoAccounts / store.tokenForRepo). */
+                    const gitlab = isGitLabRepo(r);
+                    const boundId = config.repoAccounts?.[r];
+                    const bound = boundId
+                      ? (gitlab ? (config.gitlabAccounts ?? []) : config.githubAccounts).find((a) => a.id === boundId)
+                      : undefined;
+                    const origin = `${gitlab ? "GitLab" : "GitHub"}${bound ? ` · ${bound.username}` : ""}`;
                     return (
                       <div key={r} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${isActive ? "border-branddim bg-brand/10" : "border-line bg-bgsoft"}`}>
                         <button
                           onClick={() => setActiveRepo(r)}
+                          title="Bu depoyu aktif yap"
                           className={`w-5 h-5 rounded-full grid place-items-center border shrink-0 ${isActive ? "bg-brand border-brand text-[#111110]" : "border-muted"}`}
                         >
                           {isActive && <Check size={11} />}
                         </button>
-                        <FolderGit2 size={13} className={isActive ? "text-brand" : "text-muted"} />
-                        <span className="flex-1 text-xs font-mono truncate">{r}</span>
-                        {isActive && <span className="text-[10px] text-brand font-mono">aktif</span>}
+                        <FolderGit2 size={13} className={`shrink-0 ${isActive ? "text-brand" : "text-muted"}`} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-xs font-mono truncate">{r}</span>
+                          <span className="block text-[10px] text-muted/70 truncate">{origin}</span>
+                        </span>
+                        {isActive && <span className="text-[10px] text-brand font-mono shrink-0">aktif</span>}
                         <button onClick={() => removeRepo(r)} className="text-muted hover:text-red p-1 shrink-0"><Trash2 size={13} /></button>
                       </div>
                     );
@@ -1364,7 +1404,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     <div className="text-xs font-bold text-muted uppercase tracking-wide">Hesabındaki depolar</div>
                     {accountRepos.length > 0 && (
                       <button
-                        onClick={() => { accountRepos.forEach((r) => addRepo(r)); addToast(`${accountRepos.length} depo eklendi.`, "success"); setAccountRepos([]); }}
+                        onClick={() => { accountRepos.forEach((r) => addRepo(r.repo, r.accountId)); addToast(`${accountRepos.length} depo eklendi.`, "success"); setAccountRepos([]); }}
                         className="text-[11px] text-brand hover:underline font-semibold"
                       >
                         Tümünü ekle ({accountRepos.length})
@@ -1377,12 +1417,16 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     <div className="flex flex-col gap-1.5 max-h-48 overflow-auto">
                       {accountRepos.map((r) => (
                         <button
-                          key={r}
-                          onClick={() => { addRepo(r); setAccountRepos((prev) => prev.filter((x) => x !== r)); }}
+                          key={r.repo}
+                          onClick={() => { addRepo(r.repo, r.accountId); setAccountRepos((prev) => prev.filter((x) => x.repo !== r.repo)); }}
                           className="flex items-center gap-2 px-3 py-2 rounded-lg border border-line hover:border-brand bg-bg/40 text-left transition-colors"
                         >
                           <Plus size={12} className="text-brand shrink-0" />
-                          <span className="flex-1 text-xs font-mono truncate">{r}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-xs font-mono truncate">{r.repo}</span>
+                            {/* Hangi hesaptan geldiği — birden çok hesap bağlıyken ayırt etmek için */}
+                            <span className="block text-[10px] text-muted/70 truncate">{r.accountLabel}</span>
+                          </span>
                         </button>
                       ))}
                     </div>
