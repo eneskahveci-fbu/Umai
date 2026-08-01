@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { migrateRepos, mergeConfigs } from "../store";
-import { DEFAULT_CONFIG, DEFAULT_REPO } from "../constants";
+import { DEFAULT_CONFIG } from "../constants";
 import type { Config, ModelProfile } from "../types";
 
 const model = (id: string, apiKey = ""): ModelProfile => ({
@@ -15,13 +15,23 @@ const model = (id: string, apiKey = ""): ModelProfile => ({
 const cfg = (over: Partial<Config> = {}): Config => ({ ...DEFAULT_CONFIG, ...over });
 
 const DEAD = "eneskahveci-sdo/craft-ai";
+/* Eskiden DEFAULT_CONFIG'e gömülü gelen depo — o proje de artık YOK. */
+const DEAD_DEFAULT = "gitlab.com/eneskahveci.bs/craft-ai-web";
 
 describe("migrateRepos", () => {
-  it("ölü GitHub deposunu DEFAULT_REPO ile değiştirir (liste + aktif)", () => {
+  /* Davranış DEĞİŞTİ: ölü depo başka bir sabit depoyla değiştirilmiyor, SİLİNİYOR.
+     Eski hedef (DEFAULT_REPO) de erişilemez olduğu için kullanıcı hiç seçmediği,
+     404 veren bir depoya "bağlı" kalıyordu. */
+  it("ölü depoyu listeden siler, yerine başka depo koymaz", () => {
     const out = migrateRepos(cfg({ repos: [DEAD, "a/b"], activeRepo: DEAD }));
-    expect(out.repos).toContain(DEFAULT_REPO);
-    expect(out.repos).not.toContain(DEAD);
-    expect(out.activeRepo).toBe(DEFAULT_REPO);
+    expect(out.repos).toEqual(["a/b"]);
+    expect(out.activeRepo).toBe("a/b");
+  });
+
+  it("gömülü varsayılan ölü depoyu da temizler", () => {
+    const out = migrateRepos(cfg({ repos: [DEAD_DEFAULT], activeRepo: DEAD_DEFAULT }));
+    expect(out.repos).toEqual([]);
+    expect(out.activeRepo).toBeNull();
   });
 
   it("ölü repo yoksa aynı nesneyi (referansı) döndürür", () => {
@@ -29,9 +39,34 @@ describe("migrateRepos", () => {
     expect(migrateRepos(c)).toBe(c);
   });
 
-  it("migrasyon sonrası tekrarlı repoları ayıklar", () => {
-    const out = migrateRepos(cfg({ repos: [DEAD, DEFAULT_REPO] }));
-    expect(out.repos.filter((r) => r === DEFAULT_REPO)).toHaveLength(1);
+  it("aktif depo ölüyse listede kalan ilk depoya düşer", () => {
+    const out = migrateRepos(cfg({ repos: ["x/y", DEAD], activeRepo: DEAD }));
+    expect(out.activeRepo).toBe("x/y");
+  });
+});
+
+describe("mergeConfigs — depo silme kalıcılığı", () => {
+  it("silinen depo buluttan GERİ GELMEZ (mezar taşı)", () => {
+    /* Regresyon: `repos` koşulsuz birleşimle merge ediliyordu, bu yüzden
+       kullanıcı bir depoyu silse de sonraki senkronda uzaktan geri geliyordu. */
+    const out = mergeConfigs(
+      cfg({ repos: ["a/b"], deletedRepos: ["eski/repo"] }),
+      { repos: ["eski/repo", "a/b"] },
+    );
+    expect(out.repos).toEqual(["a/b"]);
+  });
+
+  it("mezar taşı uzaktan gelse de yerelde silinmiş sayılır", () => {
+    const out = mergeConfigs(
+      cfg({ repos: ["a/b", "eski/repo"] }),
+      { repos: ["eski/repo"], deletedRepos: ["eski/repo"] },
+    );
+    expect(out.repos).toEqual(["a/b"]);
+  });
+
+  it("silinmemiş depoları iki taraftan da korur", () => {
+    const out = mergeConfigs(cfg({ repos: ["a/b"] }), { repos: ["c/d"] });
+    expect(out.repos.sort()).toEqual(["a/b", "c/d"]);
   });
 });
 
@@ -68,10 +103,10 @@ describe("mergeConfigs", () => {
     expect(out.activeModelId).toBe("m1");
   });
 
-  it("birleşmede uzaktaki ölü repo geri gelse de migrate edilir", () => {
-    const out = mergeConfigs(cfg({ repos: [DEFAULT_REPO] }), { repos: [DEAD] });
+  it("birleşmede uzaktaki ölü repo geri gelse de temizlenir", () => {
+    const out = mergeConfigs(cfg({ repos: ["a/b"] }), { repos: [DEAD] });
     expect(out.repos).not.toContain(DEAD);
-    expect(out.repos).toContain(DEFAULT_REPO);
+    expect(out.repos).toContain("a/b");
   });
 
   it("silme mezar taşı: yerelde silinmiş bir model uzaktaki bayat kopyadan geri gelmez", () => {

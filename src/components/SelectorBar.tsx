@@ -2,6 +2,8 @@
 
 import { Boxes, GitBranch, FolderGit2, Plus } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { parseRepo, splitRepoBranch } from "@/lib/github";
+import { isGitLabRepo, parseGitLabRepo } from "@/lib/gitlab";
 
 /** Model · GitHub hesabı · Repo seçici. Hem Sohbet hem Coder üst barında kullanılır. */
 export function SelectorBar() {
@@ -60,12 +62,27 @@ export function SelectorBar() {
           value={config.activeRepo ?? ""}
           onChange={(e) => {
             if (e.target.value === "__add__") {
-              const v = window.prompt("Depo (kullanici/depo):");
+              const v = window.prompt("Depo (kullanici/depo veya gitlab.com/grup/depo):");
               if (v) {
-                const clean = v.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "").replace(/\/$/, "");
-                const valid = /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/.test(clean);
-                if (valid) addRepo(clean);
-                else useStore.getState().addToast("Geçersiz depo formatı. Örn: kullanici/depo", "error");
+                /* GitLab depoları buradan EKLENEMİYORDU: eski doğrulama yalnız
+                   `github.com/` önekini soyup tek eğik çizgili `sahip/depo`
+                   deseni arıyordu — "gitlab.com/grup/alt-grup/depo" hem fazladan
+                   eğik çizgi hem de nokta içerdiği için "Geçersiz depo formatı"
+                   ile reddediliyordu. Artık sağlayıcıya göre GERÇEK ayrıştırıcı
+                   kullanılıyor (Ayarlar'daki alanla aynı davranış) ve ":dal"
+                   soneki de korunuyor. */
+                const raw = v.trim().replace(/\/$/, "");
+                const { repoStr, branch } = splitRepoBranch(raw);
+                let parsed: string | null = null;
+                if (isGitLabRepo(repoStr)) {
+                  const gl = parseGitLabRepo(repoStr);
+                  if (gl) parsed = `gitlab.com/${gl.namespace}/${gl.repo}`;
+                } else {
+                  const gh = parseRepo(repoStr);
+                  if (gh) parsed = `${gh.owner}/${gh.repo}`;
+                }
+                if (parsed) addRepo(branch ? `${parsed}:${branch}` : parsed);
+                else useStore.getState().addToast("Geçersiz depo. Örn: kullanici/depo veya gitlab.com/grup/depo", "error");
               }
             } else {
               setActiveRepo(e.target.value);

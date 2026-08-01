@@ -1221,8 +1221,16 @@ export const DEFAULT_CONFIG: Config = {
   activeGithubId: null,
   gitlabAccounts: [],
   activeGitlabId: null,
-  repos: ["gitlab.com/eneskahveci.bs/craft-ai-web"],
-  activeRepo: "gitlab.com/eneskahveci.bs/craft-ai-web",
+  /* HİÇBİR depo önceden bağlı gelmez. Eskiden buraya sabit bir geliştirme
+     deposu gömülüydü ("gitlab.com/eneskahveci.bs/craft-ai-web") — üstelik o
+     proje artık YOK (GitLab 301 → 404). Sonuçları: (1) her yeni kurulum, var
+     olmayan bir depoya "bağlı" başlıyor; (2) kullanıcı kendi deposunu
+     kaldırınca aktif depo bu ölü kayda düşüyor ve arayüz "bir depo bağlı"
+     gösterirken ajan hiçbir dosya göremiyor; (3) otomatik bağlanma sessiz
+     olduğu için 404 kullanıcıya hiç görünmüyor. Boş başla — depoyu kullanıcı
+     seçsin. Mevcut kurulumlardaki ölü kayıt store.migrateRepos ile temizlenir. */
+  repos: [],
+  activeRepo: null,
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   theme: "dark",
   style: "normal",
@@ -1278,7 +1286,13 @@ export const DEFAULT_CONFIG: Config = {
   ],
 };
 
-export const DEFAULT_REPO = "gitlab.com/eneskahveci.bs/craft-ai-web";
+/** Artık var olmayan, eskiden varsayılan olarak gömülü gelen depolar.
+    store.migrateRepos bunları kayıtlı listeden TEMİZLER (başka bir depoyla
+    değiştirmez — yerine ne konacağına kullanıcı karar verir). */
+export const DEAD_DEFAULT_REPOS = [
+  "gitlab.com/eneskahveci.bs/craft-ai-web",
+  "eneskahveci-sdo/craft-ai",
+];
 
 export const CODE_REVIEW_PROMPT =
   "Aşağıdaki kodu detaylı şekilde incele. Şu başlıklar altında bulgularını raporla:\n\n" +
