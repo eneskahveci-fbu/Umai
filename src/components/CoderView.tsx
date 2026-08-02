@@ -276,7 +276,10 @@ function ModelSwitcher() {
       icon={
         <span className="flex items-center gap-1.5 text-sm" title={activeLabel}>
           <span className="w-1.5 h-1.5 rounded-full bg-green shrink-0" />
-          <span className="truncate max-w-[140px] sm:max-w-[200px] font-semibold text-ink">{activeLabel}</span>
+          {/* Sabit 140px, telefonda tipik model adını kesiyordu ("✦ UMAI Default
+              (Ücretsiz)" 175px ister). Ekran genişliğine göre pay ver: 390px'lik
+              bir telefonda ~195px, sağdaki mod rozetine yer kalarak sığar. */}
+          <span className="truncate max-w-[50vw] sm:max-w-[200px] font-semibold text-ink">{activeLabel}</span>
           <ChevronDown size={13} className="text-muted/50 shrink-0" />
         </span>
       }
@@ -2559,10 +2562,25 @@ export function CoderView() {
           repoCtx: toolsEnabled
             ? (localActive
                 ? {
-                    owner: "local", repo: "local", branch: "main",
+                    /* Bağlı deponun KİMLİĞİ köprü modunda da gönderilir.
+                       Eskiden burada sabit "local/local" vardı: kullanıcının
+                       Ayarlar'dan bağladığı depo sessizce atılıyor, ajan
+                       yalnızca köprünün çalışma KÖKÜNÜ görüyordu. O kök çoğu
+                       kurulumda birden çok projeyi barındırır ve kendisi git
+                       deposu değildir — ajan da alâkasız bir projeyi "bağlı
+                       depo" sanıp onun remote'unu bildiriyordu. "GitLab bağlı
+                       değil / model repoyu göremiyor" raporlarının gerçek
+                       sebebi buydu. */
+                    owner: repo?.owner ?? "local",
+                    repo: repo?.repo ?? "local",
+                    branch: repo?.branch ?? "main",
                     provider: "local",
                     bridgeUrl: store.config.localBridgeUrl,
                     bridgeToken: store.config.localBridgeToken,
+                    /* Projenin köprü kökü altındaki klasörü — ajanın görüşünü
+                       o klasöre hapseder. Elle belirtilmediyse bağlı deponun
+                       adı kullanılır (ör. "craft-coder"). */
+                    bridgeDir: store.config.localBridgeDir?.trim() || repo?.repo || undefined,
                   }
                 : repo
                   ? {
