@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { friendlyError, friendlyErrorFrom, ModelOutputError } from "../friendlyError";
+import { friendlyError, friendlyErrorFrom, ModelOutputError , friendlyLinkError } from "../friendlyError";
 
 describe("friendlyError", () => {
   it("429/kota → sınır mesajı", () => {
@@ -82,5 +82,31 @@ describe("friendlyError — iOS/Safari ağ hatası", () => {
     const out = friendlyError("Load failed");
     expect(out).not.toBe("Load failed");
     expect(out.toLowerCase()).toContain("bağlantı");
+  });
+});
+
+describe("friendlyLinkError — Git hesabı bağlama hataları", () => {
+  it("'already linked' → hangi hesap çakışıyor + çıkış yolu", () => {
+    const out = friendlyLinkError("github", "Identity is already linked to another user");
+    expect(out).not.toContain("Identity is already linked");
+    expect(out).toContain("BAŞKA bir Umai hesabına bağlı");
+    expect(out).toContain("token");
+  });
+
+  it("'Unable to exchange external code' → yapılandırma kontrol listesi", () => {
+    const out = friendlyLinkError("gitlab", "Unable to exchange external code: 648c");
+    expect(out).not.toContain("Unable to exchange");
+    expect(out).toContain("Redirect URI");
+    expect(out).toContain("token");
+  });
+
+  it("iptal → sade mesaj", () => {
+    expect(friendlyLinkError("gitlab", "access_denied")).toContain("iptal");
+  });
+
+  it("tanınmayan hata: ham metni KAYBETMEZ ve alternatif sunar", () => {
+    const out = friendlyLinkError("github", "some brand new failure");
+    expect(out).toContain("some brand new failure");
+    expect(out).toContain("token");
   });
 });
