@@ -65,7 +65,7 @@ import { calculateCost, formatCost } from "@/lib/pricing";
 import { quickComplete } from "@/lib/quickComplete";
 import { fetchUserRepos } from "@/lib/github";
 import { fetchGitLabUserRepos, isGitLabRepo } from "@/lib/gitlab";
-import { friendlyError } from "@/lib/friendlyError";
+import { friendlyError, friendlyLinkError } from "@/lib/friendlyError";
 import { decryptField, isEncrypted, resolveGitToken } from "@/lib/secureKeys";
 
 /* Kullanım anında şifre çözme: bellekteki config'den gelen anahtar `enc:1:`
@@ -547,11 +547,9 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
       const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(`/app?gitlink=${prov}`)}`;
       const { error } = await sb.auth.linkIdentity({ provider: prov, options: { scopes, redirectTo } });
       if (error) {
-        addToast(
-          `${prov === "github" ? "GitHub" : "GitLab"} bağlanamadı: ${error.message}. ` +
-          `Supabase → Authentication'da ${prov} provider'ı ve "Manual linking" açık olmalı.`,
-          "error",
-        );
+        /* Ham Supabase metni ("Identity is already linked to another user")
+           kullanıcıya hiçbir şey anlatmıyordu — sebebi ve çıkış yolunu söyle. */
+        addToast(friendlyLinkError(prov, error.message), "error");
         setOauthBusy(null);
       }
       // Başarılıysa tarayıcı OAuth sayfasına yönlenir; setOauthBusy sıfırlamaya gerek yok.
