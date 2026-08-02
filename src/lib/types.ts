@@ -657,6 +657,11 @@ export interface Config {
   localBridgeUrl?: string;
   /** Yerel Mod köprü erişim token'ı (Local Bridge başlatılırken belirlenen). */
   localBridgeToken?: string;
+  /** Köprü kökü ALTINDA projenin bulunduğu klasör (ör. "craft-coder").
+      Boş bırakılırsa bağlı deponun adı kullanılır. Köprünün kökü genelde
+      birden çok projeyi barındıran bir üst klasördür; bu alan olmadan ajan
+      kökün tamamını tarayıp alâkasız projeleri bağlı depo sanıyordu. */
+  localBridgeDir?: string;
   /** Açıksa repo işlemleri Yerel Mod köprüsüne yönlendirilir. */
   localMode?: boolean;
   /** Olay kancaları: ajan turu bitince otomatik komut çalıştırır (bkz. Hook). */
