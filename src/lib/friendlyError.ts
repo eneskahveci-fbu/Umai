@@ -65,3 +65,43 @@ export function friendlyErrorFrom(e: unknown, fallback = "bilinmeyen hata"): str
   const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "";
   return friendlyError(msg || fallback);
 }
+
+/**
+ * GitHub/GitLab hesabını OAuth ile bağlarken dönen Supabase hatalarını
+ * kullanıcı diline çevirir.
+ *
+ * Neden ayrı: bu hatalar ham hâliyle ("Identity is already linked to another
+ * user", "Unable to exchange external code: 648c…") kullanıcıya HİÇBİR ŞEY
+ * anlatmıyor ve ne yapacağını da söylemiyordu — canlı hata raporlarının ikisi
+ * de buydu. Sebepler uygulama kodunda değil, kullanıcının Supabase/sağlayıcı
+ * yapılandırmasında olduğu için tek çıkar yol NET yönlendirme vermek.
+ *
+ * Her mesaj token ile bağlama seçeneğini hatırlatır: o yol OAuth'a hiç
+ * dokunmaz, giriş bile gerektirmez ve bu hataların hiçbirinden etkilenmez.
+ */
+export function friendlyLinkError(provider: "github" | "gitlab", raw: string): string {
+  const label = provider === "github" ? "GitHub" : "GitLab";
+  const m = (raw || "").toLowerCase();
+
+  if (/identity is already linked/.test(m))
+    return `Bu ${label} hesabı BAŞKA bir Umai hesabına bağlı. Aynı ${label} hesabı iki Umai hesabına bağlanamaz. ` +
+      `Çözüm: ya o ilk hesapla giriş yap, ya da bu ${label} hesabını oradan çıkar. ` +
+      `Alternatif: aşağıdan token ile ekle — giriş bile gerektirmez.`;
+
+  if (/unable to exchange external code|invalid.*(code|grant)|bad_code_verifier/.test(m))
+    return `${label} girişi tamamlanamadı. Bu neredeyse her zaman yapılandırma uyuşmazlığıdır: ` +
+      `${label} uygulamasındaki "Redirect URI" ile Supabase'in adresi birebir aynı olmalı, ` +
+      `ve Supabase'deki Client Secret güncel olmalı. Sayfayı yenileyip bir kez daha dene (kod tek kullanımlıktır). ` +
+      `Acelen varsa aşağıdan token ile ekle — bu ayarların hiçbirine ihtiyaç duymaz.`;
+
+  if (/manual linking|not enabled|provider.*disabled/.test(m))
+    return `${label} bağlama Supabase'de kapalı. Authentication → Providers'tan ${label} açılmalı ve ` +
+      `"Manual linking" etkin olmalı. Alternatif: aşağıdan token ile ekle.`;
+
+  if (/access_denied|cancell?ed/.test(m))
+    return `${label} bağlama iptal edildi. Tekrar denemek istersen yeniden başlat.`;
+
+  /* Tanınmayan hata: ham metni KAYBETME (teşhis için gerekir), ama yanına
+     her zaman çalışan alternatifi ekle. */
+  return `${label} bağlanamadı: ${raw} — Alternatif: aşağıdan token ile ekleyebilirsin (giriş gerektirmez).`;
+}

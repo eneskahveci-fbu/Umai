@@ -17,6 +17,7 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { BackgroundJobs } from "@/components/BackgroundJobs";
+import { friendlyLinkError } from "@/lib/friendlyError";
 import { useStore } from "@/lib/store";
 import { createClient, supabaseConfigured } from "@/lib/supabase/client";
 import { registerServiceWorker, watchConnection } from "@/lib/sw-register";
@@ -152,8 +153,9 @@ export default function AppPage() {
        (zaten hiç gelmeyecek). */
     const linkError = params.get("link_error");
     if (linkError) {
-      const label = which === "github" ? "GitHub" : "GitLab";
-      addToast(`${label} bağlanamadı: ${linkError}`, "error");
+      /* Sağlayıcıdan dönen ham metin ("Unable to exchange external code: 648c…")
+         kullanıcıya ne olduğunu da ne yapacağını da söylemiyordu. */
+      addToast(friendlyLinkError(which === "github" ? "github" : "gitlab", linkError), "error");
       clean();
       return;
     }
