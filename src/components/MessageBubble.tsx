@@ -17,6 +17,7 @@ import type { LucideIcon } from "lucide-react";
 import type { ChatMessage, CompareResult, FileCheckpoint, SwarmState } from "@/lib/types";
 import { skillFromText } from "@/lib/skillImport";
 import { looksLikeSkillMd } from "@/lib/odFormat";
+import { redactSecrets } from "@/lib/pii";
 import { useStore } from "@/lib/store";
 import { CodeBlock } from "./CodeBlock";
 import { ALL_AGENTS } from "@/lib/agents";
@@ -1173,7 +1174,13 @@ function MessageBubbleImpl({
                   },
                 }}
               >
-                {message.content}
+                {/* Model, kullanıcının yapıştırdığı token'ı yanıtında olduğu
+                    gibi tekrar yazabiliyor (canlı örnek: güvenlik uyarısı
+                    verirken token'ın tamamını ekrana bastı). GÖSTERİMDE
+                    maskele — saklanan içerik değişmez, yalnız ekranda ve
+                    dışa aktarmada sır görünmez. Kullanıcının KENDİ mesajı
+                    bilinçli olarak maskelenmez (kendi yazdığını görebilmeli). */}
+                {redactSecrets(message.content)}
               </ReactMarkdown>
               {streamingNow && <span className="caret" />}
             </div>
@@ -1207,9 +1214,9 @@ function MessageBubbleImpl({
             <span>{message.thinking ? "Düşünüyor…" : "Yanıt hazırlanıyor…"}</span>
             <span className="typing-shimmer" aria-hidden />
           </span>
-        ) : (
+        ) : streamingNow ? (
           <span className="caret" />
-        )}
+        ) : null}
 
         {/* Token limit cut-off strip */}
         {!streamingNow && message.finishReason === "length" && onContinue && (

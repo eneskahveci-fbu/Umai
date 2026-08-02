@@ -74,3 +74,13 @@ describe("friendlyError — kelime sınırları", () => {
     expect(friendlyError("Error 429: rate limited")).toContain("rate limit");
   });
 });
+
+describe("friendlyError — iOS/Safari ağ hatası", () => {
+  it("'Load failed' ham metin olarak geçmez, anlaşılır mesaja çevrilir", () => {
+    /* iOS'taki tüm tarayıcılar (WebKit) başarısız fetch'te bu mesajı verir;
+       desende olmadığı için kullanıcıya "Hata: Load failed" diye çıkıyordu. */
+    const out = friendlyError("Load failed");
+    expect(out).not.toBe("Load failed");
+    expect(out.toLowerCase()).toContain("bağlantı");
+  });
+});

@@ -40,8 +40,12 @@ export function friendlyError(raw: string): string {
     return "İstek sınırına (rate limit) takıldın veya kotan bitti. Biraz bekle ya da başka bir model/sağlayıcı dene.";
   if (/(timeout|timed out|etimedout|deadline)/.test(m))
     return "İstek zaman aşımına uğradı. Bağlantını kontrol et ve tekrar dene; istek çok uzunsa kısaltmayı dene.";
-  if (/(failed to fetch|network|networkerror|err_network|connection|econnrefused|fetch failed)/.test(m))
-    return "Ağ/bağlantı sorunu. İnternetini kontrol et; sağlayıcı erişilemiyor olabilir.";
+  /* "load failed" = Safari/WebKit'in (iOS'taki TÜM tarayıcılar dahil) başarısız
+     fetch mesajı. Desende yoktu, bu yüzden kullanıcıya ham "Hata: Load failed"
+     diye çıkıyordu — hiçbir şey anlatmayan, eyleme dönük olmayan bir metin.
+     "load failed" tek başına fazla genel olabileceği için tam eşleşme arıyoruz. */
+  if (/(failed to fetch|^load failed$|network|networkerror|err_network|connection|econnrefused|fetch failed)/.test(m))
+    return "Ağ/bağlantı sorunu. Telefonda sayfa arka plana alındığında veya ağ değiştiğinde de olur — internetini kontrol edip tekrar dene.";
   if (/(\b404\b|not found|model.*(not found|does not exist)|unknown model)/.test(m))
     return "Model bulunamadı. Ayarlar'dan model adının doğru yazıldığından emin ol.";
   if (/(\b500\b|\b502\b|\b503\b|\b529\b|overloaded|service unavailable|server error)/.test(m))

@@ -44,6 +44,34 @@ interface RepoCtx {
       bu köprüye (gerçek dosya sistemi + shell) gider. */
   bridgeUrl?: string;
   bridgeToken?: string;
+  /** Köprü kökü ALTINDA projenin bulunduğu alt klasör (ör. "craft-coder").
+      Köprünün çalışma kökü çoğu kurulumda birden çok projeyi barındıran bir
+      üst klasördür (ör. /opt/craft-bridge/workspace) ve KENDİSİ bir git
+      deposu değildir. Bu alan boşken ajan tüm kökü tarıyor, alâkasız
+      projelerin dosyalarını "bağlı depo" sanıyor ve `git remote -v` gibi
+      komutlar kökte anlamsız sonuç veriyordu. Doluysa tüm köprü dosya
+      yolları bu klasörle öneklenir, dönen yollardan önek soyulur — yani ajan
+      YALNIZ bağlı deponun içini görür. */
+  bridgeDir?: string;
+}
+
+/* Köprü yollarını proje alt klasörüne hapseden yardımcılar. Tek yerde
+   uygulanır (bridgeCall) ki her çağrı yeri ayrı ayrı doğru yapmak zorunda
+   kalmasın. */
+function bridgeScope(ctx: RepoCtx): string {
+  return (ctx.bridgeDir || "").replace(/^\/+|\/+$/g, "");
+}
+function scopedPath(dir: string, p: unknown): string {
+  const rel = String(p ?? "").replace(/^\/+/, "");
+  return dir ? `${dir}/${rel}` : rel;
+}
+/** Dönen mutlak-köke-göreli yollardan proje önekini soyar; proje dışındakileri
+    tamamen eler (ajan onları hiç görmemeli). */
+function unscopePaths(dir: string, paths: unknown): string[] {
+  const list = Array.isArray(paths) ? paths.filter((p): p is string => typeof p === "string") : [];
+  if (!dir) return list;
+  const pre = `${dir}/`;
+  return list.filter((p) => p.startsWith(pre)).map((p) => p.slice(pre.length));
 }
 
 /* Yerel Mod köprüsüne JSON çağrısı (gerçek FS/shell, kullanıcının makinesinde). */
@@ -55,14 +83,50 @@ async function bridgeCall(ctx: RepoCtx, endpoint: string, payload?: unknown): Pr
   if (process.env.NODE_ENV === "production" && !isSafeRemoteUrl(base)) {
     throw new Error("Güvensiz köprü adresi — yalnızca genel (public) HTTPS adresleri kabul edilir.");
   }
+  /* Proje alt klasörü varsa: giden yolları önekle, dönen yolları soy.
+     Köprünün /fs/list, /fs/glob, /fs/grep uçları HER ZAMAN kökten yürür ve
+     köke göreli yol döner; alt klasör parametresi kabul etmezler. Bu yüzden
+     kapsama, desen/filtre alanları üzerinden uygulanır. */
+  const dir = bridgeScope(ctx);
+  const body: Record<string, unknown> = { ...(payload as Record<string, unknown> ?? {}) };
+  if (dir) {
+    if (endpoint === "/fs/read" || endpoint === "/fs/write" || endpoint === "/fs/delete") {
+      body.path = scopedPath(dir, body.path);
+    } else if (endpoint === "/fs/rename") {
+      body.path = scopedPath(dir, body.path);
+      body.newPath = scopedPath(dir, body.newPath);
+    } else if (endpoint === "/fs/glob") {
+      body.pattern = scopedPath(dir, body.pattern ?? "**");
+    } else if (endpoint === "/fs/grep") {
+      body.glob = scopedPath(dir, body.glob ?? "**");
+    } else if (endpoint === "/fs/list") {
+      /* `filter` alt-dize eşleşmesidir; kaba bir ön eleme yapar, kesin
+         ayıklama aşağıda dönen yollar üzerinde yapılır. */
+      body.filter = body.filter ? `${dir}/${String(body.filter)}` : `${dir}/`;
+    }
+  }
+
   const res = await fetch(`${base}${endpoint}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${ctx.bridgeToken || ""}` },
-    body: JSON.stringify(payload ?? {}),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(30000),
   });
   if (!res.ok) throw new Error(`Yerel köprü hatası ${res.status} — köprü çalışıyor mu? (node local-bridge/server.js)`);
-  return await res.json() as Record<string, unknown>;
+  const data = await res.json() as Record<string, unknown>;
+
+  if (dir) {
+    if (Array.isArray(data.paths)) data.paths = unscopePaths(dir, data.paths);
+    if (Array.isArray(data.matches)) {
+      /* grep satırları "yol:satır: metin" biçiminde döner — baştaki proje
+         önekini soy, proje dışı eşleşmeleri at. */
+      const pre = `${dir}/`;
+      data.matches = (data.matches as unknown[])
+        .filter((m): m is string => typeof m === "string" && m.startsWith(pre))
+        .map((m) => m.slice(pre.length));
+    }
+  }
+  return data;
 }
 
 interface SkillPayload {
@@ -1595,6 +1659,22 @@ export async function POST(req: Request) {
         sysPrompt += `\n\n[Repo dosya haritası — ${allPaths.length} dosya]\n${buildRepoMap(allPaths)}`;
       }
     } catch { /* harita yoksa sessiz geç — araçlar yine çalışır */ }
+    /* Köprü modunda ajan GERÇEK bir dosya sisteminde çalışır ve komutları
+       (run_command) o makinede koşar. Çalışma klasörünü AÇIKÇA söylemezsek
+       ajan komutları köprünün kökünde çalıştırıyor; kök bir git deposu
+       olmadığı için `git remote -v` gibi komutlar anlamsız hata veriyor ya da
+       yandaki alâkasız projeyi gösteriyordu. */
+    if (rc.provider === "local") {
+      const dir = (rc.bridgeDir || "").replace(/^\/+|\/+$/g, "");
+      sysPrompt +=
+        `\n\n[Çalışma alanı — GERÇEK dosya sistemi]\n` +
+        `Bağlı depo: ${rc.owner}/${rc.repo} (${rc.branch}).\n` +
+        (dir
+          ? `Proje klasörü köprü kökünün ALTINDA: "${dir}". Dosya araçların zaten bu klasöre göre çalışır — yollara "${dir}/" EKLEME.\n` +
+            `run_command ise köprü KÖKÜNDE başlar: komutları çalıştırmadan önce 'cd ${dir}' yap (ör. run_command('cd ${dir} && git status')). ` +
+            `Kökte git komutu çalıştırma — kök bir git deposu değildir, yanındaki başka projelerin sonuçlarını bağlı depo sanma.\n`
+          : `Proje klasörü belirtilmemiş; köprü kökü doğrudan kullanılıyor.\n`);
+    }
     sysPrompt +=
       `\n\n[Ajan modu — Repo: ${body.repoCtx.owner}/${body.repoCtx.repo} (${body.repoCtx.branch})]\n` +
       `ÖNEMLİ — SEN GERÇEK BİR KODLAMA AJANISIN, sohbet botu DEĞİL. "üret / oluştur / yaz / ekle / kur / yap" ` +
