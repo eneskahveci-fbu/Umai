@@ -2280,6 +2280,29 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   </span>
                 )}
               </div>
+
+              {/* Proje klasörü — sunucudaki çalışma kökü genelde BİRDEN ÇOK proje
+                 barındırır (ör. /opt/craft-bridge/workspace altında ECC, rust-landing…).
+                 Bu alan boşsa uygulama bağlı deponun ADINI klasör adı sayar; sunucuda
+                 klasör başka bir adla duruyorsa (ya da hiç yoksa) burada belirtilebilir.
+                 Depo hem token'la hem köprüyle bağlıysa (bkz. GitLab/GitHub Hesapları)
+                 uygulama bu klasörü depoyla OTOMATİK senkron tutar — elle klonlamana
+                 gerek yok. */}
+              <div className="mt-3">
+                <label className="text-xs font-semibold text-muted/80 block mb-1">Proje klasörü (opsiyonel)</label>
+                <input
+                  type="text"
+                  value={config.localBridgeDir ?? ""}
+                  onChange={(e) => saveConfig({ ...config, localBridgeDir: e.target.value.trim() })}
+                  placeholder={config.activeRepo ? config.activeRepo.split("/").pop() : "örn. craft-coder"}
+                  className="input-mono w-full"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <p className="text-[11px] text-muted/50 mt-1 leading-relaxed">
+                  Sunucudaki çalışma kökü altında projenin bulunduğu klasör adı. Boş bırakılırsa bağlı deponun adı kullanılır.
+                </p>
+              </div>
             </div>
 
             {/* Terminal WebSocket URL */}
