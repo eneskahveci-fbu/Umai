@@ -2581,6 +2581,12 @@ export function CoderView() {
                        o klasöre hapseder. Elle belirtilmediyse bağlı deponun
                        adı kullanılır (ör. "craft-coder"). */
                     bridgeDir: store.config.localBridgeDir?.trim() || repo?.repo || undefined,
+                    /* Depo hem token'la (GitHub/GitLab) HEM köprüyle aynı anda
+                       bağlıysa: sunucu bunu kullanıp depoyu köprünün diskine
+                       gerçekten klonlar/günceller (bkz. api/chat/route.ts
+                       ensureBridgeRepo) — token bağlantısı ARTIK sessizce
+                       görmezden gelinmez, köprünün GERÇEK içeriğini besler. */
+                    gitSource: repo ? { provider: repoIsGitLab ? "gitlab" as const : "github" as const, token: repoToken } : undefined,
                   }
                 : repo
                   ? {

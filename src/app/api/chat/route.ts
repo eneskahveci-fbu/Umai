@@ -22,6 +22,8 @@ import { detectModelCapabilities, JSON_MODE_PROVIDERS, EFFORT_TOKENS, THINKING_B
 import { downgradeRequest, isOpenAiReasoningModel, adaptForOpenAiReasoning } from "@/lib/requestDowngrade";
 import { buildIdentityPrompt } from "@/lib/modelIdentity";
 import { isBuiltinMcpServerId } from "@/lib/mcpBuiltins";
+import { buildBridgeSyncCommand, isLikelyLongRunning } from "@/lib/bridgeRepo";
+import { redactSecrets } from "@/lib/pii";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendPushToUser } from "@/lib/push";
@@ -53,6 +55,12 @@ interface RepoCtx {
       yolları bu klasörle öneklenir, dönen yollardan önek soyulur — yani ajan
       YALNIZ bağlı deponun içini görür. */
   bridgeDir?: string;
+  /** Bağlı deponun KENDİ sağlayıcısı/token'ı (GitHub/GitLab) — köprü modunda
+      dahi taşınır. Doluysa, ensureBridgeRepo() bu bilgiyle depoyu köprünün
+      diskine (bridgeDir altına) klonlar/günceller: böylece "GitLab'a token ile
+      bağlandım ama köprü de açık" durumunda iki sistem birbirini SESSİZCE
+      görmezden gelmez — köprü, bağlı deponun GERÇEK bir kopyasını tutar. */
+  gitSource?: { provider: "github" | "gitlab"; token?: string };
 }
 
 /* Köprü yollarını proje alt klasörüne hapseden yardımcılar. Tek yerde
@@ -127,6 +135,105 @@ async function bridgeCall(ctx: RepoCtx, endpoint: string, payload?: unknown): Pr
     }
   }
   return data;
+}
+
+/* ensureBridgeRepo başarılı senkron zamanlarını tutar → aynı depo/köprü için
+   her mesajda yeniden klonlama/fetch yapılmaz (gereksiz gecikme + Oracle'a
+   yük). Vercel serverless fonksiyonları arasında paylaşılmaz (her instance
+   kendi belleğinde tutar) — en kötü ihtimalle soğuk başlangıçta bir kez daha
+   senkron yapılır, zararsız. */
+const bridgeSyncCache = new Map<string, number>();
+const BRIDGE_SYNC_TTL_MS = 60_000;
+
+/** Bağlı depoyu (ctx.gitSource ile) köprünün diskinde (ctx.bridgeDir altında)
+   GERÇEKTEN var olacak şekilde klonlar/günceller. Yalnızca gitSource + bridgeDir
+   ikisi de doluyken çalışır — biri eksikse (genel köprü kullanımı, repo'suz)
+   sessizce atlanır. Hata durumunda TURU ÇÖKERTMEZ: agent en azından ne olduğunu
+   bilsin diye çağıran taraf notu sistem prompt'una ekler. */
+async function ensureBridgeRepo(ctx: RepoCtx): Promise<{ ok: true } | { ok: false; error: string }> {
+  const dir = bridgeScope(ctx);
+  if (!ctx.gitSource || !dir || !ctx.bridgeUrl) return { ok: true };
+  const cacheKey = `${ctx.bridgeUrl}::${dir}::${ctx.branch}`;
+  const lastSync = bridgeSyncCache.get(cacheKey);
+  if (lastSync && Date.now() - lastSync < BRIDGE_SYNC_TTL_MS) return { ok: true };
+  try {
+    const command = buildBridgeSyncCommand({
+      source: ctx.gitSource, owner: ctx.owner, repo: ctx.repo, branch: ctx.branch, dir,
+    });
+    /* Doğrudan bridgeCall'ı DEĞİL, ROOT'a göre çalışan çıplak /exec'i kullan —
+       bridgeCall'ın /fs/* yol-önekleme mantığı /exec'e uygulanmaz (komut zaten
+       kendi içinde `dir`i taşıyor) ve klon henüz yokken `dir` altında
+       çalıştırmaya kalkışmak (cwd) klonlamayı imkânsız kılardı. */
+    const res = await fetch(`${ctx.bridgeUrl!.replace(/\/$/, "")}/exec`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${ctx.bridgeToken || ""}` },
+      body: JSON.stringify({ command }),
+      signal: AbortSignal.timeout(45_000),
+    });
+    if (!res.ok) return { ok: false, error: `Köprü senkron hatası ${res.status}` };
+    const data = await res.json() as { output?: string; exitCode?: number; error?: string };
+    if (data.error) return { ok: false, error: data.error };
+    if (typeof data.exitCode === "number" && data.exitCode !== 0) {
+      return { ok: false, error: (data.output || "").slice(-500) || `exit ${data.exitCode}` };
+    }
+    bridgeSyncCache.set(cacheKey, Date.now());
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+const BRIDGE_EXEC_POLL_MS = 1_200;
+
+/** Komutu köprüde SUNUCUDAN DOĞRUDAN çalıştırır — tarayıcıya/telefona hiç
+   gerek kalmadan. Eskiden run_command bir SSE olayıyla istemciye yollanıyor,
+   istemcinin (RealTerminal) WebSocket üzerinden Oracle'a iletip sonucu YENİ
+   bir /api/chat isteğiyle geri getirmesi bekleniyordu — telefon arka plana
+   düşünce (kilitlenince/uygulama değiştirilince) bu zincir kopuyordu, tam da
+   "arka planda çalışmaya devam etmiyor" şikâyetinin sebebiydi. Artık köprüde
+   gerçek bir /exec ucu varsa komut ORADAN, bu HTTP isteği üzerinden çalışır;
+   telefonun durumu sonucu etkilemez.
+
+   Her zaman ARKA PLANDA başlatılır (background:true) ve kısa aralıklarla
+   yoklanır — bu, hem kısa komutların (git status vb.) sonucunu hızlıca
+   döndürür HEM DE bir geliştirme sunucusu gibi bitmeyen komutların turu
+   sonsuza dek kilitlemesini önler: yoklama süresi dolunca "hâlâ çalışıyor"
+   notuyla devam edilir, komutun kendisi köprüde çalışmaya DEVAM EDER. */
+async function execCommandViaBridge(
+  ctx: RepoCtx,
+  command: string,
+): Promise<{ output: string; done: boolean; exitCode: number | null }> {
+  const base = ctx.bridgeUrl!.replace(/\/$/, "");
+  const headers = { "Content-Type": "application/json", Authorization: `Bearer ${ctx.bridgeToken || ""}` };
+  const dir = bridgeScope(ctx);
+
+  const startRes = await fetch(`${base}/exec`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ command, cwd: dir || undefined, background: true }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!startRes.ok) throw new Error(`Köprü /exec hatası ${startRes.status}`);
+  const startData = await startRes.json() as { taskId?: string; error?: string };
+  if (startData.error) throw new Error(startData.error);
+  const taskId = startData.taskId;
+  if (!taskId) throw new Error("Köprü görev kimliği döndürmedi.");
+
+  /* Kalıcı çalışan komutlar (dev sunucusu vb.) için az bekle — nasıl olsa
+     bitmeyecek; hemen "arka planda başladı" bildirimine geç. */
+  const maxPolls = isLikelyLongRunning(command) ? 3 : 15;
+  let lastOutput = "";
+  for (let i = 0; i < maxPolls; i++) {
+    await new Promise((r) => setTimeout(r, BRIDGE_EXEC_POLL_MS));
+    const statusRes = await fetch(`${base}/exec/status?id=${encodeURIComponent(taskId)}`, {
+      headers, signal: AbortSignal.timeout(10_000),
+    }).catch(() => null);
+    if (!statusRes || !statusRes.ok) continue;
+    const rec = await statusRes.json() as { status: string; output?: string; exitCode?: number | null };
+    lastOutput = rec.output || "";
+    if (rec.status !== "running") return { output: lastOutput, done: true, exitCode: rec.exitCode ?? null };
+  }
+  return { output: lastOutput, done: false, exitCode: null };
 }
 
 interface SkillPayload {
@@ -1653,26 +1760,42 @@ export async function POST(req: Request) {
     /* Büyük kod tabanı: repo DOSYA HARİTASINI prompt'a enjekte et → ajan
        list_files çağırmadan yapıyı bilir, doğru dosyayı hedefler. Tek tree
        çağrısı; Anthropic'te cache'lenir, diğerlerinde kompakt (yalnız yollar). */
+    /* Köprü modunda ajan GERÇEK bir dosya sisteminde çalışır ve komutları
+       (run_command) o makinede koşar. Çalışma klasörünü AÇIKÇA söylemezsek
+       ajan komutları köprünün kökünde çalıştırıyor; kök bir git deposu
+       olmadığı için `git remote -v` gibi komutlar anlamsız hata veriyor ya da
+       yandaki alâkasız projeyi gösteriyordu.
+
+       gitSource + bridgeDir doluysa: dosya haritasını çıkarmadan ÖNCE bağlı
+       depoyu köprünün diskinde GERÇEKTEN var/güncel hale getir (ensureBridgeRepo).
+       Aksi halde "GitLab'a token ile bağlandım ama köprü de açık" durumunda
+       köprü hâlâ eski/boş bir klasöre bakar, ajan depoyu "göremez" — token
+       bağlantısı var olsa da hiç kullanılmamış olur. */
+    let bridgeSyncNote = "";
+    if (rc.provider === "local" && rc.gitSource && rc.bridgeDir) {
+      const sync = await ensureBridgeRepo(rc);
+      if (!sync.ok) {
+        bridgeSyncNote = `\nUYARI: bağlı depo köprüde güncellenemedi (${sync.error}). Aşağıdaki dosya haritası/araçlar BAYAT ya da BOŞ olabilir — kullanıcıya bunu söyle, tahminde bulunma.\n`;
+      }
+    }
     try {
       const allPaths = await cached(repoCacheKey(rc, "tree"), () => getAllPaths(rc));
       if (allPaths.length) {
         sysPrompt += `\n\n[Repo dosya haritası — ${allPaths.length} dosya]\n${buildRepoMap(allPaths)}`;
       }
     } catch { /* harita yoksa sessiz geç — araçlar yine çalışır */ }
-    /* Köprü modunda ajan GERÇEK bir dosya sisteminde çalışır ve komutları
-       (run_command) o makinede koşar. Çalışma klasörünü AÇIKÇA söylemezsek
-       ajan komutları köprünün kökünde çalıştırıyor; kök bir git deposu
-       olmadığı için `git remote -v` gibi komutlar anlamsız hata veriyor ya da
-       yandaki alâkasız projeyi gösteriyordu. */
     if (rc.provider === "local") {
       const dir = (rc.bridgeDir || "").replace(/^\/+|\/+$/g, "");
       sysPrompt +=
         `\n\n[Çalışma alanı — GERÇEK dosya sistemi]\n` +
         `Bağlı depo: ${rc.owner}/${rc.repo} (${rc.branch}).\n` +
         (dir
-          ? `Proje klasörü köprü kökünün ALTINDA: "${dir}". Dosya araçların zaten bu klasöre göre çalışır — yollara "${dir}/" EKLEME.\n` +
-            `run_command ise köprü KÖKÜNDE başlar: komutları çalıştırmadan önce 'cd ${dir}' yap (ör. run_command('cd ${dir} && git status')). ` +
-            `Kökte git komutu çalıştırma — kök bir git deposu değildir, yanındaki başka projelerin sonuçlarını bağlı depo sanma.\n`
+          ? `Proje klasörü köprü kökünün ALTINDA: "${dir}". Dosya araçların zaten bu klasöre göre çalışır — yollara "${dir}/" EKLEME. ` +
+            `run_command da AYNI klasörde başlar (cd gerekmez) — doğrudan run_command('git status') gibi çağır.\n` +
+            (rc.gitSource
+              ? `Bu klasör her mesajda bağlı depoyla OTOMATİK senkronlanır (klon/fetch+reset) — elle git clone/pull yapmana gerek yok.\n`
+              : "") +
+            bridgeSyncNote
           : `Proje klasörü belirtilmemiş; köprü kökü doğrudan kullanılıyor.\n`);
     }
     sysPrompt +=
@@ -1848,8 +1971,13 @@ export async function POST(req: Request) {
     const MUTATING_TOOLS = new Set(["write_file", "str_replace", "delete_file", "rename_file", "create_branch", "create_pr", "run_command"]);
     coderTools = coderTools.filter((t) => !MUTATING_TOOLS.has(t.function.name));
   }
-  /* run_command yalnızca istemcide terminal varsa sunulur (yoksa çıktı gelmez). */
-  if (!body.terminalAvailable) coderTools = coderTools.filter((t) => t.function.name !== "run_command");
+  /* run_command şu ikisinden biri varsa sunulur: istemcide terminal (WebContainer/
+     uzak WS) VEYA köprüde gerçek /exec (repoCtx.provider==="local" + bridgeUrl) —
+     ikinci durumda komut SUNUCUDAN çalışır, istemcinin terminali hiç gerekmez. */
+  const bridgeExecAvailable = repoCtx?.provider === "local" && !!repoCtx.bridgeUrl;
+  if (!body.terminalAvailable && !bridgeExecAvailable) {
+    coderTools = coderTools.filter((t) => t.function.name !== "run_command");
+  }
   /* ask_user (Claude tarzı tıklanabilir anket) düz sohbette de sunulur AMA yalnız
      tool-YETENEKLİ (anahtarlı) birincil sağlayıcıda: Pollinations/OVH gibi anahtarsız
      ücretsiz uçlar function-calling desteklemeyip `tools` alanına 400 verebilir →
@@ -2348,11 +2476,33 @@ export async function POST(req: Request) {
             resultById.set(tc.id, note);
             return;
           }
-          /* run_command: sunucuda terminal yok → komutu istemciye olay olarak yolla.
-             İstemci terminalde çalıştırır, çıktıyı yeni bir mesaj olarak geri gönderir
-             (craftai:terminal-output → callApi). Bu turda placeholder sonuç döner. */
           if (tc.name === "run_command") {
             const command = String(args.command ?? "").trim();
+            /* Köprüde gerçek /exec varsa DOĞRUDAN sunucudan çalıştır — telefon/
+               tarayıcı arka planda olsa da devam eder (bkz. execCommandViaBridge). */
+            if (repoCtx && repoCtx.provider === "local" && repoCtx.bridgeUrl) {
+              try {
+                const r = await execCommandViaBridge(repoCtx, command);
+                /* Token, klon URL'sine gömülü olduğu için `git remote -v` gibi
+                   bir komut çıktısında görünebilir — ekrana/geçmişe gitmeden
+                   maskele (bkz. redactSecrets, aynı desen mesaj gösteriminde
+                   de kullanılıyor). */
+                const out = redactSecrets(r.output || "(çıktı yok)").slice(0, 8000);
+                const note = r.done
+                  ? `$ ${command}\n${out}${typeof r.exitCode === "number" && r.exitCode !== 0 ? `\n[exit: ${r.exitCode}]` : ""}`
+                  : `⏳ '${command}' sunucuda arka planda çalışmaya DEVAM EDİYOR (henüz bitmedi — telefon kilitlense/kapansa bile durmaz). Şimdiye kadarki çıktı:\n${out}`;
+                safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: note } })}\n\n`));
+                resultById.set(tc.id, note);
+              } catch (e) {
+                const note = `Hata: köprüde komut çalıştırılamadı — ${(e as Error).message}`;
+                safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: note } })}\n\n`));
+                resultById.set(tc.id, note);
+              }
+              return;
+            }
+            /* Köprü yok (WebContainer/uzak WS terminal): eski yol — istemciye
+               olay olarak yolla, çıktı yeni bir mesaj olarak geri gelsin
+               (craftai:terminal-output → callApi). Bu turda placeholder döner. */
             safe.enqueue(encoder.encode(`data: ${JSON.stringify({ run_command_event: { command } })}\n\n`));
             const note = `⏳ '${command}' komutu terminale gönderildi. Çıktısı ayrı bir mesaj olarak gelecek; ona göre devam et.`;
             safe.enqueue(
