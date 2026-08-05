@@ -25,10 +25,28 @@ describe("READONLY_TOOL_NAMES", () => {
 
 describe("executeReadTool", () => {
   const ctx = { owner: "o", repo: "r", branch: "main" };
-  it("yazma/bilinmeyen aracı reddeder (ağ çağrısı yapmadan)", async () => {
-    expect(await executeReadTool("write_file", { path: "x", content: "y" }, ctx)).toContain("yalnızca okuma");
-    expect(await executeReadTool("delete_file", { path: "x" }, ctx)).toContain("yalnızca okuma");
-    expect(await executeReadTool("rastgele", {}, ctx)).toContain("yalnızca okuma");
+  /* Davranış DEĞİŞTİ: write_file/str_replace artık KOŞULLU olarak izinli
+     (allowWrite + gerçek dosya sistemi). Değişmeyen garanti: yetki AÇIKÇA
+     verilmediyse hiçbiri çalışmaz ve ağa çıkılmaz. Yıkıcı araçlar
+     (delete_file) ve bilinmeyenler her koşulda reddedilir. */
+  it("yetki verilmeden yazma aracını reddeder — ağa çıkmadan", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const out = await executeReadTool("write_file", { path: "x", content: "y" }, ctx);
+    expect(out).toContain("yazma yetkisi yok");
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("yıkıcı ve bilinmeyen araçları HER koşulda reddeder (yetki verilse bile)", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    /* delete_file alt-ajanlara HİÇ verilmedi: silme ana ajanda bile kullanıcı
+       onayına tabi, paralel bir alt-ajanın sessizce silmesi kabul edilemez. */
+    expect(await executeReadTool("delete_file", { path: "x" }, ctx, true)).toContain("kullanamaz");
+    expect(await executeReadTool("rastgele", {}, ctx, true)).toContain("kullanamaz");
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });
 
@@ -129,5 +147,71 @@ describe("executeReadTool — list_files GitLab sayfalaması", () => {
     await executeReadTool("list_files", {}, { owner: "ns", repo: "r", branch: "main", provider: "gitlab" });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("executeReadTool — alt-ajan yazma yetkisi (güvenlik kapıları)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const localCtx = { owner: "o", repo: "r", branch: "main", provider: "local" as const, bridgeUrl: "http://localhost:1", bridgeToken: "t" };
+
+  it("allowWrite verilmezse yazma araçları REDDEDİLİR (varsayılan kapalı)", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const out = await executeReadTool("write_file", { path: "a.ts", content: "x" }, localCtx);
+    expect(out).toContain("yazma yetkisi yok");
+    /* Ağa HİÇ çıkılmamalı — yetki yoksa istek bile gitmemeli. */
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("allowWrite verilse bile provider 'local' DEĞİLSE reddedilir (commit yarışı önlemi)", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const apiCtx = { owner: "o", repo: "r", branch: "main", provider: "gitlab" as const, token: "tok" };
+    const out = await executeReadTool("write_file", { path: "a.ts", content: "x" }, apiCtx, true);
+    expect(out).toContain("çalışma alanı sunucusu");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("allowWrite + local: write_file köprüye yazar", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true, created: true }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const out = await executeReadTool("write_file", { path: "a.ts", content: "x" }, localCtx, true);
+    expect(out).toContain("✅");
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("/fs/write");
+  });
+
+  it("str_replace: old_string bulunamazsa yazma YAPMAZ", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify({ content: "merhaba dunya" }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const out = await executeReadTool("str_replace", { path: "a.ts", old_string: "YOK", new_string: "y" }, localCtx, true);
+    expect(out).toContain("bulunamadı");
+    /* Yalnız okuma yapılmalı; ikinci (yazma) çağrı olmamalı. */
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("str_replace: old_string birden çok kez geçiyorsa yazma YAPMAZ (belirsiz düzenleme)", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify({ content: "a\na\n" }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const out = await executeReadTool("str_replace", { path: "f.ts", old_string: "a", new_string: "b" }, localCtx, true);
+    expect(out).toContain("2 kez");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("str_replace: tam olarak bir eşleşmede değiştirip yazar", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ content: "const x = 1;" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const out = await executeReadTool("str_replace", { path: "f.ts", old_string: "1", new_string: "2" }, localCtx, true);
+    expect(out).toContain("1 eşleşme");
+    const writeBody = JSON.parse(String(fetchMock.mock.calls[1]![1].body));
+    expect(writeBody.content).toBe("const x = 2;");
   });
 });

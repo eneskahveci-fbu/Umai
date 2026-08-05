@@ -199,13 +199,92 @@ async function searchCode(ctx: RepoReadCtx, query: string, extension?: string): 
   return items.length ? items.map((it) => it.path).join("\n") : "(eşleşme yok)";
 }
 
-/** Salt-okunur araç çağrısını yürütür. Bilinmeyen/yazma araçları reddedilir. */
-export async function executeReadTool(name: string, args: Record<string, unknown>, ctx: RepoReadCtx): Promise<string> {
+/* ── YAZMA araçları (yalnız gerçek dosya sistemi = köprü modunda) ──
+   Neden yalnız köprüde: GitHub/GitLab API yolunda her yazma bir COMMIT'tir.
+   Paralel çalışan alt-ajanlar aynı dala aynı anda commit atarsa yarış/çakışma
+   olur (birinin yazdığı diğerinin base SHA'sını bayatlatır) ve kullanıcı
+   yarım kalmış bir geçmişle baş başa kalır. Gerçek dosya sisteminde ise
+   paralel yazma doğaldır — Claude'un alt-ajanları da tek bir çalışma
+   klasöründe böyle çalışır. Bu yüzden yazma yetkisi provider'a göre AÇIKÇA
+   kapatılır, sessizce başarısız olmaz. */
+export const WRITE_TOOLS: ReadToolDef[] = [
+  {
+    type: "function",
+    function: {
+      name: "write_file",
+      description: "Dosyayı OLUŞTURUR veya tamamen değiştirir. Küçük düzenlemeler için str_replace'i tercih et.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Repo köküne göre yol" },
+          content: { type: "string", description: "Dosyanın tam yeni içeriği" },
+        },
+        required: ["path", "content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "str_replace",
+      description: "Dosyada BELİRLİ bir metni yenisiyle değiştirir (hedefli düzenleme). old_string dosyada tam olarak BİR KEZ geçmeli.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Repo köküne göre yol" },
+          old_string: { type: "string", description: "Değiştirilecek MEVCUT metin (birebir)" },
+          new_string: { type: "string", description: "Yerine yazılacak yeni metin" },
+        },
+        required: ["path", "old_string", "new_string"],
+      },
+    },
+  },
+];
+
+async function bridgeWriteFile(ctx: RepoReadCtx, path: string, content: string): Promise<string> {
+  if (!path) return "Hata: path boş";
+  const data = await bridgeCall(ctx, "/fs/write", { path, content });
+  if (typeof data.error === "string") return `Hata: ${data.error}`;
+  return `✅ ${path} yazıldı${data.created ? " (yeni dosya)" : ""}.`;
+}
+
+async function bridgeStrReplace(ctx: RepoReadCtx, path: string, oldStr: string, newStr: string): Promise<string> {
+  if (!path) return "Hata: path boş";
+  if (!oldStr) return "Hata: old_string boş";
+  const read = await bridgeCall(ctx, "/fs/read", { path });
+  if (typeof read.error === "string") return `Hata: ${read.error} (${path})`;
+  const current = typeof read.content === "string" ? read.content : "";
+  const occurrences = current.split(oldStr).length - 1;
+  if (occurrences === 0) return `Hata: old_string '${path}' içinde bulunamadı. Önce read_file ile içeriği doğrula.`;
+  if (occurrences > 1) return `Hata: old_string '${path}' içinde ${occurrences} kez geçiyor — benzersiz olacak şekilde genişlet.`;
+  const updated = current.replace(oldStr, newStr);
+  const w = await bridgeCall(ctx, "/fs/write", { path, content: updated });
+  if (typeof w.error === "string") return `Hata: ${w.error}`;
+  return `✅ ${path}: 1 eşleşme değiştirildi.`;
+}
+
+/** Alt-ajan araç çağrısını yürütür.
+    `allowWrite` false ise (varsayılan) yazma araçları REDDEDİLİR — çağıran
+    taraf yetkiyi açıkça vermek zorundadır. */
+export async function executeReadTool(
+  name: string,
+  args: Record<string, unknown>,
+  ctx: RepoReadCtx,
+  allowWrite = false,
+): Promise<string> {
   try {
     if (name === "list_files") return await listFiles(ctx, typeof args.filter === "string" ? args.filter : undefined);
     if (name === "read_file") return await readFile(ctx, String(args.path ?? ""));
     if (name === "search_code") return await searchCode(ctx, String(args.query ?? ""), typeof args.extension === "string" ? args.extension : undefined);
-    return `Bu ajan yalnızca okuma yapabilir; '${name}' kullanılamaz.`;
+    if (name === "write_file" || name === "str_replace") {
+      if (!allowWrite) return `Bu alt-ajanın yazma yetkisi yok; '${name}' kullanılamaz. Bulgularını rapor et, değişikliği ana ajan uygular.`;
+      /* Savunma derinliği: yetki verilse bile yalnız gerçek dosya sisteminde
+         yaz. API yolunda commit yarışı olacağı için burada da kapalı. */
+      if (ctx.provider !== "local") return `Yazma yalnız çalışma alanı sunucusu (köprü) bağlıyken mümkün; '${name}' bu modda kullanılamaz.`;
+      if (name === "write_file") return await bridgeWriteFile(ctx, String(args.path ?? ""), String(args.content ?? ""));
+      return await bridgeStrReplace(ctx, String(args.path ?? ""), String(args.old_string ?? ""), String(args.new_string ?? ""));
+    }
+    return `Bu ajan '${name}' aracını kullanamaz.`;
   } catch (e) {
     return `Hata: ${(e as Error).message}`;
   }
