@@ -85,6 +85,8 @@ const TOOL_LABEL: Record<string, string> = {
   generate_image:     "Görsel üretiliyor",
   deep_research:      "Derinlemesine araştırılıyor",
   run_command:        "Komut çalıştırılıyor",
+  check_command:      "Komut durumu okunuyor",
+  stop_command:       "Komut durduruluyor",
 };
 
 const TOOL_DONE_LABEL: Record<string, string> = {
@@ -102,6 +104,8 @@ const TOOL_DONE_LABEL: Record<string, string> = {
   list_branches:      "Listelendi",
   create_branch:      "Oluşturuldu",
   run_command:        "Çalıştırıldı",
+  check_command:      "Okundu",
+  stop_command:       "Durduruldu",
   get_commit_history: "Alındı",
   web_search:         "Arandı",
   read_url:           "Okundu",

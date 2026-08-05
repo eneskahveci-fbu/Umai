@@ -329,6 +329,47 @@ export const CODER_TOOLS: ToolDefinition[] = [
       },
     },
   },
+  /* Uzun süren komutlar için takip araçları (Claude Code'un BashOutput/
+     KillShell karşılığı). run_command bir geliştirme sunucusu gibi bitmeyen
+     bir komut başlattığında "hâlâ çalışıyor" notuyla birlikte bir görev
+     kimliği döner; ajan bu araçlarla sonradan çıktıyı okuyabilir ve gerekirse
+     süreci durdurabilir. Bunlar olmadan ajan komutu başlatıp körleşiyordu:
+     "sunucu ayağa kalktı mı, hata mı verdi?" sorusunu yanıtlayamıyordu. */
+  {
+    type: "function",
+    function: {
+      name: "check_command",
+      description:
+        "Arka planda ÇALIŞMAYA DEVAM EDEN bir komutun o ana kadarki çıktısını ve durumunu okur. " +
+        "run_command 'hâlâ çalışıyor' dediğinde verdiği görev kimliğiyle kullan — ör. 'npm run dev' " +
+        "başlattıktan sonra sunucunun gerçekten ayağa kalkıp kalkmadığını görmek için. " +
+        "Aynı kimlikle birden çok kez çağrılabilir (çıktı biriktikçe yenisini görürsün).",
+      parameters: {
+        type: "object",
+        properties: {
+          task_id: { type: "string", description: "run_command'ın döndürdüğü görev kimliği." },
+        },
+        required: ["task_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "stop_command",
+      description:
+        "Arka planda çalışan bir komutu (ve başlattığı tüm alt süreçleri) DURDURUR. " +
+        "Örn. test için başlattığın geliştirme sunucusunu işin bitince kapatmak için. " +
+        "Görev kimliğini run_command'dan alırsın.",
+      parameters: {
+        type: "object",
+        properties: {
+          task_id: { type: "string", description: "Durdurulacak görevin kimliği." },
+        },
+        required: ["task_id"],
+      },
+    },
+  },
   {
     type: "function",
     function: {
