@@ -2336,12 +2336,23 @@ export async function POST(req: Request) {
               safe.enqueue(encoder.encode(`data: ${JSON.stringify({ swarm_event: { kind: "swarm", phase, agents } })}\n\n`));
             emitSwarm("working");
 
+            /* Alt-ajanlara YAZMA yetkisi: yalnız gerçek dosya sistemi (köprü)
+               varken VE ana ajanın yazma kapıları açıkken. Güvenli Mod, Plan
+               modu veya "düzenlemeleri onayla" açıkken alt-ajan da yazamaz —
+               aksi halde kullanıcının koyduğu kapı alt-ajan üzerinden
+               dolanılmış olurdu. */
+            const subAgentsCanWrite =
+              repoCtx?.provider === "local" && !!repoCtx.bridgeUrl && !blockWrites && !body.safeMode;
             const results = await Promise.all(tasks.map(async (t, i) => {
               try {
                 const out = await runReadOnlyAgent(subCfg, [
-                  { role: "system", content: "Sen uzman, son derece yetenekli bir alt-ajansın — ana modelin tüm kapasitesini kullan. Yöntem: (1) görevi kısaca planla, (2) gereken dosyaları read_file/list_files/grep ile KENDİN incele (varsayma, doğrula), (3) bulgularını dosya/satır kanıtına dayandır, (4) sonucu sunmadan önce kendi çıktını gözden geçir (öz-doğrulama). SADECE verilen alt göreve odaklan; NET, uygulanabilir, kanıtlı bir sonuç döndür. Uydurma — emin değilsen belirt. Türkçe yaz." + (repoCtx ? "" : " Bu görevde bağlı bir depo YOK; dosya araçların yok, kendi bilginle yanıtla ve dosya içeriği uydurma.") },
+                  { role: "system", content: "Sen uzman, son derece yetenekli bir alt-ajansın — ana modelin tüm kapasitesini kullan. Yöntem: (1) görevi kısaca planla, (2) gereken dosyaları read_file/list_files/grep ile KENDİN incele (varsayma, doğrula), (3) bulgularını dosya/satır kanıtına dayandır, (4) sonucu sunmadan önce kendi çıktını gözden geçir (öz-doğrulama). SADECE verilen alt göreve odaklan; NET, uygulanabilir, kanıtlı bir sonuç döndür. Uydurma — emin değilsen belirt. Türkçe yaz."
+                    + (repoCtx ? "" : " Bu görevde bağlı bir depo YOK; dosya araçların yok, kendi bilginle yanıtla ve dosya içeriği uydurma.")
+                    + (subAgentsCanWrite
+                        ? " YAZMA YETKİN VAR: değişikliği write_file/str_replace ile KENDİN uygula, 'şöyle yapılmalı' deyip bırakma. SADECE kendi alt görevinin dosyalarına dokun — diğer alt-ajanlar aynı anda başka dosyalarda çalışıyor, onların alanına girme. Bitince neyi değiştirdiğini kısaca özetle."
+                        : (repoCtx ? " Yazma yetkin YOK: dosya değiştirme, bulgularını ve önerilen değişikliği net biçimde raporla — uygulamayı ana ajan yapacak." : "")) },
                   { role: "user", content: `ALT GÖREV: ${t.title || ""}\n${t.instruction}` },
-                ], repoCtx ?? null);
+                ], repoCtx ?? null, undefined, subAgentsCanWrite);
                 agents[i] = { ...agents[i], status: "done", output: out };
                 emitSwarm("working");
                 return out;
