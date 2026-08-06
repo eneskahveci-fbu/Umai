@@ -11,7 +11,7 @@ import {
   AlertCircle, BookMarked, Brain, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
   Circle, CircleCheck, Columns, Compass, FlaskConical, GitPullRequest, Image as ImageIcon, ImageOff, ListChecks, Microscope, MoreHorizontal, Settings2,
   Code2, Copy, FileText, FolderOpen, GitBranch, GitCommit, Globe,
-  Highlighter, Loader2, Pencil, RefreshCw, Search, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, Users, Volume2, VolumeX, Wrench, X,
+  Highlighter, History, Loader2, Pencil, RefreshCw, Search, Sparkles, Terminal as TerminalIcon, ThumbsDown, ThumbsUp, Users, Volume2, VolumeX, Wrench, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ChatMessage, CompareResult, FileCheckpoint, SwarmState } from "@/lib/types";
@@ -747,6 +747,7 @@ function MessageBubbleImpl({
   onRegenerate,
   onContinue,
   onEdit,
+  onRewind,
   onSwitchVersion,
   streamingNow,
   onChecklistToggle,
@@ -762,6 +763,8 @@ function MessageBubbleImpl({
   onRegenerate?: (modelId?: string) => void;
   onContinue?: () => void;
   onEdit?: (index: number, content: string) => void;
+  /** Oturum geri sarma: bu mesajın ÖNCESİNE dön (konuşma + dosyalar). */
+  onRewind?: (index: number) => void;
   onSwitchVersion?: (branchIndex: number) => void;
   streamingNow?: boolean;
   onChecklistToggle?: () => void;
@@ -967,6 +970,18 @@ function MessageBubbleImpl({
                 {onEdit && (
                   <button onClick={startEdit} aria-label="Düzenle" className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-2.5 rounded-lg hover:bg-bgsoft transition-colors">
                     <Pencil size={12} />
+                  </button>
+                )}
+                {/* Geri sar: bu mesajın ÖNCESİNE dön — sonraki konuşma VE dosya
+                    değişiklikleri geri alınır (Claude Code /rewind gibi). */}
+                {onRewind && (
+                  <button
+                    onClick={() => onRewind(index)}
+                    aria-label="Buraya geri sar"
+                    title="Bu noktaya geri sar — sonraki mesajlar ve dosya değişiklikleri geri alınır"
+                    className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-2.5 rounded-lg hover:bg-bgsoft transition-colors"
+                  >
+                    <History size={12} />
                   </button>
                 )}
                 {onSwitchVersion && message.branches && message.branches.length > 1 && (

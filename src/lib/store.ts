@@ -556,6 +556,8 @@ interface StoreState {
   addCommandRun: (command: string, kind?: "shell" | "code") => void;
   setCommandOutput: (command: string, output: string, status: "done" | "error") => void;
   setCheckpointsOnLast: (checkpoints: FileCheckpoint[]) => void;
+  /** Aktif sohbeti ilk `keepCount` mesaja kısaltır (oturum geri sarma). */
+  truncateMessages: (keepCount: number) => void;
   addImageToLast: (url: string) => void;
   setFinishReasonOnLast: (finishReason: string | undefined) => void;
   setSourcesOnLast: (sources: { title: string; url: string }[]) => void;
@@ -1511,6 +1513,15 @@ export const useStore = create<StoreState>()((set, get) => ({
         }
         return { ...c, messages };
       }),
+    })),
+  /* Oturum geri sarma: konuşmayı `keepCount` mesaja kısaltır. Dosya tarafı
+     ayrı yürür (bkz. lib/rewind.ts planRewind + CoderView.rewindTo) — burada
+     yalnız konuşma kırpılır ki store saf/ağsız kalsın. */
+  truncateMessages: (keepCount) =>
+    set((s) => ({
+      chats: s.chats.map((c) =>
+        c.id === s.currentId ? { ...c, messages: c.messages.slice(0, Math.max(0, keepCount)) } : c,
+      ),
     })),
   /* generate_image aracının ürettiği görseli son asistan mesajına EKLER.
      Neden ayrı bir kanal: görsel eskiden `![...](url)` markdown'ı olarak

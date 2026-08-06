@@ -617,3 +617,41 @@ describe("useStore — depo/hesap bağlama (çok hesaplı)", () => {
     expect(useStore.getState().tree).toBeNull();
   });
 });
+
+describe("useStore — truncateMessages (oturum geri sarma)", () => {
+  it("aktif sohbeti verilen uzunluğa kısaltır", () => {
+    const st = useStore.getState();
+    st.newChat();
+    st.pushMessage({ role: "user", content: "1" });
+    st.pushMessage({ role: "assistant", content: "2" });
+    st.pushMessage({ role: "user", content: "3" });
+    st.pushMessage({ role: "assistant", content: "4" });
+    useStore.getState().truncateMessages(2);
+    const msgs = useStore.getState().current()?.messages ?? [];
+    expect(msgs.map((m) => m.content)).toEqual(["1", "2"]);
+  });
+
+  it("negatif/aşırı değerlerde güvenli", () => {
+    const st = useStore.getState();
+    st.newChat();
+    st.pushMessage({ role: "user", content: "a" });
+    useStore.getState().truncateMessages(-3);
+    expect(useStore.getState().current()?.messages ?? []).toHaveLength(0);
+    useStore.getState().pushMessage({ role: "user", content: "b" });
+    useStore.getState().truncateMessages(99);
+    expect(useStore.getState().current()?.messages ?? []).toHaveLength(1);
+  });
+
+  it("SADECE aktif sohbeti etkiler", () => {
+    const st = useStore.getState();
+    st.newChat();
+    st.pushMessage({ role: "user", content: "eski-sohbet" });
+    const firstId = useStore.getState().currentId;
+    useStore.getState().newChat();
+    useStore.getState().pushMessage({ role: "user", content: "x" });
+    useStore.getState().pushMessage({ role: "assistant", content: "y" });
+    useStore.getState().truncateMessages(1);
+    const other = useStore.getState().chats.find((c) => c.id === firstId);
+    expect(other?.messages).toHaveLength(1);
+  });
+});
