@@ -117,13 +117,54 @@ function runBackground(command, cwd) {
   const id = crypto.randomBytes(8).toString("hex");
   const rec = { status: "running", output: "", exitCode: null, startedAt: Date.now(), command };
   tasks.set(id, rec);
-  const child = procSpawn(command, { cwd, shell: true });
+  /* detached: süreci KENDİ süreç grubunda başlat → /exec/kill grubun tamamını
+     (kabuk + altındaki gerçek program) sonlandırabilir. Olmadan yalnız `sh`
+     ölür, `npm run dev`in başlattığı node süreci yetim kalıp yaşamaya devam
+     ederdi (port meşgul kalır). */
+  const child = procSpawn(command, { cwd, shell: true, detached: true });
+  /* Süreç referansı kayıtta TUTULUR ama enumerable DEĞİL: /exec/status yanıtı
+     JSON.stringify'dan geçtiği için serileştirmeye girmemeli. */
+  Object.defineProperty(rec, "_child", { value: child, enumerable: false });
   const cap = (d) => { rec.output += d.toString(); if (rec.output.length > 500_000) rec.output = rec.output.slice(-500_000); };
   child.stdout.on("data", cap);
   child.stderr.on("data", cap);
-  child.on("close", (code) => { rec.status = "done"; rec.exitCode = code; });
-  child.on("error", (err) => { rec.status = "error"; rec.output += "\n" + err.message; rec.exitCode = -1; });
+  /* `exited`: sürecin GERÇEKTEN bittiğini gösteren tek güvenilir işaret.
+     killBackground'daki SIGKILL yükseltmesi buna bakar — `rec.status`a
+     bakılamaz, çünkü kill isteği status'u hemen "killed" yapıyor ve
+     yükseltme koşulu asla tutmuyordu (SIGKILL hiç gönderilmiyordu). */
+  Object.defineProperty(rec, "_exited", { value: false, writable: true, enumerable: false });
+  child.on("close", (code) => { rec._exited = true; rec.status = rec.status === "killed" ? "killed" : "done"; rec.exitCode = code; });
+  child.on("error", (err) => { rec._exited = true; rec.status = "error"; rec.output += "\n" + err.message; rec.exitCode = -1; });
   return id;
+}
+
+/** Arka plan görevini (ve altındaki TÜM süreç grubunu) sonlandırır.
+    Önce SIGTERM (nazik kapanış şansı), ölmezse SIGKILL. Bu yükseltme
+    ŞART: canlı testte `sh -c "node …"` grubu SIGTERM'den sağ çıktı,
+    yalnız SIGKILL ile öldü — tek başına SIGTERM'e güvenmek, durdurulduğu
+    sanılan bir dev sunucusunun portu tutmaya devam etmesi demekti. */
+function killBackground(id) {
+  const rec = tasks.get(id);
+  if (!rec) return { error: "Görev bulunamadı" };
+  if (rec.status !== "running") return { ok: true, alreadyStopped: true, status: rec.status };
+  const child = rec._child;
+  if (!child || typeof child.pid !== "number") return { error: "Süreç referansı yok" };
+  try {
+    /* Negatif pid = süreç GRUBU (detached ile mümkün). */
+    process.kill(-child.pid, "SIGTERM");
+  } catch (e) {
+    /* ESRCH: grup zaten yok (yarış) — hata değil, başarı say. */
+    if (e.code !== "ESRCH") return { error: e.message };
+    rec._exited = true;
+  }
+  if (!rec._exited) {
+    setTimeout(() => {
+      if (rec._exited) return;
+      try { process.kill(-child.pid, "SIGKILL"); } catch { /* çoktan öldü */ }
+    }, 3000);
+  }
+  rec.status = "killed";
+  return { ok: true };
 }
 
 function runForeground(command, cwd) {
@@ -217,6 +258,10 @@ const server = http.createServer(async (req, res) => {
     }
 
     const body = req.method === "POST" ? await readBody(req) : {};
+
+    if (route === "/exec/kill") {
+      return send(res, 200, killBackground(String(body.id || "")));
+    }
 
     switch (route) {
       case "/fs/list": {

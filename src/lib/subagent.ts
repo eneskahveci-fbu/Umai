@@ -1,4 +1,4 @@
-import { READONLY_TOOLS, executeReadTool, type RepoReadCtx } from "./repoRead";
+import { READONLY_TOOLS, WRITE_TOOLS, executeReadTool, type RepoReadCtx } from "./repoRead";
 import { anthropicUpstream, type OpenAIChatBody } from "./anthropic";
 import type { Provider } from "./types";
 
@@ -76,6 +76,7 @@ async function callTurn(
   toolChoice: "auto" | "none",
   signal?: AbortSignal,
   withTools = true,
+  tools: unknown[] = READONLY_TOOLS,
 ): Promise<{ content: string; toolCalls: AccToolCall[] }> {
   const body: Record<string, unknown> = {
     model: cfg.model,
@@ -83,7 +84,7 @@ async function callTurn(
     stream: true,
     /* Depo bağlı değilken araç HİÇ gönderilmez: salt-okunur araçların hepsi
        repoya bağlıdır, boş bir `tools` dizisi bazı sağlayıcılarda 400 verir. */
-    ...(withTools ? { tools: READONLY_TOOLS, tool_choice: toolChoice } : {}),
+    ...(withTools ? { tools, tool_choice: toolChoice } : {}),
   };
   if (cfg.provider === "pollinations") body.referrer = "craft-coder";
   if (cfg.provider === "anthropic") {
@@ -107,19 +108,27 @@ export async function runReadOnlyAgent(
      buraya taşınmış hâli. Böylece "Ajan Ekibi" depo gerektirmeden çalışır. */
   ctx: RepoReadCtx | null,
   signal?: AbortSignal,
+  /** true ise alt-ajan write_file/str_replace de kullanabilir (Claude'un
+      alt-ajanlarının gerçek iş yapabilmesi gibi). Çağıran taraf bunu YALNIZ
+      yazma kapıları açıkken vermeli (Güvenli Mod / Plan modu kapalıysa);
+      ayrıca gerçek dosya sistemi şartı burada ve executeReadTool içinde
+      İKİ KEZ doğrulanır — API yolunda paralel commit yarışı olurdu. */
+  allowWrite = false,
 ): Promise<string> {
   type Msg = { role: string; content: string; tool_calls?: unknown[]; tool_call_id?: string };
   const convo: Msg[] = [...messages];
   if (!ctx) return (await callTurn(cfg, convo, "none", signal, false)).content;
+  const canWrite = allowWrite && ctx.provider === "local";
+  const tools = canWrite ? [...READONLY_TOOLS, ...WRITE_TOOLS] : READONLY_TOOLS;
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const lastRound = round === MAX_TOOL_ROUNDS - 1;
-    const { content, toolCalls } = await callTurn(cfg, convo, lastRound ? "none" : "auto", signal);
+    const { content, toolCalls } = await callTurn(cfg, convo, lastRound ? "none" : "auto", signal, true, tools);
     if (toolCalls.length === 0) return content;
     convo.push({ role: "assistant", content, tool_calls: toolCalls.map((tc) => ({ id: tc.id, function: { name: tc.name, arguments: tc.arguments } })) });
     for (const tc of toolCalls) {
       let args: Record<string, unknown> = {};
       try { args = JSON.parse(tc.arguments || "{}"); } catch { /* ignore */ }
-      const result = await executeReadTool(tc.name, args, ctx);
+      const result = await executeReadTool(tc.name, args, ctx, canWrite);
       convo.push({ role: "tool", tool_call_id: tc.id, content: result });
     }
   }
