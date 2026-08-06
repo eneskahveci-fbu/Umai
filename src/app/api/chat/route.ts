@@ -202,7 +202,7 @@ const BRIDGE_EXEC_POLL_MS = 1_200;
 async function execCommandViaBridge(
   ctx: RepoCtx,
   command: string,
-): Promise<{ output: string; done: boolean; exitCode: number | null }> {
+): Promise<{ output: string; done: boolean; exitCode: number | null; taskId: string }> {
   const base = ctx.bridgeUrl!.replace(/\/$/, "");
   const headers = { "Content-Type": "application/json", Authorization: `Bearer ${ctx.bridgeToken || ""}` };
   const dir = bridgeScope(ctx);
@@ -231,9 +231,46 @@ async function execCommandViaBridge(
     if (!statusRes || !statusRes.ok) continue;
     const rec = await statusRes.json() as { status: string; output?: string; exitCode?: number | null };
     lastOutput = rec.output || "";
-    if (rec.status !== "running") return { output: lastOutput, done: true, exitCode: rec.exitCode ?? null };
+    if (rec.status !== "running") return { output: lastOutput, done: true, exitCode: rec.exitCode ?? null, taskId };
   }
-  return { output: lastOutput, done: false, exitCode: null };
+  return { output: lastOutput, done: false, exitCode: null, taskId };
+}
+
+/** Arka plandaki komudun O ANKİ durumunu/çıktısını okur (check_command). */
+async function checkCommandViaBridge(
+  ctx: RepoCtx,
+  taskId: string,
+): Promise<{ status: string; output: string; exitCode: number | null }> {
+  const base = ctx.bridgeUrl!.replace(/\/$/, "");
+  const res = await fetch(`${base}/exec/status?id=${encodeURIComponent(taskId)}`, {
+    headers: { Authorization: `Bearer ${ctx.bridgeToken || ""}` },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (res.status === 404) throw new Error("Görev bulunamadı (kimlik yanlış ya da sunucu yeniden başlamış olabilir).");
+  if (!res.ok) throw new Error(`Köprü /exec/status hatası ${res.status}`);
+  const rec = await res.json() as { status?: string; output?: string; exitCode?: number | null };
+  return { status: rec.status || "unknown", output: rec.output || "", exitCode: rec.exitCode ?? null };
+}
+
+/** Arka plandaki komudu durdurur (stop_command). Köprü bu ucu bilmiyorsa
+    (eski sürüm — kullanıcı sunucusunu henüz güncellememiş olabilir) bunu
+    ANLAŞILIR biçimde söyler; sessizce "başarılı" demez. */
+async function stopCommandViaBridge(ctx: RepoCtx, taskId: string): Promise<string> {
+  const base = ctx.bridgeUrl!.replace(/\/$/, "");
+  const res = await fetch(`${base}/exec/kill`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${ctx.bridgeToken || ""}` },
+    body: JSON.stringify({ id: taskId }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (res.status === 404) {
+    return "Bu köprü sürümü komut durdurmayı desteklemiyor (sunucudaki bridge.mjs güncellenmeli). Komut çalışmaya devam ediyor.";
+  }
+  if (!res.ok) return `Hata: köprü /exec/kill ${res.status}`;
+  const data = await res.json() as { ok?: boolean; error?: string; alreadyStopped?: boolean; status?: string };
+  if (data.error) return `Hata: ${data.error}`;
+  if (data.alreadyStopped) return `Komut zaten çalışmıyordu (durum: ${data.status ?? "bilinmiyor"}).`;
+  return "✅ Komut durduruldu.";
 }
 
 interface SkillPayload {
@@ -1820,6 +1857,17 @@ export async function POST(req: Request) {
       `• list_branches() / create_branch(name, from?) — dal işlemleri\n` +
       `• create_pr(title, head, base, body?) — PR/MR aç (başlık+açıklamayı sen üret)\n` +
       `• get_commit_history(limit?, path?) — commit geçmişi\n` +
+      /* Aynı koşul araç filtresinde de var (bridgeExecAvailable) ama o
+         DEĞİŞKEN burada henüz tanımlı değil — sysPrompt ondan önce kuruluyor.
+         Koşulu yerinde hesapla ki talimat ile gerçekten sunulan araç listesi
+         asla çelişmesin (olmayan aracı tarif etmek modeli yanıltır). */
+      (rc.provider === "local" && !!rc.bridgeUrl
+        ? `• check_command(task_id) — arka planda süren komudun ANLIK çıktısını/durumunu oku\n` +
+          `• stop_command(task_id) — arka plandaki komudu (ve alt süreçlerini) durdur\n` +
+          `  ↳ run_command bitmeyen bir komut başlattığında bir görev kimliği döner. "npm run dev" gibi ` +
+          `bir şey başlattıysan KÖRLEŞME: check_command ile sunucunun gerçekten ayağa kalktığını doğrula, ` +
+          `işin bitince stop_command ile kapat.\n`
+        : "") +
       `• git_diff(base, head) — iki dal/commit arasındaki farkı göster\n` +
       `• git_log(branch?, path?, limit?) — commit geçmişini listele\n` +
       `• git_blame(path, startLine?, endLine?) — dosyayı etkileyen son commit'ler\n` +
@@ -1977,6 +2025,13 @@ export async function POST(req: Request) {
   const bridgeExecAvailable = repoCtx?.provider === "local" && !!repoCtx.bridgeUrl;
   if (!body.terminalAvailable && !bridgeExecAvailable) {
     coderTools = coderTools.filter((t) => t.function.name !== "run_command");
+  }
+  /* check_command/stop_command YALNIZ köprü modunda anlamlı — istemci
+     terminalinde (WebContainer/uzak WS) arka plan görev kimliği kavramı yok,
+     komut çıktısı ayrı bir mesaj olarak zaten geliyor. Sunulursa model
+     çağırır ve her seferinde "kullanılamaz" cevabı alır (boşa tur). */
+  if (!bridgeExecAvailable) {
+    coderTools = coderTools.filter((t) => t.function.name !== "check_command" && t.function.name !== "stop_command");
   }
   /* ask_user (Claude tarzı tıklanabilir anket) düz sohbette de sunulur AMA yalnız
      tool-YETENEKLİ (anahtarlı) birincil sağlayıcıda: Pollinations/OVH gibi anahtarsız
@@ -2281,12 +2336,23 @@ export async function POST(req: Request) {
               safe.enqueue(encoder.encode(`data: ${JSON.stringify({ swarm_event: { kind: "swarm", phase, agents } })}\n\n`));
             emitSwarm("working");
 
+            /* Alt-ajanlara YAZMA yetkisi: yalnız gerçek dosya sistemi (köprü)
+               varken VE ana ajanın yazma kapıları açıkken. Güvenli Mod, Plan
+               modu veya "düzenlemeleri onayla" açıkken alt-ajan da yazamaz —
+               aksi halde kullanıcının koyduğu kapı alt-ajan üzerinden
+               dolanılmış olurdu. */
+            const subAgentsCanWrite =
+              repoCtx?.provider === "local" && !!repoCtx.bridgeUrl && !blockWrites && !body.safeMode;
             const results = await Promise.all(tasks.map(async (t, i) => {
               try {
                 const out = await runReadOnlyAgent(subCfg, [
-                  { role: "system", content: "Sen uzman, son derece yetenekli bir alt-ajansın — ana modelin tüm kapasitesini kullan. Yöntem: (1) görevi kısaca planla, (2) gereken dosyaları read_file/list_files/grep ile KENDİN incele (varsayma, doğrula), (3) bulgularını dosya/satır kanıtına dayandır, (4) sonucu sunmadan önce kendi çıktını gözden geçir (öz-doğrulama). SADECE verilen alt göreve odaklan; NET, uygulanabilir, kanıtlı bir sonuç döndür. Uydurma — emin değilsen belirt. Türkçe yaz." + (repoCtx ? "" : " Bu görevde bağlı bir depo YOK; dosya araçların yok, kendi bilginle yanıtla ve dosya içeriği uydurma.") },
+                  { role: "system", content: "Sen uzman, son derece yetenekli bir alt-ajansın — ana modelin tüm kapasitesini kullan. Yöntem: (1) görevi kısaca planla, (2) gereken dosyaları read_file/list_files/grep ile KENDİN incele (varsayma, doğrula), (3) bulgularını dosya/satır kanıtına dayandır, (4) sonucu sunmadan önce kendi çıktını gözden geçir (öz-doğrulama). SADECE verilen alt göreve odaklan; NET, uygulanabilir, kanıtlı bir sonuç döndür. Uydurma — emin değilsen belirt. Türkçe yaz."
+                    + (repoCtx ? "" : " Bu görevde bağlı bir depo YOK; dosya araçların yok, kendi bilginle yanıtla ve dosya içeriği uydurma.")
+                    + (subAgentsCanWrite
+                        ? " YAZMA YETKİN VAR: değişikliği write_file/str_replace ile KENDİN uygula, 'şöyle yapılmalı' deyip bırakma. SADECE kendi alt görevinin dosyalarına dokun — diğer alt-ajanlar aynı anda başka dosyalarda çalışıyor, onların alanına girme. Bitince neyi değiştirdiğini kısaca özetle."
+                        : (repoCtx ? " Yazma yetkin YOK: dosya değiştirme, bulgularını ve önerilen değişikliği net biçimde raporla — uygulamayı ana ajan yapacak." : "")) },
                   { role: "user", content: `ALT GÖREV: ${t.title || ""}\n${t.instruction}` },
-                ], repoCtx ?? null);
+                ], repoCtx ?? null, undefined, subAgentsCanWrite);
                 agents[i] = { ...agents[i], status: "done", output: out };
                 emitSwarm("working");
                 return out;
@@ -2476,6 +2542,38 @@ export async function POST(req: Request) {
             resultById.set(tc.id, note);
             return;
           }
+          /* check_command / stop_command — arka plandaki komudu sonradan
+             okumak/durdurmak (Claude Code'un BashOutput/KillShell karşılığı).
+             Yalnız köprü modunda anlamlı: WebContainer/uzak-WS yolunda komut
+             zaten istemcide çalışır ve çıktısı ayrı mesajla döner. */
+          if (tc.name === "check_command" || tc.name === "stop_command") {
+            const taskId = String(args.task_id ?? "").trim();
+            const emit = (result: string) => {
+              safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result } })}\n\n`));
+              resultById.set(tc.id, result);
+            };
+            if (!repoCtx || repoCtx.provider !== "local" || !repoCtx.bridgeUrl) {
+              emit("Bu araç yalnız çalışma alanı sunucusu (köprü) bağlıyken kullanılabilir.");
+              return;
+            }
+            if (!taskId) { emit("Hata: task_id zorunlu."); return; }
+            try {
+              if (tc.name === "stop_command") {
+                emit(await stopCommandViaBridge(repoCtx, taskId));
+                return;
+              }
+              const r = await checkCommandViaBridge(repoCtx, taskId);
+              const out = redactSecrets(r.output || "(çıktı yok)").slice(-8000);
+              emit(
+                r.status === "running"
+                  ? `⏳ Görev ${taskId} hâlâ çalışıyor. Şimdiye kadarki çıktı:\n${out}`
+                  : `✅ Görev ${taskId} bitti (durum: ${r.status}${typeof r.exitCode === "number" ? `, exit: ${r.exitCode}` : ""}).\n${out}`,
+              );
+            } catch (e) {
+              emit(`Hata: ${(e as Error).message}`);
+            }
+            return;
+          }
           if (tc.name === "run_command") {
             const command = String(args.command ?? "").trim();
             /* Köprüde gerçek /exec varsa DOĞRUDAN sunucudan çalıştır — telefon/
@@ -2490,7 +2588,13 @@ export async function POST(req: Request) {
                 const out = redactSecrets(r.output || "(çıktı yok)").slice(0, 8000);
                 const note = r.done
                   ? `$ ${command}\n${out}${typeof r.exitCode === "number" && r.exitCode !== 0 ? `\n[exit: ${r.exitCode}]` : ""}`
-                  : `⏳ '${command}' sunucuda arka planda çalışmaya DEVAM EDİYOR (henüz bitmedi — telefon kilitlense/kapansa bile durmaz). Şimdiye kadarki çıktı:\n${out}`;
+                  /* Görev kimliğini MUTLAKA bildir: ajan sonradan check_command
+                     ile çıktıyı okuyabilsin, stop_command ile durdurabilsin.
+                     Bu olmadan komut başlatılıp körleşiliyordu. */
+                  : `⏳ '${command}' sunucuda arka planda çalışmaya DEVAM EDİYOR (telefon kilitlense/kapansa bile durmaz).\n` +
+                    `Görev kimliği: ${r.taskId}\n` +
+                    `Devamını görmek için check_command("${r.taskId}"), durdurmak için stop_command("${r.taskId}").\n` +
+                    `Şimdiye kadarki çıktı:\n${out}`;
                 safe.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_event: { phase: "end", id: tc.id, name: tc.name, result: note } })}\n\n`));
                 resultById.set(tc.id, note);
               } catch (e) {

@@ -276,7 +276,7 @@ export const CODER_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "dispatch_agents",
-      description: "Karmaşık bir görevi PARALEL alt-ajanlara böler (Claude'daki Task/subagent gibi). Her alt-ajan repoyu salt-okunur araçlarla BAĞIMSIZ inceler ve sonucunu döndürür; sen sonuçları birleştirip uygularsın. Yalnızca birbirinden bağımsız, aynı anda yapılabilen 2-4 alt görev için kullan (ör. farklı modülleri/konuları paralel araştırmak). Basit görevlerde KULLANMA — kendin oku.",
+      description: "Karmaşık bir görevi PARALEL alt-ajanlara böler (Claude'daki Task/subagent gibi). Her alt-ajan repoyu BAĞIMSIZ inceler ve sonucunu döndürür. Çalışma alanı sunucusu (köprü) bağlıysa ve yazma kapıları açıksa alt-ajanlar değişikliği KENDİLERİ de uygulayabilir; aksi halde yalnız inceleyip raporlarlar. Yalnızca birbirinden BAĞIMSIZ, aynı anda yapılabilen 2-4 alt görev için kullan — alt görevleri AYRI dosya/modüllere ayır ki paralel yazmalar çakışmasın. Basit görevlerde KULLANMA — kendin oku.",
       parameters: {
         type: "object",
         properties: {
@@ -326,6 +326,47 @@ export const CODER_TOOLS: ToolDefinition[] = [
           command: { type: "string", description: "Çalıştırılacak tek satırlık kabuk komutu. Örn: 'npm test'" },
         },
         required: ["command"],
+      },
+    },
+  },
+  /* Uzun süren komutlar için takip araçları (Claude Code'un BashOutput/
+     KillShell karşılığı). run_command bir geliştirme sunucusu gibi bitmeyen
+     bir komut başlattığında "hâlâ çalışıyor" notuyla birlikte bir görev
+     kimliği döner; ajan bu araçlarla sonradan çıktıyı okuyabilir ve gerekirse
+     süreci durdurabilir. Bunlar olmadan ajan komutu başlatıp körleşiyordu:
+     "sunucu ayağa kalktı mı, hata mı verdi?" sorusunu yanıtlayamıyordu. */
+  {
+    type: "function",
+    function: {
+      name: "check_command",
+      description:
+        "Arka planda ÇALIŞMAYA DEVAM EDEN bir komutun o ana kadarki çıktısını ve durumunu okur. " +
+        "run_command 'hâlâ çalışıyor' dediğinde verdiği görev kimliğiyle kullan — ör. 'npm run dev' " +
+        "başlattıktan sonra sunucunun gerçekten ayağa kalkıp kalkmadığını görmek için. " +
+        "Aynı kimlikle birden çok kez çağrılabilir (çıktı biriktikçe yenisini görürsün).",
+      parameters: {
+        type: "object",
+        properties: {
+          task_id: { type: "string", description: "run_command'ın döndürdüğü görev kimliği." },
+        },
+        required: ["task_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "stop_command",
+      description:
+        "Arka planda çalışan bir komutu (ve başlattığı tüm alt süreçleri) DURDURUR. " +
+        "Örn. test için başlattığın geliştirme sunucusunu işin bitince kapatmak için. " +
+        "Görev kimliğini run_command'dan alırsın.",
+      parameters: {
+        type: "object",
+        properties: {
+          task_id: { type: "string", description: "Durdurulacak görevin kimliği." },
+        },
+        required: ["task_id"],
       },
     },
   },
