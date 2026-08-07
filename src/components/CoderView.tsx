@@ -134,6 +134,7 @@ import { calculateCost, estimateTokens, formatCost, getModelPrice } from "@/lib/
 import { calcBudgetStatus, type BudgetStatus } from "@/lib/budget";
 import { buildContextSections, selectRelevantSkills } from "@/lib/prompt";
 import { detectSensitive } from "@/lib/pii";
+import { planRewind, planTouchesFiles } from "@/lib/rewind";
 import { isOfficeFile } from "@/lib/office";
 import { friendlyError } from "@/lib/friendlyError";
 import { autoEffort, autoSwarm, decidePilot, decidePilotAsync, type PilotDecision } from "@/lib/autoPilot";
@@ -940,6 +941,7 @@ export function CoderView() {
   /* Ajanın bu turda yazdığı dosyaların ESKİ içeriği — "Geri al" için. */
   const [checkpoints, setCheckpoints] = useState<{ path: string; previous: string | null }[]>([]);
   const [undoing, setUndoing] = useState(false);
+  const [rewinding, setRewinding] = useState(false);
   const [checkpointsExpanded, setCheckpointsExpanded] = useState(false);
   /* Ajanın önerdiği YIKICI işlemler (sil/yeniden adlandır) — onay bekler. */
   const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
@@ -1796,6 +1798,63 @@ export function CoderView() {
       addToast(`Geri alınamadı: ${(e as Error).message}`, "error");
     } finally {
       setUndoing(false);
+    }
+  };
+
+  /* Oturum geri sarma (Claude Code /rewind karşılığı): sohbetin HERHANGİ bir
+     noktasına dön — hem konuşmayı kısalt hem o noktadan sonraki TÜM dosya
+     değişikliklerini geri al. Mevcut "Geri Al" yalnız SON turu kapsıyordu.
+     Hangi anlık görüntünün yazılacağı saf fonksiyonda hesaplanır
+     (lib/rewind.ts — aynı dosya birden çok turda değiştiyse EN ESKİ hâl). */
+  const rewindTo = async (targetIndex: number) => {
+    const store = useStore.getState();
+    const msgs = store.current()?.messages ?? [];
+    const plan = planRewind(msgs, targetIndex);
+    if (plan.droppedMessages === 0) return;
+
+    const fileNote = planTouchesFiles(plan)
+      ? `\n\n${plan.restore.length} dosya eski hâline dönecek, ${plan.remove.length} dosya silinecek.`
+      : "";
+    if (!window.confirm(
+      `Bu noktaya geri sarılsın mı?\n\n${plan.droppedMessages} mesaj sohbetten kalkacak.${fileNote}\n\nBu işlem geri alınamaz.`,
+    )) return;
+
+    setRewinding(true);
+    try {
+      /* Dosyalar ÖNCE: konuşma kırpılmadan yapılır ki bir hata olursa
+         kullanıcı hangi noktadan döndüğünü hâlâ görebilsin. */
+      if (planTouchesFiles(plan)) {
+        if (!repo) { addToast("Dosyaları geri almak için depo bağlı olmalı.", "error"); return; }
+        const token = await store.tokenForRepo(activeRepoStr, repoIsGitLab ? "gitlab" : "github");
+        const idField = repoIsGitLab ? { namespace: repo.owner } : { owner: repo.owner };
+        const base = { ...idField, repo: repo.repo, branch: repo.branch, token };
+        const post = async (endpoint: string, body: Record<string, unknown>) => {
+          const res = await fetch(endpoint, {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+          });
+          if (!res.ok) {
+            const { error } = await res.json().catch(() => ({ error: `Hata ${res.status}` }));
+            throw new Error(error);
+          }
+        };
+        for (const f of plan.restore) {
+          await post(repoIsGitLab ? "/api/gitlab/write" : "/api/github/write",
+            { ...base, path: f.path, content: f.content, message: `rewind: ${f.path}` });
+        }
+        for (const p of plan.remove) {
+          await post(repoIsGitLab ? "/api/gitlab/delete" : "/api/github/delete",
+            { ...base, path: p, message: `rewind: remove ${p}` });
+        }
+      }
+      store.truncateMessages(plan.keepCount);
+      setCheckpoints([]);
+      setCheckpointsExpanded(false);
+      await store.persistCurrent();
+      addToast(`↩ ${plan.droppedMessages} mesaj geri sarıldı`, "success");
+    } catch (e) {
+      addToast(`Geri sarılamadı: ${(e as Error).message}`, "error");
+    } finally {
+      setRewinding(false);
     }
   };
 
@@ -3850,6 +3909,15 @@ export function CoderView() {
                         streamingNow={isLastAssistant && streaming}
                         animateIn={i >= enterFrom}
                         onEdit={m.role === "user" ? editAndResend : undefined}
+                        /* Geri sarma yalnız kullanıcı mesajlarında ve SON mesaj
+                           dışında anlamlı (sona sarmak hiçbir şey yapmaz).
+                           Akış sürerken kapalı: yarıda kesilmiş bir turu geri
+                           sarmak tutarsız duruma yol açardı. */
+                        onRewind={
+                          m.role === "user" && !streaming && !rewinding && i < messages.length - 1
+                            ? rewindTo
+                            : undefined
+                        }
                         onSwitchVersion={
                           m.branches && m.branches.length > 1
                             ? (bIdx: number) => useStore.getState().switchMessageVersion(i, bIdx)
