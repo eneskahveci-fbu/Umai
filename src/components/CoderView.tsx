@@ -1038,14 +1038,6 @@ export function CoderView() {
   const [postPrMessageIndex, setPostPrMessageIndex] = useState<number | null>(null);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
-  /* Composer auto-grow: içerik değiştikçe yükseklik içeriğe uyar (≤240px);
-     gönderimde input boşalınca tek satıra döner. */
-  useEffect(() => {
-    const t = taRef.current;
-    if (!t) return;
-    t.style.height = "auto";
-    t.style.height = `${Math.min(t.scrollHeight, 240)}px`;
-  }, [input]);
   const endRef = useRef<HTMLDivElement>(null);
   /* Sayfa gizlenirken (uygulama/sekme değişimi) akan kısmi yanıtı kalıcılaştır —
      tarayıcı sekmeyi dondurup yeniden yüklerse bile o ana kadarki yanıt durur.
@@ -1109,6 +1101,22 @@ export function CoderView() {
 
   const current = chats.find((c) => c.id === currentId) || null;
   const messages = current?.messages ?? [];
+
+  /* Composer auto-grow: içerik değiştikçe yükseklik içeriğe uyar (≤240px);
+     gönderimde input boşalınca tek satıra döner.
+     `emptyChat` BAĞIMLILIĞI ŞART: boş sohbette textarea'ya min-height veriliyor
+     (davetkâr, ~3 satırlık kutu) ve scrollHeight bu tabanı içeriyor, yani buraya
+     INLINE 68px yazılıyor. Bağımlılık yalnız `input` olsaydı, dolu bir sohbete
+     geçildiğinde input değişmediği için efekt yeniden çalışmaz ve o 68px inline
+     yükseklik olduğu gibi kalırdı — composer mesajlı ekranda da kocaman
+     görünüyordu. (tsc ve testler bunu geçirir; ancak tarayıcıda görülür.) */
+  const emptyChat = messages.length === 0;
+  useEffect(() => {
+    const t = taRef.current;
+    if (!t) return;
+    t.style.height = "auto";
+    t.style.height = `${Math.min(t.scrollHeight, 240)}px`;
+  }, [input, emptyChat]);
 
   /* S2 — giriş animasyonu eşiği. Baloncuklardaki `animate-fade-in` mount'ta
      çalıştığı için sohbet her AÇILDIĞINDA tüm geçmiş yeniden animasyonlanıyor,
@@ -4293,7 +4301,16 @@ export function CoderView() {
                       ? `${attachedFiles.length} dosya eklendi — sor veya / yaz…`
                       : "Mesajınızı yazın…"
                   }
-                  className="flex-1 bg-transparent resize-none outline-none text-[15px] sm:text-[15px] leading-relaxed max-h-[240px] py-1 placeholder:text-muted/45"
+                  /* Boş sohbette composer belirgin şekilde DAHA DOLGUN durur
+                     (~3 satır). Tek satırlık ince bir kutu "buraya yaz" demiyor;
+                     ChatGPT/Claude'un boş ekranındaki davetkâr yükseklik buradan
+                     geliyor. Sohbet başlayınca tek satıra döner — o noktada
+                     ekranı mesajlara bırakmalı.
+                     min-height CSS'i, auto-grow'un inline verdiği daha küçük
+                     `height` değerini geçer; ikisi çakışmaz. */
+                  className={`flex-1 bg-transparent resize-none outline-none text-[15px] sm:text-[15px] leading-relaxed max-h-[240px] py-1 placeholder:text-muted/45 ${
+                    emptyChat ? "min-h-[68px] sm:min-h-[76px]" : ""
+                  }`}
                 />
 
                 {!streaming && (
