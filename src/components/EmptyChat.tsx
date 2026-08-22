@@ -22,7 +22,10 @@ export function EmptyChat() {
   const lastChat = chats.find((c) => !c.incognito && c.messages.length > 0);
 
   return (
-    <div className="flex flex-col items-center justify-center h-full px-6 py-10 select-none">
+    /* ALTA yaslanır (ortaya değil): CoderView boş sohbette composer'ın altına
+       bir flex-1 boşluk koyup composer'ı ekranın ortasına taşıyor; karşılama da
+       onun hemen üstünde durmalı ki ikisi TEK bir grup gibi okunsun. */
+    <div className="flex flex-col items-center justify-end min-h-full px-6 pb-5 pt-10 select-none">
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand/70 mb-2">{greeting()}</div>
       <h2 className="text-[26px] sm:text-[28px] font-extrabold tracking-tight mb-2 text-center text-balance">Ne üzerinde çalışalım?</h2>
       <p className="text-sm text-muted/70 max-w-sm text-center leading-relaxed">

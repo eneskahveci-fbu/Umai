@@ -340,7 +340,10 @@ function StatusBar({
   if (web) badges.push({ key: "web", icon: <Globe size={12} />, label: "Web", title: "Web araması: en güncel veri internetten çekilir", className: "text-brand" });
   if (autoPilot !== false) {
     badges.push({
-      key: "oto", icon: <Sparkles size={12} className="animate-breathe" />, label: "Oto",
+      /* "Oto" değil "Oto-pilot": düşünme eforu butonu da ajan modu da "Oto"
+         diyordu, üç rozet birbirinden ayırt edilemiyordu. Özellik adı zaten
+         "Otomatik Pilot" — rozet de onu söylesin. */
+      key: "oto", icon: <Sparkles size={12} className="animate-breathe" />, label: "Oto-pilot",
       title: pilotReasons?.length ? `Bu mesajda: ${pilotReasons.join(" · ")}` : "Otomatik Pilot: eforu, web aramayı, araştırmayı, kaliteyi ve ajan ekibini craft seçer",
       className: "text-brand/80",
     });
@@ -395,8 +398,13 @@ function StatusBar({
   );
 }
 
+/* short = kapalı butonun üstündeki metin, label = açılan menüdeki satır.
+   Varsayılan ("auto") durumda buton KONTROLÜN ADINI ("Efor") gösterir, değerini
+   değil: üç ayrı kavram (düşünme eforu, ajan yazma modu, Otomatik Pilot rozeti)
+   ekranda aynı anda "Oto" yazıyordu ve hangisinin ne olduğu anlaşılmıyordu.
+   Kullanıcı bir seviye seçince buton o seviyeyi gösterir (Düşük/Orta/…). */
 const THINKING_LEVELS = [
-  { key: "auto",   label: "Oto",    short: "Oto" },
+  { key: "auto",   label: "Otomatik", short: "Efor" },
   { key: "low",    label: "Düşük",  short: "Düşük" },
   { key: "medium", label: "Orta",   short: "Orta" },
   { key: "high",   label: "Yüksek", short: "Yüksek" },
@@ -3460,7 +3468,10 @@ export function CoderView() {
         </div>
 
         <div className="flex items-center gap-1 min-w-0 shrink-0">
-          {/* Token + maliyet — masaüstünde görünür (ayrıntı Ayarlar → Kullanım'da). */}
+          {/* Token + maliyet — masaüstünde görünür (ayrıntı Ayarlar → Kullanım'da).
+              Gösterilecek token yoksa UsageBadge'in KENDİSİ null döner (bkz.
+              nothingToShow) — burada ayrıca mesaj sayısına bakmıyoruz ki koşul
+              tek kaynakta kalsın. */}
           {config.models.length > 0 && (
             <div className="hidden sm:block shrink-0">
               <UsageBadge
@@ -4324,6 +4335,14 @@ export function CoderView() {
               </div>
             </div>
           </div>
+
+          {/* Boş sohbette composer'ı dikey olarak ORTALAR. Kaydırma alanı (flex-1)
+              ile bu boşluk (flex-1) ekranı eşit paylaşır → composer tam ortaya
+              gelir, EmptyChat karşılaması da (justify-end ile) hemen üstüne
+              yaslanır. Önceden karşılama ~%40'ta, composer en altta duruyor ve
+              arada koca bir ölü boşluk kalıyordu — ekranı "demo" gösteren asıl
+              şey buydu. Mesaj gelir gelmez boşluk kaybolur, composer alta döner. */}
+          {messages.length === 0 && <div className="flex-1 min-h-0" aria-hidden />}
         </div>
 
         <RightPanel
@@ -4582,6 +4601,11 @@ function UsageBadge({ chat, pendingTokens = 0 }: { chat: { totalInTokens?: numbe
   const tokenOut = chat.totalOutTokens ?? 0;
   const total = tokenIn + tokenOut;
   const activeModel = config.models.find((m) => m.id === config.activeModelId);
+  /* Gösterecek bir şey yoksa rozet hiç ÇİZİLMEZ. "0 tok" bir bilgi değil, yalnız
+     üst çubuğu dolduran bir jargon parçasıydı; ilk gerçek token akışıyla (ya da
+     kullanıcı yazmaya başlayınca, pendingTokens) kendiliğinden belirir.
+     Koşul burada duruyor ki her çağrı yerinde tekrar edilmesin. */
+  const nothingToShow = total === 0 && pendingTokens === 0;
   const cost = activeModel ? calculateCost(activeModel.model, tokenIn, tokenOut) : null;
   const hasPrice = activeModel ? getModelPrice(activeModel.model) !== null : false;
   const pct = config.maxContext > 0 ? Math.min(100, (tokenIn / config.maxContext) * 100) : 0;
@@ -4595,6 +4619,9 @@ function UsageBadge({ chat, pendingTokens = 0 }: { chat: { totalInTokens?: numbe
     }
     setOpen((o) => !o);
   };
+
+  /* Tüm hook'lar yukarıda çağrıldı — bu erken çıkış hook sırasını bozmaz. */
+  if (nothingToShow) return null;
 
   return (
     <>

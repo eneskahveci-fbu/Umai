@@ -65,7 +65,11 @@ export default function AppPage() {
   );
 
   useEffect(() => {
-    if (window.innerWidth >= 768) setSidebarOpen(false);
+    /* Geniş ekranda kenar çubuğu AÇIK başlar (ChatGPT/Claude paraleli): daraltılmış
+       rail yalnızca etiketsiz ikonlardan oluşuyor ve ilk açılışta uygulamayı
+       "gizemli bir ikon şeridi" gibi gösteriyordu — sohbet listesi ve gezinme
+       görünür olmalı. Dar/orta ekranda (<1024px) içerik alanı öncelikli. */
+    setSidebarOpen(window.innerWidth >= 1024);
     registerServiceWorker();
     /* Depodaki şifreli API anahtarlarını çöz + eski düz metni migrate et
        (mümkün olan en erken; kullanıcı bir istek başlatmadan önce tamamlanır). */
