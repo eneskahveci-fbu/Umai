@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import { ArrowRight, Check, MessageSquare, Sparkles, Wand2, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useModalA11y } from "@/lib/useModalA11y";
@@ -18,7 +17,6 @@ export function OnboardingTour() {
   const setOnboardingDone = useStore((s) => s.setOnboardingDone);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const hasModel = useStore((s) => s.config.models.length > 0);
-  const router = useRouter();
 
   const [step, setStep] = useState(0);
   const [visible, setVisible] = useState(false);
@@ -53,20 +51,21 @@ export function OnboardingTour() {
     },
     {
       icon: <Wand2 size={22} className="text-brand" />,
-      title: "İki şey yapabilirsin",
+      title: "Sohbet et, kod yazdır",
+      /* prompt.md 3a: onboarding'de Stüdyo'ya kodlama/sohbetle EŞİT ağırlık
+         verilemez ve birincil CTA her zaman "sohbete başla / kod yaz" olmalı.
+         Önceki hâli ("İki şey yapabilirsin" + tek eylem olarak "Tasarlamayı
+         dene (Stüdyo)") bu kuralı iki yönden de çiğniyordu. Stüdyo tek satırlık
+         bir dipnot olarak KALIYOR — kaldırılmıyor (3b), yalnız öne çıkarılmıyor. */
       body: (
         <>
-          <strong className="text-ink">Tasarla & üret:</strong> web sitesi, sunum, görsel — bir cümle yeter (Stüdyo).
+          Ne istediğini yaz: <strong className="text-ink">soru sor</strong>, bir metni özetlet,
+          {" "}<strong className="text-ink">kod yazdır</strong>, hatanı bulup düzelttir.
+          {" "}GitHub/GitLab deponu bağlarsan dosyalarınla doğrudan çalışır.
           <br />
-          <strong className="text-ink">Kod & geliştirme:</strong> kod yazdır, düzelt, deponu bağla.
-          <br />
-          <span className="text-muted/70">İstediğin zaman ikisi arasında geçiş yaparsın.</span>
+          <span className="text-muted/70">Tasarım, sunum ve doküman için Stüdyo da var — sol menüden ulaşırsın.</span>
         </>
       ),
-      action: {
-        label: "Tasarlamayı dene (Stüdyo)",
-        onClick: () => { dismiss(); router.push("/studio"); },
-      },
     },
     {
       icon: <MessageSquare size={22} className="text-brand" />,
@@ -81,15 +80,24 @@ export function OnboardingTour() {
     },
     {
       icon: <Sparkles size={22} className="text-brand" />,
-      title: "İleri düzey (opsiyonel)",
+      /* "İleri düzey (opsiyonel)" başlığı, ürünün EN GÜÇLÜ kozunu (kendi
+         ücretsiz anahtarınla çok daha güçlü bir model çalıştırmak) küçültüyordu.
+         Kullanıcı bunu görmeden zayıf varsayılanla deneyip ayrılabiliyor. */
+      title: "Modeli güçlendir (ücretsiz)",
       body: hasModel ? (
         <>
-          İstersen <strong className="text-ink">kendi yapay zeka modelini</strong> ekleyebilir (Gemini, Groq, NVIDIA…),
-          GitHub/GitLab deponu bağlayabilirsin. Anahtarların yalnızca
-          {" "}<strong className="text-ink">tarayıcında</strong> kalır, bize gönderilmez.
+          Hazır gelen model ücretsiz ama <strong className="text-ink">mütevazı</strong>. Google Gemini, Groq ya da
+          Cerebras&apos;tan <strong className="text-ink">ücretsiz</strong> bir anahtar alıp (kredi kartı istemez, ~30 saniye)
+          çok daha güçlü bir modele geçebilirsin. Anahtarın yalnızca
+          {" "}<strong className="text-ink">senin tarayıcında</strong> kalır — bize gönderilmez.
+          <br />
+          <span className="text-muted/70">Sohbet ekranındaki “Daha güçlü bir model bağla” bağlantısı da aynı yere götürür.</span>
         </>
       ) : (
-        <>Ayarlar&apos;dan kendi modelini ekleyebilir, deponu bağlayabilirsin. Anahtarların tarayıcında kalır.</>
+        <>
+          Ücretsiz bir anahtarla (Gemini/Groq/Cerebras) çok daha güçlü bir modele geçebilirsin.
+          Anahtarın yalnızca tarayıcında kalır.
+        </>
       ),
       action: {
         label: "Ayarlar'ı aç",

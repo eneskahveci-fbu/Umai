@@ -53,6 +53,7 @@ import {
   Zap,
 } from "lucide-react";
 import dynamic from "next/dynamic";
+import { ConnectStrongerModel } from "./ConnectStrongerModel";
 import { detectLanguage, type EditorFile } from "@/lib/editor";
 import { bridgeListFiles, bridgeReadFile, bridgeWriteFile, bridgeDeleteFile, buildTreeFromPaths } from "@/lib/bridgeFs";
 import { extractAllFileFences } from "@/lib/parsers";
@@ -4384,7 +4385,16 @@ export function CoderView() {
               yaslanır. Önceden karşılama ~%40'ta, composer en altta duruyor ve
               arada koca bir ölü boşluk kalıyordu — ekranı "demo" gösteren asıl
               şey buydu. Mesaj gelir gelmez boşluk kaybolur, composer alta döner. */}
-          {messages.length === 0 && <div className="flex-1 min-h-0" aria-hidden />}
+          {messages.length === 0 && (
+            /* Bu boşluk aynı zamanda "daha güçlü model bağla" köprüsünü barındırır.
+               Köprü ÖNCE EmptyChat'in içindeydi (karşılama ile composer arasında)
+               ama açılınca büyüyüp composer'ın arkasına taşıyordu — seçenek listesi
+               yarıdan kesiliyordu. Composer'ın ALTINDAki bu alanda yer bol ve
+               gerekirse kendi içinde kayabiliyor. */
+            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center px-5 pt-1">
+              <ConnectStrongerModel />
+            </div>
+          )}
         </div>
 
         <RightPanel

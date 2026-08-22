@@ -8,6 +8,53 @@ export interface Preset {
   keyHint: string;
 }
 
+/* ── "Daha güçlü model bağla" köprüsü ───────────────────────────────────────
+   Ürünün en güçlü kozu (kendi anahtarınla frontier model çalıştırmak) Ayarlar'a
+   gömülüydü: anahtarsız kullanıcı zayıf varsayılan modelle karşılaşıp, 30
+   saniyelik bir işlemle çok daha güçlü bir modele geçebileceğini HİÇ görmeden
+   ayrılabiliyordu. Bu liste, anahtarın NEREDEN alınacağını `keyHint` içindeki
+   düz metinden çıkarıp yapısal (ve test edilebilir) hale getirir.
+
+   Kabul kuralı — buraya YALNIZCA gerçekten ücretsiz katmanı olan, kredi kartı
+   İSTEMEYEN sağlayıcılar girer. Ücretli bir sağlayıcıyı eklemek, prompt.md'deki
+   "ücretsiz deneyimin arkasına yeni engel koyma" kısıtını dolaylı olarak
+   çiğnerdi. (Değişmez olarak test ediliyor.) */
+export interface FreeKeyOption {
+  provider: Provider;
+  /** Kullanıcıya gösterilen kısa ad. */
+  name: string;
+  /** Neden bunu seçsin — tek cümle, abartısız. */
+  why: string;
+  /** Anahtarın alınacağı resmî sayfa. */
+  keyUrl: string;
+  /** Anahtarın beklenen ön eki (yapıştırılanı doğrulamak için). */
+  keyPrefix: string;
+}
+
+export const FREE_KEY_OPTIONS: FreeKeyOption[] = [
+  {
+    provider: "gemini",
+    name: "Google Gemini",
+    why: "En dengeli ücretsiz seçenek — uzun bağlam, güçlü Türkçe.",
+    keyUrl: "https://aistudio.google.com/apikey",
+    keyPrefix: "AIza",
+  },
+  {
+    provider: "groq",
+    name: "Groq",
+    why: "Çok hızlı yanıt — anlık sohbet için en akıcısı.",
+    keyUrl: "https://console.groq.com/keys",
+    keyPrefix: "gsk_",
+  },
+  {
+    provider: "cerebras",
+    name: "Cerebras",
+    why: "Yüksek hız, cömert ücretsiz kota.",
+    keyUrl: "https://cloud.cerebras.ai/platform/apikeys",
+    keyPrefix: "csk-",
+  },
+];
+
 /* Granüler izin sistemi: her ajan aracının kategorisi, etiketi ve risk düzeyi.
    Kullanıcı SettingsModal'daki izin tablosundan tek tek allow/deny yapar. */
 export type ToolRisk = "low" | "medium" | "high";
