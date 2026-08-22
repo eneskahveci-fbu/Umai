@@ -82,7 +82,14 @@ import { useModKey } from "@/lib/useModKey";
 import { isSupported as isWebContainerSupported } from "@/lib/webcontainer";
 import { isAdminEmail } from "@/lib/admin";
 import { extractCheckedItems } from "@/lib/checklist";
-import { MessageBubble } from "./MessageBubble";
+/* MessageBubble TEMBEL yüklenir. Kendisi küçük ama beraberinde TÜM markdown
+   render yığınını (react-markdown + remark/rehype + katex + mermaid +
+   highlight.js ≈ 247 KB) getiriyor ve bu yığın statik import'la /app'in ilk
+   paketine giriyordu — oysa boş sohbet ekranında render edilecek TEK BİR
+   markdown bile yok. Aşağıdaki `useMarkdownWarmup` ilk boyamadan sonra boş
+   zamanda modülü sessizce indirir, böylece ilk yanıt geldiğinde gecikme
+   OLMAZ; kazanılan tek şey ilk paketin küçülmesidir. */
+const MessageBubble = dynamic(() => import("./MessageBubble").then((m) => m.MessageBubble), { ssr: false });
 import { SlashMenu } from "./SlashMenu";
 
 /* Üretilen görseli Kütüphane'ye kaydeder — hem "/gorsel" komutu hem de
@@ -160,6 +167,23 @@ declare global {
 }
 
 /* ─── helpers ─── */
+
+/* Markdown yığınını ilk boyamadan SONRA, tarayıcı boştayken indirir.
+   Amaç: /app'in ilk paketi küçük kalsın ama kullanıcı ilk yanıtı aldığında
+   MessageBubble çoktan hazır olsun (tembel yüklemenin görünür bir bedeli
+   olmasın). requestIdleCallback yoksa (Safari) kısa bir timeout'a düşer. */
+function useMarkdownWarmup() {
+  useEffect(() => {
+    let cancelled = false;
+    const warm = () => { if (!cancelled) void import("./MessageBubble"); };
+    const ric = (window as unknown as {
+      requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
+    }).requestIdleCallback;
+    if (ric) { const id = ric(warm, { timeout: 2000 }); return () => { cancelled = true; void id; }; }
+    const t = setTimeout(warm, 1200);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, []);
+}
 
 /* "⋯ Daha fazla" — az kullanılan eylemleri tek menüde toplar.
    Açılır menü createPortal ile body'e render edilir (overflow kabı kırpmasın).
@@ -815,6 +839,7 @@ function SurveyCard({
 }
 
 export function CoderView() {
+  useMarkdownWarmup();
   const mod = useModKey();
   const config = useStore((s) => s.config);
   const isAdmin = isAdminEmail(useStore((s) => s.userEmail));

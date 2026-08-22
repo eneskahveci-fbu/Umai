@@ -4,14 +4,26 @@ import "./globals.css";
 import { NativeInit } from "@/components/NativeInit";
 import { RouteTransition } from "@/components/RouteTransition";
 
+/* FONT YÜKLEME STRATEJİSİ (ölçümle belirlendi)
+   Önce dört fontun DÖRDÜ de her sayfada önyükleniyordu: /app'in boş sohbet
+   ekranında ne kod bloğu ne serif başlık ne de emoji olmasına rağmen ~239 KB
+   font kritik yolda Inter ile yarışıyordu. Artık yalnız gövde fontu (Inter)
+   önyükleniyor; diğer üçü `preload: false` ile İLK GEREKTİĞİNDE iniyor
+   (kod bloğu render olunca, serif başlık çıkınca, emoji görününce).
+   `display: "swap"` hepsinde: font gelene kadar metin yedek yazı tipiyle
+   ANINDA görünür, boş kutu beklenmez. */
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin", "latin-ext"],
+  display: "swap",
 });
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin", "latin-ext"],
+  display: "swap",
+  /* Yalnız kod bloklarında/terminalde kullanılıyor — ilk boyamada yok. */
+  preload: false,
 });
 
 /* Başlıklar/hero metinler için sıcak editoryal serif — Perplexity Serif /
@@ -20,6 +32,13 @@ const jetbrainsMono = JetBrains_Mono({
 const fraunces = Fraunces({
   variable: "--font-fraunces",
   subsets: ["latin", "latin-ext"],
+  display: "swap",
+  /* Yalnız başlıklarda (landing hero, stüdyo başlıkları, sohbet h1-h4).
+     NOT: ağırlık aralığı ("500 800") ile daraltmak denendi — next/font bu
+     sürümde aralık sözdizimini kabul etmiyor ("Unknown weight"), tek tek
+     ağırlık listelemek ise değişken fontu statik örneklere böleceği için
+     toplamda kazanç getirmiyor. Kritik yoldan çıkarmak yeterli. */
+  preload: false,
 });
 
 /* Monokrom emoji fontu — tüm emojileri tek renk glif olarak çizer ve metnin
@@ -29,6 +48,11 @@ const notoEmoji = Noto_Emoji({
   variable: "--font-emoji",
   subsets: ["emoji"],
   weight: "400",
+  display: "swap",
+  /* 84 KB ile en büyük tek font ve işlevi tamamen kozmetik (emojileri tek renk
+     çizmek). Yığında yedek olarak duruyor; ancak sayfada gerçekten bir emoji
+     varsa inmeli — önyüklenmesi ilk boyamayı bedavaya geciktiriyordu. */
+  preload: false,
 });
 
 export const metadata: Metadata = {
