@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  UMAI — Apple Gizlilik Manifestosu (PrivacyInfo.xcprivacy)
+
+  Mayıs 2024'ten beri App Store'a yüklenen uygulamalar için ZORUNLUDUR.
+  Eksik ya da tutarsızsa yükleme ITMS-91053 / ITMS-91061 hatalarıyla reddedilir.
+
+  UMAI'nin veri duruşu — bu dosyadaki her iddia kodla tutarlı olmalıdır:
+    • Kullanıcı hesabı YOK, sunucumuz YOK, analitik YOK, reklam YOK.
+    • Sohbetler yalnızca cihazda saklanır.
+    • API anahtarları Keychain'de saklanır ve YALNIZCA kullanıcının kendi
+      seçtiği model sağlayıcısına (Google/Groq/Cerebras/…) gönderilir.
+    • Kullanıcının yazdığı istem, seçtiği sağlayıcıya doğrudan gider; biz
+      araya girmeyiz ve kopyasını tutmayız.
+  Bu nedenle NSPrivacyCollectedDataTypes BOŞ bir dizidir. Uygulamaya ileride
+  analitik/hesap eklenirse bu dosya ve App Store gizlilik etiketleri de
+  GÜNCELLENMELİDİR — aksi hâlde beyan yanlış olur.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Kullanıcıyı uygulamalar/siteler arası izlemiyoruz. -->
+    <key>NSPrivacyTracking</key>
+    <false/>
+
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <!-- Hiçbir veri TOPLANMIYOR (cihazdan çıkıp bize gelen veri yok). -->
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+
+    <!--
+      "Required Reason API" beyanları. Bunlar toplanan veri değildir; Apple,
+      parmak izi çıkarmaya elverişli bazı API'lerin kullanım GEREKÇESİNİ ister.
+    -->
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <!-- UserDefaults: tema, aktif model seçimi gibi kullanıcı tercihleri.
+                 CA92.1 = yalnızca uygulamanın KENDİ verisine erişim. -->
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+        <dict>
+            <!-- Dosya zaman damgaları: sohbet dosyalarının kaydedilme/güncellenme
+                 zamanı (geçmiş listesinde sıralama). C617.1 = yalnızca uygulamanın
+                 kendi konteynerindeki dosyalar. -->
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>C617.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

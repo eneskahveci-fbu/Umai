@@ -1,0 +1,34 @@
+# XcodeGen tarafından ÜRETİLİR — kaynağı project.yml'dir, sürüm kontrolüne girmez.
+UMAI.xcodeproj/
+# XcodeGen Info.plist'i project.yml'deki `info.properties`'ten üretir.
+UMAI/Info.plist
+
+## Xcode
+build/
+DerivedData/
+*.xcworkspace/xcuserdata/
+xcuserdata/
+*.xcuserstate
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Swift Package Manager
+.build/
+.swiftpm/
+
+## Bağımlılıklar
+Pods/
+Carthage/Build/
+
+## Sırlar — asla commit edilmez
+*.mobileprovision
+*.p12
+*.cer
+ExportOptions.plist
+fastlane/report.xml
+fastlane/Preview.html
+
+.DS_Store
