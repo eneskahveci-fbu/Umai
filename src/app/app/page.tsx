@@ -270,8 +270,16 @@ export default function AppPage() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      /* Odak input/textarea'daysa erken dönen bir koruma VARDI. Yanlıştı:
+         aşağıda işlenen her tuş bir Ctrl/Cmd kombinasyonu — düz yazımla asla
+         çakışmaz — ve bir sohbet uygulamasında odak neredeyse her an
+         composer'dadır. Sonuç: Ctrl+, / Ctrl+N / Ctrl+B / Ctrl+/ fiilen hiç
+         çalışmıyordu (Ctrl+K çalışıyordu, çünkü CommandPalette'in kendi
+         dinleyicisinde böyle bir koruma yok — tutarsızlık da bundandı).
+         Playwright etkileşim taramasında "ayarlar dialogu açılmadı" olarak
+         yakalandı. Modifier'sız hiçbir tuş işlenmediği için koruma gereksiz. */
       const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
       /* Ctrl/Cmd+Shift+N = gizli sohbet — CommandPalette ve Ayarlar'ın kısayol
          listesinde zaten reklamı yapılıyordu ama hiçbir yerde dinlenmiyordu. */
       if (mod && e.key.toLowerCase() === "n") { e.preventDefault(); useStore.getState().newChat(e.shiftKey); }

@@ -3139,11 +3139,17 @@ export function CoderView() {
           if (!isDefault) return;
           const last = chat.messages[chat.messages.length - 1];
           const { quickComplete } = await import("@/lib/quickComplete");
-          const t = (await quickComplete(
+          const { sanitizeAiTitle } = await import("@/lib/chatTitle");
+          /* Aday, gerçekten başlık gibi görünmüyorsa (cevaba başlayan "Tabii,
+             işte…:" cümlesi, 7+ kelime, vb.) null döner ve kullanıcı metninden
+             gelen mevcut başlık KORUNUR. Eski kod ≤60 karakter olan her ilk
+             satırı kabul ediyor, zayıf modellerde sohbet listesini "Tabii," ile
+             dolduruyordu — bkz. lib/chatTitle.ts ve testi. */
+          const t = sanitizeAiTitle(await quickComplete(
             `Konuşma:\nKullanıcı: ${raw.slice(0, 500)}\nAsistan: ${String(last?.content ?? "").slice(0, 500)}`,
             "Bu konuşma için 3-5 kelimelik, kısa ve net bir Türkçe başlık üret. SADECE başlığı döndür — tırnak, nokta, açıklama yok.",
-          )).replace(/^["'«]+|["'»]+$/g, "").split("\n")[0].trim();
-          if (t && t.length <= 60) st.renameChat(chat.id, t);
+          ));
+          if (t) st.renameChat(chat.id, t);
         } catch { /* sessiz — mevcut başlık kalır */ }
       })();
       if (useStore.getState().config.soundEnabled) {

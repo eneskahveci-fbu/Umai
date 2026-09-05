@@ -1,13 +1,16 @@
 import { test, expect } from "@playwright/test";
 
-/* Uygulama kabuğu "smoke" testleri — /app bilinçli olarak auth kapılıdır
-   (girişsiz açılmaz, bkz. src/lib/authGate.ts). Girişsiz senaryoda doğru
-   davranış /login yönlendirmesi + çalışan bir giriş formudur. LLM çağrısı
-   YAPILMAZ (deterministik kalsın). */
+/* Uygulama kabuğu "smoke" testleri. /app ARTIK auth kapılı DEĞİL: prompt.md
+   Hamle 2 ("önce dene, sonra kaydol") ile misafir kullanıcı girişsiz açıp
+   anahtarsız ücretsiz modelle sohbet edebiliyor (bkz. src/app/app/page.tsx
+   authState yorumu ve src/lib/authGate.ts). Bu testin eski hâli "/login'e
+   yönlendirir" diyordu — ürün kararıyla çelişen bayat bir varsayımdı ve
+   her koşuda kırmızı olacaktı. LLM çağrısı YAPILMAZ (deterministik kalsın). */
 test.describe("Uygulama", () => {
-  test("girişsiz /app → /login yönlendirmesi", async ({ page }) => {
+  test("girişsiz /app misafir olarak açılır: yönlendirme yok, composer hazır", async ({ page }) => {
     await page.goto("/app");
-    await page.waitForURL(/\/login/, { timeout: 20_000 });
+    await expect(page.getByPlaceholder(/Mesajınızı yazın/)).toBeVisible({ timeout: 20_000 });
+    expect(new URL(page.url()).pathname).toBe("/app");
   });
 
   test("/login formu hazır: e-posta alanı doldurulabiliyor", async ({ page }) => {

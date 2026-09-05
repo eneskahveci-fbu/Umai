@@ -11,14 +11,23 @@ test.describe("Public yüzeyler", () => {
     expect(typeof j.version).toBe("string");
   });
 
-  test("girişsiz /studio → /login yönlendirmesi", async ({ page }) => {
+  /* Stüdyo ve Ayarlar ARTIK misafir-erişimli (src/lib/authGate.ts
+     useAuthState: "asla yönlendirmez" — prompt.md Hamle 2'nin /app dışına
+     taşınmış hâli). Eski testler /login yönlendirmesi bekliyordu; ürün
+     kararıyla çelişen bayat varsayımlardı. Artık kararın kendisi korunuyor:
+     yönlendirme YOK, sayfa gerçekten render oluyor. */
+  test("girişsiz /studio misafir olarak açılır (yönlendirme yok)", async ({ page }) => {
     await page.goto("/studio");
-    await page.waitForURL(/\/login/, { timeout: 20_000 });
+    await page.waitForLoadState("networkidle").catch(() => {});
+    expect(new URL(page.url()).pathname).toBe("/studio");
+    await expect(page.getByRole("main").or(page.locator("body"))).not.toBeEmpty();
   });
 
-  test("girişsiz /settings → /login yönlendirmesi", async ({ page }) => {
+  test("girişsiz /settings misafir olarak açılır (yönlendirme yok)", async ({ page }) => {
     await page.goto("/settings");
-    await page.waitForURL(/\/login/, { timeout: 20_000 });
+    await page.waitForLoadState("networkidle").catch(() => {});
+    expect(new URL(page.url()).pathname).toBe("/settings");
+    await expect(page.getByRole("main").or(page.locator("body"))).not.toBeEmpty();
   });
 
   test("sitemap /pricing içeriyor", async ({ request }) => {
