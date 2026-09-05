@@ -1,5 +1,7 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 import { useState } from "react";
 import { Crown, ExternalLink, Loader2 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -14,6 +16,8 @@ export function ProUpgrade() {
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const addToast = useStore((s) => s.addToast);
   const [loading, setLoading] = useState(false);
+  /* Hook, aşağıdaki erken dönüşten ÖNCE çağrılmalı (hook sırası sabit kalsın). */
+  const router = useRouter();
 
   if (!supabaseConfigured) return null; // ödeme/hesap katmanı kapalı
 
@@ -21,7 +25,8 @@ export function ProUpgrade() {
     if (!userId) {
       addToast("Önce giriş yap.", "info");
       setSettingsOpen(false);
-      window.location.href = "/login";
+      /* Düz navigasyon: sıfırlanacak oturum durumu yok, SPA kabuğu korunur. */
+      router.push("/login");
       return;
     }
     setLoading(true);

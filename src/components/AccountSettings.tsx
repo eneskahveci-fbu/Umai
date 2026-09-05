@@ -84,6 +84,12 @@ export function AccountSettings() {
     const sb = createClient();
     if (sb) await sb.auth.signOut();
     useStore.getState().setUser(null, null);
+    /* Oturum kapandıktan sonra BİLİNÇLİ tam yenileme: Zustand deposu, bellekte
+       çözülmüş sırlar ve kullanıcıya ait her önbellek garantiyle sıfırlanır.
+       router.push eski kullanıcının durumunu aynı JS yığınında canlı bırakır —
+       kullanıcılar arası config sızıntısı riskinin tam kendisi (bkz. store.ts
+       CONFIG_OWNER_KEY). */
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- oturum sonrası istemci durumunu sıfırla
     window.location.href = "/login";
   };
 
@@ -129,6 +135,12 @@ export function AccountSettings() {
     setSigningOutAll(false);
     if (error) { addToast(`Çıkış yapılamadı: ${error.message}`, "error"); return; }
     useStore.getState().setUser(null, null);
+    /* Oturum kapandıktan sonra BİLİNÇLİ tam yenileme: Zustand deposu, bellekte
+       çözülmüş sırlar ve kullanıcıya ait her önbellek garantiyle sıfırlanır.
+       router.push eski kullanıcının durumunu aynı JS yığınında canlı bırakır —
+       kullanıcılar arası config sızıntısı riskinin tam kendisi (bkz. store.ts
+       CONFIG_OWNER_KEY). */
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- oturum sonrası istemci durumunu sıfırla
     window.location.href = "/login";
   };
 
@@ -146,6 +158,9 @@ export function AccountSettings() {
       await sb.auth.signOut();
       useStore.getState().setUser(null, null);
       addToast("Hesabın silindi.", "success");
+      /* Hesap silindi: silinen kullanıcıya ait hiçbir istemci durumu yaşamamalı —
+         tam yenileme (bkz. yukarıdaki signOut gerekçesi). */
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- silinen hesabın istemci durumunu sıfırla
       window.location.href = "/login";
     } catch (e) {
       addToast(`Hesap silinemedi: ${e instanceof Error ? e.message : "bilinmeyen"}`, "error");

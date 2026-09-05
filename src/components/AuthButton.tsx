@@ -89,7 +89,10 @@ export function AuthButton() {
 
   return (
     <button
-      onClick={() => { setBusy(true); window.location.href = "/login"; }}
+      /* Düz navigasyon — burada sıfırlanacak bir oturum durumu yok (misafir),
+         SPA kabuğunu koruyan router.push doğru olan. (Çıkış/hesap silme
+         sonrası tam yenileme AccountSettings'te bilinçli olarak korunuyor.) */
+      onClick={() => { setBusy(true); router.push("/login"); }}
       disabled={busy}
       title="Giriş Yap / Kayıt Ol"
       aria-label="Giriş Yap / Kayıt Ol"

@@ -84,6 +84,11 @@ export default function GlobalError({
             <button
               type="button"
               onClick={() => {
+                /* global-error kök layout'un YERİNE render edilir; App Router
+                   bağlamı bu noktada güvenilmez ve React ağacı zaten bozuk.
+                   Kurtarılamayan bir hatadan çıkışın tek sağlam yolu, bozuk
+                   istemci durumunu da sıfırlayan tam sayfa yüklemesidir. */
+                // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- bozuk ağaçtan tam yenilemeyle çık
                 window.location.href = "/";
               }}
               style={{
