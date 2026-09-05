@@ -1,10 +1,12 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, Eye, Link2, Maximize2, Minimize2, MousePointerClick, Monitor, Presentation, RotateCw, Smartphone, Wand2, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, Eye, GitBranch, Link2, Maximize2, Minimize2, MousePointerClick, Monitor, Presentation, RotateCw, Smartphone, Wand2, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useStore } from "@/lib/store";
 import type { Artifact } from "@/lib/types";
 import { buildArtifactSrcDoc, withAnnotationScript, artifactDownload, buildStandaloneSandboxDoc } from "@/lib/artifactDoc";
+import { filesForArtifact, repoSlug } from "@/lib/exportRepo";
+import { resolveGitToken } from "@/lib/secureKeys";
 import { lintArtifactByType } from "@/lib/studioCraft";
 import { STUDIO_DEVICES, deviceById, type DeviceId } from "@/lib/studioConstants";
 import { DeviceFrame } from "./studio/DeviceFrame";
@@ -59,6 +61,18 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
   const [reloadKey, setReloadKey] = useState(0);
   const [view, setView] = useState<"preview" | "code">("preview");
   const [copied, setCopied] = useState(false);
+  /* "GitHub'a gönder" — Lovable/Replit döngüsünün kopuk halkası: önizlemede
+     sıfırdan üretilen bir şeyi YENİ bir depoya göndermenin hiçbir yolu yoktu
+     (ajan yalnız zaten bağlı bir depoya yazabiliyor, create_repo aracı yok).
+     Akış: ad sor → depoyu oluştur (auto_init) → dosyaları tek commit'le yaz. */
+  const githubAccounts = useStore((s) => s.config.githubAccounts);
+  const activeGithubId = useStore((s) => s.config.activeGithubId);
+  const setSettingsOpen = useStore((s) => s.setSettingsOpen);
+  const [ghAsking, setGhAsking] = useState(false);
+  const [ghName, setGhName] = useState("");
+  const [ghPrivate, setGhPrivate] = useState(true);
+  const [ghBusy, setGhBusy] = useState(false);
+  const [ghUrl, setGhUrl] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -110,6 +124,64 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
     const a = document.createElement("a");
     a.href = url; a.download = `${(artifact.title || "artifact").replace(/\s+/g, "-").toLowerCase()}.${ext}`; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
+  };
+  const openGithubExport = () => {
+    const acc = githubAccounts.find((a) => a.id === activeGithubId) ?? githubAccounts[0];
+    if (!acc) {
+      /* Hesap yoksa hatayla dönmek yerine doğrudan bağlama ekranına götür —
+         kullanıcı ne yapacağını bilsin. */
+      addToast("Önce Ayarlar → Git'ten bir GitHub hesabı bağla.", "error");
+      setSettingsOpen(true);
+      return;
+    }
+    setGhName(repoSlug(artifact.title));
+    setGhUrl(null);
+    setGhAsking(true);
+  };
+  const exportToGithub = async () => {
+    if (ghBusy) return;
+    const acc = githubAccounts.find((a) => a.id === activeGithubId) ?? githubAccounts[0];
+    if (!acc) return;
+    const name = repoSlug(ghName);
+    setGhBusy(true);
+    try {
+      const token = await resolveGitToken(acc);
+      /* 1) Depoyu oluştur (sunucu auto_init ile ilk commit'i garantiler). */
+      const created = await fetch("/api/github/create-repo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, name, isPrivate: ghPrivate, description: artifact.title || "UMAI ile üretildi" }),
+      });
+      const c = await created.json().catch(() => ({}));
+      if (!created.ok || !c.owner) { addToast(c.error || "Depo oluşturulamadı.", "error"); return; }
+      /* 2) Dosyaları TEK commit'le yaz — mevcut batch-write ucu olduğu gibi. */
+      const wrote = await fetch("/api/github/batch-write", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token, owner: c.owner, repo: c.repo, branch: c.defaultBranch,
+          message: `UMAI: ${artifact.title || "ilk sürüm"}`,
+          files: filesForArtifact(artifact, window.location.origin),
+        }),
+      });
+      const w = await wrote.json().catch(() => ({}));
+      if (!wrote.ok) {
+        /* Depo oluştu ama dosyalar yazılamadı: kullanıcı boş depoyu görmeli,
+           çünkü tekrar denerse "ad zaten var" alır. */
+        addToast(`${w.error || "Dosyalar yazılamadı."} Depo oluştu ama boş: ${c.htmlUrl}`, "error");
+        setGhUrl(c.htmlUrl);
+        return;
+      }
+      /* Çubuğu KAPATMA: bağlantı onun içinde. İlk sürüm burada setGhAsking(false)
+         çağırıyordu ve kullanıcı yeni deposunun linkini hiç göremiyordu — yalnız
+         3 saniyede solan bir toast. Lovable'da link kalıcıdır; burada da öyle. */
+      setGhUrl(c.htmlUrl);
+      addToast(`GitHub'a gönderildi: ${c.owner}/${c.repo} ✓`, "success");
+    } catch (e) {
+      addToast((e as Error).message || "GitHub'a gönderilemedi.", "error");
+    } finally {
+      setGhBusy(false);
+    }
   };
   const publish = async () => {
     if (publishing) return;
@@ -297,6 +369,7 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
             options={[
               { key: "download", label: "İndir", icon: <Download size={14} />, onSelect: download },
               { key: "publish", label: "Yayınla (bağlantı)", icon: <Link2 size={14} />, onSelect: publish },
+              { key: "github", label: "GitHub'a gönder (yeni depo)", icon: <GitBranch size={14} />, onSelect: openGithubExport },
               ...(view === "preview" ? [
                 { key: "reload", label: "Yenile", icon: <RotateCw size={14} />, onSelect: () => setReloadKey((k) => k + 1), separatorBefore: true },
                 { key: "open-tab", label: "Yeni sekmede aç", icon: <ExternalLink size={14} />, onSelect: () => {
@@ -333,6 +406,42 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
             onClick={async () => { try { await navigator.clipboard.writeText(publishedUrl); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); } catch { /* yok say */ } }}
             className="shrink-0 flex items-center gap-1 text-muted hover:text-ink font-semibold transition-colors"
           >{linkCopied ? <><Check size={12} /> Kopyalandı</> : "Kopyala"}</button>
+        </div>
+      )}
+
+      {ghAsking && ghUrl && (
+        /* Sonuç satırı — gönderim bitince form yerine bu kalır. Kısmi hata
+           durumunda (depo açıldı, dosya yazılamadı) da gösterilir: kullanıcı
+           boş depoyu görebilmeli, çünkü tekrar denerse "ad zaten var" alır. */
+        <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-line bg-brand/5 text-[11px]">
+          <GitBranch size={12} className="text-brand shrink-0" />
+          <span className="text-muted shrink-0">Depo:</span>
+          <a href={ghUrl} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline truncate min-w-0 flex-1 font-semibold">{ghUrl.replace(/^https?:\/\//, "")}</a>
+          <a href={ghUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 text-brand hover:underline font-semibold">Depoyu aç ↗</a>
+          <button onClick={() => { setGhAsking(false); setGhUrl(null); }} className="shrink-0 text-muted hover:text-ink font-semibold transition-colors">Kapat</button>
+        </div>
+      )}
+
+      {ghAsking && !ghUrl && (
+        <div className="shrink-0 flex flex-wrap items-center gap-2 px-3 py-1.5 border-b border-line bg-brand/5 text-[11px]">
+          <GitBranch size={12} className="text-brand shrink-0" />
+          <input
+            value={ghName}
+            onChange={(e) => setGhName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") void exportToGithub(); if (e.key === "Escape") setGhAsking(false); }}
+            placeholder="depo-adi"
+            disabled={ghBusy}
+            aria-label="Yeni depo adı"
+            className="min-w-[120px] flex-1 bg-surface border border-line rounded-md px-2 py-1 font-mono text-[11px] text-ink outline-none focus:border-brand/50"
+          />
+          <label className="flex items-center gap-1 text-muted cursor-pointer select-none">
+            <input type="checkbox" checked={ghPrivate} onChange={(e) => setGhPrivate(e.target.checked)} disabled={ghBusy} />
+            Özel
+          </label>
+          <button onClick={() => void exportToGithub()} disabled={ghBusy || !repoSlug(ghName, "")} className="shrink-0 px-2.5 py-1 rounded-md bg-brand text-[#111110] font-semibold disabled:opacity-40 transition-colors">
+            {ghBusy ? "Gönderiliyor…" : "Oluştur ve gönder"}
+          </button>
+          <button onClick={() => setGhAsking(false)} disabled={ghBusy} className="shrink-0 text-muted hover:text-ink font-semibold transition-colors">Vazgeç</button>
         </div>
       )}
 
