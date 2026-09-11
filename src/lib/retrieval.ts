@@ -3,7 +3,8 @@
    ilgili PARÇALARI TF-IDF benzeri sözcüksel skorla getirir. Saf fonksiyon →
    birim testlerle doğrulanır. */
 
-function tokenize(s: string): string[] {
+/** memory.ts (yerel anlamsal hafıza / BM25) bunu yeniden kullanır — TEK tokenizer. */
+export function tokenize(s: string): string[] {
   return (s.toLowerCase().match(/[\p{L}\p{N}_]{2,}/gu) || []);
 }
 

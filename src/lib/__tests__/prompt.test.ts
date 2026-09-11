@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { selectRelevantSkills } from "../prompt";
+import { selectRelevantSkills, buildContextSections } from "../prompt";
 
 /* K1: skill seçimi artık genChat.ts (Stüdyo motorları) VE CoderView.tsx
    (ana sohbet) tarafından PAYLAŞILAN tek kaynak — önceden genChat.ts
@@ -59,5 +59,22 @@ describe("selectRelevantSkills", () => {
   it("eşit puanlı öğelerde bile daima tam olarak max adet döner", () => {
     const all = Array.from({ length: 8 }, (_, i) => skill(String(i), `Aynı${i}`, "aynı içerik burada"));
     expect(selectRelevantSkills(all, "aynı içerik ara", 5)).toHaveLength(5);
+  });
+});
+
+describe("buildContextSections — memoryContext", () => {
+  it("boşsa hiçbir şey eklemez", () => {
+    expect(buildContextSections({})).toBe("");
+  });
+
+  it("doluysa 'hatırlanan' bloğu olarak ekler, 'memories' bloğundan AYRI kalır", () => {
+    const out = buildContextSections({
+      memories: [{ id: "1", content: "kullanıcı TypeScript sever" }],
+      memoryContext: "geçen hafta X hakkında konuşmuştuk",
+    });
+    expect(out).toContain("[Kullanıcı hakkında bildiklerin]");
+    expect(out).toContain("kullanıcı TypeScript sever");
+    expect(out).toContain("[Geçmiş konuşmalardan hatırlanan ilgili parçalar]");
+    expect(out).toContain("geçen hafta X hakkında konuşmuştuk");
   });
 });
