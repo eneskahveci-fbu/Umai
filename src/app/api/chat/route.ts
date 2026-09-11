@@ -312,6 +312,10 @@ interface ChatRequest {
   memories?: MemoryItem[];
   skills?: SkillPayload[];
   searchContext?: string;
+  /** Yerel Anlamsal Hafıza'nın (bkz. lib/memory.ts) istemcide ÖNCEDEN getirdiği
+      geçmiş konuşma parçaları — IndexedDB yalnız tarayıcıda vardır, sunucu
+      yalnız hazır metni enjekte eder (bkz. prompt.ts buildContextSections). */
+  memoryContext?: string;
   projectPrompt?: string;
   tools?: boolean;
   webSearch?: boolean;
@@ -1934,14 +1938,19 @@ export async function POST(req: Request) {
       `bir-iki cümleyle kısaca tanıt.`;
   }
 
-  /* searchContext'i (varsa) AYRI, İKİNCİ bir system mesajı olarak en sona
-     ekle. anthropic.ts'teki convertMessages yalnız SON system bloğunu
-     önbelleksiz bırakır (cache_control almaz) — böylece önündeki büyük,
-     turlar arası sabit blok (repo haritası + SOUL.md + araç talimatları +
-     PLATFORM_KNOWLEDGE) gerçekten önbellekten okunur, yalnız bu küçük
-     değişken kuyruk her seferinde tam fiyata gider. */
-  const systemMessages: { role: "system"; content: string }[] = body.searchContext
-    ? [{ role: "system", content: sysPrompt }, { role: "system", content: `\n\n[Web arama sonuçları]:\n${body.searchContext}` }]
+  /* searchContext ve memoryContext'i (varsa) AYRI, İKİNCİ bir system mesajı
+     olarak en sona ekle. anthropic.ts'teki convertMessages yalnız SON system
+     bloğunu önbelleksiz bırakır (cache_control almaz) — böylece önündeki
+     büyük, turlar arası sabit blok (repo haritası + SOUL.md + araç
+     talimatları + PLATFORM_KNOWLEDGE) gerçekten önbellekten okunur, yalnız bu
+     küçük değişken kuyruk her seferinde tam fiyata gider. İkisi de turdan
+     turа değişir, bu yüzden AYNI kuyrukta birleştirilir (ayrı bir üçüncü
+     mesaj açmak önbellek sınırını erkene çekip bir kazanç sağlamaz). */
+  let volatileTail = "";
+  if (body.searchContext) volatileTail += `\n\n[Web arama sonuçları]:\n${body.searchContext}`;
+  if (body.memoryContext) volatileTail += `\n\n[Geçmiş konuşmalardan hatırlanan ilgili parçalar]:\n${body.memoryContext}`;
+  const systemMessages: { role: "system"; content: string }[] = volatileTail
+    ? [{ role: "system", content: sysPrompt }, { role: "system", content: volatileTail }]
     : [{ role: "system", content: sysPrompt }];
 
   const encoder = new TextEncoder();
