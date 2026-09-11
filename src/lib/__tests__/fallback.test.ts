@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildFallbackChain, buildQualityFallbackChain, buildChainFor, KEYLESS_PROVIDERS } from "../fallback";
 import type { ModelProfile } from "../types";
 
@@ -223,5 +223,31 @@ describe("buildChainFor — 'kalite öncelikli' tercihi TEK yerden okunur", () =
   it("strictModel, qualityFallbackChain'den ÖNCE kontrol edilir (ikisi de açık olsa bile boş döner)", () => {
     const chain = buildChainFor({ models, activeModelId: "active", strictModel: true, qualityFallbackChain: true });
     expect(chain).toEqual([]);
+  });
+
+  it("freeOrchestrator KAPALIYKEN (varsayılan/undefined) sıra değişmez", () => {
+    const off = buildChainFor({ models, activeModelId: "active" }, null, { pollinationsBackstop: false });
+    const explicitOff = buildChainFor({ models, activeModelId: "active", freeOrchestrator: false }, null, { pollinationsBackstop: false });
+    expect(explicitOff).toEqual(off);
+  });
+
+  it("freeOrchestrator AÇIKKEN öğrenilmiş güvenilirliğe göre yeniden sıralar", async () => {
+    /* orchestrator.ts localStorage'a yazar/okur — node ortamında yok, basit bir
+       in-memory stub'la simüle edilir (bkz. CLAUDE.md: vitest environment node). */
+    const store = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => { store.set(k, v); },
+      removeItem: (k: string) => { store.delete(k); },
+    });
+    const { recordOutcome } = await import("../orchestrator");
+    /* xai'yi tekrar tekrar başarısız, gemini'yi başarılı işaretle -> xai gemini'nin
+       önüne geçmiş sıralamada geriye düşmeli (sağlayıcı-rank'te zaten gemini önde,
+       burada tersini kanıtlayan bir senaryo kuruyoruz). */
+    for (let i = 0; i < 5; i++) recordOutcome("xai", false);
+    for (let i = 0; i < 5; i++) recordOutcome("gemini", true);
+    const chain = buildChainFor({ models, activeModelId: "active", freeOrchestrator: true }, null, { pollinationsBackstop: false });
+    expect(chain.map((c) => c.provider)).toEqual(["gemini", "xai"]);
+    vi.unstubAllGlobals();
   });
 });

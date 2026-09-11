@@ -1,6 +1,7 @@
 /* Chat yanıtındaki kodu canvas'ta CANLI önizlemeye çevirir.
-   Desteklenen: HTML, (birleşik) HTML+CSS+JS, React/JSX/TSX, düz JS, SVG, mermaid.
-   Önizlenemeyen diller (python, go, sql…) için null döner → zorla bozuk önizleme yok.
+   Desteklenen: HTML, (birleşik) HTML+CSS+JS, React/JSX/TSX, düz JS, SVG, mermaid,
+   SQL (sql.js ile GERÇEKTEN çalıştırılır), Python (Pyodide ile GERÇEKTEN çalıştırılır).
+   Önizlenemeyen diller (go, rust…) için null döner → zorla bozuk önizleme yok.
 
    Güvenlik: çıktı ArtifactPanel'deki sandbox'lı iframe'de (allow-scripts, allow-same-origin
    YOK) çalışır → null origin, çerez/parent erişimi olmaz. */
@@ -176,11 +177,19 @@ export function buildPreview(markdown: string): Artifact | null {
   const react = previewable[previewable.length - 1] ?? reactCandidates[reactCandidates.length - 1];
   const svg = blocks.find((b) => b.lang === "svg" || (!b.lang && b.code.trimStart().startsWith("<svg")));
   const mermaid = blocks.find((b) => b.lang === "mermaid");
+  /* sql/python: "code" tipinin aksine ÇALIŞTIRILABİLİR (bkz. artifactDoc.ts
+     buildArtifactSrcDoc — sql.js / Pyodide). Yalnız TEK bloklu, açık dil
+     etiketli yanıtlarda devreye girer; react/html gibi daha "canlı önizleme"
+     beklenen diller önceliklidir (yukarıdaki sırada zaten önce kontrol edilir). */
+  const sql = blocks.find((b) => b.lang === "sql");
+  const python = blocks.find((b) => b.lang === "python" || b.lang === "py");
 
   if (react) return { type: "html", content: reactDoc(react.code, css), title: "React Önizleme" };
   if (html) return { type: "html", content: htmlDoc(html.code, css, js), title: "HTML Önizleme" };
   if (mermaid) return { type: "mermaid", content: mermaid.code, title: "Mermaid Önizleme" };
   if (svg) return { type: "svg", content: svg.code, title: "SVG Önizleme" };
+  if (sql) return { type: "sql", content: sql.code, title: "SQL Önizleme" };
+  if (python) return { type: "python", content: python.code, title: "Python Önizleme" };
   if (js) return { type: "html", content: jsDoc(js, css), title: "JS Önizleme" };
   if (css) return { type: "html", content: htmlDoc("<div>CSS önizleme</div>", css, ""), title: "CSS Önizleme" };
   return null;

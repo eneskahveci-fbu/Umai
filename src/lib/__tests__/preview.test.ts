@@ -39,8 +39,23 @@ describe("buildPreview", () => {
     expect(buildPreview("```mermaid\ngraph TD;A-->B\n```")?.type).toBe("mermaid");
   });
 
+  it("SQL bloğunu çalıştırılabilir sql artifact'a çevirir", () => {
+    const a = buildPreview("```sql\nSELECT 1;\n```");
+    expect(a?.type).toBe("sql");
+    expect(a?.title).toBe("SQL Önizleme");
+    expect(a?.content).toBe("SELECT 1;\n");
+  });
+
+  it("Python bloğunu çalıştırılabilir python artifact'a çevirir (python ve py etiketi)", () => {
+    const a1 = buildPreview("```python\nprint(1)\n```");
+    expect(a1?.type).toBe("python");
+    expect(a1?.title).toBe("Python Önizleme");
+    const a2 = buildPreview("```py\nprint(1)\n```");
+    expect(a2?.type).toBe("python");
+  });
+
   it("önizlenemeyen kod için null döner", () => {
-    expect(buildPreview("```python\nprint(1)\n```")).toBeNull();
+    expect(buildPreview("```rust\nfn main(){}\n```")).toBeNull();
     expect(buildPreview("kod yok")).toBeNull();
   });
 
