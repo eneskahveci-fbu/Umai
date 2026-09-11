@@ -268,9 +268,12 @@ export interface Skill {
 
 export interface Artifact {
   /** Claude Artifacts paritesi: görsel tasarım (html), vektör (svg), diyagram
-      (mermaid), herhangi bir dilde kod (code) veya biçimlendirilmiş belge
-      (markdown). */
-  type: "html" | "svg" | "mermaid" | "code" | "markdown";
+      (mermaid), herhangi bir dilde kod (code, yalnız sözdizimi vurgulama) veya
+      biçimlendirilmiş belge (markdown).
+      "sql"/"python": "code"'dan farklı olarak ÇALIŞTIRILABİLİR — sql.js
+      (in-memory SQLite) / Pyodide (WASM Python) ile iframe içinde gerçekten
+      çalışır, yalnız vurgulanmaz (bkz. artifactDoc.ts buildArtifactSrcDoc). */
+  type: "html" | "svg" | "mermaid" | "code" | "markdown" | "sql" | "python";
   content: string;
   title: string;
   /** "code" tipi için sözdizimi vurgulama dili (ör. "python", "go", "sql"). */
@@ -561,6 +564,48 @@ export interface Config {
   /** Otomatik bellek: her yanıt sonrası kalıcı tercihler "🧠 Otomatik Bellek"
       skill'ine damıtılır ve sonraki sohbetlerin prompt'una eklenir. */
   autoMemory?: boolean;
+  /** Yerel Anlamsal Hafıza (Ayarlar → Model, varsayılan false). `autoMemory`
+      ile KARIŞTIRILMASIN — o, her tur sonrası bir LLM çağrısıyla kalıcı
+      "tercih" damıtır (anahtar gerektirir, `/api/memory`). Bu ise anahtarsız:
+      geçmiş konuşma parçalarını ham haliyle tarayıcı-içi IndexedDB'ye yazar
+      (bkz. lib/memory.ts) ve yeni bir istekte BM25 ile en ilgili k parçayı
+      bulup sistem promptuna ekler — "bunu daha önce konuşmuştuk" hafızası.
+      IndexedDB desteklemeyen ortamda (bkz. capabilities.ts hasIndexedDB)
+      sessizce hiçbir şey yapmaz. */
+  semanticMemoryEnabled?: boolean;
+  /** Evrimsel Model Seçici (Ayarlar → Genel → Davranış, varsayılan false):
+      açıkken her BAŞARILI/BAŞARISIZ istek sonrası model başına çok-boyutlu
+      bir "fitness" (başarı oranı × hız × token verimliliği, EMA) öğrenilir
+      ve `localStorage`'a (`craftai_fitness`) yazılır (bkz. evolutionaryRouter.ts
+      `recordFitnessOutcome`/`getFitnessScore`). `freeOrchestrator`'dan farkı:
+      o TEK boyutlu (başarı/başarısızlık) ve doğrudan fallback zincirini
+      YENİDEN SIRALAR; bu üç boyutlu ve şimdilik yalnız GÖZLEM amaçlı — henüz
+      hiçbir zinciri/seçimi etkilemez, gelecekte görev-türüne özel yönlendirme
+      için bir temel olarak biriktirilir. */
+  evolutionaryRouter?: boolean;
+  /** Kişisel Stil Hafızası (Ayarlar → Genel → Davranış, varsayılan false):
+      açıkken sohbet geçmişinden kural-tabanlı (LLM çağrısı YOK, maliyetsiz)
+      kod tercihleri çıkarılır (camelCase/snake_case, 2 boşluk, TypeScript,
+      async/await…) ve "kişilik katmanı" olarak sistem promptuna eklenir
+      (bkz. styleMemory.ts). `autoMemory`'nin aksine bir API çağrısı yapmaz —
+      yalnız o turun mesaj dizisini regex'lerle tarar. */
+  styleMemoryEnabled?: boolean;
+  /** Teknik Borç Takipçisi (Ayarlar → Genel → Davranış, varsayılan false):
+      açıkken sohbet alt çubuğunda bir rozet belirir — tıklanınca sağ panelde
+      `DebtPanel` açılır ve editörde AÇIK dosyaları (repo'nun tamamını değil)
+      döngüsel karmaşıklık, eksik JSDoc ve kopya kod blokları için tarar
+      (bkz. codeAnalysis.ts, tamamen istemci-tarafı/saf — LLM çağrısı yok). */
+  debtTrackerEnabled?: boolean;
+  /** AI Takım Arkadaşı (Ayarlar → Genel → Davranış, varsayılan false):
+      sohbet alt çubuğunda bir rozet açar → sağ panelde (`RightPanel`'in 5.
+      sekmesi, `TeammatePanel.tsx`) bağımsız bir görev kuyruğu (`teammate.ts`,
+      IndexedDB `craftai_teammate`) yönetilir. Görevler ("bu dosyayı incele",
+      "CHANGELOG üret"…) sekme kapansa/sayfa yenilense bile kuyrukta kalır;
+      "Şimdi çalıştır" tıklanınca aktif modelle tek-seferlik, araçsız bir
+      tamamlanma çağrısı yapılır (bkz. CoderView.tsx `runTeammateTask` →
+      `quickComplete`) — ana sohbet akışını/geçmişini ETKİLEMEZ, sonucu
+      "Sohbete ekle" ile composer'a taşıyabilirsin. */
+  teammateEnabled?: boolean;
   /** Yanıt token sınırında kesilirse otomatik sürdür (en çok 2 kez). */
   autoContinue?: boolean;
   /** Öğrenme Modu: yanıtlar eğitsel olur — adım adım açıklama, kavram/jargon
@@ -710,6 +755,14 @@ export interface Config {
       yetenekli eklenmiş modeller de (öncelik sırasıyla, bkz. imageGen.ts
       buildImageFallbackChain) Pollinations'a düşmeden önce sırayla denenir. */
   imageFallbackChain?: boolean;
+  /** Serbest-katman orkestratörü (Ayarlar → Model). Varsayılan (false/yok):
+      yedek zinciri her zaman sabit sırada dener (bkz. fallback.ts PROVIDER_RANK
+      / modelQuality.ts). true: her sağlayıcının Ayarlar'daki "Test et"
+      sonuçlarından öğrenilen son güvenilirlik skoruna (EMA, bkz. orchestrator.ts)
+      göre zincir yeniden sıralanır — henüz hiç test edilmemiş/başarılı olmuş
+      sağlayıcılar sabit sırayı korur, tekrar tekrar başarısız olanlar zincirde
+      geriye kayar. Tamamen istemci-tarafı (localStorage), sunucuya veri gitmez. */
+  freeOrchestrator?: boolean;
 }
 
 /** Bağlı deponun barındırıcısı. Yerel Mod ayrı bir yoldan (localBridge)

@@ -204,6 +204,14 @@ export function ArtifactCanvas({ artifact, versionIndex, versionTotal, onPrevVer
       <div className="h-12 shrink-0 flex items-center justify-between px-3 sm:px-4 border-b border-line gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-sm font-semibold truncate min-w-0">{artifact.title || "Önizleme"}</span>
+          {/* sql/python: html/svg'nin aksine görsel değil, ÇALIŞTIRILAN bir
+              betik — kullanıcı "Önizleme" sekmesinde ne beklediğini bu rozetten
+              anlar (sorgu sonucu tablosu / stdout metni). */}
+          {(artifact.type === "sql" || artifact.type === "python") && (
+            <span className="shrink-0 text-[9px] font-mono px-1.5 py-0.5 rounded bg-bgsoft border border-line/60 text-muted/60 uppercase">
+              {artifact.type}
+            </span>
+          )}
           {showVersionNav && (
             <div ref={versionRef} className="relative flex items-center gap-0.5 shrink-0 text-[10px] font-mono text-muted/70 bg-bgsoft border border-line/60 rounded-lg px-1 py-0.5">
               <button onClick={onPrevVersion} disabled={versionIndex === 0} className="disabled:opacity-30 hover:text-ink transition-colors" title="Önceki sürüm"><ChevronLeft size={13} /></button>

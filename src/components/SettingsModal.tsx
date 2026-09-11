@@ -60,6 +60,7 @@ import { AdminUsers } from "@/components/AdminUsers";
 import { createClient } from "@/lib/supabase/client";
 import { PRESETS, PROVIDER_MODELS, DEFAULT_SYSTEM_PROMPT, STYLE_LABELS, ALL_TOOL_CATALOG } from "@/lib/constants";
 import { buildChainFor, KEYLESS_PROVIDERS } from "@/lib/fallback";
+import { recordOutcome } from "@/lib/orchestrator";
 import { IMAGE_PROVIDERS, IMAGE_PROVIDER_LABEL, IMAGE_MODELS, resolveImageModel, connectedImageProviders, type ImageProvider } from "@/lib/imageGen";
 import { calculateCost, formatCost } from "@/lib/pricing";
 import { quickComplete } from "@/lib/quickComplete";
@@ -572,8 +573,16 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
       /* Kayıtlı modelin anahtarı bellekte şifreli kalmış olabilir — çöz. */
       const key = (await usableKey(m.apiKey)) || (await usableKey(config.providerKeys?.[m.provider]));
       const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "Merhaba, 1+1=?" }], baseUrl: m.baseUrl, model: m.model, apiKey: key, provider: m.provider }) });
+      /* Serbest-katman orkestratörünün (orchestrator.ts) tek öğrenme sinyali —
+         bilinçli bir bağlantı denemesi olduğu için gürültüsüz. Flag kapalıyken
+         de sessizce kaydedilir, zararı yok — yalnız freeOrchestrator açıkken
+         okunur (bkz. fallback.ts buildChainFor). */
+      recordOutcome(m.provider, res.ok);
       addToast(res.ok ? "Bağlantı başarılı!" : `Hata: ${(await res.text()).slice(0, 200)}`, res.ok ? "success" : "error");
-    } catch (err) { addToast(`Hata: ${(err as Error).message}`, "error"); }
+    } catch (err) {
+      recordOutcome(m.provider, false);
+      addToast(`Hata: ${(err as Error).message}`, "error");
+    }
     finally { setTesting(false); }
   };
 
@@ -1115,6 +1124,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               if (!activeM) return null;
               const qualityMode = config.qualityFallbackChain ?? false;
               const strictMode = config.strictModel ?? false;
+              const smartMode = config.freeOrchestrator ?? false;
               /* Önizleme, isteğin GERÇEKTEN kuracağı zincirle aynı fonksiyondan gelir
                  (buildChainFor) → kullanıcı ne görüyorsa o denenir. */
               const chain = buildChainFor(config);
@@ -1165,11 +1175,22 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                           <TrendingUp size={12} />
                           Kalite öncelikli
                         </button>
+                        <button
+                          onClick={() => saveConfig({ ...config, freeOrchestrator: !smartMode })}
+                          className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-semibold transition-colors shrink-0 ${
+                            smartMode ? "border-branddim bg-brand/10 text-brand" : "border-line text-muted hover:text-ink hover:border-brand/40"
+                          }`}
+                          title="Açıkken zincir, 'Test et' sonuçlarından öğrenilen güvenilirliğe göre yeniden sıralanır"
+                        >
+                          <Brain size={12} />
+                          Öğrenen sıralama
+                        </button>
                       </div>
                       <p className="text-xs text-muted leading-relaxed mb-2.5">
                         {qualityMode
                           ? "Aktif model hata verirse ücretli/ücretsiz farketmeksizin en güçlü modelden en zayıfa sırayla dener."
                           : "Aktif model kota/erişim hatası verirse istek düşmez; soldan sağa sırayla denenir. Her ücretsiz katmanın ayrı kotası birleşince kesintisiz kullanım sağlar."}
+                        {smartMode ? " Öğrenen sıralama açık: sıra, aşağıdaki sağlayıcıları \"Test et\" ile denedikçe öğrenilen güvenilirliğe göre kendini günceller." : ""}
                       </p>
                       <div className="flex flex-wrap items-center gap-1.5 text-xs">
                         <span className="px-2 py-1 rounded-lg border border-branddim bg-brand/10 text-brand font-semibold font-mono" title={cleanLabel(activeM.provider)}>
@@ -1618,6 +1639,16 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     title: "Zor işlerde en güçlü modeli kullan", desc: "Ajan ekibi çalışırken en yetenekli (anahtarı olan) modeli seçer — daha iyi sonuç, biraz daha maliyet." },
                   { on: !!config.learningMode, toggle: () => saveConfig({ ...config, learningMode: !config.learningMode }),
                     title: "Öğrenme Modu", desc: "Yanıtlar adım adım, kavramları açıklayarak verilir — üniversite/öğrenme amaçlı kullanım için." },
+                  { on: !!config.semanticMemoryEnabled, toggle: () => saveConfig({ ...config, semanticMemoryEnabled: !config.semanticMemoryEnabled }),
+                    title: "Yerel Anlamsal Hafıza", desc: "Geçmiş konuşmaları tarayıcında saklar, yeni sorularda ilgili parçaları hatırlar — anahtar gerektirmez, hiçbir yere gönderilmez." },
+                  { on: !!config.styleMemoryEnabled, toggle: () => saveConfig({ ...config, styleMemoryEnabled: !config.styleMemoryEnabled }),
+                    title: "Kişisel Stil Hafızası", desc: "Sohbetinden kod tercihlerini (camelCase, TypeScript, arrow function vb.) kural tabanlı çıkarır — LLM çağrısı yok, maliyetsiz." },
+                  { on: !!config.evolutionaryRouter, toggle: () => saveConfig({ ...config, evolutionaryRouter: !config.evolutionaryRouter }),
+                    title: "Evrimsel Model Seçici", desc: "Her istekten sonra modelin başarı/hız/token verimliliğini öğrenir (yalnız gözlem — henüz seçimi değiştirmez, gelecekteki yönlendirme için birikir)." },
+                  { on: !!config.debtTrackerEnabled, toggle: () => saveConfig({ ...config, debtTrackerEnabled: !config.debtTrackerEnabled }),
+                    title: "Teknik Borç Takipçisi", desc: "Editörde açık dosyaları karmaşıklık, eksik JSDoc ve kopya kod için tarayan bir panel ekler — sohbet alt çubuğundan açılır." },
+                  { on: !!config.teammateEnabled, toggle: () => saveConfig({ ...config, teammateEnabled: !config.teammateEnabled }),
+                    title: "AI Takım Arkadaşı", desc: "Sekme kapansa bile kalıcı bir görev kuyruğu ekler (kod incelemesi, dokümantasyon…) — sohbet alt çubuğundan açılır, sonuçları sohbete taşıyabilirsin." },
                 ].map((it) => (
                   <label key={it.title} className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
                     <input type="checkbox" checked={!!it.on} onChange={it.toggle} className="accent-brand mt-0.5 shrink-0" />

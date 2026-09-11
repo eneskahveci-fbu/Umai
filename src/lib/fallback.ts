@@ -1,6 +1,7 @@
 import type { ModelProfile, Provider } from "./types";
 import { POLLINATIONS_DEFAULT_MODEL, OVH_FREE_MODEL } from "./constants";
 import { modelQualityRank } from "./modelQuality";
+import { applyOrchestration } from "./orchestrator";
 
 /**
  * Çok-sağlayıcılı otomatik fallback zinciri.
@@ -218,6 +219,7 @@ export function buildChainFor(
     activeModelId?: string | null;
     qualityFallbackChain?: boolean;
     strictModel?: boolean;
+    freeOrchestrator?: boolean;
   },
   activeId?: string | null,
   opts: BuildChainOptions = {},
@@ -227,5 +229,12 @@ export function buildChainFor(
      kimliğine bürünüp cevap vermez (bkz. types.ts strictModel). */
   if (config.strictModel) return [];
   const build = config.qualityFallbackChain ? buildQualityFallbackChain : buildFallbackChain;
-  return build(config.models, activeId ?? config.activeModelId ?? null, opts);
+  const chain = build(config.models, activeId ?? config.activeModelId ?? null, opts);
+  /* Serbest-katman orkestratörü (bkz. orchestrator.ts): flag KAPALIYKEN
+     (varsayılan) applyOrchestration girdiyi değiştirmeden döner -> zincir
+     birebir aynı kalır. Açıkken adayları "Test et" sinyalinden öğrenilmiş
+     güvenilirliğe göre yeniden sıralar. TEK entegrasyon noktası burası olduğu
+     için tüm çağıranlar (CoderView, Studio, quickComplete, Fusion) otomatik
+     kapsanır. */
+  return applyOrchestration(chain, config.freeOrchestrator);
 }
