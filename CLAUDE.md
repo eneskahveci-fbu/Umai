@@ -278,8 +278,10 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
 - **Öğrenme Modu** (`config.learningMode`): açıkken sistem prompt'una eğitsel
   yönerge eklenir (adım adım açıklama, kavram tanımı, "neden", "Sırada öğren").
   MoreMenu'den toggle; durum çubuğunda rozet. Üniversite öğrencileri için.
-- **Yerel Anlamsal Hafıza** (`config.semanticMemoryEnabled`, varsayılan kapalı,
-  Ayarlar → Genel → Davranış): `src/lib/memory.ts` — her tur sonunda tam yanıt
+- **Yerel Anlamsal Hafıza** (`config.semanticMemoryEnabled`, **varsayılan AÇIK**
+  — Eyl 2026 sadeleştirme kararı: UI'a yeni bir buton/sekme eklemeyen, gözle
+  görülür gecikme/LLM çağrısı getirmeyen özellikler artık varsayılan açık,
+  Ayarlar → Genel → Davranış → "Deneysel"den kapatılabilir): `src/lib/memory.ts` — her tur sonunda tam yanıt
   metni tarayıcı-içi `IndexedDB`'ye (`craftai_memory`, ≤500 parça, en eski
   trim) parçalanarak yazılır (`memoryStore`); yeni bir mesaj gönderilmeden
   önce sorguya BM25 ile en ilgili k=5 parça geri getirilir (`memoryRetrieve`)
@@ -292,7 +294,8 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   konuşma parçalarını olduğu gibi saklayıp konuya göre geri getiren ayrı bir
   mekanizma. `IndexedDB` desteklemeyen ortamda (bkz. `capabilities.ts`
   `hasIndexedDB`) sessizce hiçbir şey yapmaz.
-- **Kişisel Stil Hafızası** (`config.styleMemoryEnabled`, varsayılan kapalı):
+- **Kişisel Stil Hafızası** (`config.styleMemoryEnabled`, **varsayılan AÇIK**,
+  aynı Eyl 2026 kararı — Ayarlar → Genel → Davranış → "Deneysel"):
   `src/lib/styleMemory.ts` — `extractStylePreferences()` o turun mesaj
   dizisini kural-tabanlı regex'lerle tarar (LLM çağrısı YOK): kullanıcı bir
   kod bloğunu onayladıysa (`APPROVAL_RE`, düzeltme sinyali yoksa) o bloğun
@@ -472,11 +475,13 @@ Playwright ile.
   Studio, quickComplete, Fusion) tek noktadan `buildChainFor(config)` üzerinden
   geçer — o `qualityFallbackChain`/`strictModel` tercihini okur ve zinciri kurar.
 - **Serbest-katman orkestratörü** (`src/lib/orchestrator.ts`, `config.
-  freeOrchestrator`, varsayılan kapalı, Ayarlar → Model → "Öğrenen sıralama"):
+  freeOrchestrator`, **varsayılan AÇIK** — Eyl 2026 sadeleştirme kararı, taze
+  kurulumda hiç istatistik olmadığı için ilk turlarda görünür bir fark
+  yaratmaz, Ayarlar → Model → "Öğrenen sıralama"'dan kapatılabilir):
   `buildChainFor` kurduğu zinciri, flag açıkken `applyOrchestration()` ile
   sağlayıcı başına öğrenilmiş güvenilirlik skoruna (EMA, α=0.3, `localStorage`
-  `craftai_provider_stats`) göre yeniden sıralar; kapalıyken (varsayılan)
-  girdiyi DEĞİŞTİRMEDEN döner — davranış birebir aynı kalır. Öğrenme sinyali
+  `craftai_provider_stats`) göre yeniden sıralar; kapalıyken girdiyi
+  DEĞİŞTİRMEDEN döner — davranış birebir aynı kalır. Öğrenme sinyali
   Ayarlar'daki "Test et" düğmesinden gelir (`recordOutcome`) — gerçek kullanıcı
   isteği değil, bilinçli/gürültüsüz bir bağlantı denemesi. TEK entegrasyon
   noktası `buildChainFor` olduğu için ayrı ayrı çağıran değiştirmek gerekmez.
@@ -498,6 +503,14 @@ Playwright ile.
   başlık) + kenar çubuğunda arama + sağda kaydırılabilir içerik. `ALL_TABS`'ta
   `admin: true` sekmeler (Gelişmiş/MCP/Kancalar) **admin dışı kullanıcıdan
   tamamen gizlenir** (`visibleTabs`). Flex zincirinde `min-h-0` şart (kaydırma).
+  **Genel → Davranış** kartı iki katmanlı (Eyl 2026 sadeleştirme): günlük
+  dokunulan 5 anahtar inline, geri kalan 5 "Deneysel" `<details>` katlanır
+  bloğunda (varsayılan kapalı görünüm — `Gelişmiş`'teki AYNI `<details>`
+  deseni, `ChevronRight` + `group-open:rotate-90`). Yeni bir opt-in davranış
+  anahtarı eklerken: UI'a yeni buton/sekme eklemiyorsa ve gözle görülür
+  gecikme/LLM çağrısı getirmiyorsa `DEFAULT_CONFIG`'te varsayılan AÇIK yap
+  ve "Deneysel"e koy; yeni bir buton/sekme ekliyorsa ya da henüz hiçbir kararı
+  etkilemiyorsa (yalnız gözlem) varsayılan KAPALI bırak.
 - **Hesap:** `AccountSettings.tsx` → şifre/e-posta/görünen ad (Supabase
   `updateUser`), oturum yönetimi (`signOut({scope:'global'})`), kullanım
   istatistikleri, hesabı silme. Silme `POST /api/account/delete`: servis anahtarı
