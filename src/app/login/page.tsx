@@ -20,6 +20,24 @@ function safeNext(): string {
   return "/app";
 }
 
+/** Ağ/altyapı seviyesinde bir başarısızlık mı (ör. Supabase projesi
+    DURAKLATILMIŞ — ücretsiz katman ~1 hafta hareketsizlikte otomatik durur —
+    ya da DNS/CORS hatası) yoksa normal bir API yanıtı mı (yanlış şifre,
+    rate limit…)? supabase-js istek hiç sunucuya ULAŞAMADIĞINDA
+    `AuthRetryableFetchError` döner — bunun gerçek API hatalarının (400/401/
+    429) aksine bir HTTP `status`'u YOKTUR. Bu ayrım kritik: kullanıcı bu
+    durumda "şifrem mi yanlış" diye kimlik bilgilerini değiştirip durur, oysa
+    sorun Supabase Dashboard'da (proje duraklatılmış) — doğru/yanlış şifre
+    HİÇ FARK ETMEZ, istek sunucuya hiç gitmiyor. */
+function isInfraFailure(err: { name?: string; status?: number; message: string }): boolean {
+  if (err.name === "AuthRetryableFetchError") return true;
+  if (typeof err.status !== "number") {
+    const m = err.message.toLowerCase();
+    if (m.includes("fetch") || m.includes("network")) return true;
+  }
+  return false;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const nextPath = safeNext();
@@ -101,6 +119,10 @@ export default function LoginPage() {
       });
       setLoading(false);
       if (err) {
+        if (isInfraFailure(err)) {
+          setError("Sunucuya ulaşılamıyor. Supabase projesi duraklatılmış olabilir — Supabase Dashboard → Restore/Resume project ile devam ettir, sonra tekrar dene.");
+          return;
+        }
         const m = err.message.toLowerCase();
         if (m.includes("rate limit")) {
           setError("E-posta gönderme limiti doldu (Supabase ücretsiz katman saatte birkaç e-posta gönderir). Biraz bekleyip tekrar dene, ya da 'Google ile Giriş Yap' kullan. Kalıcı çözüm: Supabase → Authentication → e-posta onayını kapat.");
@@ -120,6 +142,13 @@ export default function LoginPage() {
     const { error: err } = await sb.auth.signInWithPassword({ email: email.trim(), password });
     setLoading(false);
     if (err) {
+      /* Altyapı hatasını (ör. duraklatılmış Supabase projesi) ASLA yanlış
+         şifre gibi göstermeyiz ve deneme kilidine SAYMAYIZ — bu doğru/yanlış
+         şifreden bağımsız her seferinde olur, kullanıcıyı kilitlemek anlamsız. */
+      if (isInfraFailure(err)) {
+        setError("Sunucuya ulaşılamıyor. Supabase projesi duraklatılmış olabilir (ücretsiz katman ~1 hafta hareketsizlikte otomatik duraklar) — Supabase Dashboard → Restore/Resume project ile devam ettir, sonra tekrar dene.");
+        return;
+      }
       const attempts = readAttempts();
       const now = Date.now();
       const nextCount = attempts.count + 1;
@@ -167,6 +196,10 @@ export default function LoginPage() {
     const { error: err } = await sb.auth.resetPasswordForEmail(trimmed, { redirectTo: resetRedirect });
     setResetLoading(false);
     if (err) {
+      if (isInfraFailure(err)) {
+        setError("Sunucuya ulaşılamıyor. Supabase projesi duraklatılmış olabilir — Supabase Dashboard → Restore/Resume project ile devam ettir, sonra tekrar dene.");
+        return;
+      }
       const m = err.message.toLowerCase();
       setError(m.includes("rate limit")
         ? "E-posta gönderme limiti doldu (Supabase ücretsiz katman saatte birkaç e-posta gönderir). Biraz bekleyip tekrar dene."
