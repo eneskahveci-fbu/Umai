@@ -4124,8 +4124,15 @@ export function CoderView() {
           </div>
 
           {/* Terminal — bir kez boot olur, ARKAPLANDA mount kalır; kapatınca
-              yalnızca gizlenir (unmount olmaz) → ajan komutları hep çalışır. */}
-          {terminalMounted && (
+              yalnızca gizlenir (unmount olmaz) → ajan komutları hep çalışır.
+              GÖRÜNÜRLÜK (foreground) yalnız admin — arka plan mount'u (yukarıdaki
+              useEffect, repo/terminalWsUrl bağlıyken HERKESTE tetiklenir, ajan
+              run_command'ı için gerekli) admin'e özel DEĞİL, ama panelin
+              KENDİSİ hiçbir zaman admin dışı bir kullanıcıya render edilmez —
+              `isAdmin` burada TEK/son kapı: setTerminalOpen(true) başka bir
+              yoldan (ör. afterEdit hook fallback'i, satır ~2079) admin dışı
+              bir oturumda tetiklense bile ekrana hiç çıkmaz. */}
+          {isAdmin && terminalMounted && (
             <div className={terminalOpen ? "" : "hidden"}>
               <ErrorBoundary variant="inline" label="Terminal çöktü">
                 <RealTerminal onClose={() => setTerminalOpen(false)} />
