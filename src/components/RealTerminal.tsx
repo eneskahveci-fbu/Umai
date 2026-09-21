@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Cloud, ExternalLink, FolderOpen, Loader2, Maximize2, Minimize2, Power, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
+import { Cloud, ClipboardPaste, Copy, ExternalLink, FolderOpen, Loader2, Maximize2, Minimize2, Power, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
 import type { Terminal as XtermTerminal } from "@xterm/xterm";
 import { getUnsupportedReason, getWebContainer, isSupported, mountDefaults, mountFiles, needsApiKey } from "@/lib/webcontainer";
 import { fetchAllFiles } from "@/lib/github";
@@ -18,6 +18,16 @@ import {
 import { useStore } from "@/lib/store";
 import { isAdminEmail } from "@/lib/admin";
 
+/* Toolbar'daki Kopyala/Yapıştır düğmelerinin çağırdığı, terminale bağlı arayüz.
+   Klavye kısayolu (Ctrl/Cmd+C/V) MOBİLDE anlamsız — fiziksel klavye/Ctrl tuşu
+   yok. Bu yüzden aynı işlevi dokunmatik düğmelerle de sunuyoruz (bkz. aşağı,
+   toolbar). copySelection() seçili metin yoksa false döner (çağıran "önce
+   metin seç" gibi bir uyarı gösterebilir). */
+export interface TermApi {
+  copySelection: () => Promise<boolean>;
+  paste: (text: string) => void;
+}
+
 /* Kopyala/yapıştır: xterm'in varsayılanı seçili metin olsa bile Ctrl/Cmd+C'yi
    HER ZAMAN SIGINT byte'ı (0x03) olarak kabuğa gönderiyordu — kopyalama hiç
    çalışmıyordu, Ctrl+C her zaman çalışan komutu kesiyordu. Burada: seçili
@@ -25,8 +35,9 @@ import { isAdminEmail } from "@/lib/admin";
    xterm'e olayı yutturur); seçili metin YOKKEN her zamanki gibi SIGINT gider
    (`return true`). Ctrl/Cmd+V panodan `sendInput` ile terminale yazar. Ayrıca
    fare ile seçim bırakılınca (mouseup) otomatik kopyalar — çoğu masaüstü
-   terminalinin (iTerm/gnome-terminal vb.) alışılmış davranışı. */
-function attachClipboardHandlers(term: XtermTerminal, sendInput: (data: string) => void): () => void {
+   terminalinin (iTerm/gnome-terminal vb.) alışılmış davranışı. Bunlar masaüstü
+   (klavye/fare) içindir; `api` (dönüş değeri) mobil dokunmatik düğmeler için. */
+function attachClipboardHandlers(term: XtermTerminal, sendInput: (data: string) => void): { api: TermApi; cleanup: () => void } {
   term.attachCustomKeyEventHandler((ev) => {
     if (ev.type !== "keydown" || !(ev.ctrlKey || ev.metaKey)) return true;
     const key = ev.key.toLowerCase();
@@ -44,7 +55,15 @@ function attachClipboardHandlers(term: XtermTerminal, sendInput: (data: string) 
     if (term.hasSelection()) void navigator.clipboard?.writeText(term.getSelection()).catch(() => {});
   };
   term.element?.addEventListener("mouseup", onMouseUp);
-  return () => { term.element?.removeEventListener("mouseup", onMouseUp); };
+  const api: TermApi = {
+    copySelection: async () => {
+      if (!term.hasSelection()) return false;
+      await navigator.clipboard?.writeText(term.getSelection());
+      return true;
+    },
+    paste: sendInput,
+  };
+  return { api, cleanup: () => { term.element?.removeEventListener("mouseup", onMouseUp); } };
 }
 
 function codespaceUrl(owner: string, repo: string, branch?: string): string {
@@ -66,6 +85,7 @@ async function bootWsTerminal(
   appTheme: "dark" | "light",
   onReady: () => void,
   onError: (msg: string) => void,
+  onApi: (api: TermApi | null) => void,
 ): Promise<() => void> {
   const [{ Terminal }, { FitAddon }] = await Promise.all([
     import("@xterm/xterm"),
@@ -165,7 +185,8 @@ async function bootWsTerminal(
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "input", data: d }));
   };
   term.onData(sendInput);
-  const cleanupClipboard = attachClipboardHandlers(term, sendInput);
+  const { api, cleanup: cleanupClipboard } = attachClipboardHandlers(term, sendInput);
+  onApi(api);
 
   const resize = () => {
     fit.fit();
@@ -229,6 +250,7 @@ async function bootWsTerminal(
     window.removeEventListener("resize", resize);
     ro.disconnect();
     cleanupClipboard();
+    onApi(null);
     ws.close();
     term.dispose();
   };
@@ -250,6 +272,7 @@ async function bootWcTerminal(
   onReady: () => void,
   onError: (msg: string) => void,
   onNeedsKey: () => void,
+  onApi: (api: TermApi | null) => void,
   loadRepoFiles?: () => Promise<{ path: string; content: string }[]>,
 ): Promise<() => void> {
   if (!isSupported()) { onError(getUnsupportedReason() ?? "Tarayıcı desteklemiyor."); return () => {}; }
@@ -310,7 +333,8 @@ async function bootWcTerminal(
   const writer = proc.input.getWriter();
   const sendInput = (d: string) => { void writer.write(d); };
   term.onData(sendInput);
-  const cleanupClipboard = attachClipboardHandlers(term, sendInput);
+  const { api, cleanup: cleanupClipboard } = attachClipboardHandlers(term, sendInput);
+  onApi(api);
 
   let outputBuffer = "";
   proc.output.pipeTo(new WritableStream({
@@ -366,6 +390,7 @@ async function bootWcTerminal(
     window.removeEventListener("resize", resize);
     ro.disconnect();
     cleanupClipboard();
+    onApi(null);
     try { writer.releaseLock(); } catch { /* ignore */ }
     try { proc.kill(); } catch { /* ignore */ }
     term.dispose();
@@ -381,6 +406,9 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
   const [mountedFolder, setMountedFolder] = useState<string | null>(getMountedName());
   const [mounting, setMounting] = useState(false);
   const cleanupRef = useRef<(() => void) | null>(null);
+  /* Dokunmatik Kopyala/Yapıştır düğmeleri için — boot* fonksiyonları hazır
+     olunca doldurur (bkz. onApi), terminal yeniden başlayınca/kapanınca null. */
+  const [termApi, setTermApi] = useState<TermApi | null>(null);
   const apiKey = useStore((s) => s.config.webcontainerApiKey);
   const wsUrl = useStore((s) => s.config.terminalWsUrl ?? "");
   const appTheme = useStore((s) => s.config.theme);
@@ -427,12 +455,14 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
             containerRef.current, wsUrl, appThemeRef.current,
             () => setStatus("ready"),
             (msg) => { setStatus("error"); setErrMsg(msg); },
+            setTermApi,
           )
         : await bootWcTerminal(
             containerRef.current, apiKey, appThemeRef.current,
             () => setStatus("ready"),
             (msg) => { setStatus("error"); setErrMsg(msg); },
             () => setStatus("needs-key"),
+            setTermApi,
             /* Bağlı repoyu WebContainer'a getir → gerçek kod tabanında çalış. */
             async () => {
               const store = useStore.getState();
@@ -558,6 +588,34 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
         </button>
         <button onClick={restart} title="Yeniden başlat" className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors">
           <RefreshCw size={11} />
+        </button>
+        {/* Dokunmatik Kopyala/Yapıştır — mobilde Ctrl/Cmd tuşu yok, klavye
+            kısayolu işe yaramaz. Herkese açık (admin'e özel değil). */}
+        <button
+          onClick={async () => {
+            const ok = await termApi?.copySelection();
+            if (!ok) addToast("Önce kopyalanacak metni seç (basılı tut → sürükle)", "info");
+          }}
+          disabled={!termApi}
+          title="Seçili metni kopyala"
+          className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors disabled:opacity-30"
+        >
+          <Copy size={11} />
+        </button>
+        <button
+          onClick={async () => {
+            try {
+              const text = await navigator.clipboard.readText();
+              if (text) termApi?.paste(text);
+            } catch {
+              addToast("Pano okunamadı — terminale basılı tutup 'Yapıştır' deneyebilirsin", "info");
+            }
+          }}
+          disabled={!termApi}
+          title="Panodan yapıştır"
+          className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors disabled:opacity-30"
+        >
+          <ClipboardPaste size={11} />
         </button>
         {isAdmin && (
           <button
