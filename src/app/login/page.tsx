@@ -20,6 +20,24 @@ function safeNext(): string {
   return "/app";
 }
 
+/** Ağ/altyapı seviyesinde bir başarısızlık mı (ör. Supabase projesi
+    DURAKLATILMIŞ — ücretsiz katman ~1 hafta hareketsizlikte otomatik durur —
+    ya da DNS/CORS hatası) yoksa normal bir API yanıtı mı (yanlış şifre,
+    rate limit…)? supabase-js istek hiç sunucuya ULAŞAMADIĞINDA
+    `AuthRetryableFetchError` döner — bunun gerçek API hatalarının (400/401/
+    429) aksine bir HTTP `status`'u YOKTUR. Bu ayrım kritik: kullanıcı bu
+    durumda "şifrem mi yanlış" diye kimlik bilgilerini değiştirip durur, oysa
+    sorun Supabase Dashboard'da (proje duraklatılmış) — doğru/yanlış şifre
+    HİÇ FARK ETMEZ, istek sunucuya hiç gitmiyor. */
+function isInfraFailure(err: { name?: string; status?: number; message: string }): boolean {
+  if (err.name === "AuthRetryableFetchError") return true;
+  if (typeof err.status !== "number") {
+    const m = err.message.toLowerCase();
+    if (m.includes("fetch") || m.includes("network")) return true;
+  }
+  return false;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const nextPath = safeNext();
@@ -41,6 +59,7 @@ export default function LoginPage() {
   });
   const [success, setSuccess] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  const [resetLoading, setResetLoading] = useState(false);
 
   /* Referral linki (/?ref=<uuid>) tıklanıp "Ücretsiz başla" ile buraya
      düşülürse de kodu yakala — kayıt sonrası app/page.tsx bunu işler. */
@@ -100,6 +119,10 @@ export default function LoginPage() {
       });
       setLoading(false);
       if (err) {
+        if (isInfraFailure(err)) {
+          setError("Sunucuya ulaşılamıyor. Supabase projesi duraklatılmış olabilir — Supabase Dashboard → Restore/Resume project ile devam ettir, sonra tekrar dene.");
+          return;
+        }
         const m = err.message.toLowerCase();
         if (m.includes("rate limit")) {
           setError("E-posta gönderme limiti doldu (Supabase ücretsiz katman saatte birkaç e-posta gönderir). Biraz bekleyip tekrar dene, ya da 'Google ile Giriş Yap' kullan. Kalıcı çözüm: Supabase → Authentication → e-posta onayını kapat.");
@@ -119,17 +142,71 @@ export default function LoginPage() {
     const { error: err } = await sb.auth.signInWithPassword({ email: email.trim(), password });
     setLoading(false);
     if (err) {
+      /* Altyapı hatasını (ör. duraklatılmış Supabase projesi) ASLA yanlış
+         şifre gibi göstermeyiz ve deneme kilidine SAYMAYIZ — bu doğru/yanlış
+         şifreden bağımsız her seferinde olur, kullanıcıyı kilitlemek anlamsız. */
+      if (isInfraFailure(err)) {
+        setError("Sunucuya ulaşılamıyor. Supabase projesi duraklatılmış olabilir (ücretsiz katman ~1 hafta hareketsizlikte otomatik duraklar) — Supabase Dashboard → Restore/Resume project ile devam ettir, sonra tekrar dene.");
+        return;
+      }
       const attempts = readAttempts();
       const now = Date.now();
       const nextCount = attempts.count + 1;
       const lockUntil = nextCount >= 5 ? now + 60_000 : 0;
       writeAttempts({ count: nextCount, lockUntil });
-      setError(lockUntil > 0 ? "Çok fazla başarısız deneme. 60 saniye bekle." : "E-posta veya şifre hatalı.");
+      if (lockUntil > 0) {
+        setError("Çok fazla başarısız deneme. 60 saniye bekle.");
+        return;
+      }
+      /* ÖNCEDEN her hata (yanlış şifre, onaylanmamış e-posta, rate limit…)
+         AYNI "E-posta veya şifre hatalı" metnine düşüyordu — kullanıcı
+         onay e-postasını hiç görmediğinde bile şifresini unuttuğunu
+         sanıyordu. supabase-js v2.40+'ta AuthApiError.code var; ayrıca
+         mesaj metnini de kontrol ederiz (eski istemcilerde code boş olabilir). */
+      const code = (err as { code?: string }).code ?? "";
+      const m = err.message.toLowerCase();
+      if (code === "email_not_confirmed" || m.includes("not confirmed") || m.includes("confirm")) {
+        setError("Bu e-posta henüz onaylanmamış. Gelen kutunu (ve spam'i) kontrol et — kayıt sırasında gönderilen onay bağlantısına tıklaman gerekiyor.");
+      } else if (m.includes("rate limit")) {
+        setError("Çok fazla deneme yapıldı, Supabase geçici olarak kısıtladı. Biraz bekleyip tekrar dene.");
+      } else {
+        setError("E-posta veya şifre hatalı.");
+      }
       return;
     }
     writeAttempts({ count: 0, lockUntil: 0 });
     router.replace(nextPath);
     router.refresh();
+  };
+
+  /* Şifremi unuttum: Supabase'e sıfırlama e-postası ister. Dönüş linki
+     /auth/callback'e gider (kod → oturum değişimini ZATEN yapan aynı route,
+     bkz. route.ts) → next=/reset-password'e düşer; orada kullanıcı zaten
+     oturumluyken yeni şifresini belirler. */
+  const sendPasswordReset = async () => {
+    const trimmed = email.trim();
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setFieldErrors((p) => ({ ...p, email: "Önce e-postanı yaz" }));
+      return;
+    }
+    setError(""); setSuccess(""); setResetLoading(true);
+    const sb = createClient();
+    if (!sb) { setError("Kimlik doğrulama yapılandırılmamış."); setResetLoading(false); return; }
+    const resetRedirect = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/reset-password")}`;
+    const { error: err } = await sb.auth.resetPasswordForEmail(trimmed, { redirectTo: resetRedirect });
+    setResetLoading(false);
+    if (err) {
+      if (isInfraFailure(err)) {
+        setError("Sunucuya ulaşılamıyor. Supabase projesi duraklatılmış olabilir — Supabase Dashboard → Restore/Resume project ile devam ettir, sonra tekrar dene.");
+        return;
+      }
+      const m = err.message.toLowerCase();
+      setError(m.includes("rate limit")
+        ? "E-posta gönderme limiti doldu (Supabase ücretsiz katman saatte birkaç e-posta gönderir). Biraz bekleyip tekrar dene."
+        : err.message);
+      return;
+    }
+    setSuccess("Şifre sıfırlama bağlantısı gönderildi. E-postanı (ve spam klasörünü) kontrol et.");
   };
 
   const signInWithGitLab = async () => {
@@ -254,6 +331,16 @@ export default function LoginPage() {
                 </button>
               </div>
               {fieldErrors.password && <p className="text-red text-xs px-1">{fieldErrors.password}</p>}
+              {mode === "login" && (
+                <button
+                  type="button"
+                  onClick={sendPasswordReset}
+                  disabled={resetLoading}
+                  className="text-xs text-muted hover:text-brand transition-colors px-1 disabled:opacity-50"
+                >
+                  {resetLoading ? "Gönderiliyor…" : "Şifremi unuttum"}
+                </button>
+              )}
             </div>
 
             {error && <div className="px-4 py-3 rounded-xl bg-red/8 border border-red/25 text-red text-sm">{error}</div>}
