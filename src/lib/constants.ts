@@ -1250,6 +1250,18 @@ export const DEFAULT_CONFIG: Config = {
      varsayılan; isteyen Ayarlar → Kalite'den "Standart" ya da "Yüksek"e
      (Fusion — çoklu-model+hakem) kendi seçimiyle geçebilir. */
   qualityTier: "off",
+  /* Eyl 2026 sadeleştirme kararı: yalnızca arka planda SESSİZCE çalışan, YENİ
+     bir buton/sekme eklemeyen ve gözle görülür ekstra gecikme/LLM çağrısı
+     getirmeyen özellikler varsayılan AÇIK yapıldı — kullanıcı Ayarlar'a hiç
+     girmeden en iyi davranışı alsın ("otomatik" olsun). `evolutionaryRouter`
+     (henüz hiçbir kararı etkilemiyor, yalnız gözlem) ve `debtTrackerEnabled`/
+     `teammateEnabled` (composer'a kalıcı yeni bir buton ekliyor) BİLİNÇLİ
+     OLARAK varsayılan kapalı bırakıldı — qualityTier'daki AYNI ilke: görünmez
+     sürpriz maliyet/karmaşıklık eklemeyeceğine emin olmadan bir şeyi varsayılan
+     açmayız (bkz. yukarıdaki qualityTier yorumu). */
+  semanticMemoryEnabled: true,
+  styleMemoryEnabled: true,
+  freeOrchestrator: true,
   learningMode: false,
   webSearch: true,
   agentsUseStrongestModel: true,

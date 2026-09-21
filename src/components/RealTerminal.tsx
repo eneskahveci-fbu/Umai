@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Cloud, ExternalLink, FolderOpen, Loader2, Power, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
+import { Cloud, ExternalLink, FolderOpen, Loader2, Maximize2, Minimize2, Power, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
+import type { Terminal as XtermTerminal } from "@xterm/xterm";
 import { getUnsupportedReason, getWebContainer, isSupported, mountDefaults, mountFiles, needsApiKey } from "@/lib/webcontainer";
 import { fetchAllFiles } from "@/lib/github";
 import { fetchAllGitLabFiles, resolveRepoProvider } from "@/lib/gitlab";
@@ -15,6 +16,36 @@ import {
   setMounted,
 } from "@/lib/localfs";
 import { useStore } from "@/lib/store";
+import { isAdminEmail } from "@/lib/admin";
+
+/* Kopyala/yapıştır: xterm'in varsayılanı seçili metin olsa bile Ctrl/Cmd+C'yi
+   HER ZAMAN SIGINT byte'ı (0x03) olarak kabuğa gönderiyordu — kopyalama hiç
+   çalışmıyordu, Ctrl+C her zaman çalışan komutu kesiyordu. Burada: seçili
+   metin varken Ctrl/Cmd+C panoya kopyalar (SIGINT GÖNDERMEZ — `return false`
+   xterm'e olayı yutturur); seçili metin YOKKEN her zamanki gibi SIGINT gider
+   (`return true`). Ctrl/Cmd+V panodan `sendInput` ile terminale yazar. Ayrıca
+   fare ile seçim bırakılınca (mouseup) otomatik kopyalar — çoğu masaüstü
+   terminalinin (iTerm/gnome-terminal vb.) alışılmış davranışı. */
+function attachClipboardHandlers(term: XtermTerminal, sendInput: (data: string) => void): () => void {
+  term.attachCustomKeyEventHandler((ev) => {
+    if (ev.type !== "keydown" || !(ev.ctrlKey || ev.metaKey)) return true;
+    const key = ev.key.toLowerCase();
+    if (key === "c" && term.hasSelection()) {
+      void navigator.clipboard?.writeText(term.getSelection()).catch(() => {});
+      return false;
+    }
+    if (key === "v") {
+      navigator.clipboard?.readText().then((text) => { if (text) sendInput(text); }).catch(() => {});
+      return false;
+    }
+    return true;
+  });
+  const onMouseUp = () => {
+    if (term.hasSelection()) void navigator.clipboard?.writeText(term.getSelection()).catch(() => {});
+  };
+  term.element?.addEventListener("mouseup", onMouseUp);
+  return () => { term.element?.removeEventListener("mouseup", onMouseUp); };
+}
 
 function codespaceUrl(owner: string, repo: string, branch?: string): string {
   const u = new URL("https://github.com/codespaces/new");
@@ -130,9 +161,11 @@ async function bootWsTerminal(
     } catch { term.write(ev.data as string); }
   };
 
-  term.onData((d) => {
+  const sendInput = (d: string) => {
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "input", data: d }));
-  });
+  };
+  term.onData(sendInput);
+  const cleanupClipboard = attachClipboardHandlers(term, sendInput);
 
   const resize = () => {
     fit.fit();
@@ -195,6 +228,7 @@ async function bootWsTerminal(
     window.removeEventListener("craftai:terminal-run", handleRunCmd);
     window.removeEventListener("resize", resize);
     ro.disconnect();
+    cleanupClipboard();
     ws.close();
     term.dispose();
   };
@@ -274,7 +308,9 @@ async function bootWcTerminal(
 
   const proc = await wc.spawn("jsh", { terminal: { cols: term.cols, rows: term.rows } });
   const writer = proc.input.getWriter();
-  term.onData((d) => writer.write(d));
+  const sendInput = (d: string) => { void writer.write(d); };
+  term.onData(sendInput);
+  const cleanupClipboard = attachClipboardHandlers(term, sendInput);
 
   let outputBuffer = "";
   proc.output.pipeTo(new WritableStream({
@@ -329,6 +365,7 @@ async function bootWcTerminal(
     window.removeEventListener("craftai:terminal-run", handleRunCmd);
     window.removeEventListener("resize", resize);
     ro.disconnect();
+    cleanupClipboard();
     try { writer.releaseLock(); } catch { /* ignore */ }
     try { proc.kill(); } catch { /* ignore */ }
     term.dispose();
@@ -354,12 +391,26 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
   const repo = useStore((s) => s.repo);
   const codespaceHref = repo ? codespaceUrl(repo.owner, repo.repo, repo.branch) : null;
   const useWs = wsUrl.trim().length > 0;
+  /* Tam ekran: yalnız admin — geniş kullanıcı kitlesi için gereksiz bir
+     karmaşıklık/dikkat dağıtıcı, admin'in uzun komut/log takibi içinse
+     gerçek bir ihtiyaç (bkz. CLAUDE.md: "hassas ayarlar yalnız admin'e
+     görünür" ilkesiyle aynı çizgide). */
+  const isAdmin = isAdminEmail(useStore((s) => s.userEmail));
+  const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => {
     const fn = () => setMountedFolder(getMountedName());
     window.addEventListener("localfs:changed", fn);
     return () => window.removeEventListener("localfs:changed", fn);
   }, []);
+
+  /* Tam ekrandayken Escape ile çık — terminali KAPATMAZ, yalnız küçültür. */
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFullscreen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fullscreen]);
 
   /* Hazır olunca haber ver → CoderView run_command'ı tam o an gönderir (kayıp yok). */
   useEffect(() => {
@@ -448,7 +499,11 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="h-64 shrink-0 border-t border-line/60 flex flex-col"
+      className={
+        fullscreen
+          ? "fixed inset-0 z-[100] flex flex-col"
+          : "h-64 shrink-0 border-t border-line/60 flex flex-col"
+      }
       style={{ backgroundColor: appTheme === "light" ? "#23271f" : "#12140f" }}
     >
       {/* Terminal toolbar */}
@@ -504,6 +559,15 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
         <button onClick={restart} title="Yeniden başlat" className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors">
           <RefreshCw size={11} />
         </button>
+        {isAdmin && (
+          <button
+            onClick={() => setFullscreen((v) => !v)}
+            title={fullscreen ? "Tam ekrandan çık (Esc)" : "Tam ekran"}
+            className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors"
+          >
+            {fullscreen ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
+          </button>
+        )}
         <button onClick={onClose} title="Kapat" className="text-white/40 hover:text-white/80 p-1 rounded transition-colors">
           <X size={12} />
         </button>

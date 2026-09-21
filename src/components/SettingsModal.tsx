@@ -1624,7 +1624,12 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               )}
             </div>
 
-            {/* Ajan Davranışı — her gün etkileyen davranış anahtarları (açıklamalı) */}
+            {/* Ajan Davranışı — her gün etkileyen davranış anahtarları (açıklamalı).
+               Eyl 2026 sadeleştirme kararı: yalnız GÜNLÜK dokunulan/görünür etkisi
+               olan anahtarlar burada inline kalır. Arka planda sessizce çalışan,
+               UI'a yeni bir düğme/sekme EKLEMEYEN özellikler (hafıza/orkestratör)
+               varsayılan olarak AÇIK geldiği için burada göstermeye gerek yok —
+               "Deneysel" katlanır bloğuna taşındı (bkz. aşağı). */}
             <div className="premium-card rounded-xl p-4">
               <h4 className="text-sm font-bold mb-2">Davranış</h4>
               <div className="flex flex-col gap-2">
@@ -1639,16 +1644,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     title: "Zor işlerde en güçlü modeli kullan", desc: "Ajan ekibi çalışırken en yetenekli (anahtarı olan) modeli seçer — daha iyi sonuç, biraz daha maliyet." },
                   { on: !!config.learningMode, toggle: () => saveConfig({ ...config, learningMode: !config.learningMode }),
                     title: "Öğrenme Modu", desc: "Yanıtlar adım adım, kavramları açıklayarak verilir — üniversite/öğrenme amaçlı kullanım için." },
-                  { on: !!config.semanticMemoryEnabled, toggle: () => saveConfig({ ...config, semanticMemoryEnabled: !config.semanticMemoryEnabled }),
-                    title: "Yerel Anlamsal Hafıza", desc: "Geçmiş konuşmaları tarayıcında saklar, yeni sorularda ilgili parçaları hatırlar — anahtar gerektirmez, hiçbir yere gönderilmez." },
-                  { on: !!config.styleMemoryEnabled, toggle: () => saveConfig({ ...config, styleMemoryEnabled: !config.styleMemoryEnabled }),
-                    title: "Kişisel Stil Hafızası", desc: "Sohbetinden kod tercihlerini (camelCase, TypeScript, arrow function vb.) kural tabanlı çıkarır — LLM çağrısı yok, maliyetsiz." },
-                  { on: !!config.evolutionaryRouter, toggle: () => saveConfig({ ...config, evolutionaryRouter: !config.evolutionaryRouter }),
-                    title: "Evrimsel Model Seçici", desc: "Her istekten sonra modelin başarı/hız/token verimliliğini öğrenir (yalnız gözlem — henüz seçimi değiştirmez, gelecekteki yönlendirme için birikir)." },
-                  { on: !!config.debtTrackerEnabled, toggle: () => saveConfig({ ...config, debtTrackerEnabled: !config.debtTrackerEnabled }),
-                    title: "Teknik Borç Takipçisi", desc: "Editörde açık dosyaları karmaşıklık, eksik JSDoc ve kopya kod için tarayan bir panel ekler — sohbet alt çubuğundan açılır." },
-                  { on: !!config.teammateEnabled, toggle: () => saveConfig({ ...config, teammateEnabled: !config.teammateEnabled }),
-                    title: "AI Takım Arkadaşı", desc: "Sekme kapansa bile kalıcı bir görev kuyruğu ekler (kod incelemesi, dokümantasyon…) — sohbet alt çubuğundan açılır, sonuçları sohbete taşıyabilirsin." },
                 ].map((it) => (
                   <label key={it.title} className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
                     <input type="checkbox" checked={!!it.on} onChange={it.toggle} className="accent-brand mt-0.5 shrink-0" />
@@ -1659,6 +1654,45 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   </label>
                 ))}
               </div>
+
+              {/* Deneysel — Eyl 2026 sadeleştirme: 5 yeni anahtar ana listeyi
+                 kalabalıklaştırmasın diye buraya taşındı. İlk ikisi (Yerel
+                 Anlamsal Hafıza, Kişisel Stil Hafızası) DEFAULT_CONFIG'te
+                 varsayılan AÇIK — arka planda sessiz çalışır, yeni bir buton/
+                 sekme eklemez, bu yüzden çoğu kullanıcının hiç dokunmasına
+                 gerek yok. Son üçü (Evrimsel Seçici, Teknik Borç, AI Takım
+                 Arkadaşı) bilinçli olarak varsayılan KAPALI kaldı: ya henüz
+                 hiçbir kararı etkilemiyor (Evrimsel Seçici — yalnız gözlem) ya
+                 da composer'a kalıcı yeni bir buton ekliyor (Borç/Takım
+                 Arkadaşı) — bunu yalnız isteyen görsün. */}
+              <details className="mt-3 group/exp">
+                <summary className="text-xs font-bold text-muted/70 cursor-pointer list-none flex items-center gap-1.5 hover:text-ink transition-colors">
+                  <ChevronRight size={12} className="text-muted/50 transition-transform group-open/exp:rotate-90" />
+                  Deneysel
+                </summary>
+                <div className="flex flex-col gap-2 mt-2">
+                  {[
+                    { on: !!config.semanticMemoryEnabled, toggle: () => saveConfig({ ...config, semanticMemoryEnabled: !config.semanticMemoryEnabled }),
+                      title: "Yerel Anlamsal Hafıza", desc: "Geçmiş konuşmaları tarayıcında saklar, yeni sorularda ilgili parçaları hatırlar — anahtar gerektirmez, hiçbir yere gönderilmez. Varsayılan açık." },
+                    { on: !!config.styleMemoryEnabled, toggle: () => saveConfig({ ...config, styleMemoryEnabled: !config.styleMemoryEnabled }),
+                      title: "Kişisel Stil Hafızası", desc: "Sohbetinden kod tercihlerini (camelCase, TypeScript, arrow function vb.) kural tabanlı çıkarır — LLM çağrısı yok, maliyetsiz. Varsayılan açık." },
+                    { on: !!config.evolutionaryRouter, toggle: () => saveConfig({ ...config, evolutionaryRouter: !config.evolutionaryRouter }),
+                      title: "Evrimsel Model Seçici", desc: "Her istekten sonra modelin başarı/hız/token verimliliğini öğrenir (yalnız gözlem — henüz seçimi değiştirmez, gelecekteki yönlendirme için birikir)." },
+                    { on: !!config.debtTrackerEnabled, toggle: () => saveConfig({ ...config, debtTrackerEnabled: !config.debtTrackerEnabled }),
+                      title: "Teknik Borç Takipçisi", desc: "Editörde açık dosyaları karmaşıklık, eksik JSDoc ve kopya kod için tarayan bir panel ekler — sohbet alt çubuğuna yeni bir düğme koyar." },
+                    { on: !!config.teammateEnabled, toggle: () => saveConfig({ ...config, teammateEnabled: !config.teammateEnabled }),
+                      title: "AI Takım Arkadaşı", desc: "Sekme kapansa bile kalıcı bir görev kuyruğu ekler (kod incelemesi, dokümantasyon…) — sohbet alt çubuğuna yeni bir düğme koyar." },
+                  ].map((it) => (
+                    <label key={it.title} className="flex items-start gap-3 cursor-pointer p-3 rounded-xl border border-line bg-bgsoft hover:border-brand/40 transition-colors">
+                      <input type="checkbox" checked={!!it.on} onChange={it.toggle} className="accent-brand mt-0.5 shrink-0" />
+                      <span className="min-w-0">
+                        <span className="text-sm font-semibold block">{it.title}</span>
+                        <span className="text-xs text-muted mt-0.5 leading-relaxed block">{it.desc}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </details>
             </div>
 
             {/* Görünüm — tema + vurgu rengi + yazı boyutu tek grupta */}
