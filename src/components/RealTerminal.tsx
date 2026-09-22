@@ -119,7 +119,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
     }
 
     try {
-      const view = await createTerminalView(el, { theme: appThemeRef.current, fontSize: fontRef.current });
+      const view = await createTerminalView(el, { theme: appThemeRef.current, fontSize: fontRef.current, convertEol: !useWs });
       if (!alive()) { view.dispose(); return; }
       viewRef.current = view;
       view.term.attachCustomKeyEventHandler((e) => {

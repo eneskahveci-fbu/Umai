@@ -17,7 +17,10 @@ export interface TerminalView {
 
 export async function createTerminalView(
   el: HTMLDivElement,
-  opts: { theme: "dark" | "light"; fontSize: number },
+  /* convertEol: gerçek PTY (uzak köprü) zaten \r\n üretir; \n'yi \r\n'ye çevirmek
+     opencode/vim gibi tam ekran TUI'lerin imleç konumlandırmasını bozar → yalnız
+     WebContainer'da açık. */
+  opts: { theme: "dark" | "light"; fontSize: number; convertEol: boolean },
 ): Promise<TerminalView> {
   const [{ Terminal }, { FitAddon }, { SearchAddon }, { WebLinksAddon }] = await Promise.all([
     import("@xterm/xterm"),
@@ -28,7 +31,7 @@ export async function createTerminalView(
   await import("@xterm/xterm/css/xterm.css");
 
   const term = new Terminal({
-    convertEol: true,
+    convertEol: opts.convertEol,
     cursorBlink: true,
     fontFamily: TERMINAL_FONT,
     fontSize: opts.fontSize,

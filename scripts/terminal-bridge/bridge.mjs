@@ -409,12 +409,14 @@ server.on("upgrade", (req, socket, head) => {
 });
 
 wss.on("connection", (ws) => {
+  /* xterm-256color + truecolor: opencode gibi tam ekran TUI'ler 8 renkli
+     "xterm-color"da bozuk/soluk görünür; istemci (xterm.js) 24-bit rengi destekler. */
   const pty = ptySpawn(SHELL, [], {
-    name: "xterm-color",
+    name: "xterm-256color",
     cols: 80,
     rows: 24,
     cwd: process.env.CRAFT_CWD || ROOT,
-    env: process.env,
+    env: { ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor" },
   });
   pty.onData((data) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ type: "output", data })); });
   pty.onExit(() => { try { ws.close(); } catch { /* yok say */ } });
