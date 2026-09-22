@@ -668,6 +668,11 @@ export interface Config {
   /** Gerçek terminal bağlanınca otomatik çalıştırılacak kurulum komutu
    *  (ör. "npm install && npm run dev"). Boşsa hiçbir şey çalıştırılmaz. */
   terminalSetupCommand?: string;
+  /** Terminal yazı boyutu (px). Yoksa 13. Tuş şeridindeki A−/A+ ile değişir. */
+  terminalFontSize?: number;
+  /** Terminal altındaki tek dokunuşluk komut çipleri. Yoksa
+   *  DEFAULT_QUICK_COMMANDS (lib/terminalKeys.ts). Boş dizi = çip yok. */
+  terminalQuickCommands?: string[];
   /** Olaya bağlı otomasyonlar (Claude Code hooks benzeri). */
   automations?: Automation[];
   /** Stüdyo: kaydedilen projeler (çok-proje çalışma alanı). */

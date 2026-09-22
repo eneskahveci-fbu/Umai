@@ -49,6 +49,7 @@ import {
 } from "lucide-react";
 import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
 import { detectModelCapabilities } from "@/lib/modelCapabilities";
+import { DEFAULT_QUICK_COMMANDS, MAX_QUICK_COMMANDS, parseQuickCommands } from "@/lib/terminalKeys";
 import { isAdminEmail } from "@/lib/admin";
 import { readErrors, clearErrors } from "@/lib/errorLog";
 import { AccountSettings } from "@/components/AccountSettings";
@@ -2409,6 +2410,26 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 onChange={(e) => saveConfig({ ...config, terminalSetupCommand: e.target.value })}
                 placeholder="npm install && npm run dev"
                 className="input-mono w-full"
+                autoComplete="off"
+                spellCheck={false}
+              />
+
+              {/* Terminalin altındaki tek dokunuşluk komut çipleri. Metin
+                  alanı yazarken kaydedilmez (her satırda ayrıştırmak, yeni
+                  boş satır eklemeyi imkânsız kılardı) — odaktan çıkınca. */}
+              <h4 className="text-sm font-bold mt-4 mb-1">Hızlı komutlar</h4>
+              <p className="text-xs text-muted/70 mb-2 leading-relaxed">
+                Terminalin altında tek dokunuşla çalışan komutlar — her satıra bir tane
+                (en fazla {MAX_QUICK_COMMANDS}). Hepsini silersen çip gösterilmez.
+              </p>
+              <textarea
+                id="terminal-quick-commands"
+                key={(config.terminalQuickCommands ?? DEFAULT_QUICK_COMMANDS).join("\n")}
+                defaultValue={(config.terminalQuickCommands ?? DEFAULT_QUICK_COMMANDS).join("\n")}
+                onBlur={(e) => saveConfig({ ...config, terminalQuickCommands: parseQuickCommands(e.target.value) })}
+                rows={4}
+                placeholder={DEFAULT_QUICK_COMMANDS.join("\n")}
+                className="input-mono w-full resize-y"
                 autoComplete="off"
                 spellCheck={false}
               />

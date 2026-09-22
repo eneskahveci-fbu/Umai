@@ -572,7 +572,16 @@ Playwright ile.
   **veya** token ile manuel ekleme.
 - **Hibrit köprü:** `scripts/terminal-bridge/bridge.mjs` (node-pty + ws) →
   terminal (WS) + `/fs/*` + `/exec` + tokensız `/health`; istemci tarafı
-  `src/lib/bridgeFs.ts`. **Yerel LLM** (`/llm/v1/chat/completions` +
+  `src/lib/bridgeFs.ts`. **Terminal paneli** (`RealTerminal.tsx`, Eyl 2026):
+  WS koparsa üstel beklemeyle kendisi yeniden bağlanır (sayfa görünür olunca
+  / ağ gelince hemen), ilk bağlantı kurulamazsa `/health` ile "köprü kapalı"
+  ile "token yanlış"ı ayırır; dokunmatik cihazda Esc/Tab/yapışkan Ctrl/oklar
+  şeridi, herkese hızlı komut çipleri (`config.terminalQuickCommands`) ve
+  A−/A+ (`config.terminalFontSize`). Saf mantık `src/lib/terminalKeys.ts`'te
+  (test: `terminalKeys.test.ts`). Köprü 2.1+ PTY'ye `~/.opencode/bin` vb.
+  kullanıcı-alanı dizinlerini PATH'e ekler + `TERM=xterm-256color`; daha eski
+  köprüde panel "Köprüyü güncelle" düğmesi gösterir (`BRIDGE_UPDATE_COMMAND` —
+  sudo'suz, dosyayı yazıp süreci öldürür, systemd yeniden kaldırır). **Yerel LLM** (`/llm/v1/chat/completions` +
   `/llm/v1/models`, Tem 2026): aynı köprünün, aynı sunucudaki bir Ollama'ya
   OpenAI-uyumlu proxy'si — Ollama yalnız `127.0.0.1:11434`'te dinler, dışarıya
   hiç açılmaz, tek erişim yolu köprünün mevcut token doğrulaması. Uygulama

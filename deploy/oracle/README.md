@@ -52,6 +52,23 @@ Bağlantıyı uygulama tarafında **Ayarlar**'dan girersin; kod/dağıtım deği
 - Token'ı değiştir: `/etc/systemd/system/craft-bridge.service` içindeki `TOKEN=`
   değerini düzenle → `sudo systemctl daemon-reload && sudo systemctl restart craft-bridge`.
 - Workspace: `/opt/craft-bridge/workspace` (repolar/projeler burada **kalıcı**).
+- **Köprüyü güncelle (sudo GEREKMEZ):** Uygulamadaki terminal, köprü eskiyse
+  tuş şeridinde "Köprüyü güncelle" düğmesi gösterir. Elle yapmak istersen
+  terminale yapıştır:
+  ```bash
+  curl -fsSL https://gitlab.com/eneskahveci.bs/craft-coder/-/raw/main/scripts/terminal-bridge/bridge.mjs -o /opt/craft-bridge/bridge.mjs.new \
+    && node --check /opt/craft-bridge/bridge.mjs.new \
+    && mv /opt/craft-bridge/bridge.mjs.new /opt/craft-bridge/bridge.mjs \
+    && pkill -u "$(id -u)" -f 'node /opt/craft-bridge/bridge.mjs'
+  ```
+  Dosyalar `craftbridge` kullanıcısına ait olduğu için terminal onları
+  yazabilir; eski süreç ölünce systemd (`Restart=always`) 3 sn'de yeni kodla
+  kaldırır, terminal kendiliğinden yeniden bağlanır. (Terminal içinde `sudo`
+  ÇALIŞMAZ — servis `NoNewPrivileges=true` ile çalışır; bu bilinçli.)
+- **Kullanıcı-alanı araçları** (`opencode`, `bun`, `pip --user`…): köprü 2.1+
+  `~/.opencode/bin`, `~/.local/bin`, `~/.bun/bin`, `~/.npm-global/bin`,
+  `~/.cargo/bin`, `~/go/bin` dizinlerini (varsa) terminalin PATH'ine kendisi
+  ekler — `.bashrc` düzenlemeye gerek yok. `snap install` root ister, kullanma.
 
 ## (Opsiyonel) Yerel LLM — Pollinations'tan daha güçlü, tamamen kendi sunucunda
 
