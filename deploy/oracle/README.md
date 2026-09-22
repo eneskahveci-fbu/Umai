@@ -91,6 +91,17 @@ yerel modele bağlar (anahtarsız); değilse opencode içinde `/connect` ile bir
 sağlayıcı ekle. Sonra uygulamada terminali aç (açıksa ⟳ ile yeniden bağlan)
 ve `opencode` yaz. Güncellemek için aynı komutu tekrar çalıştır.
 
+**SSH'a erişemiyorsan (root'suz yol):** uygulamanın kendi terminaline (zaten
+sunucuya bağlı) şunu yapıştır — sudo gerekmez, köprü kullanıcısının kendi
+klasörüne kurar, tekrar çalıştırmak güvenli (günceller):
+
+```bash
+npm i -g --prefix ~/.local opencode-ai@latest && { grep -q craft-opencode ~/.bashrc 2>/dev/null || printf '\n# craft-opencode\nexport PATH="$HOME/.local/bin:$PATH"\nexport TERM=xterm-256color COLORTERM=truecolor\n' >> ~/.bashrc; } && . ~/.bashrc && opencode --version
+```
+
+Sürüm numarası çıkınca `opencode` yaz. (Ollama otomatik bağlantısı yalnız
+sudo'lu scriptte var; burada `/connect` ile sağlayıcı ekle.)
+
 > Not: opencode yerel bir ikili dosyadır; yalnız bu uzak köprü terminalinde
 > çalışır, tarayıcı içi WebContainer modunda çalışmaz.
 
