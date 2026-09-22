@@ -61,6 +61,8 @@ src/
     ├── fallback.ts           # buildFallbackChain — çok-sağlayıcılı oto-fallback
     ├── preview.ts            # Kod → canlı sandbox (React/JSX/HTML/SVG/mermaid + console)
     ├── mcpCatalog.ts          # MCP uygulama galerisi verisi (Notion/Slack/Drive... — URL içermez)
+    ├── terminal/             # RealTerminal'in parçaları: core (saf, testli) · view (xterm+eklentiler)
+    │                         #   · wsTransport / wcTransport (taşıyıcılar) · runBridge (AI komut köprüsü)
     └── extensions/registry.ts# EXTENSION_TOOLS/AGENTS/CATALOG + EXTENSION_PACKS
 ```
 
