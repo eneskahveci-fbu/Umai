@@ -75,6 +75,25 @@ ekstra bir kod/kavram yok.
 Farklı bir model denemek istersen: `sudo CRAFT_MODEL=qwen2.5:7b bash
 deploy/oracle/setup-llm.sh` (herhangi bir Ollama kütüphane modeli olabilir).
 
+## (Opsiyonel) opencode — terminalde `opencode` yazınca açılan AI kodlama ajanı
+
+[opencode](https://opencode.ai) açık kaynak bir terminal AI ajanıdır. Köprü
+kurulduktan sonra AYNI sunucuda tek komut:
+
+```bash
+sudo bash deploy/oracle/setup-opencode.sh
+```
+
+Ne yapar: opencode'u global kurar (terminalin PATH'inde), köprüyü günceller
+(xterm-256color + truecolor — tam ekran TUI düzgün görünsün diye) ve servisi
+yeniden başlatır. `setup-llm.sh` ile Ollama da kuruluysa opencode'u otomatik o
+yerel modele bağlar (anahtarsız); değilse opencode içinde `/connect` ile bir
+sağlayıcı ekle. Sonra uygulamada terminali aç (açıksa ⟳ ile yeniden bağlan)
+ve `opencode` yaz. Güncellemek için aynı komutu tekrar çalıştır.
+
+> Not: opencode yerel bir ikili dosyadır; yalnız bu uzak köprü terminalinde
+> çalışır, tarayıcı içi WebContainer modunda çalışmaz.
+
 ## Güvenlik
 - Köprü yalnız `127.0.0.1`'de dinler; dışarıya yalnız Caddy (443, token korumalı) açıktır.
 - `craftbridge` kullanıcısı root değildir; terminal ve dosya işlemleri bu sınırlı

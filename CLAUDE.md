@@ -488,6 +488,11 @@ Playwright ile.
   çalışır. Amaç: Pollinations'tan çok daha güçlü bir model, tamamen
   kullanıcının kendi (Oracle Always Free) sunucusunda, üçüncü tarafa veri
   gitmeden.
+  **opencode** (Eyl 2026): `deploy/oracle/setup-opencode.sh` köprü terminaline
+  opencode'u kurar (`opencode` yazınca açılır; Ollama varsa ona bağlanır).
+  Tam ekran TUI'ler için köprü PTY'si `xterm-256color` + `COLORTERM=truecolor`
+  ile açılır ve istemcide WS modunda `convertEol` KAPALIDIR (gerçek PTY zaten
+  \r\n üretir; açık kalırsa TUI imleç konumları bozulur).
 - **Native sarmalayıcı:** Capacitor (`capacitor.config.ts` canlı siteyi
   `server.url` ile yükler); `src/lib/native.ts` web'de no-op.
 
