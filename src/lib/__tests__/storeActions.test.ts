@@ -657,19 +657,20 @@ describe("useStore — truncateMessages (oturum geri sarma)", () => {
 });
 
 describe("migrateModelLabels", () => {
-  it("eski 'UMAI Default' etiketini gerçek sağlayıcı adına çevirir, diğerlerine dokunmaz", async () => {
+  it("eski varsayılan etiketleri sadeleştirir, kullanıcı adlarına dokunmaz", async () => {
     const { migrateModelLabels } = await import("../store");
     const cfg = {
       ...DEFAULT_CONFIG,
       models: [
         { ...POLLINATIONS_DEFAULT_MODEL, label: "✦ UMAI Default (Ücretsiz)" },
-        { id: "x", label: "Benim Claude'um", provider: "anthropic" as const, baseUrl: "", model: "m", apiKey: "" },
+        { ...POLLINATIONS_DEFAULT_MODEL, id: "pollinations-free", label: "Pollinations (Ücretsiz)" },
+        { id: "x", label: "Benim Claude'um (Ücretsiz)", provider: "anthropic" as const, baseUrl: "", model: "m", apiKey: "" },
       ],
     };
     const out = migrateModelLabels(cfg);
-    expect(out.models[0].label).toBe(POLLINATIONS_DEFAULT_MODEL.label);
-    expect(out.models[0].label).not.toMatch(/UMAI/i);
-    expect(out.models[1].label).toBe("Benim Claude'um");
+    expect(out.models[0].label).toBe("Pollinations");
+    expect(out.models[1].label).toBe("Pollinations");
+    expect(out.models[2].label).toBe("Benim Claude'um (Ücretsiz)");
     expect(migrateModelLabels(out)).toBe(out);
   });
 });

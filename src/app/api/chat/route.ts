@@ -319,6 +319,9 @@ interface ChatRequest {
   /** Faz 6 — yalnız generate_image: repo bağlı olmasa/Tools kapalı olsa bile
       bu TEK aracı tool-loop'a ekler (bkz. autoPilot.ts'teki autoImageGen). */
   imageGen?: boolean;
+  /** Kullanıcının bağladığı (yerleşik olmayan) MCP sunucusu açık → MCP araçları
+      repo'suz düz sohbette de tool-loop'a girsin (Eyl 2026; bkz. mcpScope.ts). */
+  useMcp?: boolean;
   /** İstemcinin (Ayarlar → Model → Görsel üretimi tercihine göre, bkz.
       imageGen.ts pickImageProvider) ÖNCEDEN çözdüğü BYOK görsel sağlayıcısı +
       anahtarı. Verilmezse (ya da üretim başarısız olursa) generate_image
@@ -1928,6 +1931,14 @@ export async function POST(req: Request) {
      zaten yukarıdaki [Ajan modu] bloğunda anlatıldı (tekrar etme); burada
      yalnızca O YOKKEN (repo bağlı değil veya Tools kapalı) bu TEK aracın
      nasıl kullanılacağını ayrıca anlat. */
+  /* Kullanıcının bağladığı MCP eklentileri repo'suz sohbette (Eyl 2026) — repo
+     modunda [Ajan modu] bloğu araçları zaten tanıtıyor. */
+  if (body.useMcp && !(body.tools && body.repoCtx)) {
+    sysPrompt +=
+      `\n\n[Bağlı eklentiler]\n` +
+      `Kullanıcının bağladığı MCP eklentilerinin araçları bu turda mevcut. İstek bir aracın işine ` +
+      `uyuyorsa (ör. sınıflandırma, karar, veri okuma) tahmin etmek yerine o aracı ÇAĞIR ve sonucu kısaca açıkla.`;
+  }
   if (body.imageGen && !(body.tools && body.repoCtx)) {
     sysPrompt +=
       `\n\n[Görsel üretim modu]\n` +
@@ -1964,7 +1975,7 @@ export async function POST(req: Request) {
      ağ maliyetli işler hâlâ SADECE bu durumlarda yapılsın; ask_user (her
      modda sunulan tek küçük araç) bunları TETİKLEMESİN, aksi halde en yaygın
      düz sohbet mesajına gereksiz MCP/Supabase gecikmesi eklenir. */
-  const wantsFullTools = !!(body.tools && body.repoCtx) || !!body.webSearch || !!body.imageGen;
+  const wantsFullTools = !!(body.tools && body.repoCtx) || !!body.webSearch || !!body.imageGen || !!(body.useMcp && body.mcpServers?.length);
   /* Yerleşik (self-hosted) sunucular göreli bir yol (/api/mcp/builtin/*) taşır
      — fetch() bunu tek başına çözemez, bu isteğin kendi origin'iyle mutlak
      hale getirilir (bkz. isSafeMcpServerUrl). */

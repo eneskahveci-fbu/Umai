@@ -8,7 +8,7 @@ import { buildChainFor } from "@/lib/fallback";
 import { createReveal, type RevealController } from "@/lib/streamReveal";
 import { switchLeftPanel } from "@/lib/leftPanel";
 import { compactPlan } from "@/lib/contextWindow";
-import { filterMcpServersForModel } from "@/lib/mcpScope";
+import { filterMcpServersForModel, wantsMcpInChat } from "@/lib/mcpScope";
 import {
   ArrowDown,
   AlertTriangle,
@@ -148,6 +148,7 @@ import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { CRAFT_OPERATING_MANUAL } from "@/lib/constants";
 import { addPendingAction, removePendingAction, isCommandAllowed, matchDangerousCommand, DEFAULT_COMMAND_ALLOWLIST, type PendingAction } from "@/lib/agentActions";
 import { FEATURES } from "@/lib/features";
+import { FREE_MODEL_CLASS, isFreeModel } from "@/lib/freeModels";
 
 declare global {
   interface SpeechRecognition {
@@ -239,7 +240,7 @@ function MoreMenu({ active, children, placement = "top", icon, title = "Daha faz
   );
 }
 
-function MoreItem({ onClick, icon, label, desc, active, keepOpen }: { onClick: () => void; icon: React.ReactNode; label: string; desc?: string; active?: boolean; keepOpen?: boolean }) {
+function MoreItem({ onClick, icon, label, desc, active, keepOpen, labelClassName }: { onClick: () => void; icon: React.ReactNode; label: string; desc?: string; active?: boolean; keepOpen?: boolean; labelClassName?: string }) {
   return (
     <button
       onClick={keepOpen ? (e) => { e.stopPropagation(); onClick(); } : onClick}
@@ -249,7 +250,7 @@ function MoreItem({ onClick, icon, label, desc, active, keepOpen }: { onClick: (
     >
       <span className="shrink-0">{icon}</span>
       <span className="min-w-0">
-        <span className="block truncate">{label}</span>
+        <span className={`block truncate ${labelClassName ?? ""}`}>{label}</span>
         {desc && <span className="block text-[10px] text-muted/50 truncate">{desc}</span>}
       </span>
     </button>
@@ -281,7 +282,7 @@ function ModelSwitcher() {
           {/* Sabit 140px, telefonda tipik model adını kesiyordu (~175px isteyen
               adlar var). Ekran genişliğine göre pay ver: 390px'lik bir telefonda
               ~195px, sağdaki mod rozetine yer kalarak sığar. */}
-          <span className="truncate max-w-[50vw] sm:max-w-[200px] font-semibold text-ink">{activeLabel}</span>
+          <span className={`truncate max-w-[50vw] sm:max-w-[200px] font-semibold ${active && isFreeModel(active.provider, active.model) ? FREE_MODEL_CLASS : "text-ink"}`}>{activeLabel}</span>
           <ChevronDown size={13} className="text-muted/50 shrink-0" />
         </span>
       }
@@ -294,6 +295,7 @@ function ModelSwitcher() {
           key={m.id}
           icon={m.id === config.activeModelId ? <Check size={13} className="text-brand" /> : <span className="w-[13px] grid place-items-center"><span className="w-1.5 h-1.5 rounded-full bg-muted/40" /></span>}
           label={m.label || m.model}
+          labelClassName={isFreeModel(m.provider, m.model) ? FREE_MODEL_CLASS : undefined}
           desc={m.provider}
           active={m.id === config.activeModelId}
           onClick={() => saveConfig({ ...config, activeModelId: m.id })}
@@ -2574,6 +2576,10 @@ export function CoderView() {
       const endpoint = useResearch
         ? "/api/research"
         : useSwarm && !isContinuation ? "/api/orchestrate" : "/api/chat";
+      /* Kullanıcının bağladığı MCP sunucuları (ör. Laya) repo'suz sohbette de
+         araç olarak çağrılabilsin — bkz. mcpScope.wantsMcpInChat. */
+      const scopedMcp = filterMcpServersForModel(store.config.mcpServers ?? [], active.id);
+      const wantMcp = wantsMcpInChat(scopedMcp);
       const callViaServer = () => fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2657,7 +2663,8 @@ export function CoderView() {
                     }
                   : undefined)
             : undefined,
-          mcpServers: filterMcpServersForModel(store.config.mcpServers ?? [], active.id).map((s) => ({
+          useMcp: wantMcp,
+          mcpServers: scopedMcp.map((s) => ({
             url: s.url,
             headers: s.headers,
             enabled: s.enabled,
@@ -2672,7 +2679,7 @@ export function CoderView() {
          kullanıcının kendi IP'si). Araç-kullanımı/web-arama/görsel-üretimi
          TOOL-LOOP gerektirir → bunlar sunucu-proxy'ye gider (yoksa araçlar
          sessizce çalışmaz, model repodan/araçlardan habersiz kalır). */
-      if (active.provider === "pollinations" && !toolsEnabled && !wantWeb && !wantImageGen) {
+      if (active.provider === "pollinations" && !toolsEnabled && !wantWeb && !wantImageGen && !wantMcp) {
         /* Bağlam blokları sunucu (/api/chat) ile ORTAK tek kaynaktan gelir →
            Pollinations kullanıcıları da aynı, eksiksiz bağlamı alır. PLATFORM_KNOWLEDGE
            eklenir ki bu sağlayıcıdaki model de platformun farkında olsun. */

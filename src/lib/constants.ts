@@ -85,13 +85,13 @@ export const PRESETS: Record<Provider, Preset> = {
     keyHint: "OpenRouter anahtarı (sk-or-...)",
   },
   groq: {
-    label: "⚡ Groq (Ücretsiz)",
+    label: "⚡ Groq",
     baseUrl: "https://api.groq.com/openai/v1",
     model: "llama-3.3-70b-versatile",
     keyHint: "gsk_...",
   },
   gemini: {
-    label: "✨ Google Gemini (Ücretsiz · Önerilen)",
+    label: "✨ Google Gemini (Önerilen)",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
     /* "gemini-flash-latest" Google'ın kendi resmî takma adı (ai.google.dev/
        gemini-api/docs/models, Tem 2026 canlı doğrulandı) — Google'ın o an
@@ -126,25 +126,25 @@ export const PRESETS: Record<Provider, Preset> = {
     keyHint: "xai-...",
   },
   pollinations: {
-    label: "✦ Pollinations (Ücretsiz · Gömülü)",
+    label: "✦ Pollinations (Gömülü)",
     baseUrl: "https://text.pollinations.ai/openai",
     model: "openai",
     keyHint: "opsiyonel: pollinations.ai ücretsiz token'ı (limiti yükseltir)",
   },
   ovh: {
-    label: "🇪🇺 OVHcloud AI Endpoints (Ücretsiz · Anahtarsız)",
+    label: "🇪🇺 OVHcloud AI Endpoints (Anahtarsız)",
     baseUrl: "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
     model: "Mistral-Small-3.2-24B-Instruct-2506",
     keyHint: "opsiyonel: OVH anahtarı (anonim 2 istek/dk sınırını kaldırır)",
   },
   github: {
-    label: "🐙 GitHub Models (Ücretsiz)",
+    label: "🐙 GitHub Models",
     baseUrl: "https://models.github.ai/inference",
     model: "gpt-4o-mini",
     keyHint: "GitHub token (models:read izinli — github.com/settings/tokens)",
   },
   nvidia: {
-    label: "🟩 NVIDIA NIM (Ücretsiz)",
+    label: "🟩 NVIDIA NIM",
     baseUrl: "https://integrate.api.nvidia.com/v1",
     model: "meta/llama-3.3-70b-instruct",
     keyHint: "nvapi-… (build.nvidia.com — ücretsiz anahtar)",
@@ -157,13 +157,13 @@ export const PRESETS: Record<Provider, Preset> = {
      muamelesi görmüyor — kullanıcı kendi anahtarını girdiğinde diğer
      anahtarlı sağlayıcılarla aynı şekilde çalışır. */
   agnes: {
-    label: "🌊 Agnes AI (Ücretsiz — sınırlı erişim)",
+    label: "🌊 Agnes AI (sınırlı erişim)",
     baseUrl: "https://apihub.agnes-ai.com/v1",
     model: "agnes-2.5-flash",
     keyHint: "Agnes AI anahtarı (agnes-ai.com — gray-release, hesabına erişim tanımlanmış olmalı)",
   },
   ollama: {
-    label: "💻 Ollama (Yerel / Ücretsiz)",
+    label: "💻 Ollama (Yerel)",
     baseUrl: "http://localhost:11434/v1",
     model: "qwen2.5-coder:7b",
     keyHint: "ollama (boş bırakılabilir)",
@@ -1192,7 +1192,7 @@ export const POLLINATIONS_DEFAULT_MODEL: ModelProfile = {
   id: "craft-default-pollinations",
   /* Eyl 2026: model adında marka ("UMAI Default") değil GERÇEK sağlayıcı yazar;
      eski kayıtlı etiket store.ts → migrateModelLabels ile düzeltilir. */
-  label: "Pollinations (Ücretsiz)",
+  label: "Pollinations",
   provider: "pollinations",
   baseUrl: "https://text.pollinations.ai/openai",
   model: "openai",
@@ -1205,7 +1205,7 @@ export const POLLINATIONS_DEFAULT_MODEL: ModelProfile = {
    kendi OVH modelini/anahtarını da ekleyebilir (PRESETS.ovh). */
 export const OVH_FREE_MODEL: ModelProfile = {
   id: "craft-keyless-ovh",
-  label: "🇪🇺 OVH Ücretsiz (Anahtarsız)",
+  label: "🇪🇺 OVH (Anahtarsız)",
   provider: "ovh",
   baseUrl: "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
   model: "Mistral-Small-3.2-24B-Instruct-2506",
@@ -1216,7 +1216,7 @@ export const DEFAULT_CONFIG: Config = {
   /* Her hesapta hazır gelen ücretsiz, anahtarsız model (Pollinations). Kullanıcı
      kendi modellerini ekleyebilir; bu varsayılan herkeste kalır. */
   models: [
-    { id: "pollinations-free", label: "Pollinations (Ücretsiz)", provider: "pollinations", baseUrl: "https://text.pollinations.ai/openai", model: "openai", apiKey: "" },
+    { id: "pollinations-free", label: "Pollinations", provider: "pollinations", baseUrl: "https://text.pollinations.ai/openai", model: "openai", apiKey: "" },
   ],
   activeModelId: "pollinations-free",
   providerKeys: {},
