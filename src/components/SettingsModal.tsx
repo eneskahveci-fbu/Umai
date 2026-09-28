@@ -233,9 +233,8 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   if (search !== prevSearch) {
     setPrevSearch(search);
     if (search.trim() && matchingTabs.size > 0) {
-      const adminOnly = new Set(["advanced", "hooks"]);
-      const first = (["model", "fusion", "github", "extensions", "general", "kullanim", "plan", "hakkinda", "advanced", "hooks", "hesap"] as const)
-        .find((k) => matchingTabs.has(k) && (isAdmin || !adminOnly.has(k)));
+      const first = (["model", "fusion", "github", "advanced", "hooks", "extensions", "general", "kullanim", "plan", "hakkinda", "hesap"] as const)
+        .find((k) => matchingTabs.has(k));
       if (first && first !== tab) { changeTab(first); setSearchJump(true); }
     }
   }
@@ -716,12 +715,12 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     { key: "model", label: "Model", icon: Cpu, admin: false, group: undefined },
     { key: "fusion", label: "Kalite", icon: Sparkles, admin: false, group: undefined },
     { key: "github", label: "Git", icon: GitBranch, admin: false, group: "Çalışma Alanı" },
+    { key: "advanced", label: "Terminal & Sunucu", icon: Wrench, admin: false, group: undefined },
+    { key: "hooks", label: "Kancalar", icon: Webhook, admin: false, group: undefined },
     { key: "extensions", label: "Eklentiler", icon: Blocks, admin: false, group: undefined },
     { key: "general", label: "Genel", icon: SlidersHorizontal, admin: false, group: undefined },
     { key: "kullanim", label: "Kullanım", icon: BarChart3, admin: false, group: "Kullanım & Plan" },
     { key: "plan", label: "Plan", icon: Crown, admin: false, group: undefined },
-    { key: "advanced", label: "Geliştirici", icon: Wrench, admin: true, group: "Yönetici" },
-    { key: "hooks", label: "Kancalar", icon: Webhook, admin: true, group: undefined },
     { key: "hakkinda", label: "Hakkında", icon: Info, admin: false, group: undefined },
   ] as const;
   const visibleTabs = ALL_TABS.filter((t) => isAdmin || !t.admin);
@@ -2199,8 +2198,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               </label>
             </div>
 
-            {/* WebContainer API key — yalnız admin */}
-            {isAdmin && (
+            {/* WebContainer API key */}
             <div>
               <h4 className="text-sm font-bold mb-1">WebContainer API Key</h4>
               <p className="text-xs text-muted/70 mb-2 leading-relaxed">
@@ -2221,10 +2219,8 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 autoComplete="off"
               />
             </div>
-            )}
 
-            {/* Hassas sunucu/terminal ayarları — yalnız admin görür (yeni kullanıcılar gizli) */}
-            {isAdmin && (
+            {/* Sunucu/terminal ayarları — Eyl 2026: herkese açık (coder odaklı ürün) */}
             <>
             {/* Hibrit Sunucu — tek adres hem terminal hem dosya sistemi kurar */}
             <div>
@@ -2352,7 +2348,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               />
             </div>
             </>
-            )}
 
             {/* Otomasyonlar (olaya bağlı komutlar — Claude Code hooks benzeri) */}
             <div>
@@ -2410,7 +2405,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               </button>
             </div>
 
-            {isAdmin && (
             <>
             {/* Yerel Mod (Local Bridge) */}
             <div>
@@ -2455,7 +2449,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               />
             </div>
             </>
-            )}
 
             {/* İstatistikler */}
             <div>

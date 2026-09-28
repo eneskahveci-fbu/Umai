@@ -23,6 +23,9 @@ import {
   Zap,
   Code2,
   Blocks,
+  FolderGit2,
+  Plus,
+  Server,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { FEATURES } from "@/lib/features";
@@ -211,6 +214,38 @@ export function CommandPalette() {
         setOpen(false);
       },
       keywords: ["donusturucu", "dönüştürücü", "converter", "pdf", "png", "jpg", "webp", "donustur", "dönüştür"],
+    },
+    {
+      id: "open-files",
+      label: "Dosyalar (bağlı repo)",
+      icon: <FolderGit2 size={16} />,
+      action: () => {
+        useStore.getState().setLeftPanel("files");
+        router.push("/app");
+        setOpen(false);
+      },
+      keywords: ["dosya", "dosyalar", "files", "repo", "depo", "agac", "ağaç", "explorer"],
+    },
+    {
+      id: "open-workspace",
+      label: "Sunucu dosyaları (workspace)",
+      icon: <Server size={16} />,
+      action: () => {
+        useStore.getState().setLeftPanel("workspace");
+        router.push("/app");
+        setOpen(false);
+      },
+      keywords: ["sunucu", "server", "workspace", "yerel", "local", "oracle", "kopru", "köprü"],
+    },
+    {
+      id: "connect-repo",
+      label: "Repo bağla (GitHub/GitLab)",
+      icon: <Plus size={16} />,
+      action: () => {
+        router.push("/settings?tab=github");
+        setOpen(false);
+      },
+      keywords: ["repo", "depo", "bagla", "bağla", "github", "gitlab", "proje", "ekle"],
     },
     {
       id: "open-skills",

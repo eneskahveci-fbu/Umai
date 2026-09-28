@@ -46,23 +46,21 @@ describe("composer dosya ekleme — tek düğme (Ö11)", () => {
   });
 });
 
-/* Ö8 — panellerin Araçlar menüsünde GERÇEKTEN listelendiğini kilitler.
+/* Ö8 — Dosyalar/Sunucu panellerine Sidebar'dan GERÇEKTEN ulaşılabildiğini kilitler.
+   Eyl 2026: "Araçlar" açılır menüsü kaldırıldı; Dosyalar üst seviye nav satırı,
+   Sunucu ise Repolar bölümündeki "yerel" satırı oldu.
    (Sidebar JSX'i React/DOM gerektiriyor; bu proje jsdom kullanmıyor.) */
-describe("Araçlar menüsü — Dosyalar/Sunucu girişleri (Ö8)", () => {
+describe("Sidebar — Dosyalar/Sunucu girişleri (Ö8)", () => {
   const sidebar = readFileSync(join(process.cwd(), "src/components/Sidebar.tsx"), "utf8");
 
-  it("iki panel de Araçlar öğesi olarak var", () => {
-    expect(sidebar).toContain('label: "Dosyalar (depo)"');
-    expect(sidebar).toContain('label: "Sunucu (workspace)"');
-  });
-
-  /* B2'den sonra öğeler store'u DOĞRUDAN değil, yönlendirmeyi bilen
-     openLeftPanel üzerinden çağırıyor; o da /app'teyken mevcut saf yardımcıyı
-     (toggleLeftPanel) kullanan store eylemine düşüyor. Zincir korunuyor. */
-  it("mevcut saf yardımcıyı kullanan store eylemine bağlılar", () => {
-    expect(sidebar).toContain("toggleLeftPanelState(which)");
+  it("iki panel de Sidebar'dan açılabiliyor", () => {
     expect(sidebar).toContain('openLeftPanel("files")');
     expect(sidebar).toContain('openLeftPanel("workspace")');
+    expect(sidebar).toContain(">Dosyalar</span>");
+  });
+
+  it("mevcut saf yardımcıyı kullanan store eylemine bağlılar", () => {
+    expect(sidebar).toContain("toggleLeftPanelState(which)");
   });
 
   it("CoderView paneli artık yerel state'te değil, store'dan okuyor", () => {
@@ -71,23 +69,22 @@ describe("Araçlar menüsü — Dosyalar/Sunucu girişleri (Ö8)", () => {
   });
 });
 
-/* B2 (hata taraması) — "Dosyalar (depo)" ve "Sunucu (workspace)" öğeleri
-   koşulsuzdu. Sidebar /app, /chats, /projects, /settings sayfalarının
+/* B2 (hata taraması) — Sidebar /app, /chats, /projects, /settings sayfalarının
    hepsinde render ediliyor ama panelleri ÇİZEN CoderView yalnız /app'te:
    /app dışında tıklama sessiz bir no-op'tu ve kullanıcı sonradan /app'e
    geçtiğinde hiç açmadığını sandığı panel açık geliyordu. */
-describe("Araçlar panelleri — /app dışında sessiz no-op değil (B2)", () => {
+describe("Sidebar panelleri — /app dışında sessiz no-op değil (B2)", () => {
   const sidebar = readFileSync(join(process.cwd(), "src/components/Sidebar.tsx"), "utf8");
 
-  it("öğeler doğrudan store'u değil, yönlendirmeyi bilen yardımcıyı çağırır", () => {
-    expect(sidebar).toContain('label: "Dosyalar (depo)", onClick: () => openLeftPanel("files")');
-    expect(sidebar).toContain('label: "Sunucu (workspace)", onClick: () => openLeftPanel("workspace")');
+  it("girişler doğrudan store'u değil, yönlendirmeyi bilen yardımcıyı çağırır", () => {
+    expect(sidebar).toContain("const openLeftPanel = useOpenLeftPanel()");
+    expect(sidebar).not.toMatch(/onClick=\{\(\) => \{?\s*useStore\.getState\(\)\.toggleLeftPanelState/);
   });
 
   it("yardımcı /app dışındaysa önce /app'e yönlendirir", () => {
-    const fn = sidebar.slice(sidebar.indexOf("const openLeftPanel"), sidebar.indexOf("const items = ["));
-    expect(fn).toContain('toolsPath !== "/app"');
-    expect(fn).toContain('toolsRouter.push("/app")');
+    const fn = sidebar.slice(sidebar.indexOf("function useOpenLeftPanel"), sidebar.indexOf("function repoLabel"));
+    expect(fn).toContain('pathname !== "/app"');
+    expect(fn).toContain('router.push("/app")');
     /* Gezinmeden gelen istek her zaman "aç" demektir — toggle DEĞİL. */
     expect(fn).toContain("setLeftPanel(which)");
     /* /app'teyken eski davranış (aç/kapat) korunur. */
