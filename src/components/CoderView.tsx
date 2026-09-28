@@ -147,6 +147,7 @@ import { retrieve } from "@/lib/retrieval";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { CRAFT_OPERATING_MANUAL } from "@/lib/constants";
 import { addPendingAction, removePendingAction, isCommandAllowed, matchDangerousCommand, DEFAULT_COMMAND_ALLOWLIST, type PendingAction } from "@/lib/agentActions";
+import { FEATURES } from "@/lib/features";
 
 declare global {
   interface SpeechRecognition {
@@ -2191,7 +2192,7 @@ export function CoderView() {
        Tools kapalı olsa bile doğal dilden görsel isteği algılanırsa bu TEK
        araç sunucudaki tool-loop'a eklenir (bkz. api/chat/route.ts'in
        body.imageGen dalı). deep_research/dispatch_agents hâlâ repo ister. */
-    const wantImageGen = !!pilot?.image;
+    const wantImageGen = FEATURES.media && !!pilot?.image;
     /* Sunucu (route.ts'in generate_image işleyicisi) her zaman anahtarsız
        Pollinations'a düşüyordu — kullanıcının Ayarlar → Model'de seçtiği/
        eklediği modelden TAMAMEN bağımsız, kafa karıştırıcıydı ("Model X seçili
@@ -3142,7 +3143,7 @@ export function CoderView() {
     const imgDetected = findAgentByCommand(text);
     const imgAgent = imgDetected ?? activeAgent;
     const imgPromptText = imgDetected ? stripCommand(text) : text;
-    if (imgAgent?.id === "image-gen" && imgPromptText.trim()) {
+    if (FEATURES.media && imgAgent?.id === "image-gen" && imgPromptText.trim()) {
       if (!store.currentId) store.newChat(incognito);
       const imgPrompt = imgPromptText.trim();
       setInput("");

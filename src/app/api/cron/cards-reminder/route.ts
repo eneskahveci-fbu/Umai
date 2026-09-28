@@ -3,6 +3,7 @@ import { SUPABASE_URL } from "@/lib/supabase/config";
 import { sendPushToUser } from "@/lib/push";
 import { usersNeedingCardReminder, cardReminderMessage, type UserConfigRow } from "@/lib/cardReminders";
 import { timingSafeEqualStr } from "@/lib/validate";
+import { FEATURES } from "@/lib/features";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +16,9 @@ export const dynamic = "force-dynamic";
    Vercel'in kendi dokümante edilmiş davranışıdır. Env'ler yoksa (henüz
    yapılandırılmadıysa) 501 ile nazikçe çıkar; site bundan etkilenmez. */
 export async function GET(req: Request) {
+  /* Kartlar rafa kaldırıldıysa (lib/features.ts) hatırlatma gönderme — bildirim
+     kullanıcıyı gizli bir sayfaya götürürdü. */
+  if (!FEATURES.contentTools) return Response.json({ ok: true, notified: 0, shelved: true });
   const secret = process.env.CRON_SECRET;
   if (!secret) {
     return Response.json({ error: "CRON_SECRET yapılandırılmamış." }, { status: 501 });

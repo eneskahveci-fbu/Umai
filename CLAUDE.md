@@ -60,6 +60,7 @@ src/
     ├── agents.ts             # Slash komut agent'ları (/refactor, /test...)
     ├── fallback.ts           # buildFallbackChain — çok-sağlayıcılı oto-fallback
     ├── preview.ts            # Kod → canlı sandbox (React/JSX/HTML/SVG/mermaid + console)
+    ├── features.ts           # FEATURES — rafa kaldırılan özelliklerin aç/kapa anahtarları
     ├── mcpCatalog.ts          # MCP uygulama galerisi verisi (Notion/Slack/Drive... — URL içermez)
     ├── terminal/             # RealTerminal'in parçaları: core (saf, testli) · view (xterm+eklentiler)
     │                         #   · wsTransport / wcTransport (taşıyıcılar) · runBridge (AI komut köprüsü)
@@ -85,6 +86,20 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   kullanıcılara 5 hazır skill dosyası getirir (TypeScript, Next.js/React,
   Tailwind/UI, Güvenlik, Yanıt formatı). Hepsi varsayılan olarak aktiftir ve
   onay kutusuyla tek tek seçilebilir.
+
+## Rafa kaldırılanlar (Eyl 2026 kullanıcı kararı) — ÖNCE BUNU OKU
+
+`src/lib/features.ts` → `FEATURES` = `{ designStudio, contentTools, media }`, üçü de
+**`false`**. Tasarım Stüdyosu, içerik araçları (Doküman/Anket/Defter/Kroki/
+Kartlar) ve medya (`/gorsel`, `generate_image`, yanıt seslendirme) GİZLİ ama
+kodu duruyor; aşağıdaki bölümler bu kodu anlatır, canlıda görünmezler. Gizleme
+noktaları: Sidebar/mobil sekme/⌘K/onboarding/tanıtım sayfası/Kütüphane/
+ProjectModal/ArtifactPanel "Stüdyo'da aç"/MessageBubble TTS/Ayarlar "Görsel
+üretimi"; `/studio*` rotaları `app/studio/StudioGate.tsx` ile `/app`'e
+yönlenir; `/api/chat` `imageGen`'i zorla kapatır ve `generate_image`'i araç
+listesinden + sistem promptundan çıkarır; kart hatırlatma cron'u no-op. Kullanıcı
+verisi silinmez, `/a/[id]` paylaşım linkleri çalışır. Geri açmak = ilgili
+anahtarı `true` yap. Yeni bir giriş noktası eklerken bu anahtarlara bağla.
 
 ## Stüdyolar, Önizleme ve Modlar
 

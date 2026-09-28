@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, MessageSquare, Sparkles, Wand2, X } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { FEATURES } from "@/lib/features";
 import { useModalA11y } from "@/lib/useModalA11y";
 
 interface Step {
@@ -51,7 +52,8 @@ export function OnboardingTour() {
         </>
       ),
     },
-    {
+    /* Stüdyo rafa kaldırıldıysa (lib/features.ts) bu adım hiç gösterilmez. */
+    ...(FEATURES.designStudio ? [{
       icon: <Wand2 size={22} className="text-brand" />,
       title: "İki şey yapabilirsin",
       body: (
@@ -67,7 +69,7 @@ export function OnboardingTour() {
         label: "Tasarlamayı dene (Stüdyo)",
         onClick: () => { dismiss(); router.push("/studio"); },
       },
-    },
+    }] as Step[] : []),
     {
       icon: <MessageSquare size={22} className="text-brand" />,
       title: "Sadece yaz",

@@ -28,6 +28,7 @@ import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendPushToUser } from "@/lib/push";
 import type { ChatMessage, MemoryItem, Provider, ResponseStyle, SwarmAgentState } from "@/lib/types";
+import { FEATURES } from "@/lib/features";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -1434,6 +1435,8 @@ export async function POST(req: Request) {
 
   let body: ChatRequest;
   try { body = await req.json(); } catch { return new Response("Geçersiz istek gövdesi", { status: 400 }); }
+  /* Görsel üretimi rafa kaldırıldıysa (lib/features.ts) istemci ne derse desin kapalı. */
+  if (!FEATURES.media) body.imageGen = false;
 
   /* Pro kapısı: sunucunun (ücretli) LLM anahtarı YALNIZCA Pro kullanıcıya açılır.
      BYOK ve anahtar gerektirmeyen sağlayıcılar herkes için çalışır; Pro değilse
@@ -1874,7 +1877,7 @@ export async function POST(req: Request) {
       `• discover_rules() — CLAUDE.md/AGENTS.md/.rules gibi davranış dosyalarını otomatik tara\n` +
       `• trigger_ci(workflow, ref?, inputs?) — GitHub Actions workflow'unu tetikle\n` +
       `• dispatch_agents(tasks[]) — karmaşık görevi PARALEL salt-okunur alt-ajanlara böl (Claude'daki gibi)\n` +
-      `• generate_image(prompt, aspect_ratio?) — kullanıcı görsel/resim isteyince ÇAĞIR (doğal dilde, komut gerekmez); görsel arayüzde OTOMATİK gösterilir, yanıtına markdown/URL/base64 YAZMA\n` +
+      (FEATURES.media ? `• generate_image(prompt, aspect_ratio?) — kullanıcı görsel/resim isteyince ÇAĞIR (doğal dilde, komut gerekmez); görsel arayüzde OTOMATİK gösterilir, yanıtına markdown/URL/base64 YAZMA\n` : "") +
       `• deep_research(topic) — kullanıcı derinlemesine/kaynaklı bir araştırma/rapor isteyince ÇAĞIR; dönen atıflı raporu ÖZETLEMEDEN aynen ilet\n` +
       `• update_plan(plan) — çok adımlı görevde canlı yapılacaklar listesi\n` +
       (webToolsOn ? `• web_search(query) — internette ara\n• read_url(url) — web sayfası oku\n` : "") +
@@ -1884,7 +1887,7 @@ export async function POST(req: Request) {
       `— ARAÇLARI GERÇEKTEN ÇAĞIR — anlatma/simüle etme. Komutu veya kodu kullanıcıya "şunu çalıştır / şunu yapıştır" diye METİN olarak VERME; uygun araç varsa (run_command, str_replace, write_file) KENDİN çağır ve sonucu göster. Kullanıcı senin yapmanı bekliyor, tarif etmeni değil.\n` +
       `— Çok adımlı (2+) görevlerde MUTLAKA önce update_plan ile yapılacaklar listesini yaz (kullanıcı ilerlemeyi canlı "todo" kutusunda görür), her adım bitince planı güncelleyip [x] işaretle — bunu atlama.\n` +
       `— Görev BAĞIMSIZ paralel parçalara bölünebiliyorsa (ör. birden çok modülü ayrı ayrı incelemek) dispatch_agents ile alt-ajanlara dağıt; basitse kendin yap.\n` +
-      `— Kullanıcı bir görsel/resim/illüstrasyon istediğinde (komut/buton beklemeden, doğal dilden anla) generate_image'i çağır. Üretilen görsel arayüzde OTOMATİK olarak gösterilir: yanıtına markdown görsel etiketi (![...]), URL ya da base64 veri YAZMA — yalnızca bir-iki cümleyle tanıt.\n` +
+      (FEATURES.media ? `— Kullanıcı bir görsel/resim/illüstrasyon istediğinde (komut/buton beklemeden, doğal dilden anla) generate_image'i çağır. Üretilen görsel arayüzde OTOMATİK olarak gösterilir: yanıtına markdown görsel etiketi (![...]), URL ya da base64 veri YAZMA — yalnızca bir-iki cümleyle tanıt.\n` : "") +
       `— Kullanıcı derinlemesine/kaynaklı/kapsamlı bir araştırma istediğinde deep_research'ü çağır; dönen atıflı raporu ÖZETLEMEDEN/KISALTMADAN, atıfları ve Kaynaklar bölümünü koruyarak ilet.\n` +
       `— Cevaplamadan önce ilgili dosyaları oku. Bağımsız okumaları TEK turda birlikte iste (paralel çalışır).\n` +
       `— list_files veya search_code ile önce yapıyı anla, sonra spesifik dosyalara gir.\n` +
@@ -2011,6 +2014,7 @@ export async function POST(req: Request) {
   const planGate = !!body.planApprovalMode && !body.planApproved;
   const blockWrites = !!body.requireWriteApproval || planGate;
   let coderTools = [...CODER_TOOLS, ...EXTENSION_TOOLS];
+  if (!FEATURES.media) coderTools = coderTools.filter((t) => t.function.name !== "generate_image");
   if (blockWrites) coderTools = coderTools.filter((t) => t.function.name !== "write_file" && t.function.name !== "str_replace");
   if (planGate) coderTools = coderTools.filter((t) => t.function.name !== "delete_file" && t.function.name !== "rename_file");
   /* Salt-okunur Güvenli Mod: TÜM değiştirici araçları kaldır (yazma/silme/

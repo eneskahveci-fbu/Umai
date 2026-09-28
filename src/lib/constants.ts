@@ -1,5 +1,6 @@
 import type { Config, ModelProfile, Provider, ResponseStyle, Skill } from "./types";
 import { DEFAULT_COMMAND_ALLOWLIST } from "./agentActions";
+import { FEATURES } from "./features";
 
 export interface Preset {
   label: string;
@@ -31,7 +32,7 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
   // Planlama — düşük
   { name: "update_plan", label: "Görev planı güncelle", category: "Planlama", risk: "low" },
   { name: "dispatch_agents", label: "Alt-ajan çalıştır", category: "Planlama", risk: "low" },
-  { name: "generate_image", label: "Görsel üret", category: "Ağ", risk: "low" },
+  ...(FEATURES.media ? [{ name: "generate_image", label: "Görsel üret", category: "Ağ", risk: "low" } as const] : []),
   { name: "deep_research", label: "Derinlemesine araştır", category: "Ağ", risk: "medium" },
   // Yazma — orta
   { name: "write_file", label: "Dosya yaz / oluştur", category: "Yazma", risk: "medium" },
