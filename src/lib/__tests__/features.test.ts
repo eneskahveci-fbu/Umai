@@ -33,3 +33,15 @@ describe("medya anahtarı", () => {
     expect(ALL_AGENTS.some((a) => a.id === "image-gen")).toBe(FEATURES.media);
   });
 });
+
+describe("wantsMcpInChat", () => {
+  it("yalnız kullanıcının bağladığı (yerleşik olmayan) sunucu tetikler", async () => {
+    const { wantsMcpInChat } = await import("@/lib/mcpScope");
+    const builtin = { id: "t", name: "Zaman", url: "/api/mcp/builtin/time", enabled: true };
+    const laya = { id: "l", name: "Laya", url: "https://1.2.3.4.sslip.io/mcp/local/laya", enabled: true };
+    expect(wantsMcpInChat([builtin])).toBe(false);
+    expect(wantsMcpInChat([builtin, laya])).toBe(true);
+    expect(wantsMcpInChat([{ ...laya, url: "" }])).toBe(false);
+    expect(wantsMcpInChat([{ ...laya, enabled: false }])).toBe(false);
+  });
+});

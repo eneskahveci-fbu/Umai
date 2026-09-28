@@ -22,6 +22,7 @@ import { useModalA11y } from "@/lib/useModalA11y";
 import { PROJECT_COLORS, projectColorHex } from "@/lib/constants";
 import { setSurfaceOpenItem } from "@/lib/surfaceNav";
 import { FEATURES } from "@/lib/features";
+import { FREE_MODEL_COLOR, isFreeModel } from "@/lib/freeModels";
 type Tab = "chats" | "settings" | "knowledge" | "skills" | "stats";
 
 const EMOJI_CHOICES = ["📁", "🌐", "🔌", "📊", "📱", "⚙️", "🧪", "🚀", "🔬", "🧩", "📦", "🛠️", "💡", "🎨", "🔐", "📝"];
@@ -379,7 +380,7 @@ export function ProjectModal() {
                   >
                     <option value="">Genel aktif</option>
                     {config.models.map((m) => (
-                      <option key={m.id} value={m.id}>{m.label}</option>
+                      <option key={m.id} value={m.id} style={isFreeModel(m.provider, m.model) ? { color: FREE_MODEL_COLOR } : undefined}>{m.label}</option>
                     ))}
                   </select>
                 </Field>

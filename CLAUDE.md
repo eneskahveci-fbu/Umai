@@ -126,6 +126,23 @@ Claude Code web; opencode'un TUI görünümü DEĞİL). Yapılanlar:
   artık admin'e özel değil. Admin'e özel kalan: Otomatik Pilot anahtarı,
   AdminAnalytics/AdminUsers.
 - Mobil alt sekme: Sohbet / Ayarlar (+ Stüdyo yalnız `studioEnabled()` iken).
+- **Ücretsiz modeller renkle** (`lib/freeModels.ts` → `isFreeModel`/`FREE_PROVIDERS`/
+  `FREE_MODEL_CLASS` = `text-cyan`): model etiketlerinde "(Ücretsiz)" YAZMAZ;
+  ücretsiz olanlar (anahtarsız/ücretsiz katmanlı sağlayıcılar + `:free` sonekli
+  modeller) tüm model listelerinde cyan. Yerel `<option>`'larda `FREE_MODEL_COLOR`.
+  Eski kayıtlı varsayılan etiketler `store.ts` → `migrateModelLabels` (yalnız
+  birebir eşleşen eski varsayılanlar; kullanıcı adlarına dokunmaz).
+- **MCP düz sohbette**: kullanıcının bağladığı (yerleşik olmayan) bir MCP sunucusu
+  açıksa (`mcpScope.wantsMcpInChat`) istemci `useMcp` yollar → `/api/chat`
+  `wantsFullTools`'a girer, araçlar repo'suz sohbette de sunulur; Pollinations
+  tarayıcı-doğrudan hızlı yolu o durumda atlanır. Yerleşikler (Zaman/Adım Adım
+  Düşünme) tek başına TETİKLEMEZ (her mesaja gecikme eklemesin diye).
+- **Laya** (karar modeli, sohbet modeli DEĞİL): köprüde **kalıcı yerel MCP**
+  (`bridge.mjs` → `/mcp/local/<ad>/tools/list|call`, komutlar yalnız sunucudaki
+  `mcp-servers.json`'dan; süreç bir kez başlar, açık kalır). Katalog girdisi
+  `bridgePath: "/mcp/local/laya"` → kart açılınca adres = `localBridgeUrl` + yol,
+  başlık = köprü token'ı. Kurulum `deploy/oracle/setup-laya.sh` (sudo'lu ya da
+  uygulama terminalinden sudo'suz/uv ile).
 
 ## Stüdyolar, Önizleme ve Modlar
 

@@ -280,16 +280,21 @@ function applyTheme(theme: "dark" | "light") {
   document.documentElement.classList.toggle("light", theme === "light");
 }
 
-/* Eski "✦ UMAI Default (Ücretsiz)" etiketini (kayıtlı config'lerde ve buluttan
-   gelen kopyada kalır) gerçek sağlayıcı adına çevirir — model adında marka
-   yazmasın (Eyl 2026 kullanıcı kararı). Kullanıcının kendi verdiği adlara dokunmaz. */
+/* Eski varsayılan model etiketlerini günceller (kayıtlı config'lerde ve buluttan
+   gelen kopyada kalırlar): model adında marka ("UMAI Default") ve "(Ücretsiz)"
+   yazmaz — ücretsizlik artık renkle gösterilir (lib/freeModels.ts). YALNIZ
+   uygulamanın kendi eski varsayılan etiketleri birebir eşleşirse değişir;
+   kullanıcının kendi verdiği adlara dokunulmaz. Eyl 2026 kullanıcı kararları. */
+const LEGACY_MODEL_LABELS: Record<string, string> = {
+  "✦ UMAI Default (Ücretsiz)": "Pollinations",
+  "Pollinations (Ücretsiz)": "Pollinations",
+  "🇪🇺 OVH Ücretsiz (Anahtarsız)": "🇪🇺 OVH (Anahtarsız)",
+};
 export function migrateModelLabels(cfg: Config): Config {
-  if (!Array.isArray(cfg.models) || !cfg.models.some((m) => /UMAI Default/i.test(m.label ?? ""))) return cfg;
+  if (!Array.isArray(cfg.models) || !cfg.models.some((m) => m.label in LEGACY_MODEL_LABELS)) return cfg;
   return {
     ...cfg,
-    models: cfg.models.map((m) =>
-      /UMAI Default/i.test(m.label ?? "") ? { ...m, label: POLLINATIONS_DEFAULT_MODEL.label } : m,
-    ),
+    models: cfg.models.map((m) => (m.label in LEGACY_MODEL_LABELS ? { ...m, label: LEGACY_MODEL_LABELS[m.label] } : m)),
   };
 }
 

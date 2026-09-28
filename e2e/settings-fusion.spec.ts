@@ -12,6 +12,6 @@ test.describe("Ayarlar → Fusion sekmesi", () => {
 
     await page.getByRole("button", { name: "Manuel" }).click();
     await expect(page.getByText("Taslak modelleri")).toBeVisible();
-    await expect(page.getByText("Pollinations (Ücretsiz)")).toBeVisible();
+    await expect(page.getByText("Pollinations", { exact: true }).first()).toBeVisible();
   });
 });
