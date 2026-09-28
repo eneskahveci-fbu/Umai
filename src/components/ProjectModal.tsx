@@ -21,6 +21,7 @@ import { useStore } from "@/lib/store";
 import { useModalA11y } from "@/lib/useModalA11y";
 import { PROJECT_COLORS, projectColorHex } from "@/lib/constants";
 import { setSurfaceOpenItem } from "@/lib/surfaceNav";
+import { FEATURES } from "@/lib/features";
 type Tab = "chats" | "settings" | "knowledge" | "skills" | "stats";
 
 const EMOJI_CHOICES = ["📁", "🌐", "🔌", "📊", "📱", "⚙️", "🧪", "🚀", "🔬", "🧩", "📦", "🛠️", "💡", "🎨", "🔐", "📝"];
@@ -301,10 +302,10 @@ export function ProjectModal() {
               </div>
 
               <div className="pt-2 border-t border-line/60 space-y-4">
-                {renderContentSection("doc")}
-                {renderContentSection("form")}
-                {renderContentSection("notebook")}
-                {renderContentSection("design")}
+                {FEATURES.contentTools && renderContentSection("doc")}
+                {FEATURES.contentTools && renderContentSection("form")}
+                {FEATURES.contentTools && renderContentSection("notebook")}
+                {FEATURES.designStudio && renderContentSection("design")}
               </div>
             </>
           )}

@@ -83,6 +83,7 @@ async function usableKey(raw: string | undefined | null): Promise<string> {
 import { pickReplacementModel } from "@/lib/modelPicker";
 import { isPushSubscribed, pushSupported, subscribeToPush, unsubscribeFromPush } from "@/lib/sw-register";
 import type { Provider, ResponseStyle } from "@/lib/types";
+import { FEATURES } from "@/lib/features";
 
 export type SettingsTab = "model" | "github" | "general" | "fusion" | "advanced" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim";
 
@@ -1206,6 +1207,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                kafa karıştırıcıydı ("Model X seçili ama Pollinations kullanılıyor"
                raporu). Yalnız kullanıcının ZATEN eklediği (anahtarı olan)
                sağlayıcılar listelenir — "halihazırda var olan anahtarlarla". */}
+            {FEATURES.media && (
             <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50">
               <div className="flex items-center justify-between gap-2 mb-1.5">
                 <div className="flex items-center gap-1.5">
@@ -1300,6 +1302,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   deneyerek anlıyordu. */}
               <ImageModelPicker config={config} saveConfig={saveConfig} />
             </div>
+            )}
           </section>
         )}
 

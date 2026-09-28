@@ -25,6 +25,7 @@ import {
   Blocks,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { FEATURES } from "@/lib/features";
 import { useModalA11y } from "@/lib/useModalA11y";
 import { useModKey } from "@/lib/useModKey";
 import { setSurfaceOpenItem } from "@/lib/surfaceNav";
@@ -70,7 +71,7 @@ export function CommandPalette() {
   const listRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  const actions: PaletteAction[] = [
+  const allActions: PaletteAction[] = [
     {
       id: "new-chat",
       label: "Yeni sohbet",
@@ -273,6 +274,13 @@ export function CommandPalette() {
       keywords: ["kisayol", "shortcut", "klavye", "keyboard"],
     },
   ];
+  /* Rafa kaldırılan özelliklerin komutları gizlenir (bkz. lib/features.ts). */
+  const shelved = new Set([
+    ...(FEATURES.designStudio ? [] : ["open-studio"]),
+    ...(FEATURES.contentTools ? [] : ["open-docs", "open-forms", "open-notebook", "open-map", "open-cards"]),
+    ...(FEATURES.media ? [] : ["open-image"]),
+  ]);
+  const actions = allActions.filter((a) => !shelved.has(a.id));
 
   const commandRows: Row[] = (query
     ? actions.filter((a) => {
@@ -324,7 +332,7 @@ export function CommandPalette() {
         }))
     : [];
 
-  const docRows: Row[] = query.length >= 1
+  const docRows: Row[] = FEATURES.contentTools && query.length >= 1
     ? (config.craftDocs ?? [])
         .filter((d) => d.title.toLowerCase().includes(q))
         .slice(0, 5)
@@ -337,7 +345,7 @@ export function CommandPalette() {
         }))
     : [];
 
-  const formRows: Row[] = query.length >= 1
+  const formRows: Row[] = FEATURES.contentTools && query.length >= 1
     ? (config.craftForms ?? [])
         .filter((f) => f.title.toLowerCase().includes(q))
         .slice(0, 5)
@@ -350,7 +358,7 @@ export function CommandPalette() {
         }))
     : [];
 
-  const notebookRows: Row[] = query.length >= 1
+  const notebookRows: Row[] = FEATURES.contentTools && query.length >= 1
     ? (config.craftNotebooks ?? [])
         .filter((n) => n.title.toLowerCase().includes(q))
         .slice(0, 5)
@@ -363,7 +371,7 @@ export function CommandPalette() {
         }))
     : [];
 
-  const mapRows: Row[] = query.length >= 1
+  const mapRows: Row[] = FEATURES.contentTools && query.length >= 1
     ? (config.craftMaps ?? [])
         .filter((m) => m.title.toLowerCase().includes(q))
         .slice(0, 5)
@@ -376,7 +384,7 @@ export function CommandPalette() {
         }))
     : [];
 
-  const deckRows: Row[] = query.length >= 1
+  const deckRows: Row[] = FEATURES.contentTools && query.length >= 1
     ? (config.craftDecks ?? [])
         .filter((d) => d.title.toLowerCase().includes(q))
         .slice(0, 5)

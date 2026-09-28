@@ -22,6 +22,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { studioEnabled } from "@/lib/features";
 import type { Chat } from "@/lib/types";
 import { chatEmbeddingText, findRelated, withFreshEmbeddings } from "@/lib/relatedItems";
 import { AuthButton } from "./AuthButton";
@@ -221,17 +222,19 @@ export function Sidebar() {
         <div className="flex-1" />
 
         <div className="px-2 pb-3 space-y-1 shrink-0 border-t border-line/60 pt-3">
-          <button
-            onClick={() => router.push("/studio")}
-            title="Stüdyo"
-            className={`w-full h-9 rounded-xl border grid place-items-center transition-colors ${
-              pathname.startsWith("/studio")
-                ? "border-brand/40 bg-brand/10 text-brand"
-                : "border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink"
-            }`}
-          >
-            <Sparkles size={14} />
-          </button>
+          {studioEnabled() && (
+            <button
+              onClick={() => router.push("/studio")}
+              title="Stüdyo"
+              className={`w-full h-9 rounded-xl border grid place-items-center transition-colors ${
+                pathname.startsWith("/studio")
+                  ? "border-brand/40 bg-brand/10 text-brand"
+                  : "border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink"
+              }`}
+            >
+              <Sparkles size={14} />
+            </button>
+          )}
           <button
             onClick={() => setExtensionStoreOpen(true)}
             title="Eklenti Mağazası"
@@ -322,16 +325,18 @@ export function Sidebar() {
           <MessageSquare size={16} className="shrink-0" />
           <span className="flex-1 text-left">Sohbetler</span>
         </button>
-        <button
-          onClick={() => { router.push("/studio"); closeOnMobile(); }}
-          aria-current={pathname.startsWith("/studio") ? "page" : undefined}
-          className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-            pathname.startsWith("/studio") ? "bg-brand/10 text-brand" : "text-ink/85 hover:bg-bgsoft/70 hover:text-ink"
-          }`}
-        >
-          <Sparkles size={16} className="shrink-0" />
-          <span className="flex-1 text-left">Stüdyo</span>
-        </button>
+        {studioEnabled() && (
+          <button
+            onClick={() => { router.push("/studio"); closeOnMobile(); }}
+            aria-current={pathname.startsWith("/studio") ? "page" : undefined}
+            className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+              pathname.startsWith("/studio") ? "bg-brand/10 text-brand" : "text-ink/85 hover:bg-bgsoft/70 hover:text-ink"
+            }`}
+          >
+            <Sparkles size={16} className="shrink-0" />
+            <span className="flex-1 text-left">Stüdyo</span>
+          </button>
+        )}
         {/* Kütüphane üst seviyede (Codex IA önerisi): üretilen çıktılar
            keşfedilebilir olsun — Araçlar açılır listesine gömülmesin. */}
         <button

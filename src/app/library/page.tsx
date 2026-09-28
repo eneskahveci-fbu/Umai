@@ -6,17 +6,24 @@ import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { useAuthState, useThemeClasses } from "@/lib/authGate";
 import type { MediaAsset } from "@/lib/types";
+import { FEATURES } from "@/lib/features";
 
 type Tab = "all" | "media" | "design" | "docs" | "forms" | "notebooks";
 
-const tabs: { id: Tab; label: string; icon: typeof Images }[] = [
+/* Rafa kaldırılan özelliklerin sekmeleri/bölümleri gizlenir (lib/features.ts). */
+const SHELVED_TABS = new Set<Tab>([
+  ...(FEATURES.designStudio ? [] : ["design" as const]),
+  ...(FEATURES.contentTools ? [] : ["docs" as const, "forms" as const, "notebooks" as const]),
+]);
+
+const tabs = ([
   { id: "all", label: "Tümü", icon: LayoutPanelTop },
   { id: "media", label: "Medya", icon: Images },
   { id: "design", label: "Tasarım", icon: LayoutPanelTop },
   { id: "docs", label: "Doküman", icon: FileText },
   { id: "forms", label: "Anket", icon: ListChecks },
   { id: "notebooks", label: "Defter", icon: BookOpen },
-];
+] satisfies { id: Tab; label: string; icon: typeof Images }[]).filter((t) => !SHELVED_TABS.has(t.id));
 
 export default function LibraryPage() {
   /* /studio ve /app ile AYNI misafir-erişimli davranış (tutarlılık) + tema
@@ -30,7 +37,7 @@ export default function LibraryPage() {
   const saveConfig = useStore((s) => s.saveConfig);
   const [tab, setTab] = useState<Tab>("all");
   const media = useMemo(() => [...(config.mediaAssets ?? [])].sort((a, b) => b.createdAt - a.createdAt), [config.mediaAssets]);
-  const show = (kind: Tab) => tab === "all" || tab === kind;
+  const show = (kind: Tab) => !SHELVED_TABS.has(kind) && (tab === "all" || tab === kind);
 
   if (auth === "checking") {
     return <div className="h-screen grid place-items-center bg-bg text-muted/60 text-sm">Yükleniyor…</div>;
@@ -55,7 +62,7 @@ export default function LibraryPage() {
           {tabs.map((item) => <button key={item.id} onClick={() => setTab(item.id)} role="tab" aria-selected={tab === item.id} className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${tab === item.id ? "border-brand text-brand" : "border-transparent text-muted hover:text-ink"}`}><item.icon size={14} />{item.label}</button>)}
         </div>
 
-        {show("media") && <section className="mb-10"><SectionHead title="Medya" count={media.length} empty="Henüz görsel yok. Sohbette /gorsel ile üret veya dosya dönüştür." />
+        {show("media") && <section className="mb-10"><SectionHead title="Medya" count={media.length} empty={FEATURES.media ? "Henüz görsel yok. Sohbette /gorsel ile üret veya dosya dönüştür." : "Henüz görsel yok. Dönüştürücü ile dosya dönüştürebilirsin."} />
           {media.length > 0 && <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">{media.map((asset) => <MediaCard key={asset.id} asset={asset} onConvert={() => sendToConverter(asset.url)} onDelete={() => saveConfig({ ...config, mediaAssets: media.filter((x) => x.id !== asset.id) })} />)}</div>}
         </section>}
 
