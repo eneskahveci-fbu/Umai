@@ -101,6 +101,28 @@ listesinden + sistem promptundan çıkarır; kart hatırlatma cron'u no-op. Kull
 verisi silinmez, `/a/[id]` paylaşım linkleri çalışır. Geri açmak = ilgili
 anahtarı `true` yap. Yeni bir giriş noktası eklerken bu anahtarlara bağla.
 
+## Coder odaklı yön (Eyl 2026 kullanıcı kararı) — Claude Code web'e paralel
+
+Ürün sohbet uygulamasından "proje önde" bir kodlama aracına dönüyor (hedef:
+Claude Code web; opencode'un TUI görünümü DEĞİL). Yapılanlar:
+- **Sidebar**: nav = Ara / Sohbetler / **Dosyalar** / Eklentiler. "Araçlar"
+  açılır menüsü, "Kütüphane" ve "Projeler" nav satırları KALDIRILDI (sayfalar/
+  kod duruyor: `/library`, `/projects`, ⌘K). Yerine **Repolar** bölümü
+  (`RepoSwitcher`): `config.repos` arasında tek tık geçiş, "Projesiz sohbet"
+  (activeRepo=null + repo/tree düşürülür), "Repo bağla" → `/settings?tab=github`,
+  Yerel Mod açıksa sunucu satırı (tıklayınca Sunucu dosyaları paneli). Paneller
+  `useOpenLeftPanel()` ile açılır (/app dışındaysa önce /app'e gider — B2).
+  Skills/Snippet'ler/Etkinlik/Kısayollar/Dosyalar/Sunucu/Repo bağla ⌘K'da.
+- **Boş ekran** (`EmptyChat.tsx`): bağlı depo varsa "Bu projede ne yapalım?" +
+  depo/dal rozeti; yoksa depo kartları + "Repo bağla" + "Kendi sunucunu bağla".
+  Projesiz sohbet her zaman mümkün (hiçbir ön koşul yok — kuzey yıldızı).
+- **Terminal + sunucu ayarları HERKESE AÇIK**: `CoderView` terminal düğmesinin
+  admin kapısı kalktı; Ayarlar'da "Terminal & Sunucu" (eski admin "Geliştirici")
+  ve "Kancalar" sekmeleri + içlerindeki WebContainer/Hibrit/Yerel Mod bölümleri
+  artık admin'e özel değil. Admin'e özel kalan: Otomatik Pilot anahtarı,
+  AdminAnalytics/AdminUsers.
+- Mobil alt sekme: Sohbet / Ayarlar (+ Stüdyo yalnız `studioEnabled()` iken).
+
 ## Stüdyolar, Önizleme ve Modlar
 
 - **Tasarım Stüdyosu** (`DesignStudio.tsx`, rota `/studio`): Claude Design'a
@@ -422,8 +444,8 @@ Playwright ile.
   kullanıcı girişinde yerel config sızmaz (temiz `DEFAULT_CONFIG`'e düşer).
 - **Auth + admin:** Supabase (`src/lib/supabase/{client,server,config}.ts`);
   `config.ts` env yoksa sabit fallback'e düşer (login hep çalışır).
-  `src/lib/admin.ts` → `isAdminEmail()`; hassas ayarlar (Hibrit Sunucu,
-  Terminal, WebContainer API anahtarı) yalnız admin'e görünür. `/app` girişsiz
+  `src/lib/admin.ts` → `isAdminEmail()`; Eyl 2026'dan beri Terminal/Hibrit
+  Sunucu/WebContainer ayarları HERKESE açık (bkz. "Coder odaklı yön"). `/app` girişsiz
   açılmaz (auth gate — `src/app/app/page.tsx`).
 - **Ayarlar (GNOME tarzı):** `SettingsModal.tsx` sol dikey sekme çubuğu (ikon +
   başlık) + kenar çubuğunda arama + sağda kaydırılabilir içerik. `ALL_TABS`'ta

@@ -810,7 +810,6 @@ function SurveyCard({
 export function CoderView() {
   const mod = useModKey();
   const config = useStore((s) => s.config);
-  const isAdmin = isAdminEmail(useStore((s) => s.userEmail));
   const repo = useStore((s) => s.repo);
   const tree = useStore((s) => s.tree);
   const chats = useStore((s) => s.chats);
@@ -3492,17 +3491,15 @@ export function CoderView() {
              yok. Dosyalar/Sunucu (workspace) burada değil ama artık
              ERİŞİLEBİLİR: Sidebar → "Araçlar" menüsünden açılıyorlar
              (Ö8, Tem 2026 kullanıcı isteği). Durum store'da (leftPanel). */}
-          {isAdmin && (
-            <button
-              onClick={() => { setTerminalMounted(true); setTerminalOpen((v) => !v); }}
-              title={terminalOpen ? "Terminal'i kapat" : `Terminal${terminalSupported ? "" : " (masaüstü Chrome/Edge gerekir)"}`}
-              className={`w-8 h-8 rounded-lg grid place-items-center transition-colors shrink-0 ${
-                terminalOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
-              }`}
-            >
-              <Terminal size={15} />
-            </button>
-          )}
+          <button
+            onClick={() => { setTerminalMounted(true); setTerminalOpen((v) => !v); }}
+            title={terminalOpen ? "Terminal'i kapat" : `Terminal${terminalSupported ? "" : " (masaüstü Chrome/Edge gerekir)"}`}
+            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors shrink-0 ${
+              terminalOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
+            }`}
+          >
+            <Terminal size={15} />
+          </button>
           {/* Gizli sohbet — Ağu 2026 kullanıcı kararı: ⋯ menüsü tamamen
              kalktığı için kendi ikonu oldu (herkese açık). Tools/Güvenli/
              Karşılaştır de kalktı: Tools zaten repo bağlanınca kendiliğinden
