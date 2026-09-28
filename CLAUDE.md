@@ -113,9 +113,13 @@ Claude Code web; opencode'un TUI görünümü DEĞİL). Yapılanlar:
   Yerel Mod açıksa sunucu satırı (tıklayınca Sunucu dosyaları paneli). Paneller
   `useOpenLeftPanel()` ile açılır (/app dışındaysa önce /app'e gider — B2).
   Skills/Snippet'ler/Etkinlik/Kısayollar/Dosyalar/Sunucu/Repo bağla ⌘K'da.
-- **Boş ekran** (`EmptyChat.tsx`): bağlı depo varsa "Bu projede ne yapalım?" +
-  depo/dal rozeti; yoksa depo kartları + "Repo bağla" + "Kendi sunucunu bağla".
-  Projesiz sohbet her zaman mümkün (hiçbir ön koşul yok — kuzey yıldızı).
+- **Boş ekran** (`EmptyChat.tsx`): YALNIZ başlık (+ bağlı depo varsa depo/dal
+  rozeti). Kullanıcı kararı: "ana ekranda gereksiz yönlendirme olmasın" — başka
+  sayfaya giden kart/link (Repo bağla, sunucu, "kaldığın yerden devam") EKLEME;
+  bunların yeri Sidebar/⌘K. Projesiz sohbet her zaman mümkün.
+- **Model adları**: varsayılan Pollinations profili "Pollinations (Ücretsiz)";
+  model etiketinde marka ("UMAI Default") YAZMAZ. Eski kayıtlı etiket
+  `store.ts` → `migrateModelLabels` ile hem yüklemede hem bulut birleşmesinde düzelir.
 - **Terminal + sunucu ayarları HERKESE AÇIK**: `CoderView` terminal düğmesinin
   admin kapısı kalktı; Ayarlar'da "Terminal & Sunucu" (eski admin "Geliştirici")
   ve "Kancalar" sekmeleri + içlerindeki WebContainer/Hibrit/Yerel Mod bölümleri

@@ -1190,7 +1190,9 @@ export const DEFAULT_SKILLS: Skill[] = [
 
 export const POLLINATIONS_DEFAULT_MODEL: ModelProfile = {
   id: "craft-default-pollinations",
-  label: "✦ UMAI Default (Ücretsiz)",
+  /* Eyl 2026: model adında marka ("UMAI Default") değil GERÇEK sağlayıcı yazar;
+     eski kayıtlı etiket store.ts → migrateModelLabels ile düzeltilir. */
+  label: "Pollinations (Ücretsiz)",
   provider: "pollinations",
   baseUrl: "https://text.pollinations.ai/openai",
   model: "openai",
