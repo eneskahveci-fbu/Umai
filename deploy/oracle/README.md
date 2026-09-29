@@ -113,9 +113,16 @@ döner (100+ dil, Türkçe dahil). craft.ai'da sohbetteki modelin çağırdığ�
 MCP aracıdır.
 
 ```bash
-sudo bash deploy/oracle/setup-laya.sh      # SSH ile
-bash deploy/oracle/setup-laya.sh           # SSH yoksa: uygulamanın terminalinden (sudo'suz)
+# SSH yoksa — uygulamanın kendi terminalinden, sudo'suz, repo klonu gerekmez:
+curl -fsSL https://umai.vercel.app/setup-laya.sh | bash
+
+# SSH ile (repo klonluysa):
+sudo bash deploy/oracle/setup-laya.sh
 ```
+
+`curl … | bash` yolu güncel köprüyü sitenin herkese açık kopyasından
+(`/bridge.mjs`) indirir; site eski sürümü sunuyorsa kurulum yapmadan durur.
+Farklı bir alan adın varsa: `UMAI_BASE=https://siten … | bash`.
 
 Ne yapar: ayrı bir Python ortamına CPU PyTorch + `laya[mcp]` kurar, çok dilli
 checkpoint'i (~322M) bir kez indirir, köprünün `mcp-servers.json`'una `laya`

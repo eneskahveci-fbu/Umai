@@ -11,7 +11,8 @@
 # İKİ ÇALIŞMA MODU (ikisi de aynı sonucu verir):
 #   1) SSH ile:                         sudo bash deploy/oracle/setup-laya.sh
 #   2) SSH yoksa, uygulamanın kendi terminalinden (köprü kullanıcısı olarak,
-#      sudo'suz):                        bash deploy/oracle/setup-laya.sh
+#      sudo'suz, repo klonu GEREKMEZ):
+#        curl -fsSL https://umai.vercel.app/setup-laya.sh | bash
 #      → Python'u uv ile kullanıcı klasörüne kurar, köprüyü günceller ve
 #        yeniden başlatır (systemd otomatik geri açar; terminal birkaç saniye
 #        kopar, ⟳ ile yeniden bağlan).
@@ -33,11 +34,26 @@
 # ════════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
-REPO_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-BRIDGE_SRC="$REPO_DIR/scripts/terminal-bridge/bridge.mjs"
 BRIDGE_HOME="/opt/craft-bridge"
 LAYA_MODELS="${LAYA_MODELS:-multilingual}"
-[ -f "$BRIDGE_SRC" ] || { echo "bridge.mjs bulunamadı ($BRIDGE_SRC). Repo içinden çalıştır."; exit 1; }
+UMAI_BASE="${UMAI_BASE:-https://umai.vercel.app}"
+
+# Güncel bridge.mjs: repo içinden çalışıyorsa oradan, yoksa (ör. `curl … | bash`,
+# SSH/klon olmadan) sitenin herkese açık kopyasından (public/bridge.mjs — repo'daki
+# scripts/terminal-bridge/bridge.mjs ile birebir aynı tutulur, test korur).
+SCRIPT_PATH="${BASH_SOURCE[0]:-}"
+BRIDGE_SRC=""
+if [ -n "$SCRIPT_PATH" ] && [ -f "$SCRIPT_PATH" ]; then
+  REPO_DIR="$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)"
+  [ -f "$REPO_DIR/scripts/terminal-bridge/bridge.mjs" ] && BRIDGE_SRC="$REPO_DIR/scripts/terminal-bridge/bridge.mjs"
+fi
+if [ -z "$BRIDGE_SRC" ]; then
+  BRIDGE_SRC="$(mktemp -d)/bridge.mjs"   # .mjs uzantısı şart: node --check ESM olarak doğrulasın
+  echo "→ Güncel köprü indiriliyor: $UMAI_BASE/bridge.mjs"
+  curl -fsSL "$UMAI_BASE/bridge.mjs" -o "$BRIDGE_SRC" || { echo "bridge.mjs indirilemedi ($UMAI_BASE). Farklı adres için: UMAI_BASE=https://siten"; exit 1; }
+  node --check "$BRIDGE_SRC" 2>/dev/null || { echo "İndirilen bridge.mjs geçerli JavaScript değil."; exit 1; }
+  grep -q "/mcp/local/" "$BRIDGE_SRC" || { echo "Sitedeki bridge.mjs eski (kalıcı MCP desteği yok) — önce güncel sürüm yayınlanmalı."; exit 1; }
+fi
 [ -d "$BRIDGE_HOME" ] || { echo "$BRIDGE_HOME yok — önce hibrit köprüyü kur: sudo bash $REPO_DIR/deploy/oracle/setup.sh"; exit 1; }
 
 TOTAL_RAM_MB="$(awk '/MemTotal/{printf "%.0f", $2/1024}' /proc/meminfo)"
