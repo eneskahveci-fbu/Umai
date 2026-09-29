@@ -142,7 +142,11 @@ Claude Code web; opencode'un TUI görünümü DEĞİL). Yapılanlar:
   `mcp-servers.json`'dan; süreç bir kez başlar, açık kalır). Katalog girdisi
   `bridgePath: "/mcp/local/laya"` → kart açılınca adres = `localBridgeUrl` + yol,
   başlık = köprü token'ı. Kurulum `deploy/oracle/setup-laya.sh` (sudo'lu ya da
-  uygulama terminalinden sudo'suz/uv ile).
+  uygulama terminalinden sudo'suz/uv ile: `curl -fsSL <site>/setup-laya.sh | bash`).
+- **Köprü dosyaları sitede herkese açık**: `public/bridge.mjs` ve
+  `public/setup-laya.sh`, kaynakları `scripts/terminal-bridge/bridge.mjs` ve
+  `deploy/oracle/setup-laya.sh` ile BİREBİR aynı olmalı (`publicBridge.test.ts`
+  korur). Köprüyü değiştirdiğinde public kopyayı da güncelle (`cp`), yoksa test kırılır.
 
 ## Stüdyolar, Önizleme ve Modlar
 
