@@ -75,6 +75,70 @@ ekstra bir kod/kavram yok.
 Farklı bir model denemek istersen: `sudo CRAFT_MODEL=qwen2.5:7b bash
 deploy/oracle/setup-llm.sh` (herhangi bir Ollama kütüphane modeli olabilir).
 
+## (Opsiyonel) opencode — terminalde `opencode` yazınca açılan AI kodlama ajanı
+
+[opencode](https://opencode.ai) açık kaynak bir terminal AI ajanıdır. Köprü
+kurulduktan sonra AYNI sunucuda tek komut:
+
+```bash
+sudo bash deploy/oracle/setup-opencode.sh
+```
+
+Ne yapar: opencode'u global kurar (terminalin PATH'inde), köprüyü günceller
+(xterm-256color + truecolor — tam ekran TUI düzgün görünsün diye) ve servisi
+yeniden başlatır. `setup-llm.sh` ile Ollama da kuruluysa opencode'u otomatik o
+yerel modele bağlar (anahtarsız); değilse opencode içinde `/connect` ile bir
+sağlayıcı ekle. Sonra uygulamada terminali aç (açıksa ⟳ ile yeniden bağlan)
+ve `opencode` yaz. Güncellemek için aynı komutu tekrar çalıştır.
+
+**SSH'a erişemiyorsan (root'suz yol):** uygulamanın kendi terminaline (zaten
+sunucuya bağlı) şunu yapıştır — sudo gerekmez, köprü kullanıcısının kendi
+klasörüne kurar, tekrar çalıştırmak güvenli (günceller):
+
+```bash
+npm i -g --prefix ~/.local opencode-ai@latest && { grep -q craft-opencode ~/.bashrc 2>/dev/null || printf '\n# craft-opencode\nexport PATH="$HOME/.local/bin:$PATH"\nexport TERM=xterm-256color COLORTERM=truecolor\n' >> ~/.bashrc; } && . ~/.bashrc && opencode --version
+```
+
+Sürüm numarası çıkınca `opencode` yaz. (Ollama otomatik bağlantısı yalnız
+sudo'lu scriptte var; burada `/connect` ile sağlayıcı ekle.)
+
+> Not: opencode yerel bir ikili dosyadır; yalnız bu uzak köprü terminalinde
+> çalışır, tarayıcı içi WebContainer modunda çalışmaz.
+
+## (Opsiyonel) Laya — yerel karar modeli, sohbette araç olarak
+
+[Laya](https://github.com/NandhaKishorM/laya) (Apache 2.0) sohbet modeli
+DEĞİLDİR: metin + tipli sorular alır, **seçim / puan / evet-hayır** kararı
+döner (100+ dil, Türkçe dahil). craft.ai'da sohbetteki modelin çağırdığı bir
+MCP aracıdır.
+
+```bash
+# SSH yoksa — uygulamanın kendi terminalinden, sudo'suz, repo klonu gerekmez:
+curl -fsSL https://umai.vercel.app/setup-laya.sh | bash
+
+# SSH ile (repo klonluysa):
+sudo bash deploy/oracle/setup-laya.sh
+```
+
+`curl … | bash` yolu güncel köprüyü sitenin herkese açık kopyasından
+(`/bridge.mjs`) indirir; site eski sürümü sunuyorsa kurulum yapmadan durur.
+Farklı bir alan adın varsa: `UMAI_BASE=https://siten … | bash`.
+
+Ne yapar: ayrı bir Python ortamına CPU PyTorch + `laya[mcp]` kurar, çok dilli
+checkpoint'i (~322M) bir kez indirir, köprünün `mcp-servers.json`'una `laya`
+girdisini ekler ve köprüyü günceller. Köprü Laya'yı **bir kez başlatıp açık
+tutar** (her çağrıda model yüklemez) ve `https://<alan>/mcp/local/laya`
+adresinden sunar (köprü token'ıyla korunur). En az ~3GB RAM gerekir (Ampere
+A1 uygun; AMD 1GB yetmez).
+
+Sonra uygulamada **Eklentiler → "Laya (karar modeli)"** kartını aç — hibrit
+sunucun Ayarlar'da bağlıysa adres + token otomatik dolar. Araç çağırabilen bir
+model seçili olmalı.
+
+Aynı mekanizmayla başka stdio MCP sunucuları da eklenebilir:
+`/opt/craft-bridge/mcp-servers.json` → `{"<ad>": {"command": "...", "args": [], "env": {}}}`,
+adres `https://<alan>/mcp/local/<ad>`.
+
 ## Güvenlik
 - Köprü yalnız `127.0.0.1`'de dinler; dışarıya yalnız Caddy (443, token korumalı) açıktır.
 - `craftbridge` kullanıcısı root değildir; terminal ve dosya işlemleri bu sınırlı

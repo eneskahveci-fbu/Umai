@@ -38,6 +38,12 @@
  *   ALLOWED_ORIGIN  CORS origin              (varsayılan *)
  *   MAX_FILE_BYTES  Okuma/yazma üst sınırı   (varsayılan 2_000_000)
  *   OLLAMA_URL    Yerel Ollama adresi        (varsayılan http://127.0.0.1:11434)
+ *   MCP_CONFIG    Kalıcı yerel MCP sunucuları (varsayılan: bridge.mjs yanındaki
+ *                 mcp-servers.json) — ör. {"laya": {"command": "…/laya-mcp-server"}}.
+ *                 Her biri köprüyle BİRLİKTE bir kez başlar, açık kalır ve
+ *                 https://<alan>/mcp/local/<ad> adresinden craft.ai'nın normal
+ *                 HTTP MCP istemcisine sunulur (Ayarlar → Eklentiler; başlık:
+ *                 Authorization: Bearer <token>). Bkz. deploy/oracle/setup-laya.sh.
  *
  * Güvenlik: HTTP token (Bearer/X-Bridge-Token) + WS token (?token=). Tek kullanıcı
  * (root değil) ile çalıştır. Yol her zaman WORK_DIR içinde kalır (path traversal yok).
@@ -51,6 +57,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import os from "node:os";
 import { Readable } from "node:stream";
+import { fileURLToPath } from "node:url";
 
 const PORT = Number(process.env.PORT || 7777);
 const HOST = process.env.HOST || "127.0.0.1";
@@ -204,9 +211,136 @@ function mcpRpc(command, args, env, requests) {
       if (requests.every((r) => responses[r.id] !== undefined)) { clearTimeout(timer); done(); }
     });
     child.on("error", () => { clearTimeout(timer); resolve({ error: "spawn edilemedi" }); });
-    for (const r of requests) child.stdin.write(JSON.stringify(r) + "\n");
+    for (const r of requests) {
+      child.stdin.write(JSON.stringify(r) + "\n");
+      /* MCP spesifikasyonu: initialize yanıtından sonra istemci
+         "notifications/initialized" gönderir. Mevcut SDK'lar (mcp 2.2 dahil)
+         eksikliğini tolere ediyor ama katı sunucular için gönderiyoruz. */
+      if (r.method === "initialize") child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
+    }
   });
 }
+
+/* ── Kalıcı yerel MCP sunucuları ──
+   mcpRpc her çağrıda süreci baştan başlatır; model yükleyen sunucular (ör. Laya
+   ~400M parametreyi belleğe alır) için bu her çağrıda saniyeler demek ve
+   craft.ai'nın 5-15 sn MCP zaman aşımına takılır. Burada sunucu köprüyle bir
+   kez başlar, açık kalır; istekler id ile eşlenir. Komutlar YALNIZ sunucudaki
+   yapılandırma dosyasından okunur (istek gövdesinden asla). */
+const MCP_CONFIG_PATH =
+  process.env.MCP_CONFIG || path.join(path.dirname(fileURLToPath(import.meta.url)), "mcp-servers.json");
+const MCP_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,40}$/i;
+const MCP_INIT_TIMEOUT_MS = 10 * 60_000; // ilk açılışta model ağırlıkları inebilir
+const persistentMcp = new Map();
+
+async function loadMcpConfig() {
+  try {
+    const cfg = JSON.parse(await fsp.readFile(MCP_CONFIG_PATH, "utf-8"));
+    return cfg && typeof cfg === "object" ? cfg : {};
+  } catch { return {}; }
+}
+
+function startPersistentMcp(name, spec) {
+  const child = procSpawn(spec.command, Array.isArray(spec.args) ? spec.args : [], {
+    cwd: ROOT,
+    env: { ...process.env, ...(spec.env || {}) },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const st = { child, pending: new Map(), nextId: 1, alive: true, stderr: "", tools: null, ready: null };
+  let buf = "";
+  child.stdout.on("data", (d) => {
+    buf += d.toString();
+    let nl;
+    while ((nl = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line) continue;
+      let msg;
+      try { msg = JSON.parse(line); } catch { continue; }
+      const p = msg.id != null ? st.pending.get(msg.id) : null;
+      if (p) { st.pending.delete(msg.id); clearTimeout(p.timer); p.resolve(msg); }
+    }
+  });
+  child.stderr.on("data", (d) => { st.stderr = (st.stderr + d.toString()).slice(-4000); });
+  const die = (why) => {
+    if (!st.alive) return;
+    st.alive = false;
+    for (const p of st.pending.values()) { clearTimeout(p.timer); p.resolve({ error: { message: why } }); }
+    st.pending.clear();
+    if (persistentMcp.get(name) === st) persistentMcp.delete(name); // sonraki istek yeniden başlatır
+    console.log(`[mcp:${name}] ${why}`);
+  };
+  child.on("exit", (code) => die(`kapandı (kod ${code}). ${st.stderr.slice(-400)}`));
+  child.on("error", (e) => die("başlatılamadı: " + e.message));
+  st.request = (method, params, timeoutMs) => new Promise((resolve) => {
+    if (!st.alive) return resolve({ error: { message: `MCP sunucusu "${name}" çalışmıyor` } });
+    const id = st.nextId++;
+    const timer = setTimeout(() => { st.pending.delete(id); resolve({ error: { message: `zaman aşımı (${method})` } }); }, timeoutMs);
+    st.pending.set(id, { resolve, timer });
+    child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params: params || {} }) + "\n");
+  });
+  st.ready = (async () => {
+    const init = await st.request("initialize", {
+      protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "craft-hybrid-bridge", version: "2.1.0" },
+    }, MCP_INIT_TIMEOUT_MS);
+    if (init.error) throw new Error(init.error.message || "initialize başarısız");
+    child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
+    console.log(`[mcp:${name}] hazır`);
+  })();
+  st.ready.catch((e) => console.log(`[mcp:${name}] ${e.message}`));
+  persistentMcp.set(name, st);
+  return st;
+}
+
+async function getPersistentMcp(name) {
+  if (!MCP_NAME_RE.test(name)) return null;
+  const running = persistentMcp.get(name);
+  if (running) return running;
+  const spec = (await loadMcpConfig())[name];
+  if (!spec || typeof spec.command !== "string" || !spec.command) return null;
+  return startPersistentMcp(name, spec);
+}
+
+/* Hazır olmasını en fazla `ms` bekle — craft.ai'nın kendi zaman aşımından önce
+   anlamlı bir hata dönebilmek için. */
+function waitReady(st, ms) {
+  return Promise.race([
+    st.ready.then(() => null, (e) => e.message),
+    new Promise((r) => setTimeout(() => r("hâlâ hazırlanıyor (ilk açılışta model indiriliyor olabilir) — biraz sonra tekrar dene"), ms)),
+  ]);
+}
+
+/* craft.ai'nın HTTP MCP istemcisi: POST <url>/tools/list | <url>/tools/call,
+   gövde JSON-RPC; yanıttan result.tools / result.content okur. */
+async function handleLocalMcp(name, op, body) {
+  const rpcId = body && body.id != null ? body.id : 1;
+  const fail = (message) => ({ jsonrpc: "2.0", id: rpcId, error: { code: -32000, message } });
+  const st = await getPersistentMcp(name);
+  if (!st) return fail(`Yerel MCP sunucusu bulunamadı: "${name}" (${MCP_CONFIG_PATH})`);
+  if (op === "list") {
+    if (st.tools) return { jsonrpc: "2.0", id: rpcId, result: { tools: st.tools } };
+    const notReady = await waitReady(st, 4000);
+    if (notReady) return fail(notReady);
+    const r = await st.request("tools/list", {}, 4000);
+    if (r.error) return fail(r.error.message || "tools/list başarısız");
+    st.tools = (r.result && r.result.tools) || [];
+    return { jsonrpc: "2.0", id: rpcId, result: { tools: st.tools } };
+  }
+  const params = (body && body.params) || {};
+  if (typeof params.name !== "string") return fail("tools/call: araç adı eksik");
+  const notReady = await waitReady(st, 10_000);
+  if (notReady) return fail(notReady);
+  const r = await st.request("tools/call", { name: params.name, arguments: params.arguments || {} }, 13_000);
+  if (r.error) return fail(r.error.message || "tools/call başarısız");
+  return { jsonrpc: "2.0", id: rpcId, result: r.result };
+}
+
+/* Köprüyle birlikte yapılandırılmış sunucuları ısıt (ilk istek beklemesin). */
+loadMcpConfig().then((cfg) => {
+  for (const [name, spec] of Object.entries(cfg)) {
+    if (MCP_NAME_RE.test(name) && spec && typeof spec.command === "string") startPersistentMcp(name, spec);
+  }
+});
 
 /* ── HTTP yardımcıları ── */
 function send(res, code, obj) {
@@ -261,6 +395,11 @@ const server = http.createServer(async (req, res) => {
 
     if (route === "/exec/kill") {
       return send(res, 200, killBackground(String(body.id || "")));
+    }
+
+    const localMcp = route.match(/^\/mcp\/local\/([^/]+)\/tools\/(list|call)$/);
+    if (localMcp && req.method === "POST") {
+      return send(res, 200, await handleLocalMcp(decodeURIComponent(localMcp[1]), localMcp[2], body));
     }
 
     switch (route) {
@@ -409,12 +548,14 @@ server.on("upgrade", (req, socket, head) => {
 });
 
 wss.on("connection", (ws) => {
+  /* xterm-256color + truecolor: opencode gibi tam ekran TUI'ler 8 renkli
+     "xterm-color"da bozuk/soluk görünür; istemci (xterm.js) 24-bit rengi destekler. */
   const pty = ptySpawn(SHELL, [], {
-    name: "xterm-color",
+    name: "xterm-256color",
     cols: 80,
     rows: 24,
     cwd: process.env.CRAFT_CWD || ROOT,
-    env: process.env,
+    env: { ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor" },
   });
   pty.onData((data) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ type: "output", data })); });
   pty.onExit(() => { try { ws.close(); } catch { /* yok say */ } });

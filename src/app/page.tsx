@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ReferralCapture } from "@/components/ReferralCapture";
 import { BrandMark } from "@/components/BrandMark";
 import { MarketingHeader, OpenAppCta } from "@/components/MarketingHeader";
+import { FEATURES } from "@/lib/features";
 import {
   ArrowRight,
   ChevronDown,
@@ -110,12 +111,12 @@ export default function Home() {
           </Link>
         </div>
 
-        <p className="text-xs text-muted/60 mt-6">
+        {FEATURES.designStudio && <p className="text-xs text-muted/60 mt-6">
           Web sitesi, sunum ve görsel tasarımı mı arıyorsun?{" "}
           <Link href="/studio" className="text-muted hover:text-brand underline underline-offset-2 transition-colors">
             Stüdyo&apos;ya göz at
           </Link>
-        </p>
+        </p>}
       </header>
 
       {/* NE YAPABİLİRSİN — sade, dört öğe */}

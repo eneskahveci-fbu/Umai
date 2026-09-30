@@ -1,20 +1,33 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Cloud, ExternalLink, FolderOpen, Loader2, Power, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
-import { getUnsupportedReason, getWebContainer, isSupported, mountDefaults, mountFiles, needsApiKey } from "@/lib/webcontainer";
-import { fetchAllFiles } from "@/lib/github";
-import { fetchAllGitLabFiles, resolveRepoProvider } from "@/lib/gitlab";
-import type { TreeNode } from "@/lib/types";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  dirHandleToTree,
-  getMountedHandle,
-  getMountedName,
-  isLocalFsSupported,
-  pickLocalDirectory,
-  setMounted,
-} from "@/lib/localfs";
+  ChevronDown, ChevronUp, Cloud, Eraser, ExternalLink, FolderOpen, Loader2, Maximize2, Minimize2,
+  Power, RefreshCw, Search, Settings as SettingsIcon, X,
+} from "lucide-react";
+import {
+  FONT_DEFAULT, HEIGHT_MIN, clampFont, clampHeight, hostLabel, terminalBackground,
+} from "@/lib/terminal/core";
+import { createTerminalView, type TerminalView } from "@/lib/terminal/view";
+import { connectWs } from "@/lib/terminal/wsTransport";
+import { connectWebContainer, loadConnectedRepoFiles, webContainerBlocker } from "@/lib/terminal/wcTransport";
+import { getMountedName, isLocalFsSupported, pickLocalDirectory, setMounted } from "@/lib/localfs";
 import { useStore } from "@/lib/store";
+
+/* Terminal görünümü: yalnız UI. Taşıyıcılar (uzak WS PTY / WebContainer), xterm
+   kurulumu ve AI run-command köprüsü `src/lib/terminal/*` altında ayrı modüller. */
+
+type Status = "idle" | "booting" | "ready" | "error" | "needs-key" | "closed";
+
+const HEIGHT_KEY = "craftai_terminal_h";
+const FONT_KEY = "craftai_terminal_font";
+
+function readPref(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function writePref(key: string, v: number) {
+  try { localStorage.setItem(key, String(v)); } catch { /* gizli pencere vb. */ }
+}
 
 function codespaceUrl(owner: string, repo: string, branch?: string): string {
   const u = new URL("https://github.com/codespaces/new");
@@ -23,327 +36,30 @@ function codespaceUrl(owner: string, repo: string, branch?: string): string {
   return u.toString();
 }
 
-type Status = "idle" | "booting" | "ready" | "error" | "needs-key";
+const STATUS_LABEL: Record<Status, string> = {
+  idle: "boşta", booting: "bağlanıyor…", ready: "hazır", error: "hata", "needs-key": "key gerekli", closed: "bağlantı koptu",
+};
 
-/* ── WebSocket PTY mode ─────────────────────────────────────────────
-   Connects to a remote terminal-server (ws/wss URL).
-   Protocol: client sends JSON {type:"input",data:"..."} | {type:"resize",cols,rows}
-             server sends JSON {type:"output",data:"..."} ── */
-async function bootWsTerminal(
-  containerEl: HTMLDivElement,
-  wsUrl: string,
-  appTheme: "dark" | "light",
-  onReady: () => void,
-  onError: (msg: string) => void,
-): Promise<() => void> {
-  const [{ Terminal }, { FitAddon }] = await Promise.all([
-    import("@xterm/xterm"),
-    import("@xterm/addon-fit"),
-  ]);
-  await import("@xterm/xterm/css/xterm.css");
-
-  const isLight = appTheme === "light";
-  const term = new Terminal({
-    convertEol: true, cursorBlink: true,
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-    fontSize: 13,
-    theme: {
-      background: isLight ? "#23271f" : "#12140f",
-      foreground: "#e6e3d8", cursor: "#5c9478",
-      selectionBackground: "#5c947840",
-    },
-  });
-  const fit = new FitAddon();
-  term.loadAddon(fit);
-  term.open(containerEl);
-  fit.fit();
-
-  /* URL'i normalize et + yaygın hataları yakala:
-     - http(s):// yanlışlıkla yapıştırılmışsa ws(s)://'e çevir (Oracle "Yerel Mod"
-       https adresi de buraya konabilir → wss'e döner).
-     - HTTPS bir sayfada (vercel.app) güvensiz ws:// tarayıcı tarafından SESSİZCE
-       engellenir (mixed content) → otomatik wss'e yükselt; bu, "Sunucuya
-       bağlanılamadı" hatasının en yaygın gizli sebebidir.
-     - Şema hâlâ ws/wss değilse net, eyleme dönük hata ver. */
-  let url = wsUrl.trim();
-  if (/^https:\/\//i.test(url)) url = url.replace(/^https:/i, "wss:");
-  else if (/^http:\/\//i.test(url)) url = url.replace(/^http:/i, "ws:");
-  const pageIsHttps = typeof window !== "undefined" && window.location.protocol === "https:";
-  if (pageIsHttps && /^ws:\/\//i.test(url)) url = url.replace(/^ws:/i, "wss:");
-  if (!/^wss?:\/\//i.test(url)) {
-    onError("Geçersiz terminal adresi. wss://sunucu/?token=… biçiminde olmalı (Oracle kurulumunun verdiği adresi yapıştır).");
-    return () => { term.dispose(); };
-  }
-
-  let ws: WebSocket;
-  try {
-    ws = new WebSocket(url);
-  } catch (e) {
-    onError(`Terminal adresi açılamadı: ${(e as Error).message}`);
-    return () => { term.dispose(); };
-  }
-
-  /* Bağlantı zaman aşımı: WS açılmazsa onerror bazen hiç ateşlemez (özellikle
-     mobil Safari). 12 sn içinde açılmazsa net teşhis ver. */
-  let opened = false;
-  let connectTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
-    if (!opened && ws.readyState !== WebSocket.OPEN) {
-      try { ws.close(); } catch { /* yoksay */ }
-      onError("Sunucu yanıt vermiyor (12s). Oracle sunucusu çalışıyor mu, TLS/port (443) açık mı ve adres+token doğru mu kontrol et.");
-    }
-  }, 12000);
-  const clearConnectTimer = () => { if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; } };
-
-  ws.onopen = () => {
-    opened = true; clearConnectTimer();
-    ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
-    onReady();
-    /* Otomasyon: bağlanınca kurulum komutunu bir kez çalıştır (SessionStart). */
-    const setup = useStore.getState().config.terminalSetupCommand?.trim();
-    if (setup) {
-      setTimeout(() => {
-        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "input", data: setup + "\n" }));
-      }, 300);
-    }
-  };
-  ws.onerror = () => {
-    clearConnectTimer();
-    onError(
-      pageIsHttps
-        ? "Sunucuya bağlanılamadı. HTTPS sitede yalnızca wss:// (TLS'li) çalışır — Oracle sunucusunun çalıştığını ve sertifikasının geçerli olduğunu doğrula; adres+token'ı kontrol et."
-        : "Sunucuya bağlanılamadı. URL'i ve token'ı kontrol et (sunucu çalışıyor ve port açık olmalı).",
-    );
-  };
-  ws.onclose = (ev) => {
-    clearConnectTimer();
-    if (ev.code === 4403) { onError("Erişim reddedildi — token geçersiz."); return; }
-    if (!opened) {
-      onError("Bağlantı kurulamadan kapandı. Sunucu adresi/port erişilebilir mi ve token doğru mu kontrol et.");
-      return;
-    }
-    term.writeln("\r\n\x1b[33m[Bağlantı kapandı]\x1b[0m");
-  };
-  ws.onmessage = (ev) => {
-    try {
-      const msg = JSON.parse(ev.data as string) as { type: string; data?: string };
-      if (msg.type === "output" && msg.data) term.write(msg.data);
-    } catch { term.write(ev.data as string); }
-  };
-
-  term.onData((d) => {
-    if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "input", data: d }));
-  });
-
-  const resize = () => {
-    fit.fit();
-    if (ws.readyState === WebSocket.OPEN)
-      ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
-  };
-  window.addEventListener("resize", resize);
-  const ro = new ResizeObserver(resize);
-  ro.observe(containerEl);
-
-  /* AI run-command bridge — komut bitişini SENTINEL marker ile algılar (sabit
-     timeout yok), exit code'u yakalar ve ANSI'den temizlenmiş çıktı döndürür.
-     Böylece build/install/test gibi uzun komutlar eksiksiz ve doğru raporlanır
-     (Claude Code'un stdout+exit davranışına yakın). */
-  let outputBuffer = "";
-  const origOnMsg = ws.onmessage;
-  ws.onmessage = (ev) => {
-    origOnMsg?.call(ws, ev);
-    try {
-      const msg = JSON.parse(ev.data as string) as { type: string; data?: string };
-      if (msg.type === "output" && msg.data) {
-        outputBuffer += msg.data;
-        if (outputBuffer.length > 200_000) outputBuffer = outputBuffer.slice(-200_000);
-      }
-    } catch { /* ignore */ }
-  };
-  const handleRunCmd = (e: Event) => {
-    const cmd = (e as CustomEvent<{ command: string }>).detail?.command;
-    if (!cmd || ws.readyState !== WebSocket.OPEN) return;
-    const id = Math.random().toString(36).slice(2, 8);
-    const START = `__CRAFT_S_${id}__`;
-    const DONE = `__CRAFT_D_${id}__`;
-    const from = outputBuffer.length;
-    /* echo START → komut → echo DONE:exitcode. Marker'lar gerçek çıktıyı sarar. */
-    ws.send(JSON.stringify({ type: "input", data: `printf '${START}\\n'; ${cmd}; printf '${DONE}:%s\\n' "$?"\n` }));
-    const startedAt = Date.now();
-    const doneRe = new RegExp(`${DONE}:(\\d+)`);
-    const poll = setInterval(() => {
-      const slice = outputBuffer.slice(from);
-      const m = slice.match(doneRe);
-      const timedOut = Date.now() - startedAt > 120_000;
-      if (!m && !timedOut) return;
-      clearInterval(poll);
-      const sIdx = slice.lastIndexOf(START, m ? m.index : undefined);
-      let out = sIdx >= 0 ? slice.slice(sIdx + START.length, m ? m.index : undefined) : slice;
-      out = out
-        .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")   // CSI ANSI dizileri
-        .replace(/\x1b\][^\x07]*(\x07|\x1b\\)/g, "") // OSC dizileri
-        .replace(/\r/g, "")
-        .trim();
-      const code = m ? m[1] : "timeout";
-      const body = `${out || "(çıktı yok)"}\n[exit: ${code}]`.slice(-6000);
-      window.dispatchEvent(new CustomEvent("craftai:terminal-output", { detail: { command: cmd, output: body } }));
-    }, 300);
-  };
-  window.addEventListener("craftai:terminal-run", handleRunCmd);
-
-  return () => {
-    clearConnectTimer();
-    window.removeEventListener("craftai:terminal-run", handleRunCmd);
-    window.removeEventListener("resize", resize);
-    ro.disconnect();
-    ws.close();
-    term.dispose();
-  };
-}
-
-/* ── WebContainer mode (mevcut) ─────────────────────────────────── */
-/* Repo ağacını düz blob listesine çevirir (mount için). */
-function treeBlobs(node: TreeNode): { path: string; type: string }[] {
-  const items: { path: string; type: string }[] = [];
-  for (const f of node.files) items.push({ path: f.path, type: "blob" });
-  for (const child of Object.values(node.dirs)) items.push(...treeBlobs(child));
-  return items;
-}
-
-async function bootWcTerminal(
-  containerEl: HTMLDivElement,
-  apiKey: string,
-  appTheme: "dark" | "light",
-  onReady: () => void,
-  onError: (msg: string) => void,
-  onNeedsKey: () => void,
-  loadRepoFiles?: () => Promise<{ path: string; content: string }[]>,
-): Promise<() => void> {
-  if (!isSupported()) { onError(getUnsupportedReason() ?? "Tarayıcı desteklemiyor."); return () => {}; }
-  if (needsApiKey() && !apiKey.trim()) { onNeedsKey(); return () => {}; }
-
-  const [{ Terminal }, { FitAddon }] = await Promise.all([
-    import("@xterm/xterm"),
-    import("@xterm/addon-fit"),
-  ]);
-  await import("@xterm/xterm/css/xterm.css");
-
-  const isLight = appTheme === "light";
-  const term = new Terminal({
-    convertEol: true, cursorBlink: true,
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-    fontSize: 13,
-    theme: {
-      background: isLight ? "#23271f" : "#12140f",
-      foreground: "#e6e3d8", cursor: "#5c9478",
-      selectionBackground: "#5c947840",
-      black: "#1c1917", brightBlack: "#4a4540",
-    },
-  });
-  const fit = new FitAddon();
-  term.loadAddon(fit);
-  term.open(containerEl);
-  fit.fit();
-
-  const wc = await getWebContainer(apiKey);
-  const handle = getMountedHandle();
-  if (handle) {
-    const { tree, fileCount, truncated, skipped } = await dirHandleToTree(handle);
-    await wc.mount(tree);
-    term.writeln(`\x1b[1;32m✓ Mount: \x1b[36m${getMountedName()}\x1b[0m (${fileCount} dosya${truncated ? ", \x1b[33mkesildi\x1b[0m" : ""})`);
-    if (skipped.length > 0) term.writeln(`\x1b[33m⚠ Atlandı (>5MB): ${skipped.slice(0, 3).join(", ")}${skipped.length > 3 ? ` ve ${skipped.length - 3} daha` : ""}\x1b[0m`);
-  } else if (loadRepoFiles) {
-    /* Yerel klasör yok ama bir repo bağlı → gerçek repoyu mount et. */
-    term.writeln("\x1b[2mBağlı repo yükleniyor…\x1b[0m");
-    try {
-      const files = await loadRepoFiles();
-      if (files.length) {
-        await mountFiles(wc, files);
-        term.writeln(`\x1b[1;32m✓ Repo mount edildi: \x1b[36m${files.length} dosya\x1b[0m — gerçek kod tabanı hazır`);
-      } else {
-        await mountDefaults(wc);
-      }
-    } catch {
-      await mountDefaults(wc);
-      term.writeln("\x1b[33m⚠ Repo yüklenemedi, boş sandbox açıldı.\x1b[0m");
-    }
-  } else {
-    await mountDefaults(wc);
-  }
-  term.writeln("\x1b[1;35m▲ UMAI sandbox\x1b[0m — Node.js + busybox-shell hazır");
-  term.writeln("\x1b[2mDeneyin: \x1b[36mnpm install\x1b[2m, \x1b[36mnpm run dev\x1b[2m, \x1b[36mnpm test\x1b[2m, \x1b[36mls\x1b[0m\n");
-
-  const proc = await wc.spawn("jsh", { terminal: { cols: term.cols, rows: term.rows } });
-  const writer = proc.input.getWriter();
-  term.onData((d) => writer.write(d));
-
-  let outputBuffer = "";
-  proc.output.pipeTo(new WritableStream({
-    write: (chunk) => {
-      term.write(chunk);
-      outputBuffer += chunk;
-      if (outputBuffer.length > 200_000) outputBuffer = outputBuffer.slice(-200_000);
-    },
-  })).catch(() => {});
-
-  /* SENTINEL marker ile komut bitişi + exit code (WS modundaki ile aynı). */
-  const handleRunCmd = (e: Event) => {
-    const cmd = (e as CustomEvent<{ command: string }>).detail?.command;
-    if (!cmd) return;
-    const id = Math.random().toString(36).slice(2, 8);
-    const START = `__CRAFT_S_${id}__`;
-    const DONE = `__CRAFT_D_${id}__`;
-    const from = outputBuffer.length;
-    writer.write(`printf '${START}\\n'; ${cmd}; printf '${DONE}:%s\\n' "$?"\n`);
-    const startedAt = Date.now();
-    const doneRe = new RegExp(`${DONE}:(\\d+)`);
-    const poll = setInterval(() => {
-      const slice = outputBuffer.slice(from);
-      const m = slice.match(doneRe);
-      const timedOut = Date.now() - startedAt > 120_000;
-      if (!m && !timedOut) return;
-      clearInterval(poll);
-      const sIdx = slice.lastIndexOf(START, m ? m.index : undefined);
-      let out = sIdx >= 0 ? slice.slice(sIdx + START.length, m ? m.index : undefined) : slice;
-      out = out
-        .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
-        .replace(/\x1b\][^\x07]*(\x07|\x1b\\)/g, "")
-        .replace(/\r/g, "")
-        .trim();
-      const code = m ? m[1] : "timeout";
-      const body = `${out || "(çıktı yok)"}\n[exit: ${code}]`.slice(-6000);
-      window.dispatchEvent(new CustomEvent("craftai:terminal-output", { detail: { command: cmd, output: body } }));
-    }, 300);
-  };
-  window.addEventListener("craftai:terminal-run", handleRunCmd);
-
-  const resize = () => {
-    fit.fit();
-    try { proc.resize({ cols: term.cols, rows: term.rows }); } catch { /* not ready */ }
-  };
-  window.addEventListener("resize", resize);
-  const ro = new ResizeObserver(resize);
-  ro.observe(containerEl);
-  onReady();
-
-  return () => {
-    window.removeEventListener("craftai:terminal-run", handleRunCmd);
-    window.removeEventListener("resize", resize);
-    ro.disconnect();
-    try { writer.releaseLock(); } catch { /* ignore */ }
-    try { proc.kill(); } catch { /* ignore */ }
-    term.dispose();
-  };
-}
-
-/* ── Component ─────────────────────────────────────────────────────── */
+const iconBtn = "text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors disabled:opacity-30";
+const primaryBtn = "flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-[#111110] hover:bg-branddim transition-colors font-semibold";
 
 export function RealTerminal({ onClose }: { onClose: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<TerminalView | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
+  const bootSeq = useRef(0);
+
   const [status, setStatus] = useState<Status>("idle");
   const [errMsg, setErrMsg] = useState("");
   const [mountedFolder, setMountedFolder] = useState<string | null>(getMountedName());
   const [mounting, setMounting] = useState(false);
-  const cleanupRef = useRef<(() => void) | null>(null);
+  const [height, setHeight] = useState(() => clampHeight(readPref(HEIGHT_KEY), typeof window === "undefined" ? 800 : window.innerHeight));
+  const [maximized, setMaximized] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const fontRef = useRef(clampFont(readPref(FONT_KEY)));
+
   const apiKey = useStore((s) => s.config.webcontainerApiKey);
   const wsUrl = useStore((s) => s.config.terminalWsUrl ?? "");
   const appTheme = useStore((s) => s.config.theme);
@@ -354,6 +70,7 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
   const repo = useStore((s) => s.repo);
   const codespaceHref = repo ? codespaceUrl(repo.owner, repo.repo, repo.branch) : null;
   const useWs = wsUrl.trim().length > 0;
+  const modeLabel = useWs ? `Uzak (${hostLabel(wsUrl)})` : "WebContainer";
 
   useEffect(() => {
     const fn = () => setMountedFolder(getMountedName());
@@ -366,39 +83,72 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
     if (status === "ready") window.dispatchEvent(new Event("craftai:terminal-ready"));
   }, [status]);
 
+  /* Süren bir boot'u geçersiz kıl — geç gelen sonuçlar state'e dokunmaz. */
+  const cancelBoot = () => { bootSeq.current++; };
+
+  const teardown = () => {
+    cleanupRef.current?.();
+    cleanupRef.current = null;
+    viewRef.current?.dispose();
+    viewRef.current = null;
+  };
+
+  const setFont = useCallback((next: number) => {
+    const v = clampFont(next);
+    fontRef.current = v;
+    writePref(FONT_KEY, v);
+    const view = viewRef.current;
+    if (!view) return;
+    view.term.options.fontSize = v;
+    try { view.fit.fit(); } catch { /* yoksay */ }
+  }, []);
+
   const boot = async () => {
-    if (!containerRef.current) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const seq = ++bootSeq.current;
+    const alive = () => seq === bootSeq.current;
     setStatus("booting");
     setErrMsg("");
+    const fail = (msg: string) => { if (alive()) { setStatus("error"); setErrMsg(msg); } };
+
+    if (!useWs) {
+      const blocker = webContainerBlocker(apiKey);
+      if (blocker === "needs-key") { setStatus("needs-key"); return; }
+      if (blocker) { fail(blocker.error); return; }
+    }
+
     try {
+      const view = await createTerminalView(el, { theme: appThemeRef.current, fontSize: fontRef.current, convertEol: !useWs });
+      if (!alive()) { view.dispose(); return; }
+      viewRef.current = view;
+      view.term.attachCustomKeyEventHandler((e) => {
+        if (e.type !== "keydown") return true;
+        const mod = e.ctrlKey || e.metaKey;
+        if (mod && e.shiftKey && e.code === "KeyF") { setSearchOpen(true); return false; }
+        if (mod && e.shiftKey && e.code === "KeyC") {
+          const sel = view.term.getSelection();
+          if (sel) void navigator.clipboard?.writeText(sel).catch(() => {});
+          return false;
+        }
+        if (mod && e.shiftKey && e.code === "Equal") { setFont(fontRef.current + 1); return false; }
+        if (mod && e.shiftKey && e.code === "Minus") { setFont(fontRef.current - 1); return false; }
+        if (mod && e.shiftKey && e.code === "Digit0") { setFont(FONT_DEFAULT); return false; }
+        return true;
+      });
+
+      const cb = {
+        onReady: () => { if (alive()) setStatus("ready"); },
+        onError: fail,
+        onClosed: () => { if (alive()) setStatus("closed"); },
+      };
       const cleanup = useWs
-        ? await bootWsTerminal(
-            containerRef.current, wsUrl, appThemeRef.current,
-            () => setStatus("ready"),
-            (msg) => { setStatus("error"); setErrMsg(msg); },
-          )
-        : await bootWcTerminal(
-            containerRef.current, apiKey, appThemeRef.current,
-            () => setStatus("ready"),
-            (msg) => { setStatus("error"); setErrMsg(msg); },
-            () => setStatus("needs-key"),
-            /* Bağlı repoyu WebContainer'a getir → gerçek kod tabanında çalış. */
-            async () => {
-              const store = useStore.getState();
-              const r = store.repo;
-              if (!r || !store.tree) return [];
-              const treeItems = treeBlobs(store.tree);
-              const activeRepo = store.config.activeRepo || "";
-              if (resolveRepoProvider(r, activeRepo) === "gitlab") {
-                return await fetchAllGitLabFiles(r.owner, r.repo, r.branch, treeItems, await store.tokenForRepo(activeRepo, "gitlab"));
-              }
-              return await fetchAllFiles(r.owner, r.repo, r.branch, treeItems, await store.tokenForRepo(activeRepo, "github"));
-            },
-          );
+        ? connectWs(view, wsUrl, cb)
+        : await connectWebContainer(view, apiKey, cb, loadConnectedRepoFiles);
+      if (!alive()) { cleanup(); return; }
       cleanupRef.current = cleanup;
     } catch (e) {
-      setStatus("error");
-      setErrMsg((e as Error).message);
+      fail((e as Error).message);
     }
   };
 
@@ -407,14 +157,59 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
        doğrudan çağırmak yerine bir tık erteleyerek "cascading render" uyarısını
        önleriz (davranış aynı — terminal yine mount'ta başlar). */
     const id = setTimeout(() => { void boot(); }, 0);
-    return () => { clearTimeout(id); cleanupRef.current?.(); };
+    return () => { clearTimeout(id); cancelBoot(); teardown(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const restart = () => {
-    cleanupRef.current?.();
-    cleanupRef.current = null;
-    boot();
+    teardown();
+    void boot();
+  };
+
+  /* ── Yükseklik: üst kenardan sürükle, cihazda hatırla ── */
+  const onDragStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = maximized ? Math.round(window.innerHeight * 0.8) : height;
+    setMaximized(false);
+    let last = startH;
+    const move = (ev: PointerEvent) => {
+      last = clampHeight(startH + (startY - ev.clientY), window.innerHeight);
+      setHeight(last);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      writePref(HEIGHT_KEY, last);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+  const nudgeHeight = (delta: number) => {
+    const next = clampHeight(height + delta, window.innerHeight);
+    setHeight(next);
+    writePref(HEIGHT_KEY, next);
+  };
+
+  /* ── Arama ── */
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+  const find = (dir: "next" | "prev") => {
+    const s = viewRef.current?.search;
+    if (!s || !query) return;
+    if (dir === "next") s.findNext(query);
+    else s.findPrevious(query);
+  };
+  const closeSearch = () => {
+    setSearchOpen(false);
+    viewRef.current?.search.clearDecorations();
+    viewRef.current?.term.focus();
+  };
+
+  const clearScreen = () => {
+    viewRef.current?.term.clear();
+    viewRef.current?.term.focus();
   };
 
   const mountFolder = async () => {
@@ -442,155 +237,178 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
     restart();
   };
 
-  const modeLabel = useWs
-    ? `Uzak (${(() => { try { return new URL(wsUrl).hostname; } catch { return "ws"; } })()})`
-    : "WebContainer";
+  const panelHeight = maximized ? "80dvh" : `${Math.max(HEIGHT_MIN, height)}px`;
+  /* Engelleyici durumlar terminali örter; açılış sırasında ise xterm görünür kalır
+     (WebContainer mount ilerlemesini oraya yazar) ve yalnız küçük bir rozet çıkar. */
+  const overlay = status === "needs-key" || status === "error";
+  const hasTerm = status === "ready" || status === "closed";
 
   return (
     <div
-      className="h-64 shrink-0 border-t border-line/60 flex flex-col"
-      style={{ backgroundColor: appTheme === "light" ? "#23271f" : "#12140f" }}
+      className="shrink-0 border-t border-line/60 flex flex-col relative"
+      style={{ backgroundColor: terminalBackground(appTheme), height: panelHeight }}
     >
-      {/* Terminal toolbar */}
-      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-line/30 bg-black/20 shrink-0">
+      {/* Boyutlandırma tutamacı */}
+      <div
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Terminal yüksekliği"
+        aria-valuenow={Math.round(height)}
+        tabIndex={0}
+        onPointerDown={onDragStart}
+        onDoubleClick={() => setMaximized((m) => !m)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowUp") { e.preventDefault(); nudgeHeight(24); }
+          if (e.key === "ArrowDown") { e.preventDefault(); nudgeHeight(-24); }
+        }}
+        className="absolute -top-1 left-0 right-0 h-2 cursor-row-resize z-10 hover:bg-brand/30 focus-visible:bg-brand/40 transition-colors"
+      />
+
+      {/* Araç çubuğu */}
+      <div className="flex items-center gap-1 px-3 py-1 border-b border-line/30 bg-black/20 shrink-0">
         <Power size={11} className={
           status === "ready" ? "text-green" :
           status === "booting" ? "text-yellow animate-pulse" :
-          status === "error" ? "text-red" : "text-white/30"
+          status === "error" || status === "closed" ? "text-red" : "text-white/30"
         } />
-        <span className="text-[11px] font-mono text-white/50 truncate max-w-[140px]">
-          {modeLabel} · {
-            status === "ready" ? "hazır" :
-            status === "booting" ? "bağlanıyor…" :
-            status === "error" ? "hata" :
-            status === "needs-key" ? "key gerekli" : "boşta"
-          }
+        <span className="ml-1 text-[11px] font-mono text-white/50 truncate max-w-[260px]" title={`${modeLabel} · ${STATUS_LABEL[status]}`}>
+          {modeLabel} · {STATUS_LABEL[status]}
         </span>
         {!useWs && mountedFolder && (
           <button
             onClick={unmountFolder}
             title="Klasörü kaldır"
-            className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-green/15 hover:bg-green/25 text-green/90 font-mono transition-colors"
+            className="ml-1 flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-green/15 hover:bg-green/25 text-green/90 font-mono transition-colors"
           >
             <FolderOpen size={10} /> {mountedFolder} <X size={9} className="opacity-60" />
           </button>
         )}
+        {status === "closed" && (
+          <button onClick={restart} className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-yellow/15 hover:bg-yellow/25 text-yellow transition-colors">
+            Yeniden bağlan
+          </button>
+        )}
         <div className="flex-1" />
+        <button onClick={() => setSearchOpen((o) => !o)} disabled={!hasTerm} title="Ara (Ctrl+Shift+F)" aria-label="Terminalde ara" className={iconBtn}>
+          <Search size={11} />
+        </button>
+        <button onClick={clearScreen} disabled={!hasTerm} title="Ekranı temizle" aria-label="Ekranı temizle" className={iconBtn}>
+          <Eraser size={11} />
+        </button>
         {codespaceHref && (
-          <a
-            href={codespaceHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={`GitHub Codespaces'te aç — ${repo!.owner}/${repo!.repo}`}
-            className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors"
-          >
+          <a href={codespaceHref} target="_blank" rel="noopener noreferrer" title={`GitHub Codespaces'te aç — ${repo!.owner}/${repo!.repo}`} className={iconBtn}>
             <Cloud size={11} />
           </a>
         )}
         {!useWs && (
-          <button
-            onClick={mountFolder}
-            disabled={mounting}
-            aria-label="Yerel klasör mount et"
-            title={mountedFolder ? "Başka klasör seç" : "Yerel klasör mount et"}
-            className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors disabled:opacity-30"
-          >
+          <button onClick={mountFolder} disabled={mounting} aria-label="Yerel klasör mount et" title={mountedFolder ? "Başka klasör seç" : "Yerel klasör mount et"} className={iconBtn}>
             {mounting ? <Loader2 size={11} className="animate-spin" /> : <FolderOpen size={11} />}
           </button>
         )}
-        <button onClick={() => setSettingsOpen(true)} title="Terminal ayarları" className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors">
+        <button onClick={() => setSettingsOpen(true)} title="Terminal ayarları" aria-label="Terminal ayarları" className={iconBtn}>
           <SettingsIcon size={11} />
         </button>
-        <button onClick={restart} title="Yeniden başlat" className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors">
+        <button onClick={restart} title="Yeniden başlat" aria-label="Yeniden başlat" className={iconBtn}>
           <RefreshCw size={11} />
         </button>
-        <button onClick={onClose} title="Kapat" className="text-white/40 hover:text-white/80 p-1 rounded transition-colors">
+        <button onClick={() => setMaximized((m) => !m)} title={maximized ? "Küçült" : "Büyüt"} aria-label={maximized ? "Küçült" : "Büyüt"} className={iconBtn}>
+          {maximized ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
+        </button>
+        <button onClick={onClose} title="Kapat" aria-label="Terminali kapat" className={iconBtn}>
           <X size={12} />
         </button>
       </div>
 
-      {/* Status overlays */}
-      {status === "needs-key" && (
-        <div className="flex-1 grid place-items-center px-6">
-          <div className="text-center max-w-md">
-            <p className="text-xs font-semibold text-white/80 mb-1.5">WebContainer API key gerekli</p>
-            <p className="text-[11px] text-white/40 leading-relaxed mb-3">
-              Bu domain&apos;de terminal çalışmak için ücretsiz bir key istiyor.{" "}
-              <a href="https://webcontainer.io/enterprise" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
-                webcontainer.io
-              </a>
-              {" "}üzerinden al → Ayarlar → Geliştirici.{" "}
-              <strong className="text-white/60">Ya da kendi sunucunu bağla (Ayarlar → Terminal).</strong>
-            </p>
-            <div className="flex items-center justify-center gap-2 flex-wrap">
-              <button onClick={() => setSettingsOpen(true)} className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-[#111110] hover:bg-branddim transition-colors font-semibold">
-                <SettingsIcon size={11} /> Ayarlar
-              </button>
-              {codespaceHref && (
-                <a href={codespaceHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white/70 hover:text-white/90 transition-colors font-semibold">
-                  <Cloud size={11} /> Codespaces&apos;te aç
-                </a>
-              )}
-            </div>
-          </div>
+      {/* Arama çubuğu */}
+      {searchOpen && (
+        <div className="flex items-center gap-1 px-3 py-1 border-b border-line/30 bg-black/30 shrink-0">
+          <Search size={11} className="text-white/40" />
+          <input
+            ref={searchInputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); find(e.shiftKey ? "prev" : "next"); }
+              if (e.key === "Escape") { e.preventDefault(); closeSearch(); }
+            }}
+            placeholder="Çıktıda ara… (Enter: sonraki, Shift+Enter: önceki)"
+            aria-label="Terminal çıktısında ara"
+            className="flex-1 min-w-0 bg-transparent text-[11px] font-mono text-white/80 placeholder:text-white/30 outline-none"
+          />
+          <button onClick={() => find("prev")} title="Önceki" aria-label="Önceki eşleşme" className={iconBtn}><ChevronUp size={12} /></button>
+          <button onClick={() => find("next")} title="Sonraki" aria-label="Sonraki eşleşme" className={iconBtn}><ChevronDown size={12} /></button>
+          <button onClick={closeSearch} title="Kapat (Esc)" aria-label="Aramayı kapat" className={iconBtn}><X size={11} /></button>
         </div>
       )}
 
-      {status === "error" && (
-        <div className="flex-1 grid place-items-center px-6">
-          <div className="text-center max-w-md">
-            <p className="text-xs text-red mb-1.5">Terminal başlatılamadı</p>
-            <p className="text-[11px] text-white/40 leading-relaxed mb-3">{errMsg}</p>
-            <div className="flex items-center justify-center gap-2 flex-wrap">
-              {useWs ? (
-                <button onClick={() => setSettingsOpen(true)} className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-[#111110] hover:bg-branddim transition-colors font-semibold">
-                  <SettingsIcon size={11} /> Ayarlar
-                </button>
-              ) : codespaceHref ? (
-                <a href={codespaceHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-[#111110] hover:bg-branddim transition-colors font-semibold">
-                  <Cloud size={11} /> Codespaces&apos;te aç
-                </a>
-              ) : (
-                <button onClick={() => setSettingsOpen(true)} className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-[#111110] hover:bg-branddim transition-colors font-semibold">
-                  <SettingsIcon size={11} /> Sunucu bağla
-                </button>
-              )}
-              <button onClick={restart} className="text-[11px] px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white/60 transition-colors">
-                Tekrar dene
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="flex-1 min-h-0 relative">
+        <div
+          ref={containerRef}
+          role="group"
+          aria-label={`Terminal — ${modeLabel}`}
+          className={`absolute inset-0 px-2 py-1 ${overlay ? "invisible" : ""}`}
+        />
 
-      {status === "booting" && (
-        <div className="flex-1 grid place-items-center">
-          <div className="flex items-center gap-2 text-xs text-white/40">
-            <Loader2 size={13} className="animate-spin" />
-            {useWs ? "Uzak sunucuya bağlanılıyor…" : "WebContainer başlatılıyor (5-10 sn sürebilir)…"}
-          </div>
-        </div>
-      )}
+        {overlay && (
+          <div className="absolute inset-0 grid place-items-center px-6 overflow-auto">
+            {status === "needs-key" && (
+              <div className="text-center max-w-md">
+                <p className="text-xs font-semibold text-white/80 mb-1.5">WebContainer API key gerekli</p>
+                <p className="text-[11px] text-white/40 leading-relaxed mb-3">
+                  Bu domain&apos;de terminal çalışmak için ücretsiz bir key istiyor.{" "}
+                  <a href="https://webcontainer.io/enterprise" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
+                    webcontainer.io
+                  </a>
+                  {" "}üzerinden al → Ayarlar → Geliştirici.{" "}
+                  <strong className="text-white/60">Ya da kendi sunucunu bağla (Ayarlar → Terminal).</strong>
+                </p>
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                  <button onClick={() => setSettingsOpen(true)} className={primaryBtn}>
+                    <SettingsIcon size={11} /> Ayarlar
+                  </button>
+                  {codespaceHref && (
+                    <a href={codespaceHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white/70 hover:text-white/90 transition-colors font-semibold">
+                      <Cloud size={11} /> Codespaces&apos;te aç
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
 
-      {status === "idle" && (
-        <div className="flex-1 grid place-items-center">
-          <div className="text-center space-y-2">
-            <p className="text-[11px] text-white/40">Terminal hazırlanıyor…</p>
-            {codespaceHref && (
-              <a href={codespaceHref} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white/60 transition-colors">
-                <ExternalLink size={11} /> Codespaces ile aç
+            {status === "error" && (
+              <div className="text-center max-w-md">
+                <p className="text-xs text-red mb-1.5">Terminal başlatılamadı</p>
+                <p className="text-[11px] text-white/40 leading-relaxed mb-3">{errMsg}</p>
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                  {!useWs && codespaceHref ? (
+                    <a href={codespaceHref} target="_blank" rel="noopener noreferrer" className={primaryBtn}>
+                      <Cloud size={11} /> Codespaces&apos;te aç
+                    </a>
+                  ) : (
+                    <button onClick={() => setSettingsOpen(true)} className={primaryBtn}>
+                      <SettingsIcon size={11} /> {useWs ? "Ayarlar" : "Sunucu bağla"}
+                    </button>
+                  )}
+                  <button onClick={restart} className="text-[11px] px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white/60 transition-colors">
+                    Tekrar dene
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {(status === "booting" || status === "idle") && (
+          <div className="absolute bottom-2 right-3 flex items-center gap-2 text-[11px] text-white/50 bg-black/40 rounded-md px-2 py-1">
+            <Loader2 size={12} className="animate-spin" />
+            {status === "idle" ? "Terminal hazırlanıyor…" : useWs ? "Uzak sunucuya bağlanılıyor…" : "WebContainer başlatılıyor (5-10 sn sürebilir)…"}
+            {codespaceHref && status === "idle" && (
+              <a href={codespaceHref} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-white/60 hover:text-white/90">
+                <ExternalLink size={11} /> Codespaces
               </a>
             )}
           </div>
-        </div>
-      )}
-
-      <div
-        ref={containerRef}
-        role="group"
-        aria-label={`Terminal — ${modeLabel}`}
-        className="flex-1 min-h-0 px-2 py-1"
-      />
+        )}
+      </div>
     </div>
   );
 }
