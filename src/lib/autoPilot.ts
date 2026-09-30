@@ -75,19 +75,41 @@ export function autoSwarm(text: string): boolean {
 }
 
 /* Güncellik sinyali: bugünün bilgisi/haber/fiyat/sürüm sorusu → web bağlamı.
-   Temkinli: kod/genel bilgi sorularında tetiklenmez. */
+   Temkinli: kod/genel bilgi sorularında tetiklenmez.
+
+   Web ön-araması cevabın BAŞLAMASINI bekletir (CoderView, 4.5 sn'ye kadar) —
+   bu yüzden yanlış pozitifin bedeli doğrudan gecikmedir. Eyl 2026 ölçümünde
+   "ürün kartlarında görsel, başlık, FİYAT ve sepete ekle…" diyen sıradan bir
+   tasarım isteği ve "ortamı KUR" gibi kurulum istekleri web araması
+   tetikliyordu: "fiyat" bir ürün alanı, "kur" ise bir fiil. Bu yüzden sinyaller
+   İKİYE ayrıldı:
+   - GÜÇLÜ (güncel/bugün/son sürüm/haber…): her uzunlukta geçerli.
+   - ZAYIF (fiyat/kur/döviz/dolar/borsa/maç…): yalnız KISA, soru biçimli
+     mesajlarda ("bitcoin fiyatı kaç?") — uzun bir tasarım/kod tarifinde değil.
+   Çıplak "kur" kaldırıldı; yalnız "kuru" (dolar kuru) sayılır. */
+const WEB_STRONG_RE = /\b(güncel|bugün|şu an(da)?|son (sürüm|dakika|haber)|en yeni|haber|hava (durumu|nasıl)|kim kazandı|ne zaman çık)\b/;
+const WEB_WEAK_RES: RegExp[] = [
+  /\b(fiyat[ıi]?|kuru|piyasa|döviz|maç|skor)\b/,
+  /\b(dolar|euro|avro|sterlin|\$|€|£)\b/,
+  /\b(gram altın|çeyrek altın|tam altın|gram gümüş|ons)\b/,
+  /\b(bitcoin|btc|ethereum|eth|kripto|dogecoin|solana)\b/,
+  /\b(borsa|bist|nasdaq|hisse|faiz|enflasyon)\b/,
+  /\b(kaç (tl|lira|dolar|euro)|ne kadar (tl|lira|dolar|euro))\b/,
+];
+const WEB_WEAK_MAX_CHARS = 160;
+/* Kodlama/ürün-yapma bağlamı: "kartta FİYAT göster", "ödeme formuna dolar simgesi
+   ekle" gibi cümlelerde zayıf sinyal bir canlı-veri sorusu DEĞİL, bir arayüz/veri
+   alanıdır. Kelime köküne bakar (Türkçe ekler için `\p{L}*`; `\b` Türkçe
+   karakterlerde çalışmadığından Unicode sınır kullanılır). */
+const CODING_CONTEXT_RE = /(?<![\p{L}])(göster|ekle|oluştur|tasarla|kodla|sayfa|bileşen|component|fonksiyon|api|endpoint|form|buton|kart|tablo|sütun|değişken|state|hook|yaz|yap|kur(?:ul|ar|arım|mak)|sepet|ürün)\p{L}*/u;
 export function autoWeb(text: string): boolean {
   const t = (text || "").trim().toLowerCase();
   if (t.length < 8) return false;
   if (/```/.test(t)) return false; // kod odaklı istek — web gereksiz
-  return /\b(güncel|bugün|şu an(da)?|son (sürüm|dakika|haber)|en yeni|fiyat[ıi]?|kur[uu]?|haber|hava (durumu|nasıl)|kim kazandı|ne zaman çık|piyasa|döviz|maç|skor)\b/.test(t)
-    /* Döviz / değerli metal / kripto / borsa — canlı veri gerektirir (kaç/ne kadar). */
-    || /\b(dolar|euro|avro|sterlin|\$|€|£)\b/.test(t)
-    || /\b(gram altın|çeyrek altın|tam altın|gram gümüş|ons)\b/.test(t)
-    || /\b(bitcoin|btc|ethereum|eth|kripto|dogecoin|solana)\b/.test(t)
-    || /\b(borsa|bist|nasdaq|hisse|faiz|enflasyon)\b/.test(t)
-    || /\b(kaç (tl|lira|dolar|euro)|ne kadar (tl|lira|dolar|euro))\b/.test(t)
-    || (/\b20(2[4-9]|3\d)\b/.test(t) && /\?/.test(t));
+  if (WEB_STRONG_RE.test(t)) return true;
+  if (/\b20(2[4-9]|3\d)\b/.test(t) && /\?/.test(t)) return true;
+  if (t.length > WEB_WEAK_MAX_CHARS || CODING_CONTEXT_RE.test(t)) return false;
+  return WEB_WEAK_RES.some((re) => re.test(t));
 }
 
 /* Derin araştırma: açıkça çok kaynaklı/kapsamlı rapor isteği. */

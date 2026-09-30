@@ -137,14 +137,14 @@ import { detectSensitive } from "@/lib/pii";
 import { planRewind, planTouchesFiles } from "@/lib/rewind";
 import { isOfficeFile } from "@/lib/office";
 import { friendlyError } from "@/lib/friendlyError";
-import { autoEffort, autoSwarm, decidePilot, decidePilotAsync, type PilotDecision } from "@/lib/autoPilot";
+import { autoEffort, autoSwarm, decidePilot, type PilotDecision } from "@/lib/autoPilot";
 import { pickDraftModels, buildBoostInstruction, generateDrafts, fillSelfConsistency, judgeDrafts } from "@/lib/boost";
 import { runCompare } from "@/lib/compare";
 import { fetchTextModels } from "@/lib/pollinations";
 import { importSkillFromUrl, parseSkillIntent, skillFromText } from "@/lib/skillImport";
 import { trackEvent } from "@/lib/analytics";
 import { retrieve } from "@/lib/retrieval";
-import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
+import { PLATFORM_KNOWLEDGE, PLATFORM_KNOWLEDGE_BRIEF, buildEnvironmentBlock, needsPlatformKnowledge } from "@/lib/platform-knowledge";
 import { CRAFT_OPERATING_MANUAL } from "@/lib/constants";
 import { addPendingAction, removePendingAction, isCommandAllowed, matchDangerousCommand, DEFAULT_COMMAND_ALLOWLIST, type PendingAction } from "@/lib/agentActions";
 import { FEATURES } from "@/lib/features";
@@ -2179,25 +2179,16 @@ export function CoderView() {
     const pilotEnabled = isAdminNow ? store.config.autoPilot !== false : true;
     const pilotRepoCtx = !!store.repo || !!(store.config.localMode && store.config.localBridgeUrl?.trim());
     const pilotShouldRun = pilotEnabled && !opts?.continuation && !overrideAgent;
-    /* H6 — "ilk mesajda çok geç cevap veriyor". Pilot turu (/api/route-plan)
-       ilk token'dan ÖNCE, seri olarak bekleniyor. O uç AYRI bir lambda: sohbetin
-       ilk mesajında kendi soğuk açılışını da yaşıyor ve tipik bir ilk mesaj
-       (60-300 karakter) `pilotConfidence`'tan geçemediği için bu tur neredeyse
-       her zaman çalışıyordu. Sohbetin İLK mesajında artık ağa hiç çıkılmıyor;
-       aynı kararlar senkron regex yoluyla (decidePilot — zaten dokümante edilmiş
-       güvenli yedek) anında veriliyor. Sonraki mesajlarda lambda ısınmış olur ve
-       LLM-tabanlı yönlendirme eskisi gibi devreye girer. */
-    const userTurns = (store.current()?.messages ?? []).filter((m) => m.role === "user").length;
-    const isFirstTurn = userTurns <= 1;
-    const pilot: PilotDecision | null = !pilotShouldRun
-      ? null
-      : isFirstTurn
-        ? decidePilot(_lastUserText, { hasRepo: pilotRepoCtx })
-        : await decidePilotAsync(
-            _lastUserText,
-            { hasRepo: pilotRepoCtx },
-            { baseUrl: active.baseUrl, model: active.model, apiKey: await usableApiKey(active) },
-          );
+    /* Pilot kararı HER ZAMAN senkron regex yolundan (decidePilot) ve anında
+       verilir — cevabı başlatmadan önce ağa ÇIKILMAZ. Eskiden 2. mesajdan
+       itibaren regex'in emin olmadığı mesajlarda (300+ karakter: hata çıktısı,
+       kod yapıştırma — kodlayıcı için en yaygın durum) /api/route-plan'a ayrı bir
+       LLM çağrısı yapılıyor, ilk token'dan ÖNCE 4 sn'ye kadar bekleniyordu
+       (Eyl 2026 kullanıcı kararı: "modeller anında cevap versin"). LLM-tabanlı
+       decidePilotAsync korunuyor ama artık çağrılmıyor. */
+    const pilot: PilotDecision | null = pilotShouldRun
+      ? decidePilot(_lastUserText, { hasRepo: pilotRepoCtx })
+      : null;
     setLastPilot(pilot);
     /* Ajan Ekibi: elle çip artık yok — yalnız Otomatik Pilot'un kararına
        (ya da Pilot devre dışıysa eski regex yedeğine) bağlı. */
@@ -2525,18 +2516,34 @@ export function CoderView() {
        Eskiden HER İKİ sağlayıcının AKTİF hesabının token'ı çekilip aralarından
        seçiliyordu; artık deponun kendi hesabına bağlı token alınır (bkz.
        tokenForRepo) — birden çok hesap bağlıyken doğru olan budur. */
-    const repoToken = await store.tokenForRepo(activeRepo, repoIsGitLab ? "gitlab" : "github");
+    /* Cevabı başlatmadan önce gereken üç bağımsız iş PARALEL yürür (eskiden art
+       arda bekleniyordu: token → web araması → hafıza). Toplam bekleme artık
+       toplam değil, EN YAVAŞ olanın süresi; ikisi de kısa zaman aşımına bağlı
+       (web 4,5 sn, hafıza 0,5 sn) — yavaş/sessiz kalan bir uç cevabı tutmaz. */
+    const tokenP = store.tokenForRepo(activeRepo, repoIsGitLab ? "gitlab" : "github");
 
     /* Web search pre-fetch: when searchOn, fetch Jina results before sending to AI */
-    let webSearchContext = "";
+    const webP: Promise<string> = wantWeb
+      ? fetch(`/api/web-search?q=${encodeURIComponent(lastUserMsg?.content ?? "")}`, { signal: AbortSignal.timeout(4500) })
+          .then((r) => (r.ok ? r.text() : ""))
+          .catch(() => "" /* ignore — continue without search */)
+      : Promise.resolve("");
+
+    /* Yerel Anlamsal Hafıza (bkz. lib/memory.ts): geçmiş konuşma parçalarından
+       bu turun sorgusuna BM25 ile en ilgili k'sını getirir. Anahtarsız/LLM
+       çağrısı olmadan çalışır — autoMemory'nin (fact-extraction) aksine hiçbir
+       modele bağlı değil, yalnızca IndexedDB desteğine (hasIndexedDB) bağlı. */
+    const memoryP: Promise<string> = store.config.semanticMemoryEnabled
+      ? Promise.race([
+          import("@/lib/memory")
+            .then(({ memoryRetrieve }) => memoryRetrieve(lastUserMsg?.content ?? "", 5))
+            .then((hits) => (hits.length ? hits.map((h) => `- ${h.content}`).join("\n") : "")),
+          new Promise<string>((res) => setTimeout(() => res(""), 500)),
+        ]).catch(() => "" /* sessiz — hafıza olmadan devam */)
+      : Promise.resolve("");
+
+    const [repoToken, webSearchContext, memoryContext] = await Promise.all([tokenP, webP, memoryP]);
     if (wantWeb) {
-      const userQuery = lastUserMsg?.content ?? "";
-      try {
-        const wsr = await fetch(`/api/web-search?q=${encodeURIComponent(userQuery)}`, {
-          signal: AbortSignal.timeout(12000),
-        });
-        if (wsr.ok) webSearchContext = await wsr.text();
-      } catch { /* ignore — continue without search */ }
       /* Kaynakları metinden ayrıkla → yanıt altında "Kaynaklar" olarak göster. */
       const sources: { title: string; url: string }[] = [];
       for (const block of webSearchContext.split("\n\n")) {
@@ -2546,19 +2553,6 @@ export function CoderView() {
         if (url && title && sources.length < 8 && !sources.some((s) => s.url === url)) sources.push({ title, url });
       }
       if (sources.length) store.setSourcesOnLast(sources);
-    }
-
-    /* Yerel Anlamsal Hafıza (bkz. lib/memory.ts): geçmiş konuşma parçalarından
-       bu turun sorgusuna BM25 ile en ilgili k'sını getirir. Anahtarsız/LLM
-       çağrısı olmadan çalışır — autoMemory'nin (fact-extraction) aksine hiçbir
-       modele bağlı değil, yalnızca IndexedDB desteğine (hasIndexedDB) bağlı. */
-    let memoryContext = "";
-    if (store.config.semanticMemoryEnabled) {
-      try {
-        const { memoryRetrieve } = await import("@/lib/memory");
-        const hits = await memoryRetrieve(lastUserMsg?.content ?? "", 5);
-        if (hits.length) memoryContext = hits.map((h) => `- ${h.content}`).join("\n");
-      } catch { /* sessiz — hafıza olmadan devam */ }
     }
 
     /* Devam modunda full mevcut içerikten başlar → akış aynı baloncuğa eklenir. */
@@ -2710,6 +2704,7 @@ export function CoderView() {
             url: s.url,
             headers: s.headers,
             enabled: s.enabled,
+            name: s.name,
           })),
         }),
       });
@@ -2723,9 +2718,21 @@ export function CoderView() {
          sessizce çalışmaz, model repodan/araçlardan habersiz kalır). */
       if (active.provider === "pollinations" && !toolsEnabled && !wantWeb && !wantImageGen && !wantMcp) {
         /* Bağlam blokları sunucu (/api/chat) ile ORTAK tek kaynaktan gelir →
-           Pollinations kullanıcıları da aynı, eksiksiz bağlamı alır. PLATFORM_KNOWLEDGE
-           eklenir ki bu sağlayıcıdaki model de platformun farkında olsun. */
-        const sysContent = finalSystemPrompt + "\n\n" + PLATFORM_KNOWLEDGE + buildContextSections({
+           Pollinations kullanıcıları da aynı, eksiksiz bağlamı alır. Platform
+           bilgisi sunucudaki gibi İKİ KADEMELİ: kısa dizin + canlı [Ortam] bloğu
+           her mesajda, ~9 KB'lik tam rehber yalnız soru arayüz/platform hakkındaysa.
+           (Eskiden her mesaja tam rehber gidiyordu — varsayılan ücretsiz modelin
+           ilk-token gecikmesini gereksiz büyütüyordu.) */
+        const envBlock = buildEnvironmentBlock({
+          repo: repo ? { owner: repo.owner, repo: repo.repo, branch: repo.branch, provider: repoIsGitLab ? "gitlab" : "github" }
+            : localActive ? { owner: "local", repo: "local", provider: "local" } : null,
+          localBridge: localActive,
+          toolsOn: false,
+          terminal: localActive || !!(store.config.terminalWsUrl?.trim()) || terminalSupported,
+          mcpNames: [],
+        });
+        const sysContent = finalSystemPrompt + "\n\n" + PLATFORM_KNOWLEDGE_BRIEF + "\n\n" + envBlock
+          + (needsPlatformKnowledge(_lastUserText) ? "\n\n" + PLATFORM_KNOWLEDGE : "") + buildContextSections({
           style: store.config.style,
           memories: store.config.memories,
           skills: activeSkills,

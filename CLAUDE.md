@@ -125,6 +125,32 @@ Claude Code web; opencode'un TUI görünümü DEĞİL). Yapılanlar:
   artık admin'e özel değil. Admin'e özel kalan: Otomatik Pilot anahtarı,
   AdminAnalytics/AdminUsers.
 - Mobil alt sekme: Sohbet / Ayarlar (+ Stüdyo yalnız `studioEnabled()` iken).
+- **Hız — "modeller anında cevap versin"** (Eyl 2026): cevabın İLK parçasından
+  önce beklenen ağ adımları kesildi. (a) Pilot kararı HER ZAMAN senkron
+  `decidePilot`'tan gelir; LLM'li `decidePilotAsync` (300+ karakterli her mesajda
+  `/api/route-plan`, 4 sn'ye kadar) korunuyor ama ARTIK ÇAĞRILMIYOR. (b) `autoWeb`:
+  zayıf sinyaller (fiyat/kur/döviz/dolar/borsa/maç…) yalnız KISA (≤160) ve
+  kodlama-bağlamsız mesajlarda web aratır; çıplak "kur" (fiil) kaldırıldı — yoksa
+  "kartta fiyat göster" / "ortamı kur" web araması tetikliyordu. (c) `CoderView`
+  token + web ön-araması (4,5 sn) + anlamsal hafıza (0,5 sn) `Promise.all` ile
+  PARALEL. (d) `/api/chat`: SOUL/AGENTS.md, package.json, .gitignore, dosya ağacı
+  aynı anda çekilir (prompta eklenme SIRASI aynı → prompt caching bozulmaz); MCP
+  araç listesi 60 sn önbellekli, başarısızlık 20 sn negatif önbellekli, zaman aşımı
+  2,5 sn (yavaş/kapalı bir eklenti — ör. Laya yüklenirken — her mesajı bekletmesin).
+  Playwright ölçümü (sahte uçlar, ilk cevap süresi): hata çıktısı yapıştırma
+  3139→108 ms, tasarım tarifi 1615→122 ms, kısa mesaj ~105 ms (değişmedi). NOT:
+  kalite kademesi (`qualityTier`) zaten varsayılan `"off"` — ağır iç-taslak hattı
+  varsayılan olarak çalışmaz; `[KALİTE MODU]` istemi yalnız kademe açıksa eklenir.
+- **Platform farkındalığı** (opencode gibi model ortamını bilir): `lib/
+  platform-knowledge.ts` rehberi `FEATURES`'tan KURAR (`buildPlatformBrief` /
+  `buildPlatformKnowledge`): rafa kalkan yüzeyler anlatılmaz, "Şu an KAPALI"
+  notuyla söylenir; anahtar açılınca eski bölümler geri gelir. Her istekte kısa
+  dizin + canlı `[Ortam]` bloğu (`buildEnvironmentBlock`: bugünün tarihi, proje/
+  dal, araçlar açık mı, terminal, bağlı MCP adları — ~100 token); ~9 KB tam rehber
+  yalnız arayüz sorusunda (`needsPlatformKnowledge`), tarayıcıdaki doğrudan-
+  Pollinations yolunda da (eskiden her mesaja 17 KB). Repo modunda proje kuralı
+  adayları: SOUL.md → .craft.md → .craftai.md → AGENTS.md → CLAUDE.md. Yeni bir
+  menü/özellik/sekme eklediğinde `platform-knowledge.ts`'i güncelle (test kilitli).
 - **Ücretsiz modeller renkle** (`lib/freeModels.ts` → `isFreeModel`/`FREE_PROVIDERS`/
   `FREE_MODEL_CLASS` = `text-cyan`): model etiketlerinde "(Ücretsiz)" YAZMAZ;
   ücretsiz olanlar (anahtarsız/ücretsiz katmanlı sağlayıcılar + `:free` sonekli
