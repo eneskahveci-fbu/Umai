@@ -63,7 +63,7 @@ function throttle(key, minMs) {
 
 async function post(url, headers, body, timeoutMs, minIntervalMs = 0) {
   let last;
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < 8; attempt++) {
     await throttle(new URL(url).host, minIntervalMs);
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), timeoutMs);
@@ -72,6 +72,8 @@ async function post(url, headers, body, timeoutMs, minIntervalMs = 0) {
       const txt = await res.text();
       if (res.ok) return JSON.parse(txt);
       last = new Error(`HTTP ${res.status}: ${txt.slice(0, 300)}`);
+      const ra = Number(res.headers.get("retry-after"));
+      if (res.status === 429 && ra > 0) last.retryAfterMs = Math.min(ra, 120) * 1000 + 2000;
       if (res.status !== 429 && res.status < 500) throw last;
     } catch (e) {
       last = e.name === "AbortError" ? new Error(`zaman aşımı (${timeoutMs / 1000}s)`) : e;
@@ -79,7 +81,7 @@ async function post(url, headers, body, timeoutMs, minIntervalMs = 0) {
     } finally {
       clearTimeout(t);
     }
-    await sleep(/^HTTP 429/.test(last?.message ?? "") ? 30000 : 1500 * 2 ** attempt);
+    await sleep(last?.retryAfterMs ?? (/^HTTP 429/.test(last?.message ?? "") ? 30000 : 1500 * 2 ** attempt));
   }
   throw last;
 }
