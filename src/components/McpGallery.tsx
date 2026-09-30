@@ -5,6 +5,7 @@ import { Check, ChevronDown, Loader2, Play, Trash2 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { MCP_CATALOG, type McpCatalogEntry } from "@/lib/mcpCatalog";
 import type { McpServer } from "@/lib/types";
+import { FREE_MODEL_CLASS, isFreeModel } from "@/lib/freeModels";
 
 /* Uygulama Bağlantıları galerisi — ExtensionsSettings.tsx (Ayarlar → Eklentiler)
    VE ExtensionStoreModal.tsx (Sidebar → Eklentiler, Settings'i açmadan hızlı
@@ -43,6 +44,26 @@ export function McpGallery() {
     if (existing) {
       updateMcpServer(existing.id, { enabled: !existing.enabled });
       addToast(existing.enabled ? `${entry.name} kapatıldı` : `${entry.name} açıldı`, "info");
+      return;
+    }
+    if (entry.bridgePath) {
+      /* Köprüde çalışan yerel sunucu: adres/token Ayarlar → Terminal & Sunucu'daki
+         hibrit köprüden gelir (aynı sunucu, aynı token). */
+      const base = config.localBridgeUrl?.trim().replace(/\/$/, "");
+      const token = config.localBridgeToken?.trim();
+      addMcpServer({
+        name: entry.name,
+        url: base ? `${base}${entry.bridgePath}` : "",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        enabled: true,
+        catalogId: entry.id,
+      });
+      addToast(
+        base
+          ? `${entry.name} açıldı — sunucunda kurulu olmalı (deploy/oracle/setup-laya.sh).`
+          : `${entry.name} açıldı — önce Ayarlar → Terminal & Sunucu'da hibrit sunucunu bağla, sonra adresi aşağıya gir.`,
+        base ? "success" : "info",
+      );
       return;
     }
     addMcpServer({ name: entry.name, url: entry.builtinUrl ?? "", enabled: true, catalogId: entry.id });
@@ -117,6 +138,9 @@ export function McpGallery() {
               {e.builtinUrl && (
                 <span className="self-start text-[9.5px] font-semibold text-brand bg-brand/10 border border-brand/20 px-1.5 py-0.5 rounded">Yerleşik</span>
               )}
+              {e.bridgePath && (
+                <span className="self-start text-[9.5px] font-semibold text-cyan bg-cyan/10 border border-cyan/20 px-1.5 py-0.5 rounded" title="Kendi hibrit sunucunda (Oracle) çalışır">Sunucunda</span>
+              )}
             </div>
           );
         })}
@@ -183,7 +207,7 @@ export function McpGallery() {
                               onChange={() => toggleModelAllowed(srv, m.id)}
                               className="accent-brand"
                             />
-                            {m.label || m.model}
+                            <span className={isFreeModel(m.provider, m.model) ? FREE_MODEL_CLASS : undefined}>{m.label || m.model}</span>
                           </label>
                         ))}
                       </div>

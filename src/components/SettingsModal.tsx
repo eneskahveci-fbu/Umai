@@ -83,6 +83,8 @@ async function usableKey(raw: string | undefined | null): Promise<string> {
 import { pickReplacementModel } from "@/lib/modelPicker";
 import { isPushSubscribed, pushSupported, subscribeToPush, unsubscribeFromPush } from "@/lib/sw-register";
 import type { Provider, ResponseStyle } from "@/lib/types";
+import { FEATURES } from "@/lib/features";
+import { FREE_MODEL_CLASS, FREE_MODEL_COLOR, FREE_PROVIDERS, isFreeModel } from "@/lib/freeModels";
 
 export type SettingsTab = "model" | "github" | "general" | "fusion" | "advanced" | "hooks" | "hesap" | "extensions" | "plan" | "hakkinda" | "kullanim";
 
@@ -232,9 +234,8 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   if (search !== prevSearch) {
     setPrevSearch(search);
     if (search.trim() && matchingTabs.size > 0) {
-      const adminOnly = new Set(["advanced", "hooks"]);
-      const first = (["model", "fusion", "github", "extensions", "general", "kullanim", "plan", "hakkinda", "advanced", "hooks", "hesap"] as const)
-        .find((k) => matchingTabs.has(k) && (isAdmin || !adminOnly.has(k)));
+      const first = (["model", "fusion", "github", "advanced", "hooks", "extensions", "general", "kullanim", "plan", "hakkinda", "hesap"] as const)
+        .find((k) => matchingTabs.has(k));
       if (first && first !== tab) { changeTab(first); setSearchJump(true); }
     }
   }
@@ -715,12 +716,12 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
     { key: "model", label: "Model", icon: Cpu, admin: false, group: undefined },
     { key: "fusion", label: "Kalite", icon: Sparkles, admin: false, group: undefined },
     { key: "github", label: "Git", icon: GitBranch, admin: false, group: "Çalışma Alanı" },
+    { key: "advanced", label: "Terminal & Sunucu", icon: Wrench, admin: false, group: undefined },
+    { key: "hooks", label: "Kancalar", icon: Webhook, admin: false, group: undefined },
     { key: "extensions", label: "Eklentiler", icon: Blocks, admin: false, group: undefined },
     { key: "general", label: "Genel", icon: SlidersHorizontal, admin: false, group: undefined },
     { key: "kullanim", label: "Kullanım", icon: BarChart3, admin: false, group: "Kullanım & Plan" },
     { key: "plan", label: "Plan", icon: Crown, admin: false, group: undefined },
-    { key: "advanced", label: "Geliştirici", icon: Wrench, admin: true, group: "Yönetici" },
-    { key: "hooks", label: "Kancalar", icon: Webhook, admin: true, group: undefined },
     { key: "hakkinda", label: "Hakkında", icon: Info, admin: false, group: undefined },
   ] as const;
   const visibleTabs = ALL_TABS.filter((t) => isAdmin || !t.admin);
@@ -901,7 +902,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   <button
                     key={p}
                     onClick={() => onProvider(p)}
-                    className={`px-2.5 py-1 rounded-full border text-[11px] font-semibold transition-colors ${provider === p ? "border-brand/50 bg-brand/12 text-brand" : "border-line/60 text-muted hover:text-ink hover:border-brand/30"}`}
+                    className={`px-2.5 py-1 rounded-full border text-[11px] font-semibold transition-colors ${provider === p ? "border-brand/50 bg-brand/12 text-brand" : `border-line/60 hover:text-ink hover:border-brand/30 ${FREE_PROVIDERS.has(p) ? FREE_MODEL_CLASS : "text-muted"}`}`}
                   >
                     {cleanLabel(p)}
                   </button>
@@ -913,7 +914,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 className="input-mono w-full mb-2.5"
               >
                 {(Object.keys(PRESETS) as Provider[]).map((p) => (
-                  <option key={p} value={p}>{PRESETS[p].label}</option>
+                  <option key={p} value={p} style={FREE_PROVIDERS.has(p) ? { color: FREE_MODEL_COLOR } : undefined}>{PRESETS[p].label}</option>
                 ))}
               </select>
               {QUICK_KEY_URL[provider] && (
@@ -1007,7 +1008,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   {fetchedModels.length > 0 ? (
                     <select value={model} onChange={(e) => setModel(e.target.value)} className="input-mono">
                       {!fetchedModels.includes(model) && model && <option value={model}>{model}</option>}
-                      {fetchedModels.map((m) => <option key={m} value={m}>{m}</option>)}
+                      {fetchedModels.map((m) => <option key={m} value={m} style={isFreeModel(provider, m) ? { color: FREE_MODEL_COLOR } : undefined}>{m}</option>)}
                     </select>
                   ) : (
                     <>
@@ -1050,6 +1051,12 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
             </div>
 
             {config.models.length > 0 && (
+              <p className="text-[11px] text-muted/60 mb-1.5 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-cyan shrink-0" />
+                <span><span className={FREE_MODEL_CLASS}>Bu renkteki</span> modeller ücretsiz (anahtarsız ya da ücretsiz katmanlı).</span>
+              </p>
+            )}
+            {config.models.length > 0 && (
               <div className="stagger flex flex-col gap-2 mb-4">
                 {config.models.map((m, mi) => {
                   const active = config.activeModelId === m.id;
@@ -1075,7 +1082,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                         </button>
                         <div className="flex-1 min-w-0">
                           {ed ? <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} className="input-mono !py-1 text-sm" /> : <>
-                            <div className="text-sm font-semibold truncate">{m.label}</div>
+                            <div className={`text-sm font-semibold truncate ${isFreeModel(m.provider, m.model) ? FREE_MODEL_CLASS : ""}`}>{m.label}</div>
                             <div className="text-xs text-muted font-mono truncate">{m.model}</div>
                             {badges.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-1">
@@ -1206,6 +1213,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                kafa karıştırıcıydı ("Model X seçili ama Pollinations kullanılıyor"
                raporu). Yalnız kullanıcının ZATEN eklediği (anahtarı olan)
                sağlayıcılar listelenir — "halihazırda var olan anahtarlarla". */}
+            {FEATURES.media && (
             <div className="rounded-xl border border-line p-3.5 bg-bgsoft/50">
               <div className="flex items-center justify-between gap-2 mb-1.5">
                 <div className="flex items-center gap-1.5">
@@ -1300,6 +1308,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                   deneyerek anlıyordu. */}
               <ImageModelPicker config={config} saveConfig={saveConfig} />
             </div>
+            )}
           </section>
         )}
 
@@ -1920,7 +1929,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                     >
                       <option value="">Varsayılan</option>
                       {config.models.map((m) => (
-                        <option key={m.id} value={m.id}>{m.label || m.model}</option>
+                        <option key={m.id} value={m.id} style={isFreeModel(m.provider, m.model) ? { color: FREE_MODEL_COLOR } : undefined}>{m.label || m.model}</option>
                       ))}
                     </select>
                   </label>
@@ -2093,7 +2102,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                       const selectedIds = config.qualityModelIds ?? [];
                       const selected = selectedIds.includes(m.id);
                       const atLimit = selectedIds.length >= 3;
-                      const free = KEYLESS_PROVIDERS.has(m.provider);
+                      const free = isFreeModel(m.provider, m.model);
                       return (
                         <label
                           key={m.id}
@@ -2112,8 +2121,8 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                             className="accent-brand shrink-0"
                           />
                           <span className="min-w-0 flex-1">
-                            <span className="text-sm font-semibold block truncate">{m.label}</span>
-                            <span className="text-[11px] text-muted/60">{m.provider}{free ? " · ücretsiz" : ""}</span>
+                            <span className={`text-sm font-semibold block truncate ${free ? FREE_MODEL_CLASS : ""}`}>{m.label}</span>
+                            <span className="text-[11px] text-muted/60">{m.provider}</span>
                           </span>
                         </label>
                       );
@@ -2196,8 +2205,7 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               </label>
             </div>
 
-            {/* WebContainer API key — yalnız admin */}
-            {isAdmin && (
+            {/* WebContainer API key */}
             <div>
               <h4 className="text-sm font-bold mb-1">WebContainer API Key</h4>
               <p className="text-xs text-muted/70 mb-2 leading-relaxed">
@@ -2218,10 +2226,8 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 autoComplete="off"
               />
             </div>
-            )}
 
-            {/* Hassas sunucu/terminal ayarları — yalnız admin görür (yeni kullanıcılar gizli) */}
-            {isAdmin && (
+            {/* Sunucu/terminal ayarları — Eyl 2026: herkese açık (coder odaklı ürün) */}
             <>
             {/* Hibrit Sunucu — tek adres hem terminal hem dosya sistemi kurar */}
             <div>
@@ -2349,7 +2355,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               />
             </div>
             </>
-            )}
 
             {/* Otomasyonlar (olaya bağlı komutlar — Claude Code hooks benzeri) */}
             <div>
@@ -2407,7 +2412,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               </button>
             </div>
 
-            {isAdmin && (
             <>
             {/* Yerel Mod (Local Bridge) */}
             <div>
@@ -2452,7 +2456,6 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               />
             </div>
             </>
-            )}
 
             {/* İstatistikler */}
             <div>

@@ -8,7 +8,7 @@ import { buildChainFor } from "@/lib/fallback";
 import { createReveal, type RevealController } from "@/lib/streamReveal";
 import { switchLeftPanel } from "@/lib/leftPanel";
 import { compactPlan } from "@/lib/contextWindow";
-import { filterMcpServersForModel } from "@/lib/mcpScope";
+import { filterMcpServersForModel, wantsMcpInChat } from "@/lib/mcpScope";
 import {
   ArrowDown,
   AlertTriangle,
@@ -147,6 +147,8 @@ import { retrieve } from "@/lib/retrieval";
 import { PLATFORM_KNOWLEDGE } from "@/lib/platform-knowledge";
 import { CRAFT_OPERATING_MANUAL } from "@/lib/constants";
 import { addPendingAction, removePendingAction, isCommandAllowed, matchDangerousCommand, DEFAULT_COMMAND_ALLOWLIST, type PendingAction } from "@/lib/agentActions";
+import { FEATURES } from "@/lib/features";
+import { FREE_MODEL_CLASS, isFreeModel } from "@/lib/freeModels";
 
 declare global {
   interface SpeechRecognition {
@@ -238,7 +240,7 @@ function MoreMenu({ active, children, placement = "top", icon, title = "Daha faz
   );
 }
 
-function MoreItem({ onClick, icon, label, desc, active, keepOpen }: { onClick: () => void; icon: React.ReactNode; label: string; desc?: string; active?: boolean; keepOpen?: boolean }) {
+function MoreItem({ onClick, icon, label, desc, active, keepOpen, labelClassName }: { onClick: () => void; icon: React.ReactNode; label: string; desc?: string; active?: boolean; keepOpen?: boolean; labelClassName?: string }) {
   return (
     <button
       onClick={keepOpen ? (e) => { e.stopPropagation(); onClick(); } : onClick}
@@ -248,7 +250,7 @@ function MoreItem({ onClick, icon, label, desc, active, keepOpen }: { onClick: (
     >
       <span className="shrink-0">{icon}</span>
       <span className="min-w-0">
-        <span className="block truncate">{label}</span>
+        <span className={`block truncate ${labelClassName ?? ""}`}>{label}</span>
         {desc && <span className="block text-[10px] text-muted/50 truncate">{desc}</span>}
       </span>
     </button>
@@ -277,10 +279,10 @@ function ModelSwitcher() {
       icon={
         <span className="flex items-center gap-1.5 text-sm" title={activeLabel}>
           <span className="w-1.5 h-1.5 rounded-full bg-green shrink-0" />
-          {/* Sabit 140px, telefonda tipik model adını kesiyordu ("✦ UMAI Default
-              (Ücretsiz)" 175px ister). Ekran genişliğine göre pay ver: 390px'lik
-              bir telefonda ~195px, sağdaki mod rozetine yer kalarak sığar. */}
-          <span className="truncate max-w-[50vw] sm:max-w-[200px] font-semibold text-ink">{activeLabel}</span>
+          {/* Sabit 140px, telefonda tipik model adını kesiyordu (~175px isteyen
+              adlar var). Ekran genişliğine göre pay ver: 390px'lik bir telefonda
+              ~195px, sağdaki mod rozetine yer kalarak sığar. */}
+          <span className={`truncate max-w-[50vw] sm:max-w-[200px] font-semibold ${active && isFreeModel(active.provider, active.model) ? FREE_MODEL_CLASS : "text-ink"}`}>{activeLabel}</span>
           <ChevronDown size={13} className="text-muted/50 shrink-0" />
         </span>
       }
@@ -293,6 +295,7 @@ function ModelSwitcher() {
           key={m.id}
           icon={m.id === config.activeModelId ? <Check size={13} className="text-brand" /> : <span className="w-[13px] grid place-items-center"><span className="w-1.5 h-1.5 rounded-full bg-muted/40" /></span>}
           label={m.label || m.model}
+          labelClassName={isFreeModel(m.provider, m.model) ? FREE_MODEL_CLASS : undefined}
           desc={m.provider}
           active={m.id === config.activeModelId}
           onClick={() => saveConfig({ ...config, activeModelId: m.id })}
@@ -809,7 +812,6 @@ function SurveyCard({
 export function CoderView() {
   const mod = useModKey();
   const config = useStore((s) => s.config);
-  const isAdmin = isAdminEmail(useStore((s) => s.userEmail));
   const repo = useStore((s) => s.repo);
   const tree = useStore((s) => s.tree);
   const chats = useStore((s) => s.chats);
@@ -2191,7 +2193,7 @@ export function CoderView() {
        Tools kapalı olsa bile doğal dilden görsel isteği algılanırsa bu TEK
        araç sunucudaki tool-loop'a eklenir (bkz. api/chat/route.ts'in
        body.imageGen dalı). deep_research/dispatch_agents hâlâ repo ister. */
-    const wantImageGen = !!pilot?.image;
+    const wantImageGen = FEATURES.media && !!pilot?.image;
     /* Sunucu (route.ts'in generate_image işleyicisi) her zaman anahtarsız
        Pollinations'a düşüyordu — kullanıcının Ayarlar → Model'de seçtiği/
        eklediği modelden TAMAMEN bağımsız, kafa karıştırıcıydı ("Model X seçili
@@ -2574,6 +2576,10 @@ export function CoderView() {
       const endpoint = useResearch
         ? "/api/research"
         : useSwarm && !isContinuation ? "/api/orchestrate" : "/api/chat";
+      /* Kullanıcının bağladığı MCP sunucuları (ör. Laya) repo'suz sohbette de
+         araç olarak çağrılabilsin — bkz. mcpScope.wantsMcpInChat. */
+      const scopedMcp = filterMcpServersForModel(store.config.mcpServers ?? [], active.id);
+      const wantMcp = wantsMcpInChat(scopedMcp);
       const callViaServer = () => fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2657,7 +2663,8 @@ export function CoderView() {
                     }
                   : undefined)
             : undefined,
-          mcpServers: filterMcpServersForModel(store.config.mcpServers ?? [], active.id).map((s) => ({
+          useMcp: wantMcp,
+          mcpServers: scopedMcp.map((s) => ({
             url: s.url,
             headers: s.headers,
             enabled: s.enabled,
@@ -2672,7 +2679,7 @@ export function CoderView() {
          kullanıcının kendi IP'si). Araç-kullanımı/web-arama/görsel-üretimi
          TOOL-LOOP gerektirir → bunlar sunucu-proxy'ye gider (yoksa araçlar
          sessizce çalışmaz, model repodan/araçlardan habersiz kalır). */
-      if (active.provider === "pollinations" && !toolsEnabled && !wantWeb && !wantImageGen) {
+      if (active.provider === "pollinations" && !toolsEnabled && !wantWeb && !wantImageGen && !wantMcp) {
         /* Bağlam blokları sunucu (/api/chat) ile ORTAK tek kaynaktan gelir →
            Pollinations kullanıcıları da aynı, eksiksiz bağlamı alır. PLATFORM_KNOWLEDGE
            eklenir ki bu sağlayıcıdaki model de platformun farkında olsun. */
@@ -3142,7 +3149,7 @@ export function CoderView() {
     const imgDetected = findAgentByCommand(text);
     const imgAgent = imgDetected ?? activeAgent;
     const imgPromptText = imgDetected ? stripCommand(text) : text;
-    if (imgAgent?.id === "image-gen" && imgPromptText.trim()) {
+    if (FEATURES.media && imgAgent?.id === "image-gen" && imgPromptText.trim()) {
       if (!store.currentId) store.newChat(incognito);
       const imgPrompt = imgPromptText.trim();
       setInput("");
@@ -3491,17 +3498,15 @@ export function CoderView() {
              yok. Dosyalar/Sunucu (workspace) burada değil ama artık
              ERİŞİLEBİLİR: Sidebar → "Araçlar" menüsünden açılıyorlar
              (Ö8, Tem 2026 kullanıcı isteği). Durum store'da (leftPanel). */}
-          {isAdmin && (
-            <button
-              onClick={() => { setTerminalMounted(true); setTerminalOpen((v) => !v); }}
-              title={terminalOpen ? "Terminal'i kapat" : `Terminal${terminalSupported ? "" : " (masaüstü Chrome/Edge gerekir)"}`}
-              className={`w-8 h-8 rounded-lg grid place-items-center transition-colors shrink-0 ${
-                terminalOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
-              }`}
-            >
-              <Terminal size={15} />
-            </button>
-          )}
+          <button
+            onClick={() => { setTerminalMounted(true); setTerminalOpen((v) => !v); }}
+            title={terminalOpen ? "Terminal'i kapat" : `Terminal${terminalSupported ? "" : " (masaüstü Chrome/Edge gerekir)"}`}
+            className={`w-8 h-8 rounded-lg grid place-items-center transition-colors shrink-0 ${
+              terminalOpen ? "text-brand bg-brand/10" : "text-muted hover:text-ink hover:bg-bgsoft"
+            }`}
+          >
+            <Terminal size={15} />
+          </button>
           {/* Gizli sohbet — Ağu 2026 kullanıcı kararı: ⋯ menüsü tamamen
              kalktığı için kendi ikonu oldu (herkese açık). Tools/Güvenli/
              Karşılaştır de kalktı: Tools zaten repo bağlanınca kendiliğinden

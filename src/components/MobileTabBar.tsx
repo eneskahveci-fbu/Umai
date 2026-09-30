@@ -26,8 +26,9 @@
    göstergesi tek seferde ortadan kalkıyor. */
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Images, MessageSquare, Settings, Sparkles } from "lucide-react";
+import { MessageSquare, Settings, Sparkles } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { studioEnabled } from "@/lib/features";
 
 /* Sanal klavye açık mı? (mobil) — visualViewport küçülmesiyle algılanır.
    Alt bar klavye açıkken gizlenir; sayfalar alt boşluğu buna göre sıfırlar. */
@@ -48,8 +49,7 @@ interface Tab { href: string; label: string; icon: typeof MessageSquare }
 
 const TABS: Tab[] = [
   { href: "/app", label: "Sohbet", icon: MessageSquare },
-  { href: "/studio", label: "Stüdyo", icon: Sparkles },
-  { href: "/library", label: "Kütüphane", icon: Images },
+  ...(studioEnabled() ? [{ href: "/studio", label: "Stüdyo", icon: Sparkles }] : []),
   { href: "/settings", label: "Ayarlar", icon: Settings },
 ];
 

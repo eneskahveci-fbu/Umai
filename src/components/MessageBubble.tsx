@@ -24,6 +24,7 @@ import { ALL_AGENTS } from "@/lib/agents";
 import { playTts, speakableText, stopTts } from "@/lib/pollinations";
 import { toggleChecklistLine } from "@/lib/checklist";
 import { detectLanguage } from "@/lib/editor";
+import { FEATURES } from "@/lib/features";
 
 /* `<li>` (task-list-item) render'ında bulunan güvenilir satır numarasını,
    içindeki checkbox `<input>`'a taşımak için — bkz. MessageBubbleImpl'deki
@@ -1259,9 +1260,9 @@ function MessageBubbleImpl({
             <button onClick={copyMessage} aria-label={copied ? "Kopyalandı" : "Kopyala"} title={copied ? "Kopyalandı" : "Kopyala"} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-2.5 rounded-lg hover:bg-bgsoft transition-colors">
               {copied ? <Check size={12} /> : <Copy size={12} />}
             </button>
-            <button onClick={toggleSpeak} aria-label={speakingTts ? "Durdur" : "Seslendir"} title={speakingTts ? "Durdur" : "Yanıtı seslendir (Pollinations)"} className={`flex items-center gap-1 text-[11px] p-2.5 rounded-lg hover:bg-bgsoft transition-colors ${speakingTts ? "text-brand" : "text-muted/50 hover:text-ink"}`}>
+            {FEATURES.media && <button onClick={toggleSpeak} aria-label={speakingTts ? "Durdur" : "Seslendir"} title={speakingTts ? "Durdur" : "Yanıtı seslendir (Pollinations)"} className={`flex items-center gap-1 text-[11px] p-2.5 rounded-lg hover:bg-bgsoft transition-colors ${speakingTts ? "text-brand" : "text-muted/50 hover:text-ink"}`}>
               {speakingTts ? <VolumeX size={12} /> : <Volume2 size={12} />}
-            </button>
+            </button>}
             {showRegenerate && onRegenerate && (
               /* N2 — tek model varsa doğrudan yeniden üretir (eski davranış);
                  birden çok model eklenmişse tıklayınca model listesi açılır ve

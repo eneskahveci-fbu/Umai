@@ -1,14 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Activity,
   Blocks,
-  BookOpen,
-  FolderOpen,
-  Images,
-  Keyboard,
+  FileCode2,
+  FolderGit2,
   Link2,
   Loader2,
   MessageSquare,
@@ -17,11 +14,10 @@ import {
   Server,
   Settings,
   Sparkles,
-  Wrench,
   X,
-  Zap,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { studioEnabled } from "@/lib/features";
 import type { Chat } from "@/lib/types";
 import { chatEmbeddingText, findRelated, withFreshEmbeddings } from "@/lib/relatedItems";
 import { AuthButton } from "./AuthButton";
@@ -33,119 +29,94 @@ import { useModKey } from "@/lib/useModKey";
    Etkinlik günlüğü/Kısayollar buraya (Sidebar → Eklentiler'in yanına)
    taşındı (Efor + oturuma özgü kontroller ⋯ menüsünde kaldı). AuthButton'daki
    AYNI hafif açılır-panel deseni (ref + dışarı tıklama/Escape ile kapan). */
-function SidebarToolsButton({ variant, onNavigate }: { variant: "rail" | "nav"; onNavigate?: () => void }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const toolsRouter = useRouter();
-  const toolsPath = usePathname() ?? "";
-
-  /* Sol "Alan" panellerini (Dosyalar/Sunucu) açar.
-
-     Sidebar /app, /chats, /projects, /settings sayfalarının HEPSİNDE render
-     ediliyor, ama panelleri ÇİZEN CoderView yalnız /app'te. Doğrudan
-     toggleLeftPanelState çağırmak, /app dışında sessiz bir no-op'a yol
-     açıyordu: menü kapanıyor, store değişiyor, ekranda hiçbir şey olmuyordu —
-     üstelik kullanıcı sonradan /app'e geçtiğinde hiç açmadığını sandığı panel
-     açık geliyordu. Artık gerekirse önce /app'e gidilir. */
-  const openLeftPanel = (which: "files" | "workspace") => {
-    if (toolsPath !== "/app") {
-      /* Panel /app'te mount olunca doğru durumda olsun diye state ÖNCE
-         ayarlanır; toggle yerine doğrudan set — gezinmeden gelen istek her
-         zaman "aç" demektir, "kapat" değil. */
+/* Sol "Alan" panellerini (Dosyalar/Sunucu) açar. Paneli ÇİZEN CoderView yalnız
+   /app'te; başka sayfadaysak state ÖNCE ayarlanıp /app'e gidilir (aksi halde
+   sessiz bir no-op olurdu). Eskiden "Araçlar" açılır menüsündeydi (Eyl 2026:
+   o menü kaldırıldı, Dosyalar üst seviyeye taşındı). */
+function useOpenLeftPanel() {
+  const router = useRouter();
+  const pathname = usePathname() ?? "";
+  return (which: "files" | "workspace") => {
+    if (pathname !== "/app") {
       useStore.getState().setLeftPanel(which);
-      toolsRouter.push("/app");
+      router.push("/app");
       return;
     }
     useStore.getState().toggleLeftPanelState(which);
   };
+}
 
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => { if (!rootRef.current?.contains(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+/* "owner/repo:dal" ya da "gitlab.com/grup/alt/repo" → kısa ad + dal. */
+function repoLabel(r: string): { name: string; branch?: string } {
+  const [path, branch] = r.split(":");
+  const parts = path.replace(/^gitlab\.com\//, "").split("/");
+  return { name: parts.slice(-2).join("/"), branch };
+}
 
-  const items = [
-    /* Skills — sağ üst ⋯ menüsünden buraya taşındı (Tem 2026 kullanıcı
-       kararı): global bir eylem (setSkillsOpen), composer/oturum durumuna
-       bağlı değil, aynen Kütüphane/Etkinlik Günlüğü/Kısayollar gibi — bu
-       yüzden en sık kullanılan öğe olarak listenin başına eklendi. */
-    { icon: <Zap size={14} />, label: "Skills", onClick: () => useStore.getState().setSkillsOpen(true) },
-    /* Ö8/Ö9 (Tem 2026 kullanıcı isteği): "Dosyalar" (bağlı deponun ağacı) ve
-       "Sunucu" (Local Bridge workspace) panellerinin ÜST-SEVİYE GİRİŞİ yoktu —
-       ⋯ menüsü kaldırılınca tetikleyicileri de gitmiş, paneller kod olarak
-       duruyor ama açılamıyordu. Buraya taşındılar; durum store'da (leftPanel)
-       tutulduğu için Sidebar (CoderView'ın kardeşi) onları açabiliyor. */
-    { icon: <FolderOpen size={14} />, label: "Dosyalar (depo)", onClick: () => openLeftPanel("files") },
-    { icon: <Server size={14} />, label: "Sunucu (workspace)", onClick: () => openLeftPanel("workspace") },
-    { icon: <BookOpen size={14} />, label: "Snippet'ler", onClick: () => { useStore.getState().setLibraryTab("snippets"); useStore.getState().setLibraryOpen(true); } },
-    { icon: <Activity size={14} />, label: "Etkinlik Günlüğü", onClick: () => useStore.getState().setActivityOpen(true) },
-    { icon: <Keyboard size={14} />, label: "Kısayollar", onClick: () => useStore.getState().setShortcutsOpen(true) },
-  ];
+/* Repolar (Eyl 2026 — Claude Code tarzı "proje önde"): bağlı depolar arasında
+   tek tıkla geçiş. Aktif depo vurgulanır; "Projesiz" sohbet de seçilebilir.
+   Depo ekleme/hesaplar Ayarlar → Git'te (tek kaynak). */
+function RepoSwitcher({ onNavigate }: { onNavigate: () => void }) {
+  const repos = useStore((s) => s.config.repos);
+  const activeRepo = useStore((s) => s.config.activeRepo);
+  const localMode = useStore((s) => s.config.localMode);
+  const localBridgeUrl = useStore((s) => s.config.localBridgeUrl);
+  const setActiveRepo = useStore((s) => s.setActiveRepo);
+  const router = useRouter();
+  const openLeftPanel = useOpenLeftPanel();
+  const localHost = (() => {
+    if (!localMode || !localBridgeUrl?.trim()) return null;
+    try { return new URL(localBridgeUrl).hostname; } catch { return "sunucu"; }
+  })();
 
-  const run = (fn: () => void) => { fn(); setOpen(false); onNavigate?.(); };
-
-  if (variant === "rail") {
-    return (
-      <div className="relative" ref={rootRef}>
-        <button
-          onClick={() => setOpen((v) => !v)}
-          title="Araçlar"
-          aria-expanded={open}
-          className={`w-full h-9 rounded-xl border grid place-items-center transition-colors ${
-            open ? "border-brand/40 bg-brand/10 text-brand" : "border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink"
-          }`}
-        >
-          <Wrench size={14} />
-        </button>
-        {open && (
-          <div className="animate-fade-in absolute left-full bottom-0 ml-2 z-30 w-52 rounded-xl border border-line bg-surface elev-2 overflow-hidden text-sm">
-            {items.map((it) => (
-              <button
-                key={it.label}
-                onClick={() => run(it.onClick)}
-                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bgsoft/70 text-left text-ink/85 transition-colors"
-              >
-                {it.icon} {it.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
+  const pick = (r: string | null) => {
+    if (r) setActiveRepo(r);
+    else {
+      /* Projesiz: aktif depoyu boşalt + canlı bağlantıyı düşür (yeniden bağlanma
+         efekti activeRepo boşken erken çıkar, eski ağaç asılı kalmasın). */
+      const st = useStore.getState();
+      st.saveConfig({ ...st.config, activeRepo: null });
+      useStore.setState({ repo: null, tree: null });
+    }
+    onNavigate();
+  };
+  const row = (active: boolean) =>
+    `w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors ${
+      active ? "bg-brand/10 text-brand" : "text-muted hover:text-ink hover:bg-bgsoft/60"
+    }`;
 
   return (
-    <div className="relative" ref={rootRef}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-          open ? "bg-brand/10 text-brand" : "text-ink/85 hover:bg-bgsoft/70 hover:text-ink"
-        }`}
-      >
-        <Wrench size={16} className="shrink-0" />
-        <span className="flex-1 text-left">Araçlar</span>
-      </button>
-      {open && (
-        <div className="animate-fade-in absolute top-full left-0 right-0 mt-1 z-30 rounded-xl border border-line bg-surface elev-2 overflow-hidden text-sm">
-          {items.map((it) => (
-            <button
-              key={it.label}
-              onClick={() => run(it.onClick)}
-              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bgsoft/70 text-left text-ink/85 transition-colors"
-            >
-              {it.icon} {it.label}
+    <div className="px-2 pt-3 pb-1">
+      <div className="px-1.5 pb-1.5 text-[11px] font-semibold text-muted/50 uppercase tracking-wide">Repolar</div>
+      <div className="space-y-0.5">
+        {localHost && (
+          <button onClick={() => { openLeftPanel("workspace"); onNavigate(); }} className={row(false)} title="Yerel Mod açık: ajan bu sunucunun dosya sisteminde çalışır — sunucu dosyalarını aç">
+            <Server size={12} className="shrink-0 text-green/80" />
+            <span className="flex-1 text-[12.5px] truncate">{localHost}</span>
+            <span className="text-[9px] font-mono text-green/80 shrink-0">yerel</span>
+          </button>
+        )}
+        {repos.map((r) => {
+          const { name, branch } = repoLabel(r);
+          return (
+            <button key={r} onClick={() => pick(r)} title={r} aria-current={r === activeRepo ? "true" : undefined} className={row(r === activeRepo)}>
+              <FolderGit2 size={12} className="shrink-0 opacity-70" />
+              <span className="flex-1 text-[12.5px] truncate font-mono">{name}</span>
+              {branch && <span className="text-[9px] font-mono opacity-60 shrink-0">{branch}</span>}
             </button>
-          ))}
-        </div>
-      )}
+          );
+        })}
+        {repos.length > 0 && (
+          <button onClick={() => pick(null)} aria-current={!activeRepo ? "true" : undefined} className={row(!activeRepo)}>
+            <MessageSquare size={12} className="shrink-0 opacity-50" />
+            <span className="flex-1 text-[12.5px] truncate">Projesiz sohbet</span>
+          </button>
+        )}
+        <button onClick={() => { router.push("/settings?tab=github"); onNavigate(); }} className={row(false)}>
+          <Plus size={12} className="shrink-0 opacity-60" />
+          <span className="flex-1 text-[12.5px] truncate">Repo bağla</span>
+        </button>
+      </div>
     </div>
   );
 }
@@ -171,6 +142,8 @@ export function Sidebar() {
   const setCommandPaletteOpen = useStore((s) => s.setCommandPaletteOpen);
   const extensionStoreOpen = useStore((s) => s.extensionStoreOpen);
   const setExtensionStoreOpen = useStore((s) => s.setExtensionStoreOpen);
+  const leftPanel = useStore((s) => s.leftPanel);
+  const openLeftPanel = useOpenLeftPanel();
 
   /* Mobilde sidebar tam-ekran overlay olduğundan, yeni sohbet başlatmak onu
      otomatik kapatmalı — aksi halde kullanıcı ayrıca "X"e basmak zorunda
@@ -221,17 +194,19 @@ export function Sidebar() {
         <div className="flex-1" />
 
         <div className="px-2 pb-3 space-y-1 shrink-0 border-t border-line/60 pt-3">
-          <button
-            onClick={() => router.push("/studio")}
-            title="Stüdyo"
-            className={`w-full h-9 rounded-xl border grid place-items-center transition-colors ${
-              pathname.startsWith("/studio")
-                ? "border-brand/40 bg-brand/10 text-brand"
-                : "border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink"
-            }`}
-          >
-            <Sparkles size={14} />
-          </button>
+          {studioEnabled() && (
+            <button
+              onClick={() => router.push("/studio")}
+              title="Stüdyo"
+              className={`w-full h-9 rounded-xl border grid place-items-center transition-colors ${
+                pathname.startsWith("/studio")
+                  ? "border-brand/40 bg-brand/10 text-brand"
+                  : "border-line/60 hover:border-brand/40 hover:bg-bgsoft text-muted hover:text-ink"
+              }`}
+            >
+              <Sparkles size={14} />
+            </button>
+          )}
           <button
             onClick={() => setExtensionStoreOpen(true)}
             title="Eklenti Mağazası"
@@ -243,7 +218,6 @@ export function Sidebar() {
           >
             <Blocks size={14} />
           </button>
-          <SidebarToolsButton variant="rail" />
           <button
             onClick={() => router.push("/settings")}
             title={`Ayarlar (${mod}+,)`}
@@ -322,37 +296,26 @@ export function Sidebar() {
           <MessageSquare size={16} className="shrink-0" />
           <span className="flex-1 text-left">Sohbetler</span>
         </button>
+        {studioEnabled() && (
+          <button
+            onClick={() => { router.push("/studio"); closeOnMobile(); }}
+            aria-current={pathname.startsWith("/studio") ? "page" : undefined}
+            className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors ${
+              pathname.startsWith("/studio") ? "bg-brand/10 text-brand" : "text-ink/85 hover:bg-bgsoft/70 hover:text-ink"
+            }`}
+          >
+            <Sparkles size={16} className="shrink-0" />
+            <span className="flex-1 text-left">Stüdyo</span>
+          </button>
+        )}
         <button
-          onClick={() => { router.push("/studio"); closeOnMobile(); }}
-          aria-current={pathname.startsWith("/studio") ? "page" : undefined}
+          onClick={() => { openLeftPanel("files"); closeOnMobile(); }}
           className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-            pathname.startsWith("/studio") ? "bg-brand/10 text-brand" : "text-ink/85 hover:bg-bgsoft/70 hover:text-ink"
+            leftPanel === "files" && pathname === "/app" ? "bg-brand/10 text-brand" : "text-ink/85 hover:bg-bgsoft/70 hover:text-ink"
           }`}
         >
-          <Sparkles size={16} className="shrink-0" />
-          <span className="flex-1 text-left">Stüdyo</span>
-        </button>
-        {/* Kütüphane üst seviyede (Codex IA önerisi): üretilen çıktılar
-           keşfedilebilir olsun — Araçlar açılır listesine gömülmesin. */}
-        <button
-          onClick={() => { router.push("/library"); closeOnMobile(); }}
-          aria-current={pathname.startsWith("/library") ? "page" : undefined}
-          className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-            pathname.startsWith("/library") ? "bg-brand/10 text-brand" : "text-ink/85 hover:bg-bgsoft/70 hover:text-ink"
-          }`}
-        >
-          <Images size={16} className="shrink-0" />
-          <span className="flex-1 text-left">Kütüphane</span>
-        </button>
-        <button
-          onClick={() => { router.push("/projects"); closeOnMobile(); }}
-          aria-current={pathname.startsWith("/projects") ? "page" : undefined}
-          className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-            pathname.startsWith("/projects") ? "bg-brand/10 text-brand" : "text-ink/85 hover:bg-bgsoft/70 hover:text-ink"
-          }`}
-        >
-          <FolderOpen size={16} className="shrink-0" />
-          <span className="flex-1 text-left">Projeler</span>
+          <FileCode2 size={16} className="shrink-0" />
+          <span className="flex-1 text-left">Dosyalar</span>
         </button>
         <button
           onClick={() => { setExtensionStoreOpen(true); closeOnMobile(); }}
@@ -363,16 +326,16 @@ export function Sidebar() {
           <Blocks size={16} className="shrink-0" />
           <span className="flex-1 text-left">Eklentiler</span>
         </button>
-        <SidebarToolsButton variant="nav" onNavigate={closeOnMobile} />
       </nav>
 
       {/* "Son Sohbetler" — her zaman görünen, en son 7 sohbet (Tem 2026
           kullanıcı kararı ile geri getirildi). Accordion DEĞİL, sabit liste;
           tüm sohbetler (arama/etiket/pin) hâlâ yalnız /chats'te. */}
       <div className="flex-1 overflow-y-auto min-h-0">
+        <RepoSwitcher onNavigate={closeOnMobile} />
         {recentChats.length > 0 && (
           <div className="px-2 pt-3 pb-1">
-            <div className="px-1.5 pb-1.5 text-[11px] font-semibold text-muted/50 uppercase tracking-wide">Son Sohbetler</div>
+            <div className="px-1.5 pb-1.5 text-[11px] font-semibold text-muted/50 uppercase tracking-wide">Son oturumlar</div>
             <div className="space-y-0.5">
               {recentChats.map((c) => (
                 <button
