@@ -32,4 +32,13 @@ describe("MCP_CATALOG", () => {
       expect(isBuiltinMcpServerId(e.builtinUrl.slice("/api/mcp/builtin/".length))).toBe(true);
     }
   });
+
+  it("bridgePath doluysa yalnız köprünün /mcp/local/<ad> yolu (tam URL değil) ve builtinUrl ile birlikte değil", () => {
+    for (const e of MCP_CATALOG) {
+      if (!e.bridgePath) continue;
+      expect(e.bridgePath).toMatch(/^\/mcp\/local\/[a-z0-9][a-z0-9_-]*$/);
+      expect(e.builtinUrl).toBeUndefined();
+    }
+    expect(MCP_CATALOG.find((e) => e.id === "laya")?.bridgePath).toBe("/mcp/local/laya");
+  });
 });

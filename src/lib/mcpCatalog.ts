@@ -27,9 +27,17 @@ export interface McpCatalogEntry {
   /** Doluysa bu girdi yerleşiktir — kart açılınca kurulum gerektirmeden
       doğrudan bu (aynı-köken, göreli) URL ile çalışır. */
   builtinUrl?: string;
+  /** Doluysa bu girdi kullanıcının KENDİ hibrit köprüsünde (Oracle) çalışır:
+      kart açılınca adres = Ayarlar'daki köprü adresi + bu yol, başlık = köprü
+      token'ı (bkz. McpGallery.tsx, scripts/terminal-bridge/bridge.mjs
+      /mcp/local/*). Tam URL değil, yalnız YOL — katalog değişmezi korunur. */
+  bridgePath?: string;
 }
 
 export const MCP_CATALOG: McpCatalogEntry[] = [
+  /* Laya — açık kaynak (Apache 2.0) karar modeli; sohbet modeli DEĞİL, araç.
+     Kurulum: deploy/oracle/setup-laya.sh (Eyl 2026 kullanıcı kararı). */
+  { id: "laya", name: "Laya (karar modeli)", icon: "⚖️", description: "Sunucunda çalışan yerel karar modeli: metni sınıflandırır, puanlar, evet/hayır der (100+ dil).", bridgePath: "/mcp/local/laya" },
   { id: "notion", name: "Notion", icon: "📝", description: "Notion sayfalarına ve veritabanlarına eriş." },
   { id: "slack", name: "Slack", icon: "💬", description: "Slack kanallarını ve mesajlarını oku." },
   { id: "drive", name: "Google Drive", icon: "📁", description: "Drive dosyalarını ara, içeriğini oku." },

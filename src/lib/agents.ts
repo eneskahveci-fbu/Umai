@@ -989,7 +989,10 @@ export const AGENTS: Agent[] = [
 
 import { EXTENSION_AGENTS } from "@/lib/extensions/registry";
 import { getUserAgents } from "@/lib/extensions/customAgents";
-export const ALL_AGENTS = [...AGENTS, ...EXTENSION_AGENTS];
+import { FEATURES } from "@/lib/features";
+/* /gorsel (image-gen) görsel üretimi rafa kaldırıldıysa (lib/features.ts) slash
+   menüsünde görünmez ve komut olarak tanınmaz. */
+export const ALL_AGENTS = [...AGENTS, ...EXTENSION_AGENTS].filter((a) => FEATURES.media || a.id !== "image-gen");
 
 export function findAgentByCommand(text: string): Agent | null {
   const first = text.trim().split(/\s+/)[0].toLowerCase();
