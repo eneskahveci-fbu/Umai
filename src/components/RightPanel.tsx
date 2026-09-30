@@ -2,16 +2,18 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { FileCode2, GitBranch, Sparkles, X } from "lucide-react";
+import { FileCode2, GitBranch, Sparkles, AlertTriangle, Users, X } from "lucide-react";
 import type { EditorFile } from "@/lib/editor";
 import type { Artifact } from "@/lib/types";
 
 const EditorPanel = dynamic(() => import("./EditorPanel").then((m) => m.EditorPanel), { ssr: false });
 import { GitPanel } from "./GitPanel";
 import { ArtifactPanel } from "./ArtifactPanel";
+import { DebtPanel } from "./DebtPanel";
+import { TeammatePanel } from "./TeammatePanel";
 import { ErrorBoundary } from "./ErrorBoundary";
 
-type Tool = "editor" | "git" | "artifact";
+type Tool = "editor" | "git" | "artifact" | "debt" | "teammate";
 
 /* Editör üstündeki dosya sekmesi şeridi — birden fazla dosya açıkken görünür. */
 function FileTabsBar({
@@ -67,16 +69,32 @@ interface RightPanelProps {
   onSelectTab?: (path: string) => void;
   onCloseTab?: (path: string) => void;
   onEditorDirtyChange?: (dirty: boolean) => void;
+  /** Teknik Borç Takipçisi (opt-in, config.debtTrackerEnabled). `openTabs`'i
+      tarar — repo'nun tamamını değil, editörde ZATEN açık dosyaları. */
+  debtOpen?: boolean;
+  onCloseDebt?: () => void;
+  /** AI Takım Arkadaşı (opt-in, config.teammateEnabled) — arka plan görev
+      kuyruğu. `onRunTeammateTask`/`onAddTeammateResultToChat` CoderView'un
+      model/fallback zincirine ve composer'ına bağlanır. */
+  teammateOpen?: boolean;
+  onCloseTeammate?: () => void;
+  onRunTeammateTask?: (prompt: string, onChunk: (chunk: string) => void) => Promise<void>;
+  onAddTeammateResultToChat?: (content: string) => void;
 }
 
 export function RightPanel(props: RightPanelProps) {
   const tabs = useMemo<{ id: Tool; label: string; icon: typeof FileCode2; available: boolean }[]>(
     () => [
-      { id: "editor",   label: "Editör",   icon: FileCode2, available: props.editorOpen },
-      { id: "git",      label: "Git",      icon: GitBranch, available: props.gitOpen },
-      { id: "artifact", label: "Önizleme", icon: Sparkles,  available: !!props.artifact },
+      { id: "editor",   label: "Editör",   icon: FileCode2,     available: props.editorOpen },
+      { id: "git",      label: "Git",      icon: GitBranch,     available: props.gitOpen },
+      { id: "artifact", label: "Önizleme", icon: Sparkles,      available: !!props.artifact },
+      { id: "debt",     label: "Borç",     icon: AlertTriangle, available: !!props.debtOpen },
+      /* Etiket bilinçli olarak "Görevler" — "Ekip" zaten StatusBar'daki Otomatik
+         Pilot/swarm rozetinin adı (bkz. CLAUDE.md "Oto-ajan"), aynı kelimeyi iki
+         farklı özellik için kullanmak kafa karıştırır. */
+      { id: "teammate", label: "Görevler", icon: Users,         available: !!props.teammateOpen },
     ],
-    [props.editorOpen, props.gitOpen, props.artifact],
+    [props.editorOpen, props.gitOpen, props.artifact, props.debtOpen, props.teammateOpen],
   );
 
   const firstAvailable = tabs.find((t) => t.available)?.id ?? null;
@@ -95,14 +113,21 @@ export function RightPanel(props: RightPanelProps) {
     editor: props.editorOpen,
     git: props.gitOpen,
     artifact: !!props.artifact,
+    debt: !!props.debtOpen,
+    teammate: !!props.teammateOpen,
   });
   useEffect(() => {
-    const cur = { editor: props.editorOpen, git: props.gitOpen, artifact: !!props.artifact };
+    const cur = {
+      editor: props.editorOpen, git: props.gitOpen, artifact: !!props.artifact,
+      debt: !!props.debtOpen, teammate: !!props.teammateOpen,
+    };
     if (cur.editor && !prevOpen.current.editor) setActive("editor");
     if (cur.git && !prevOpen.current.git) setActive("git");
     if (cur.artifact && !prevOpen.current.artifact) setActive("artifact");
+    if (cur.debt && !prevOpen.current.debt) setActive("debt");
+    if (cur.teammate && !prevOpen.current.teammate) setActive("teammate");
     prevOpen.current = cur;
-  }, [props.editorOpen, props.gitOpen, props.artifact]);
+  }, [props.editorOpen, props.gitOpen, props.artifact, props.debtOpen, props.teammateOpen]);
 
   /* Boyutlandırılabilir genişlik (masaüstü). Lazy init → SSR güvenli, set-state
      effect'i yok. Sol kenardan sürükle; her değişimde localStorage'a yaz. */
@@ -135,6 +160,8 @@ export function RightPanel(props: RightPanelProps) {
   const closeActive = () => {
     if (effectiveActive === "editor") props.onCloseEditor();
     else if (effectiveActive === "git") props.onCloseGit();
+    else if (effectiveActive === "debt") props.onCloseDebt?.();
+    else if (effectiveActive === "teammate") props.onCloseTeammate?.();
   };
 
   const startResize = (e: React.MouseEvent) => {
@@ -303,6 +330,20 @@ export function RightPanel(props: RightPanelProps) {
           {effectiveActive === "artifact" && props.artifact && (
             <ErrorBoundary variant="inline" label="Önizleme çöktü">
               <ArtifactPanel />
+            </ErrorBoundary>
+          )}
+          {effectiveActive === "debt" && (
+            <ErrorBoundary variant="inline" label="Teknik Borç paneli çöktü">
+              <DebtPanel files={props.openTabs ?? []} onClose={() => props.onCloseDebt?.()} />
+            </ErrorBoundary>
+          )}
+          {effectiveActive === "teammate" && (
+            <ErrorBoundary variant="inline" label="AI Takım Arkadaşı paneli çöktü">
+              <TeammatePanel
+                onClose={() => props.onCloseTeammate?.()}
+                onRunTask={props.onRunTeammateTask}
+                onAddToChat={props.onAddTeammateResultToChat}
+              />
             </ErrorBoundary>
           )}
         </div>

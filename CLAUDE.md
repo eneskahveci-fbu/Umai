@@ -62,8 +62,7 @@ src/
     ├── preview.ts            # Kod → canlı sandbox (React/JSX/HTML/SVG/mermaid + console)
     ├── features.ts           # FEATURES — rafa kaldırılan özelliklerin aç/kapa anahtarları
     ├── mcpCatalog.ts          # MCP uygulama galerisi verisi (Notion/Slack/Drive... — URL içermez)
-    ├── terminal/             # RealTerminal'in parçaları: core (saf, testli) · view (xterm+eklentiler)
-    │                         #   · wsTransport / wcTransport (taşıyıcılar) · runBridge (AI komut köprüsü)
+    ├── terminalKeys.ts       # Terminal paneli saf mantığı: tuş şeridi, yeniden bağlanma, yazı boyutu (testli)
     └── extensions/registry.ts# EXTENSION_TOOLS/AGENTS/CATALOG + EXTENSION_PACKS
 ```
 
@@ -314,7 +313,17 @@ Claude Code web; opencode'un TUI görünümü DEĞİL). Yapılanlar:
   akışlı LLM çağrısı + JSON ayıklama; anahtarsızda Pollinations'a düşer.
 - **Sandbox / Artifacts** (`preview.ts` + `ArtifactPanel.tsx`): kod bloğu →
   sandbox'lı iframe canlı önizleme. React/JSX/TSX (Babel standalone CDN),
-  HTML+CSS+JS, SVG, mermaid. İframe-içi **console paneli** (parent'a mesaj
+  HTML+CSS+JS, SVG, mermaid, **SQL** (sql.js/SQLite-WASM CDN, `db.exec()` ile
+  GERÇEKTEN çalıştırılır — sonuç kümesi tablo olarak gösterilir) ve **Python**
+  (Pyodide WASM CDN, GERÇEKTEN çalıştırılır — stdout/stderr Python tarafında
+  `contextlib.redirect_stdout/stderr` ile yakalanır). Bunlar `type: "code"`
+  (yalnız sözdizimi vurgulama, `highlight.js`) tipinden AYRI iki artifact
+  türü (`Artifact["type"]`'a `"sql"`/`"python"` eklendi) — `artifactDoc.ts`
+  `buildArtifactSrcDoc`'ta kendi çalıştırma iskeletleri var. Kullanıcı
+  içeriği bir `<script>` bloğuna gömülürken YALNIZ `JSON.stringify` YETMEZ
+  (`</script>` dizisini kaçırmaz → XSS) — `jsStringLiteral()` bunu ayrıca
+  kaçırır (bkz. `preview.ts`'teki `safeScript` ile aynı sınıf sorun, farklı
+  katman). İframe-içi **console paneli** (parent'a mesaj
   yollamaz). Panel: önizleme↔kod geçişi, kaynağı kopyala, indir, yenile,
   yeni sekmede aç, büyüt. **İşaretle & Değiştir** (AI Studio Annotation Mode
   paraleli, `ArtifactCanvas` + `artifactDoc.ts`'teki `withAnnotationScript`):
@@ -332,6 +341,70 @@ Claude Code web; opencode'un TUI görünümü DEĞİL). Yapılanlar:
 - **Öğrenme Modu** (`config.learningMode`): açıkken sistem prompt'una eğitsel
   yönerge eklenir (adım adım açıklama, kavram tanımı, "neden", "Sırada öğren").
   MoreMenu'den toggle; durum çubuğunda rozet. Üniversite öğrencileri için.
+- **Yerel Anlamsal Hafıza** (`config.semanticMemoryEnabled`, **varsayılan AÇIK**
+  — Eyl 2026 sadeleştirme kararı: UI'a yeni bir buton/sekme eklemeyen, gözle
+  görülür gecikme/LLM çağrısı getirmeyen özellikler artık varsayılan açık,
+  Ayarlar → Genel → Davranış → "Deneysel"den kapatılabilir): `src/lib/memory.ts` — her tur sonunda tam yanıt
+  metni tarayıcı-içi `IndexedDB`'ye (`craftai_memory`, ≤500 parça, en eski
+  trim) parçalanarak yazılır (`memoryStore`); yeni bir mesaj gönderilmeden
+  önce sorguya BM25 ile en ilgili k=5 parça geri getirilir (`memoryRetrieve`)
+  ve `searchContext` ile AYNI deseni izleyerek (bkz. `prompt.ts`
+  `buildContextSections` `memoryContext` alanı) sistem promptunun en sonuna,
+  turdan turа değişen ikinci system mesajı olarak eklenir — Anthropic prompt
+  caching'i bozmaz. **`config.memories`/`autoMemory` ile KARIŞTIRILMASIN**:
+  onlar kullanıcının elle eklediği ya da bir LLM çağrısıyla (`/api/memory`)
+  damıtılan KALICI "tercih" notlarıdır; bu ise anahtarsız/modelsiz, ham
+  konuşma parçalarını olduğu gibi saklayıp konuya göre geri getiren ayrı bir
+  mekanizma. `IndexedDB` desteklemeyen ortamda (bkz. `capabilities.ts`
+  `hasIndexedDB`) sessizce hiçbir şey yapmaz.
+- **Kişisel Stil Hafızası** (`config.styleMemoryEnabled`, **varsayılan AÇIK**,
+  aynı Eyl 2026 kararı — Ayarlar → Genel → Davranış → "Deneysel"):
+  `src/lib/styleMemory.ts` — `extractStylePreferences()` o turun mesaj
+  dizisini kural-tabanlı regex'lerle tarar (LLM çağrısı YOK): kullanıcı bir
+  kod bloğunu onayladıysa (`APPROVAL_RE`, düzeltme sinyali yoksa) o bloğun
+  stil örüntülerini (arrow function/2 boşluk/TypeScript interface/async…)
+  tercih olarak biriktirir; ayrıca mesaj metninde açık sinyalleri (camelCase,
+  Tailwind, yarn/pnpm…) doğrudan yakalar. `buildPersonalityLayer()` bunu
+  sistem promptuna eklenecek kısa bir "kişilik katmanı"na çevirir.
+- **Evrimsel Model Seçici** (`config.evolutionaryRouter`, varsayılan kapalı):
+  `src/lib/evolutionaryRouter.ts` — her istekten sonra (başarılı VEYA
+  başarısız) model+sağlayıcı başına üç boyutlu bir "fitness" öğrenilir
+  (başarı oranı × hız skoru × token verimliliği, her biri ayrı EMA α=0.25,
+  `localStorage` `craftai_fitness`). `orchestrator.ts`'in (Faz 0+6) TEK
+  boyutlu, canlı fallback-sırasını DEĞİŞTİREN skorundan farklı olarak bu
+  ÜÇ boyutlu ve şimdilik yalnız GÖZLEM amaçlı — `getFitnessScore`/
+  `getAllFitnessRecords` dışa açılır ama henüz hiçbir seçimi etkilemez;
+  ileride görev-türüne özel yönlendirme (`TaskCategory`) için bir temel
+  olarak biriktirilir.
+- **Teknik Borç Takipçisi** (`config.debtTrackerEnabled`, varsayılan kapalı):
+  sohbet alt çubuğunda bir rozet açar → sağ panelde (`RightPanel`'in 4.
+  sekmesi, `DebtPanel.tsx`) editörde AÇIK dosyaları (repo'nun tamamını değil
+  — büyük repoda yavaşlamaz, kullanıcının ZATEN baktığı dosyalar hakkında
+  anında geri bildirim) tarar: döngüsel karmaşıklık (McCabe, `src/lib/
+  codeAnalysis.ts` `cyclomaticComplexity`), eksik JSDoc'lu export'lar
+  (`missingJsdoc`), kopya kod blokları (`detectDuplicates`, hash-tabanlı 5
+  satırlık pencere). Tamamen istemci-tarafı/saf fonksiyonlar — LLM çağrısı
+  yok. `src/lib/autoDoc.ts` (`buildChangelogEntry`/`buildReadmePrompt`) aynı
+  "Oto-Dok" fikrinin devamı — commit listesinden konvansiyonel bir CHANGELOG
+  taslağı / README güncelleme prompt'u üretir — ama `capabilities.ts` gibi
+  şimdilik hiçbir UI çağıranı YOK, ileride DebtPanel'e "Oto-Dok" eylemi
+  olarak bağlanmak üzere hazır kütüphane katmanı. **`changelog.ts`'teki
+  `CHANGELOG_ENTRIES` ile KARIŞTIRILMASIN** — o, `/changelog` pazarlama
+  sayfası için elle kürasyonlu sabit bir dizi; `autoDoc.ts` ise kullanıcının
+  BAĞLI DEPOSUNDAKİ gerçek commit'lerden taslak üretir.
+- **AI Takım Arkadaşı** (`config.teammateEnabled`, varsayılan kapalı):
+  sohbet alt çubuğunda bir rozet açar → sağ panelde (`RightPanel`'in 5.
+  sekmesi, `TeammatePanel.tsx`) bağımsız, KALICI bir görev kuyruğu —
+  `src/lib/teammate.ts`, IndexedDB `craftai_teammate`. Kuyruk sekme
+  kapansa/sayfa yenilense bile hayatta kalır (5sn yoklamayla senkron);
+  görevin KENDİSİ (`teammate.ts`) hangi modelin/sistem promptunun
+  kullanılacağını BİLMEZ — bunu çağıran taraf (`CoderView.tsx`'teki
+  `runTeammateTask`) sağlar: aktif modelle `quickComplete()` üzerinden
+  tek-seferlik, araçsız bir tamamlanma çağrısı yapar, ana sohbet
+  geçmişini/akışını hiç etkilemez. Sonuç "Sohbete ekle" ile composer'a
+  taşınabilir (`setPendingInput`). "İptal" yalnız kaydı `cancelled`
+  işaretler — devam eden ağ isteğini GERÇEKTEN durdurmaz (bilinçli
+  sınırlama, AbortController plumbing'i kapsam dışı bırakıldı).
 - **Kalite Modu / görünmez süpervizör** (`config.qualityMode`, Tem 2026
   kullanıcı kararı): tek yanıtta taslak→öz-eleştiri→düzeltme; araçsız/tekil
   sohbet turlarında ayrıca 3 iç taslak+hakem (Fusion) tetikler (bkz.
@@ -461,7 +534,24 @@ Playwright ile.
   Aktif model hata verince (kota/erişim/5xx) istek düşmez, sıradaki ücretsiz
   sağlayıcıya geçer; her zaman anahtarsız Pollinations tabanı eklenir. İstemci
   zinciri kurar, `/api/chat`'e `fallbacks` olarak yollar; sunucu sırayla dener.
-  Stüdyolar ve `CoderView` aynı zinciri kullanır.
+  Stüdyolar ve `CoderView` aynı zinciri kullanır. Tüm çağıranlar (CoderView,
+  Studio, quickComplete, Fusion) tek noktadan `buildChainFor(config)` üzerinden
+  geçer — o `qualityFallbackChain`/`strictModel` tercihini okur ve zinciri kurar.
+- **Serbest-katman orkestratörü** (`src/lib/orchestrator.ts`, `config.
+  freeOrchestrator`, **varsayılan AÇIK** — Eyl 2026 sadeleştirme kararı, taze
+  kurulumda hiç istatistik olmadığı için ilk turlarda görünür bir fark
+  yaratmaz, Ayarlar → Model → "Öğrenen sıralama"'dan kapatılabilir):
+  `buildChainFor` kurduğu zinciri, flag açıkken `applyOrchestration()` ile
+  sağlayıcı başına öğrenilmiş güvenilirlik skoruna (EMA, α=0.3, `localStorage`
+  `craftai_provider_stats`) göre yeniden sıralar; kapalıyken girdiyi
+  DEĞİŞTİRMEDEN döner — davranış birebir aynı kalır. Öğrenme sinyali
+  Ayarlar'daki "Test et" düğmesinden gelir (`recordOutcome`) — gerçek kullanıcı
+  isteği değil, bilinçli/gürültüsüz bir bağlantı denemesi. TEK entegrasyon
+  noktası `buildChainFor` olduğu için ayrı ayrı çağıran değiştirmek gerekmez.
+  `src/lib/capabilities.ts` (WebGPU/WebRTC/IndexedDB/crossOriginIsolated/Worker
+  algılama, hepsi SSR-safe) gelecekteki fazlar (yerel model çıkarımı, gerçek
+  kod çalıştırma, P2P işbirliği) için baştan hazırlanmış güvenlik kapısı —
+  şimdilik hiçbir çağıranı yok.
 - **Durum + kalıcılık:** `src/lib/store.ts` (Zustand) tek kaynak. `saveConfig`
   hem state'e hem `localStorage`'a (`craftai_config`) yazar. Giriş yapılınca
   `syncConfig(userId)` Supabase `user_config` ile birleştirir. **Per-user
@@ -476,6 +566,14 @@ Playwright ile.
   başlık) + kenar çubuğunda arama + sağda kaydırılabilir içerik. `ALL_TABS`'ta
   `admin: true` sekmeler (Gelişmiş/MCP/Kancalar) **admin dışı kullanıcıdan
   tamamen gizlenir** (`visibleTabs`). Flex zincirinde `min-h-0` şart (kaydırma).
+  **Genel → Davranış** kartı iki katmanlı (Eyl 2026 sadeleştirme): günlük
+  dokunulan 5 anahtar inline, geri kalan 5 "Deneysel" `<details>` katlanır
+  bloğunda (varsayılan kapalı görünüm — `Gelişmiş`'teki AYNI `<details>`
+  deseni, `ChevronRight` + `group-open:rotate-90`). Yeni bir opt-in davranış
+  anahtarı eklerken: UI'a yeni buton/sekme eklemiyorsa ve gözle görülür
+  gecikme/LLM çağrısı getirmiyorsa `DEFAULT_CONFIG`'te varsayılan AÇIK yap
+  ve "Deneysel"e koy; yeni bir buton/sekme ekliyorsa ya da henüz hiçbir kararı
+  etkilemiyorsa (yalnız gözlem) varsayılan KAPALI bırak.
 - **Hesap:** `AccountSettings.tsx` → şifre/e-posta/görünen ad (Supabase
   `updateUser`), oturum yönetimi (`signOut({scope:'global'})`), kullanım
   istatistikleri, hesabı silme. Silme `POST /api/account/delete`: servis anahtarı
@@ -537,7 +635,16 @@ Playwright ile.
   **veya** token ile manuel ekleme.
 - **Hibrit köprü:** `scripts/terminal-bridge/bridge.mjs` (node-pty + ws) →
   terminal (WS) + `/fs/*` + `/exec` + tokensız `/health`; istemci tarafı
-  `src/lib/bridgeFs.ts`. **Yerel LLM** (`/llm/v1/chat/completions` +
+  `src/lib/bridgeFs.ts`. **Terminal paneli** (`RealTerminal.tsx`, Eyl 2026):
+  WS koparsa üstel beklemeyle kendisi yeniden bağlanır (sayfa görünür olunca
+  / ağ gelince hemen), ilk bağlantı kurulamazsa `/health` ile "köprü kapalı"
+  ile "token yanlış"ı ayırır; dokunmatik cihazda Esc/Tab/yapışkan Ctrl/oklar
+  şeridi, herkese hızlı komut çipleri (`config.terminalQuickCommands`) ve
+  A−/A+ (`config.terminalFontSize`). Saf mantık `src/lib/terminalKeys.ts`'te
+  (test: `terminalKeys.test.ts`). Köprü 2.1+ PTY'ye `~/.opencode/bin` vb.
+  kullanıcı-alanı dizinlerini PATH'e ekler + `TERM=xterm-256color`; daha eski
+  köprüde panel "Köprüyü güncelle" düğmesi gösterir (`BRIDGE_UPDATE_COMMAND` —
+  sudo'suz, dosyayı yazıp süreci öldürür, systemd yeniden kaldırır). **Yerel LLM** (`/llm/v1/chat/completions` +
   `/llm/v1/models`, Tem 2026): aynı köprünün, aynı sunucudaki bir Ollama'ya
   OpenAI-uyumlu proxy'si — Ollama yalnız `127.0.0.1:11434`'te dinler, dışarıya
   hiç açılmaz, tek erişim yolu köprünün mevcut token doğrulaması. Uygulama
@@ -553,8 +660,10 @@ Playwright ile.
   **opencode** (Eyl 2026): `deploy/oracle/setup-opencode.sh` köprü terminaline
   opencode'u kurar (`opencode` yazınca açılır; Ollama varsa ona bağlanır).
   Tam ekran TUI'ler için köprü PTY'si `xterm-256color` + `COLORTERM=truecolor`
-  ile açılır ve istemcide WS modunda `convertEol` KAPALIDIR (gerçek PTY zaten
-  \r\n üretir; açık kalırsa TUI imleç konumları bozulur).
+  ile açılır (`ptyEnv()`); istemcide `convertEol` açık kalabilir — opencode ile
+  her iki ayarda da doğru çizildiği Playwright'ta doğrulandı. Terminal paneli
+  ve tam ekran düğmesi HERKESE açık (eskiden admin'e özeldi; Eyl 2026 kararı).
+  Tıklanabilir linkler `@xterm/addon-web-links` ile.
 - **Native sarmalayıcı:** Capacitor (`capacitor.config.ts` canlı siteyi
   `server.url` ile yükler); `src/lib/native.ts` web'de no-op.
 

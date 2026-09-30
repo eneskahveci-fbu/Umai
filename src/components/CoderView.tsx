@@ -959,6 +959,23 @@ export function CoderView() {
   /* Dosya ağacı sağ-tık menüsü konumu + hedef dosya. */
   const [treeMenu, setTreeMenu] = useState<{ x: number; y: number; file: TreeFile } | null>(null);
   const [gitPanelOpen, setGitPanelOpen] = useState(false);
+  /* Teknik Borç Takipçisi paneli (opt-in, config.debtTrackerEnabled). */
+  const [debtOpen, setDebtOpen] = useState(false);
+  /* AI Takım Arkadaşı paneli (opt-in, config.teammateEnabled). */
+  const [teammateOpen, setTeammateOpen] = useState(false);
+
+  /* AI Takım Arkadaşı (config.teammateEnabled) görevlerini çalıştırır — aktif
+     modelle tek-seferlik, araçsız bir tamamlanma çağrısı (bkz. quickComplete).
+     Kuyruğun kendisi (teammate.ts) IndexedDB'de yaşar ve model/anahtar
+     bilmez; bu callback onu CoderView'un aktif modeline bağlar. */
+  const runTeammateTask = useCallback(async (prompt: string, onChunk: (chunk: string) => void) => {
+    const { quickComplete } = await import("@/lib/quickComplete");
+    const result = await quickComplete(
+      prompt,
+      "Sen deneyimli bir yazılım mühendisisin. İstenen görevi net, öz ve doğrudan uygulanabilir şekilde yerine getir.",
+    );
+    onChunk(result);
+  }, []);
 
   /* Dosyayı editörde aç: sekme yoksa ekle, varsa içeriğini güncelle, aktif yap. */
   const openInEditor = useCallback((f: EditorFile) => {
@@ -2484,6 +2501,17 @@ export function CoderView() {
       const cs = (store.config.customStyles ?? []).find((s) => s.id === store.config.activeCustomStyleId);
       if (cs?.instructions.trim()) finalSystemPrompt += `\n\n[Stil]: ${cs.instructions.trim()}`;
     }
+    /* Kişisel Stil Hafızası: sohbetten kural-tabanlı (LLM çağrısı yok) çıkarılan
+       kod tercihleri "kişilik katmanı" olarak enjekte edilir. */
+    if (store.config.styleMemoryEnabled) {
+      const { extractStylePreferences, buildPersonalityLayer } = await import("@/lib/styleMemory");
+      const prefs = extractStylePreferences(store.current()?.messages ?? []);
+      const layer = buildPersonalityLayer(prefs);
+      if (layer) finalSystemPrompt += `\n\n${layer}`;
+    }
+
+    /* Evrimsel Model Seçici: gecikmeyi ölçmek için bu turun başlangıç anı. */
+    const evoCallStartMs = typeof performance !== "undefined" ? performance.now() : 0;
 
     const repo = store.repo;
     /* Yerel Mod: köprü tanımlı ve açıksa, github/gitlab repo'ya gerek kalmadan
@@ -2518,6 +2546,19 @@ export function CoderView() {
         if (url && title && sources.length < 8 && !sources.some((s) => s.url === url)) sources.push({ title, url });
       }
       if (sources.length) store.setSourcesOnLast(sources);
+    }
+
+    /* Yerel Anlamsal Hafıza (bkz. lib/memory.ts): geçmiş konuşma parçalarından
+       bu turun sorgusuna BM25 ile en ilgili k'sını getirir. Anahtarsız/LLM
+       çağrısı olmadan çalışır — autoMemory'nin (fact-extraction) aksine hiçbir
+       modele bağlı değil, yalnızca IndexedDB desteğine (hasIndexedDB) bağlı. */
+    let memoryContext = "";
+    if (store.config.semanticMemoryEnabled) {
+      try {
+        const { memoryRetrieve } = await import("@/lib/memory");
+        const hits = await memoryRetrieve(lastUserMsg?.content ?? "", 5);
+        if (hits.length) memoryContext = hits.map((h) => `- ${h.content}`).join("\n");
+      } catch { /* sessiz — hafıza olmadan devam */ }
     }
 
     /* Devam modunda full mevcut içerikten başlar → akış aynı baloncuğa eklenir. */
@@ -2624,6 +2665,7 @@ export function CoderView() {
           maxTokens: activeProjectCfg?.maxTokens,
           effort: thinkingMode,
           searchContext: webSearchContext || undefined,
+          memoryContext: memoryContext || undefined,
           repoCtx: toolsEnabled
             ? (localActive
                 ? {
@@ -2688,6 +2730,7 @@ export function CoderView() {
           memories: store.config.memories,
           skills: activeSkills,
           searchContext: webSearchContext || undefined,
+          memoryContext: memoryContext || undefined,
         });
         /* `referrer`: Pollinations anonim (referrer'sız) istekleri en agresif
            kısıtlar. Sabit bir referrer eklemek daha yüksek limitli kovaya alır. */
@@ -3066,6 +3109,12 @@ export function CoderView() {
         tokenOut = await countTokens(full.slice(priorLen));
       }
       useStore.getState().updateLastTokens(tokenIn, tokenOut);
+      /* Evrimsel Model Seçici: BAŞARILI istek sonucu fitness deposuna kaydedilir
+         (fire-and-forget, hata atmaz). */
+      if (useStore.getState().config.evolutionaryRouter) {
+        const { recordFitnessOutcome } = await import("@/lib/evolutionaryRouter");
+        recordFitnessOutcome(active.provider, active.model, performance.now() - evoCallStartMs, tokenIn, tokenOut, true);
+      }
       /* geri-al noktalarını mesaja yaz → persistCurrent ile sohbetle kaydedilir,
          sayfa yenilense bile son turun "Geri Al" imkânı kaybolmaz */
       if (turnCheckpoints.length) useStore.getState().setCheckpointsOnLast(turnCheckpoints);
@@ -3082,6 +3131,12 @@ export function CoderView() {
         await callApi(overrideAgent, { ...opts, noStrongest: true });
       } else {
         useStore.getState().updateLastContent(`**Hata:** ${friendlyError((err as Error).message)}`, { isError: true });
+        /* Evrimsel Model Seçici: BAŞARISIZ isteği de kaydet — yalnız başarıyı
+           öğrenip hiç başarısızlık görmeyen bir skor yanıltıcı olurdu. */
+        if (useStore.getState().config.evolutionaryRouter) {
+          void import("@/lib/evolutionaryRouter").then(({ recordFitnessOutcome }) =>
+            recordFitnessOutcome(active.provider, active.model, performance.now() - evoCallStartMs, 0, 0, false));
+        }
         void runHooks(false, "error");
       }
     } finally {
@@ -3117,6 +3172,12 @@ export function CoderView() {
         notifyReady("UMAI", "Yanıt hazır.");
       }
       void extractMemory();
+      /* Yerel Anlamsal Hafıza: bu turun tam metnini fire-and-forget IndexedDB'ye
+         yazar — sonraki sorgular BM25 ile bunu geri bulabilsin. Hata atmaz,
+         akışı asla bloklamaz (bkz. memory.ts memoryStore). */
+      if (useStore.getState().config.semanticMemoryEnabled && full.trim()) {
+        void import("@/lib/memory").then(({ memoryStore }) => memoryStore(full, useStore.getState().current()?.id ?? "_"));
+      }
       fireHooks("onStop");
     }
     /* Otomatik devam (Claude Code gibi): yanıt token sınırında kesildiyse aynı
@@ -4068,7 +4129,9 @@ export function CoderView() {
           </div>
 
           {/* Terminal — bir kez boot olur, ARKAPLANDA mount kalır; kapatınca
-              yalnızca gizlenir (unmount olmaz) → ajan komutları hep çalışır. */}
+              yalnızca gizlenir (unmount olmaz) → ajan komutları hep çalışır.
+              Herkese açık (Eyl 2026 kullanıcı kararı, "Coder odaklı yön"): eskiden
+              panel `isAdmin` ile admin dışı herkesten gizleniyordu. */}
           {terminalMounted && (
             <div className={terminalOpen ? "" : "hidden"}>
               <ErrorBoundary variant="inline" label="Terminal çöktü">
@@ -4311,7 +4374,27 @@ export function CoderView() {
                   alanının bir parçası, artık ayrı bir üst header'da değil).
                   Sağ: aktif mod rozetleri. */}
               <div className="flex flex-wrap items-center justify-between gap-y-1 mt-2 px-0.5">
-                <ModelSwitcher />
+                <div className="flex items-center gap-1.5">
+                  <ModelSwitcher />
+                  {config.debtTrackerEnabled && (
+                    <button
+                      onClick={() => setDebtOpen(true)}
+                      className="flex items-center gap-1 text-xs text-muted/70 hover:text-ink transition-colors px-1.5 py-1 rounded-lg hover:bg-bgsoft"
+                      title="Teknik Borç Takipçisi: açık dosyaları karmaşıklık/JSDoc/kopya kod için tara"
+                    >
+                      <AlertTriangle size={13} />
+                    </button>
+                  )}
+                  {config.teammateEnabled && (
+                    <button
+                      onClick={() => setTeammateOpen(true)}
+                      className="flex items-center gap-1 text-xs text-muted/70 hover:text-ink transition-colors px-1.5 py-1 rounded-lg hover:bg-bgsoft"
+                      title="AI Takım Arkadaşı: arka planda çalışan görev kuyruğu"
+                    >
+                      <Users size={13} />
+                    </button>
+                  )}
+                </div>
                 <StatusBar
                   safeMode={config.safeMode}
                   web={lastPilot?.web}
@@ -4351,6 +4434,12 @@ export function CoderView() {
           onCloseGit={() => setGitPanelOpen(false)}
           onReviewPr={() => setPrModalOpen(true)}
           artifact={artifact}
+          debtOpen={debtOpen}
+          onCloseDebt={() => setDebtOpen(false)}
+          teammateOpen={teammateOpen}
+          onCloseTeammate={() => setTeammateOpen(false)}
+          onRunTeammateTask={runTeammateTask}
+          onAddTeammateResultToChat={(content) => useStore.getState().setPendingInput(content)}
         />
       </div>
 

@@ -53,6 +53,34 @@ describe("buildArtifactSrcDoc — mevcut türler değişmedi", () => {
   });
 });
 
+describe("buildArtifactSrcDoc — sql (sql.js ile GERÇEKTEN çalıştırılır)", () => {
+  it("sql.js CDN'ini ve kullanıcı sorgusunu gömer", () => {
+    const doc = buildArtifactSrcDoc("sql", "SELECT 1;");
+    expect(doc).toContain("sql-wasm.js");
+    expect(doc).toContain("db.exec");
+    expect(doc).toContain(JSON.stringify("SELECT 1;"));
+  });
+  it("kullanıcı içeriğindeki </script>'i kaçırır (JSON.stringify zaten güvenli kaçırır)", () => {
+    const doc = buildArtifactSrcDoc("sql", "-- </script><img onerror=alert(1)>");
+    expect(doc).not.toContain("</script><img");
+  });
+});
+
+describe("buildArtifactSrcDoc — python (Pyodide ile GERÇEKTEN çalıştırılır)", () => {
+  it("Pyodide CDN'ini ve kullanıcı kodunu global olarak gömer", () => {
+    const doc = buildArtifactSrcDoc("python", "print('merhaba')");
+    expect(doc).toContain("pyodide.js");
+    expect(doc).toContain("py.globals.set");
+    expect(doc).toContain(JSON.stringify("print('merhaba')"));
+  });
+  it("stdout/stderr'i redirect_stdout ile yakalayan bir runner kurar (naif string join YOK)", () => {
+    const doc = buildArtifactSrcDoc("python", "print(1)");
+    expect(doc).toContain("redirect_stdout");
+    expect(doc).toContain("redirect_stderr");
+    expect(doc).not.toContain("_stdout.buf");
+  });
+});
+
 describe("withAnnotationScript — İşaretle & Değiştir", () => {
   it("script'i SON </body>'den hemen önce enjekte eder", () => {
     const doc = buildArtifactSrcDoc("html", "<p>hi</p>");
@@ -118,5 +146,9 @@ describe("artifactDownload — uzantılar", () => {
   });
   it("html gövdesi tam belgeye tamamlanır", () => {
     expect(artifactDownload("html", "<p>hi</p>").body).toContain("<!DOCTYPE html>");
+  });
+  it("sql → .sql, python → .py, ham içerik (çalıştırma iskeleti eklenmez)", () => {
+    expect(artifactDownload("sql", "SELECT 1;")).toEqual({ ext: "sql", body: "SELECT 1;" });
+    expect(artifactDownload("python", "print(1)")).toEqual({ ext: "py", body: "print(1)" });
   });
 });
