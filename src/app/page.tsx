@@ -2,46 +2,67 @@ import Link from "next/link";
 import { ReferralCapture } from "@/components/ReferralCapture";
 import { BrandMark } from "@/components/BrandMark";
 import { MarketingHeader, OpenAppCta } from "@/components/MarketingHeader";
-import { FEATURES } from "@/lib/features";
 import {
   ArrowRight,
   ChevronDown,
-  FileText,
-  FlaskConical,
-  Image as ImageIcon,
-  LayoutTemplate,
-  MessageCircle,
-  ShieldCheck,
+  GitBranch,
+  KeyRound,
+  Repeat,
+  TerminalSquare,
 } from "lucide-react";
 
-/* İnsan diliyle "ne yapabilirsin" — jargon yok, herkes anlar. */
-const CAN_DO = [
-  { icon: <LayoutTemplate size={20} />, title: "Web sitesi tasarla", desc: "\"Kahve dükkânım için modern bir sayfa\" yaz — dakikada canlı, indirilebilir bir site çıkar." },
-  { icon: <FileText size={20} />, title: "Sunum hazırla", desc: "Konuyu söyle, slaytları senin için kursun. PDF ya da bağımsız dosya olarak dışa aktar." },
-  { icon: <ImageIcon size={20} />, title: "Görsel üret", desc: "Hayal ettiğini anlat, yapay zeka çizsin. Birden çok varyasyon, anahtar gerekmez." },
-  { icon: <MessageCircle size={20} />, title: "Her şeyi sor", desc: "E-posta yaz, bir metni özetle, fikir al, öğren. Sıradan bir sohbet kadar kolay." },
+/* Dört somut gerçek — "ne yapabilirsin" değil "neden sınırsız". */
+const PILLARS = [
+  {
+    icon: <KeyRound size={18} />,
+    title: "Anahtarsız başla",
+    desc: "Hesap, kart, API anahtarı yok. Açtığın an hazır ücretsiz modelle yazmaya başlarsın.",
+  },
+  {
+    icon: <Repeat size={18} />,
+    title: "Limit dolarsa yedek devreye girer",
+    desc: "Bir sağlayıcı kotaya ya da hataya takılınca istek düşmez; sıradaki ücretsiz modele geçer.",
+  },
+  {
+    icon: <GitBranch size={18} />,
+    title: "Deponla birlikte çalışır",
+    desc: "GitHub ya da GitLab deponu bağla; model dosyaları okur, düzenler, dal ve commit yönetir.",
+  },
+  {
+    icon: <TerminalSquare size={18} />,
+    title: "Kendi terminalin",
+    desc: "Kendi sunucundaki terminale bağlan, komut çalıştır. Anahtarların yalnız tarayıcında kalır.",
+  },
+];
+
+/* Otomatik yedek zincirinin gerçek mantığı (lib/fallback.ts) — görsel özet. */
+const CHAIN = [
+  { name: "Pollinations", note: "anahtarsız", free: true },
+  { name: "Groq", note: "ücretsiz katman", free: true },
+  { name: "Gemini", note: "ücretsiz katman", free: true },
+  { name: "Kendi anahtarın", note: "istersen", free: false },
 ];
 
 const FAQS = [
   {
-    q: "Yazılım veya yapay zeka bilmiyorum, kullanabilir miyim?",
-    a: "Evet — UMAI tam da bunun için tasarlandı. Ne istediğini sıradan cümlelerle yazarsın, gerisini yapay zeka halleder. Hiçbir kurulum, kod ya da teknik bilgi gerekmez.",
+    q: "Gerçekten ücretsiz mi? Kredi kartı istiyor mu?",
+    a: "Kart istemez. Hazır gelen ücretsiz modellerle hemen yazmaya başlarsın. Daha güçlü bir model istersen kendi API anahtarını eklersin; faturayı sağlayıcın keser, UMAI aracılık payı almaz.",
   },
   {
-    q: "Ücretsiz mi? Kredi kartı istiyor mu?",
-    a: "Anında, ücretsiz ve kredi kartsız başlarsın. Hazır gelen ücretsiz yapay zeka ile hemen üretmeye başlayabilirsin. İleri düzey için istersen kendi modelini ekleyebilirsin.",
+    q: "Limite takılırsam ne olur?",
+    a: "İstek düşmez. Aktif model kota ya da erişim hatası verince sıradaki ücretsiz sağlayıcıya otomatik geçilir; her zaman anahtarsız bir taban modelle devam edersin.",
   },
   {
-    q: "Neler yapabilirim?",
-    a: "Web sitesi ve sunum tasarlayabilir, görsel üretebilir, metin yazdırabilir, soru sorabilirsin. Yazılımcıysan kod üretip GitHub/GitLab depona bağlanabilirsin — hepsi tek yerde.",
+    q: "Depoma ne kadar erişiyor?",
+    a: "Yalnız bağladığın depoya, senin verdiğin izinle. Model dosyaları okur ve düzenler; değişiklikleri sen görür, onaylarsın. Depo bağlamadan da normal sohbet edebilirsin.",
   },
   {
     q: "Verilerim güvende mi?",
-    a: "Evet. Kendi anahtarını eklersen yalnızca senin tarayıcında kalır, sunucuya gönderilmez. Sohbetlerin için isteğe bağlı bulut senkronu var; kullanmak zorunda değilsin.",
+    a: "Kendi anahtarların yalnızca tarayıcında saklanır, sunucuda tutulmaz. Sohbet senkronu isteğe bağlıdır; kullanmak zorunda değilsin.",
   },
   {
     q: "Telefonda çalışıyor mu?",
-    a: "Evet, telefon ve tablette tam çalışır. Ana ekrana uygulama gibi de ekleyebilirsin.",
+    a: "Evet. Telefon ve tablette tam çalışır, ana ekrana uygulama gibi eklenebilir.",
   },
 ];
 
@@ -52,14 +73,14 @@ const JSON_LD_APP = {
   "@type": "SoftwareApplication",
   name: "UMAI",
   description:
-    "Herkes için yapay zeka stüdyosu. Web sitesi ve sunum tasarla, görsel üret, her şeyi sor — ya da kod yazıp GitHub/GitLab depona bağlan. Kurulum yok, ücretsiz başlar.",
+    "Asla ödeme yapmadan, asla limitle karşılaşmadan kod yaz ve sohbet et. GitHub/GitLab deponu bağla; kurulum ve kredi kartı yok.",
   url: SITE_URL,
-  applicationCategory: "DesignApplication",
+  applicationCategory: "DeveloperApplication",
   operatingSystem: "Web",
   inLanguage: "tr",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
   author: { "@type": "Person", name: "Enes Kahveci", email: "eneskahveci.bs@gmail.com" },
-  featureList: ["Web sitesi tasarımı", "Sunum üretimi", "Görsel üretimi", "Yapay zeka sohbeti", "Kod & depo entegrasyonu"],
+  featureList: ["Ücretsiz yapay zeka kodlama asistanı", "Otomatik yedek model zinciri", "GitHub ve GitLab entegrasyonu", "Tarayıcıda terminal"],
 };
 
 const JSON_LD_FAQ = {
@@ -92,95 +113,131 @@ export default function Home() {
       />
 
       {/* HERO — tek mesaj: asla ödeme yapmadan, asla limitle karşılaşmadan */}
-      <header className="max-w-3xl mx-auto px-5 sm:px-6 pt-20 sm:pt-28 pb-14 text-center w-full">
-        <h1 className="font-serif text-[2.4rem] leading-[1.12] sm:text-5xl lg:text-6xl font-semibold tracking-tight text-balance">
-          Asla ödeme yapmadan, asla limitle karşılaşmadan kod yaz ve sohbet et.
-        </h1>
+      <header className="hero-stage relative overflow-hidden">
+        <div className="relative max-w-6xl mx-auto px-5 sm:px-6 pt-16 sm:pt-24 pb-10 grid lg:grid-cols-[1.05fr_1fr] gap-12 lg:gap-10 items-center">
+          <div className="text-center lg:text-left">
+            <p className="inline-flex items-center gap-2 text-[12px] font-mono text-muted border border-line/70 bg-surface/60 rounded-full pl-2 pr-3 py-1 mb-6">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand shadow-[0_0_8px_var(--color-brand)]" />
+              Kurulum yok · kart yok · anahtar yok
+            </p>
+            <h1 className="font-serif text-[2.5rem] leading-[1.08] sm:text-6xl font-semibold tracking-[-0.025em] text-balance">
+              Asla ödeme yapmadan, asla limitle karşılaşmadan{" "}
+              <span className="text-brand italic">kod yaz</span> ve sohbet et.
+            </h1>
+            <p className="text-[17px] text-muted max-w-xl mx-auto lg:mx-0 mt-6 leading-relaxed text-balance">
+              Depoyu bağla, ne istediğini yaz; model dosyaları okur, düzenler ve komut çalıştırır.
+              Ücretsiz modellerle hemen başla, istersen kendi anahtarını getir.
+            </p>
+            <div className="flex flex-wrap justify-center lg:justify-start items-center gap-3 mt-9">
+              <Link
+                href="/app"
+                className="btn-glow inline-flex items-center gap-2 bg-brand hover:bg-branddim text-[#0b0d09] font-semibold px-7 py-3.5 rounded-xl text-[15px]"
+              >
+                Sohbete başla <ArrowRight size={17} />
+              </Link>
+              <Link href="/pricing" className="inline-flex items-center gap-2 text-sm text-muted hover:text-ink font-medium px-4 py-3.5 transition-colors">
+                Fiyatlandırma
+              </Link>
+            </div>
+          </div>
 
-        <p className="text-lg text-muted max-w-2xl mx-auto mt-6 leading-relaxed text-balance">
-          Kendi anahtarını getir ya da anahtarsız ücretsiz modellerle hemen başla — GitHub veya
-          GitLab deponu bağla, kod üret, sohbet et. Kurulum yok, kredi kartı yok, sürpriz ücret yok.
-        </p>
-
-        <div className="flex justify-center mt-10">
-          <Link
-            href="/app"
-            className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-[#111110] font-semibold px-8 py-4 rounded-xl transition-colors text-[15px] shadow-sm shadow-brand/20"
-          >
-            Sohbete başla <ArrowRight size={17} />
-          </Link>
-        </div>
-
-        {FEATURES.designStudio && <p className="text-xs text-muted/60 mt-6">
-          Web sitesi, sunum ve görsel tasarımı mı arıyorsun?{" "}
-          <Link href="/studio" className="text-muted hover:text-brand underline underline-offset-2 transition-colors">
-            Stüdyo&apos;ya göz at
-          </Link>
-        </p>}
-      </header>
-
-      {/* NE YAPABİLİRSİN — sade, dört öğe */}
-      <section className="max-w-4xl mx-auto px-5 sm:px-6 py-14 w-full">
-        <h2 className="font-serif text-2xl sm:text-3xl font-semibold mb-8 tracking-tight text-center text-balance">UMAI ile neler yapabilirsin?</h2>
-        <div className="grid sm:grid-cols-2 gap-3">
-          {CAN_DO.map((f) => (
-            <div key={f.title} className="premium-card rounded-2xl p-5 flex items-start gap-4">
-              <div className="w-11 h-11 rounded-xl bg-brand/10 text-brand grid place-items-center shrink-0">
-                {f.icon}
+          {/* İMZA — gerçek ürün penceresi: depo rozeti, araç çağrıları, diff, durum çubuğu */}
+          <div className="relative" aria-hidden="true">
+            <div className="hero-window rounded-2xl overflow-hidden">
+              <div className="flex items-center gap-2 px-4 h-10 border-b border-line/70 bg-surface2/40">
+                <span className="flex gap-1.5">
+                  <i className="w-2.5 h-2.5 rounded-full bg-red/70" />
+                  <i className="w-2.5 h-2.5 rounded-full bg-yellow/70" />
+                  <i className="w-2.5 h-2.5 rounded-full bg-green/70" />
+                </span>
+                <span className="mx-auto inline-flex items-center gap-1.5 text-[11px] font-mono text-muted">
+                  <GitBranch size={11} className="text-brand/80" /> ornek/proje · main
+                </span>
+                <span className="w-10" />
               </div>
-              <div className="min-w-0">
-                <h3 className="font-bold text-[15px] mb-1">{f.title}</h3>
-                <p className="text-muted text-[13px] leading-relaxed">{f.desc}</p>
+              <div className="p-4 sm:p-5 font-mono text-[12px] leading-relaxed space-y-3.5">
+                <div className="flex gap-2.5">
+                  <span className="text-brand select-none">›</span>
+                  <p className="text-ink">şifre sıfırlama sayfasındaki boş e-posta hatasını düzelt</p>
+                </div>
+                <div className="space-y-1 text-muted">
+                  <p><span className="text-green">✓</span> src/app/reset-password/page.tsx okundu</p>
+                  <p><span className="text-green">✓</span> src/lib/validate.ts okundu</p>
+                  <p><span className="text-brand">✎</span> 2 dosya düzenlendi <span className="text-green">+14</span> <span className="text-red">−3</span></p>
+                </div>
+                <div className="rounded-lg border border-line/70 bg-codebg/70 overflow-hidden text-[11.5px]">
+                  <p className="px-3 py-1.5 border-b border-line/60 text-muted/80">src/lib/validate.ts</p>
+                  <p className="px-3 py-0.5 bg-red/10 text-red/90">− if (email) return true;</p>
+                  <p className="px-3 py-0.5 bg-green/10 text-green">+ if (!email.trim()) return false;</p>
+                  <p className="px-3 py-0.5 bg-green/10 text-green">+ return EMAIL_RE.test(email);</p>
+                </div>
+                <p className="text-ink/90 font-sans text-[13px] leading-relaxed">
+                  Boş e-posta artık formu göndermeden engelleniyor. Testi de ekledim.
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-3 px-4 h-9 border-t border-line/70 bg-surface2/40 text-[11px] font-mono">
+                <span className="text-cyan">Pollinations</span>
+                <span className="text-muted">₺0 · limit yok</span>
               </div>
             </div>
-          ))}
+            <p className="text-center text-[11px] text-muted/60 mt-3">Örnek oturum</p>
+          </div>
         </div>
-      </section>
+      </header>
 
-      {/* ARAŞTIRMA & KURUMLAR */}
-      <section className="max-w-5xl mx-auto px-5 sm:px-6 py-14 w-full">
-        <div className="text-center mb-8">
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted mb-3">
-            <FlaskConical size={13} /> Araştırma & Kurumlar için
-          </span>
-          <h2 className="font-serif text-2xl sm:text-3xl font-semibold tracking-tight text-balance">Ar-Ge ekipleri, akademisyenler ve kurumlar için</h2>
-          <p className="text-muted max-w-2xl mx-auto mt-3 text-balance">Proje başvurusundan sunuma, rapordan postere kadar — araştırma işini konuşarak hazırla. Verini kendi kontrolünde tut.</p>
+      {/* NEDEN SINIRSIZ — dört somut gerçek */}
+      <section className="max-w-6xl mx-auto px-5 sm:px-6 py-16 w-full">
+        <div className="max-w-2xl mb-10">
+          <h2 className="font-serif text-3xl sm:text-4xl font-semibold tracking-tight text-balance">Sürpriz fatura ve “limit doldu” ekranı yok.</h2>
+          <p className="text-muted mt-3 leading-relaxed">Ürün, tek bir sağlayıcının kotasına bağlı kalmayacak şekilde kurulu.</p>
         </div>
-        <div className="grid sm:grid-cols-3 gap-3 mb-6">
-          {[
-            { icon: <FileText size={20} />, title: "Başvuru & rapor", desc: "Destek/hibe proje önerisi, dönem ve sonuç raporu iskeletleri; literatür özeti ve kaynakça. Hazır şablonlar Skills panelinde." },
-            { icon: <LayoutTemplate size={20} />, title: "Poster & sunum", desc: "Akademik poster, tek sayfalık proje özeti, proje sunumu ve sertifika — Stüdyo'da bir cümleyle üret, PDF olarak dışa aktar." },
-            { icon: <ShieldCheck size={20} />, title: "Veri sende kalır", desc: "Anahtarların yalnız tarayıcında; içerik sunucuda saklanmaz. Kendi modelini (yerel/kurum) bağla — gizlilik-önce mimari." },
-          ].map((f) => (
-            <div key={f.title} className="premium-card rounded-2xl p-5">
-              <div className="w-11 h-11 rounded-xl bg-brand/10 text-brand grid place-items-center mb-3">{f.icon}</div>
-              <h3 className="font-bold text-[15px] mb-1">{f.title}</h3>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {PILLARS.map((f) => (
+            <div key={f.title} className="premium-card rounded-2xl p-5 hover:border-brand/30">
+              <div className="w-9 h-9 rounded-lg bg-brand/10 text-brand grid place-items-center mb-4">{f.icon}</div>
+              <h3 className="font-semibold text-[15px] mb-1.5 tracking-tight">{f.title}</h3>
               <p className="text-muted text-[13px] leading-relaxed">{f.desc}</p>
             </div>
           ))}
         </div>
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <Link href="/app" className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-[#111110] font-semibold px-6 py-3 rounded-xl text-sm transition-colors">
-            Araştırma için dene <ArrowRight size={15} />
-          </Link>
-          <a href="mailto:eneskahveci.bs@gmail.com?subject=UMAI%20—%20Kurumsal%2FAra%C5%9Ft%C4%B1rma%20Kullan%C4%B1m%C4%B1" className="inline-flex items-center gap-2 border border-line bg-surface text-muted hover:text-ink hover:border-brand/40 px-6 py-3 rounded-xl text-sm font-medium transition-colors">
-            Kurumsal kullanım / teklif <ArrowRight size={15} />
-          </a>
+      </section>
+
+      {/* YEDEK ZİNCİRİ — otomatik geçişin görsel özeti */}
+      <section className="max-w-6xl mx-auto px-5 sm:px-6 py-10 w-full">
+        <div className="premium-card rounded-3xl p-6 sm:p-10">
+          <div className="grid lg:grid-cols-[1fr_1.3fr] gap-8 lg:gap-12 items-center">
+            <div>
+              <h2 className="font-serif text-2xl sm:text-3xl font-semibold tracking-tight text-balance">Biri tıkanınca, sıradaki devralır.</h2>
+              <p className="text-muted mt-3 leading-relaxed text-[15px]">
+                Kota, erişim ya da sunucu hatası olduğunda istek yarıda kalmaz; ücretsiz sağlayıcılar arasında
+                otomatik geçilir. Sen aynı sohbette devam edersin.
+              </p>
+            </div>
+            <ol className="flex flex-col sm:flex-row sm:items-stretch gap-2.5">
+              {CHAIN.map((c, i) => (
+                <li key={c.name} className="flex sm:flex-1 items-center gap-2.5">
+                  <div className="flex-1 rounded-xl border border-line/80 bg-bg/60 px-4 py-3.5">
+                    <p className={`text-[14px] font-semibold ${c.free ? "text-cyan" : "text-ink"}`}>{c.name}</p>
+                    <p className="text-[11px] font-mono text-muted mt-0.5">{c.note}</p>
+                  </div>
+                  {i < CHAIN.length - 1 && <ArrowRight size={14} className="hidden sm:block text-muted/50 shrink-0" />}
+                </li>
+              ))}
+            </ol>
+          </div>
         </div>
       </section>
 
-      {/* CTA BANNER */}
-      <section className="max-w-5xl mx-auto px-5 sm:px-6 py-14 w-full">
-        <div className="rounded-2xl border border-line bg-surface p-10 sm:p-14 text-center">
-          <h2 className="font-serif text-2xl sm:text-3xl font-semibold mb-3 tracking-tight text-balance">Ücretsiz başla</h2>
-          <p className="text-muted mb-8 max-w-lg mx-auto text-balance">
-            Hesap oluşturmadan dene; kredi kartı gerekmez.
-          </p>
+      {/* CTA */}
+      <section className="max-w-6xl mx-auto px-5 sm:px-6 py-16 w-full">
+        <div className="cta-panel rounded-3xl px-6 py-14 sm:py-16 text-center">
+          <h2 className="font-serif text-3xl sm:text-4xl font-semibold mb-3 tracking-tight text-balance">İlk mesajını şimdi gönder.</h2>
+          <p className="text-muted mb-8 max-w-md mx-auto text-balance">Kayıt olmadan dene; kredi kartı gerekmez.</p>
           <Link
             href="/app"
-            className="inline-flex items-center gap-2 bg-brand hover:bg-branddim text-[#111110] font-semibold px-8 py-4 rounded-xl transition-colors text-[15px]"
+            className="btn-glow inline-flex items-center gap-2 bg-brand hover:bg-branddim text-[#0b0d09] font-semibold px-8 py-4 rounded-xl text-[15px]"
           >
-            UMAI&apos;yi aç <ArrowRight size={17} />
+            Sohbete başla <ArrowRight size={17} />
           </Link>
         </div>
       </section>
@@ -188,7 +245,7 @@ export default function Home() {
       {/* FAQ */}
       <section className="max-w-3xl mx-auto px-5 sm:px-6 py-14 w-full">
         <div className="text-center mb-10">
-          <h2 className="font-serif text-3xl font-semibold mb-3 tracking-tight">Sık sorulan sorular</h2>
+          <h2 className="font-serif text-3xl sm:text-4xl font-semibold mb-3 tracking-tight">Sık sorulan sorular</h2>
         </div>
         <div className="space-y-3">
           {FAQS.map((faq) => (
@@ -210,7 +267,7 @@ export default function Home() {
             <BrandMark size={22} />
             <span className="text-ink">UMAI</span>
           </div>
-          <p className="text-sm text-muted">Web sitesi, sunum ve görsel tasarla · kod yaz ve depona bağlan</p>
+          <p className="text-sm text-muted">Asla ödeme yapmadan, asla limitle karşılaşmadan kod yaz ve sohbet et.</p>
 
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 mt-8 text-xs text-muted/70">
             <Link href="/pricing" className="hover:text-brand transition-colors">Fiyatlandırma</Link>
