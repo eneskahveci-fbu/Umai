@@ -12,7 +12,7 @@ export function EmptyChat() {
   const repo = useStore((s) => s.repo);
 
   return (
-    <div className="flex flex-col items-center justify-center h-full px-6 py-10 select-none">
+    <div className="empty-glow flex flex-col items-center justify-center h-full px-6 py-10 select-none">
       {repo && (
         <div className="inline-flex items-center gap-1.5 text-[12px] font-mono text-muted/80 mb-3 px-2.5 py-1 rounded-lg border border-line/60 bg-surface/50">
           <FolderGit2 size={13} className="text-brand/80" />
@@ -25,7 +25,7 @@ export function EmptyChat() {
           )}
         </div>
       )}
-      <h2 className="text-[26px] sm:text-[28px] font-extrabold tracking-tight text-center text-balance">
+      <h2 className="text-[30px] sm:text-[36px] font-serif font-semibold tracking-[-0.02em] text-center text-balance">
         {repo ? "Bu projede ne yapalım?" : "Ne üzerinde çalışalım?"}
       </h2>
     </div>

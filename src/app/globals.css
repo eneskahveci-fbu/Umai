@@ -968,3 +968,42 @@ html.light body {
   .typing-shimmer::after { animation: none; }
   .caret { animation: none; }
 }
+
+
+/* ─── Açılış sayfası (premium cila) ─────────────────────────────────────
+   Hero: ince nokta ızgarası + marka tonlu tek ışık; pencere: katmanlı gölge
+   ve iç kenar parıltısı. Süs değil — ürünün gerçek görünümünü taşır. */
+.hero-stage {
+  background:
+    radial-gradient(60% 55% at 78% 28%, color-mix(in srgb, var(--color-brand) 13%, transparent), transparent 70%),
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--color-ink) 9%, transparent) 1px, transparent 0) 0 0 / 22px 22px;
+  -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent);
+  mask-image: linear-gradient(180deg, #000 78%, transparent);
+}
+.hero-window {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-ink) 4%, var(--color-surface)), var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-ink) 12%, var(--color-line));
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--color-ink) 9%, transparent) inset,
+    0 2px 6px rgba(0,0,0,.35),
+    0 30px 70px -20px rgba(0,0,0,.7),
+    0 0 90px -30px color-mix(in srgb, var(--color-brand) 35%, transparent);
+}
+@media (min-width: 1024px) { .hero-window { transform: perspective(1400px) rotateY(-4deg) rotateX(1.5deg); } }
+.btn-glow {
+  box-shadow: 0 1px 0 rgba(255,255,255,.35) inset, 0 8px 24px -8px color-mix(in srgb, var(--color-brand) 60%, transparent);
+  transition: background-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-spring), box-shadow var(--dur-3) var(--ease-out);
+}
+.btn-glow:hover { transform: translateY(-1px); box-shadow: 0 1px 0 rgba(255,255,255,.4) inset, 0 12px 30px -8px color-mix(in srgb, var(--color-brand) 75%, transparent); }
+.btn-glow:active { transform: translateY(0); }
+.cta-panel {
+  border: 1px solid color-mix(in srgb, var(--color-brand) 22%, var(--color-line));
+  background:
+    radial-gradient(70% 90% at 50% 0%, color-mix(in srgb, var(--color-brand) 14%, transparent), transparent 70%),
+    var(--color-surface);
+}
+html.light .hero-window { box-shadow: 0 1px 0 #fff inset, 0 30px 60px -25px rgba(20,21,15,.25); }
+@media (prefers-reduced-motion: reduce) { .btn-glow:hover { transform: none; } }
+
+/* Boş sohbet: başlığın arkasında tek, çok hafif marka ışığı. */
+.empty-glow { background: radial-gradient(45% 40% at 50% 42%, color-mix(in srgb, var(--color-brand) 7%, transparent), transparent 70%); }
