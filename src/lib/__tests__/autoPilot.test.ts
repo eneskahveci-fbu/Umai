@@ -173,6 +173,18 @@ describe("yardımcılar", () => {
   it("autoWeb: genel bilgi sorusu tetiklemez", () => {
     expect(autoWeb("Python'da liste nasıl sıralanır?")).toBe(false);
   });
+  it("autoWeb: kodlama/tasarım tarifindeki 'fiyat'/'kur' web araması SAYILMAZ (yanlış pozitif → cevap 12 sn gecikirdi)", () => {
+    expect(autoWeb("Ürün kartlarında görsel, başlık, fiyat ve sepete ekle butonu olsun")).toBe(false);
+    expect(autoWeb("kartta fiyat göster")).toBe(false);
+    expect(autoWeb("Docker ortamını kur ve projeyi ayağa kaldır")).toBe(false);
+    expect(autoWeb("ödeme formuna dolar simgesi ekle")).toBe(false);
+    const uzun = "Bir e-ticaret sitesi için ürün listeleme sayfasını tasarla. Filtreler solda, ürün kartları sağda olsun; kartlarda görsel, başlık, fiyat ve sepete ekle butonu bulunsun. Mobilde tek sütun, masaüstünde dört sütun kullan. Erişilebilirliğe ve performansa dikkat et, bileşenleri küçük tut.";
+    expect(autoWeb(uzun)).toBe(false);
+  });
+  it("autoWeb: güçlü güncellik sinyali kodlama bağlamında da web'e gider", () => {
+    expect(autoWeb("en güncel next.js sürümü nedir")).toBe(true);
+    expect(autoWeb("react'in son sürüm notları neler")).toBe(true);
+  });
   it("autoWeb: döviz/güncel veri sorusu tetikler", () => {
     expect(autoWeb("1 dolar kaç tl")).toBe(true);
     expect(autoWeb("euro ne kadar bugün")).toBe(true);
