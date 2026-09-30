@@ -1,0 +1,7 @@
+[
+  { "id": "claude-opus", "label": "Claude Opus", "provider": "anthropic", "baseUrl": "https://api.anthropic.com/v1", "model": "claude-opus-4-8", "apiKeyEnv": "ANTHROPIC_API_KEY" },
+  { "id": "gemini-flash", "label": "Gemini Flash", "provider": "openai", "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai", "model": "gemini-flash-latest", "apiKeyEnv": "GEMINI_API_KEY" },
+  { "id": "groq-llama", "label": "Groq Llama 3.3 70B", "provider": "openai", "baseUrl": "https://api.groq.com/openai/v1", "model": "llama-3.3-70b-versatile", "apiKeyEnv": "GROQ_API_KEY" },
+  { "id": "deepseek", "label": "DeepSeek", "provider": "openai", "baseUrl": "https://api.deepseek.com/v1", "model": "deepseek-chat", "apiKeyEnv": "DEEPSEEK_API_KEY" },
+  { "id": "pollinations", "label": "Pollinations (anahtarsız)", "provider": "openai", "baseUrl": "https://text.pollinations.ai/openai", "model": "openai", "keyless": true }
+]
