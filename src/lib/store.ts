@@ -214,8 +214,8 @@ function loadConfig(): Config {
         merged.mediaAssets = mediaAssets;
         try { store.setItem(CONFIG_KEY, JSON.stringify(merged)); } catch { /* kota — yok say */ }
       }
-      /* Ölü GitHub deposunu canlı GitLab deposuna migrate et */
-      const migrated = migrateRepos(merged);
+      /* Ölü GitHub deposunu canlı GitLab deposuna migrate et + eski model etiketi */
+      const migrated = migrateModelLabels(migrateRepos(merged));
       if (migrated !== merged) {
         try { store.setItem(CONFIG_KEY, JSON.stringify(migrated)); } catch { /* yok say */ }
       }
@@ -278,6 +278,24 @@ function saveLocalChats(chats: Chat[]) {
 function applyTheme(theme: "dark" | "light") {
   if (typeof document === "undefined") return;
   document.documentElement.classList.toggle("light", theme === "light");
+}
+
+/* Eski varsayılan model etiketlerini günceller (kayıtlı config'lerde ve buluttan
+   gelen kopyada kalırlar): model adında marka ("UMAI Default") ve "(Ücretsiz)"
+   yazmaz — ücretsizlik artık renkle gösterilir (lib/freeModels.ts). YALNIZ
+   uygulamanın kendi eski varsayılan etiketleri birebir eşleşirse değişir;
+   kullanıcının kendi verdiği adlara dokunulmaz. Eyl 2026 kullanıcı kararları. */
+const LEGACY_MODEL_LABELS: Record<string, string> = {
+  "✦ UMAI Default (Ücretsiz)": "Pollinations",
+  "Pollinations (Ücretsiz)": "Pollinations",
+  "🇪🇺 OVH Ücretsiz (Anahtarsız)": "🇪🇺 OVH (Anahtarsız)",
+};
+export function migrateModelLabels(cfg: Config): Config {
+  if (!Array.isArray(cfg.models) || !cfg.models.some((m) => m.label in LEGACY_MODEL_LABELS)) return cfg;
+  return {
+    ...cfg,
+    models: cfg.models.map((m) => (m.label in LEGACY_MODEL_LABELS ? { ...m, label: LEGACY_MODEL_LABELS[m.label] } : m)),
+  };
 }
 
 /* Ölü/gömülü varsayılan depoları kayıtlı listeden TEMİZLER.
@@ -364,8 +382,8 @@ export function mergeConfigs(local: Config, remote: Partial<Config>): Config {
   base.activeModelId = has(base.models, base.activeModelId) ? base.activeModelId : (base.models[0]?.id ?? null);
   base.activeGithubId = has(base.githubAccounts, base.activeGithubId) ? base.activeGithubId : (base.githubAccounts[0]?.id ?? null);
   base.activeGitlabId = has(base.gitlabAccounts, base.activeGitlabId) ? base.activeGitlabId : (base.gitlabAccounts[0]?.id ?? null);
-  /* Birleşmede uzaktaki ölü repo geri gelmiş olabilir → tekrar migrate et. */
-  return migrateRepos(base);
+  /* Birleşmede uzaktaki ölü repo / eski model etiketi geri gelmiş olabilir → tekrar migrate et. */
+  return migrateModelLabels(migrateRepos(base));
 }
 
 /* MUTLAK KURAL: giriş yapınca yerel sohbetler EZİLMEZ; buluttakilerle BİRLEŞTİRİLİR.

@@ -4,6 +4,7 @@ import { useStore } from "@/lib/store";
 import { useSurfaceNav, setSurfaceOpenItem } from "@/lib/surfaceNav";
 import { buildStudioProjectFromArtifact, withStudioProject } from "@/lib/studioHandoff";
 import { ArtifactCanvas } from "./ArtifactCanvas";
+import { FEATURES } from "@/lib/features";
 
 /* Sohbetin Artifact paneli — global store'daki aktif artifact yuvasına bağlı.
    Sürüm geçmişi de STORE'da tutulur (L4): panel iki ayrı ağaç konumunda
@@ -34,7 +35,7 @@ export function ArtifactPanel() {
       onPrevVersion={() => setVIndex(vIndex - 1)}
       onNextVersion={() => setVIndex(vIndex + 1)}
       onClose={() => setArtifact(null)}
-      onOpenInStudio={() => {
+      onOpenInStudio={!FEATURES.designStudio ? undefined : () => {
         /* N1 — sohbetten Stüdyo'ya devir: artifact bir StudioProject'e çevrilip
            kaydedilir, sonra ⌘K/ProjectModal'ın kullandığı AYNI köprüyle
            (setSurfaceOpenItem → DesignStudio'nun consumeSurfaceOpenItem

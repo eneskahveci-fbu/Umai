@@ -16,7 +16,6 @@ import {
   setMounted,
 } from "@/lib/localfs";
 import { useStore } from "@/lib/store";
-import { isAdminEmail } from "@/lib/admin";
 import {
   applyCtrl,
   BRIDGE_UPDATE_COMMAND,
@@ -141,9 +140,10 @@ interface WsBootOpts extends BootCommon {
 }
 
 async function bootWsTerminal(containerEl: HTMLDivElement, o: WsBootOpts): Promise<() => void> {
-  const [{ Terminal }, { FitAddon }] = await Promise.all([
+  const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
     import("@xterm/xterm"),
     import("@xterm/addon-fit"),
+    import("@xterm/addon-web-links"),
   ]);
   await import("@xterm/xterm/css/xterm.css");
 
@@ -156,6 +156,8 @@ async function bootWsTerminal(containerEl: HTMLDivElement, o: WsBootOpts): Promi
   });
   const fit = new FitAddon();
   term.loadAddon(fit);
+  /* `npm run dev` → http://localhost:3000 gibi adresler tıklanabilir. */
+  term.loadAddon(new WebLinksAddon());
   term.open(containerEl);
   fit.fit();
 
@@ -419,9 +421,10 @@ async function bootWcTerminal(containerEl: HTMLDivElement, o: WcBootOpts): Promi
   if (!isSupported()) { onError(getUnsupportedReason() ?? "Tarayıcı desteklemiyor."); return () => {}; }
   if (needsApiKey() && !apiKey.trim()) { onNeedsKey(); return () => {}; }
 
-  const [{ Terminal }, { FitAddon }] = await Promise.all([
+  const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
     import("@xterm/xterm"),
     import("@xterm/addon-fit"),
+    import("@xterm/addon-web-links"),
   ]);
   await import("@xterm/xterm/css/xterm.css");
 
@@ -434,6 +437,8 @@ async function bootWcTerminal(containerEl: HTMLDivElement, o: WcBootOpts): Promi
   });
   const fit = new FitAddon();
   term.loadAddon(fit);
+  /* `npm run dev` → http://localhost:3000 gibi adresler tıklanabilir. */
+  term.loadAddon(new WebLinksAddon());
   term.open(containerEl);
   fit.fit();
 
@@ -561,11 +566,8 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
   const repo = useStore((s) => s.repo);
   const codespaceHref = repo ? codespaceUrl(repo.owner, repo.repo, repo.branch) : null;
   const useWs = wsUrl.trim().length > 0;
-  /* Tam ekran: yalnız admin — geniş kullanıcı kitlesi için gereksiz bir
-     karmaşıklık/dikkat dağıtıcı, admin'in uzun komut/log takibi içinse
-     gerçek bir ihtiyaç (bkz. CLAUDE.md: "hassas ayarlar yalnız admin'e
-     görünür" ilkesiyle aynı çizgide). */
-  const isAdmin = isAdminEmail(useStore((s) => s.userEmail));
+  /* Tam ekran: herkese açık (Eyl 2026 kullanıcı kararı — terminal artık admin'e
+     özel değil, "Coder odaklı yön"; eskiden yalnız admin'di). */
   const [fullscreen, setFullscreen] = useState(false);
 
   /* Yazı boyutu + hızlı komutlar config'te kalıcı. `terminalQuickCommands`
@@ -827,15 +829,13 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
         >
           <ClipboardPaste size={11} />
         </button>
-        {isAdmin && (
-          <button
-            onClick={() => setFullscreen((v) => !v)}
-            title={fullscreen ? "Tam ekrandan çık (Esc)" : "Tam ekran"}
-            className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors"
-          >
-            {fullscreen ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
-          </button>
-        )}
+        <button
+          onClick={() => setFullscreen((v) => !v)}
+          title={fullscreen ? "Tam ekrandan çık (Esc)" : "Tam ekran"}
+          className="text-white/40 hover:text-white/80 w-7 h-7 grid place-items-center rounded transition-colors"
+        >
+          {fullscreen ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
+        </button>
         <button onClick={onClose} title="Kapat" className="text-white/40 hover:text-white/80 p-1 rounded transition-colors">
           <X size={12} />
         </button>

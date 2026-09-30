@@ -60,7 +60,9 @@ src/
     ├── agents.ts             # Slash komut agent'ları (/refactor, /test...)
     ├── fallback.ts           # buildFallbackChain — çok-sağlayıcılı oto-fallback
     ├── preview.ts            # Kod → canlı sandbox (React/JSX/HTML/SVG/mermaid + console)
+    ├── features.ts           # FEATURES — rafa kaldırılan özelliklerin aç/kapa anahtarları
     ├── mcpCatalog.ts          # MCP uygulama galerisi verisi (Notion/Slack/Drive... — URL içermez)
+    ├── terminalKeys.ts       # Terminal paneli saf mantığı: tuş şeridi, yeniden bağlanma, yazı boyutu (testli)
     └── extensions/registry.ts# EXTENSION_TOOLS/AGENTS/CATALOG + EXTENSION_PACKS
 ```
 
@@ -83,6 +85,67 @@ parçalarıdır. Skills butonuna basınca `SkillsPanel` modali açılır.
   kullanıcılara 5 hazır skill dosyası getirir (TypeScript, Next.js/React,
   Tailwind/UI, Güvenlik, Yanıt formatı). Hepsi varsayılan olarak aktiftir ve
   onay kutusuyla tek tek seçilebilir.
+
+## Rafa kaldırılanlar (Eyl 2026 kullanıcı kararı) — ÖNCE BUNU OKU
+
+`src/lib/features.ts` → `FEATURES` = `{ designStudio, contentTools, media }`, üçü de
+**`false`**. Tasarım Stüdyosu, içerik araçları (Doküman/Anket/Defter/Kroki/
+Kartlar) ve medya (`/gorsel`, `generate_image`, yanıt seslendirme) GİZLİ ama
+kodu duruyor; aşağıdaki bölümler bu kodu anlatır, canlıda görünmezler. Gizleme
+noktaları: Sidebar/mobil sekme/⌘K/onboarding/tanıtım sayfası/Kütüphane/
+ProjectModal/ArtifactPanel "Stüdyo'da aç"/MessageBubble TTS/Ayarlar "Görsel
+üretimi"; `/studio*` rotaları `app/studio/StudioGate.tsx` ile `/app`'e
+yönlenir; `/api/chat` `imageGen`'i zorla kapatır ve `generate_image`'i araç
+listesinden + sistem promptundan çıkarır; kart hatırlatma cron'u no-op. Kullanıcı
+verisi silinmez, `/a/[id]` paylaşım linkleri çalışır. Geri açmak = ilgili
+anahtarı `true` yap. Yeni bir giriş noktası eklerken bu anahtarlara bağla.
+
+## Coder odaklı yön (Eyl 2026 kullanıcı kararı) — Claude Code web'e paralel
+
+Ürün sohbet uygulamasından "proje önde" bir kodlama aracına dönüyor (hedef:
+Claude Code web; opencode'un TUI görünümü DEĞİL). Yapılanlar:
+- **Sidebar**: nav = Ara / Sohbetler / **Dosyalar** / Eklentiler. "Araçlar"
+  açılır menüsü, "Kütüphane" ve "Projeler" nav satırları KALDIRILDI (sayfalar/
+  kod duruyor: `/library`, `/projects`, ⌘K). Yerine **Repolar** bölümü
+  (`RepoSwitcher`): `config.repos` arasında tek tık geçiş, "Projesiz sohbet"
+  (activeRepo=null + repo/tree düşürülür), "Repo bağla" → `/settings?tab=github`,
+  Yerel Mod açıksa sunucu satırı (tıklayınca Sunucu dosyaları paneli). Paneller
+  `useOpenLeftPanel()` ile açılır (/app dışındaysa önce /app'e gider — B2).
+  Skills/Snippet'ler/Etkinlik/Kısayollar/Dosyalar/Sunucu/Repo bağla ⌘K'da.
+- **Boş ekran** (`EmptyChat.tsx`): YALNIZ başlık (+ bağlı depo varsa depo/dal
+  rozeti). Kullanıcı kararı: "ana ekranda gereksiz yönlendirme olmasın" — başka
+  sayfaya giden kart/link (Repo bağla, sunucu, "kaldığın yerden devam") EKLEME;
+  bunların yeri Sidebar/⌘K. Projesiz sohbet her zaman mümkün.
+- **Model adları**: varsayılan Pollinations profili "Pollinations (Ücretsiz)";
+  model etiketinde marka ("UMAI Default") YAZMAZ. Eski kayıtlı etiket
+  `store.ts` → `migrateModelLabels` ile hem yüklemede hem bulut birleşmesinde düzelir.
+- **Terminal + sunucu ayarları HERKESE AÇIK**: `CoderView` terminal düğmesinin
+  admin kapısı kalktı; Ayarlar'da "Terminal & Sunucu" (eski admin "Geliştirici")
+  ve "Kancalar" sekmeleri + içlerindeki WebContainer/Hibrit/Yerel Mod bölümleri
+  artık admin'e özel değil. Admin'e özel kalan: Otomatik Pilot anahtarı,
+  AdminAnalytics/AdminUsers.
+- Mobil alt sekme: Sohbet / Ayarlar (+ Stüdyo yalnız `studioEnabled()` iken).
+- **Ücretsiz modeller renkle** (`lib/freeModels.ts` → `isFreeModel`/`FREE_PROVIDERS`/
+  `FREE_MODEL_CLASS` = `text-cyan`): model etiketlerinde "(Ücretsiz)" YAZMAZ;
+  ücretsiz olanlar (anahtarsız/ücretsiz katmanlı sağlayıcılar + `:free` sonekli
+  modeller) tüm model listelerinde cyan. Yerel `<option>`'larda `FREE_MODEL_COLOR`.
+  Eski kayıtlı varsayılan etiketler `store.ts` → `migrateModelLabels` (yalnız
+  birebir eşleşen eski varsayılanlar; kullanıcı adlarına dokunmaz).
+- **MCP düz sohbette**: kullanıcının bağladığı (yerleşik olmayan) bir MCP sunucusu
+  açıksa (`mcpScope.wantsMcpInChat`) istemci `useMcp` yollar → `/api/chat`
+  `wantsFullTools`'a girer, araçlar repo'suz sohbette de sunulur; Pollinations
+  tarayıcı-doğrudan hızlı yolu o durumda atlanır. Yerleşikler (Zaman/Adım Adım
+  Düşünme) tek başına TETİKLEMEZ (her mesaja gecikme eklemesin diye).
+- **Laya** (karar modeli, sohbet modeli DEĞİL): köprüde **kalıcı yerel MCP**
+  (`bridge.mjs` → `/mcp/local/<ad>/tools/list|call`, komutlar yalnız sunucudaki
+  `mcp-servers.json`'dan; süreç bir kez başlar, açık kalır). Katalog girdisi
+  `bridgePath: "/mcp/local/laya"` → kart açılınca adres = `localBridgeUrl` + yol,
+  başlık = köprü token'ı. Kurulum `deploy/oracle/setup-laya.sh` (sudo'lu ya da
+  uygulama terminalinden sudo'suz/uv ile: `curl -fsSL <site>/setup-laya.sh | bash`).
+- **Köprü dosyaları sitede herkese açık**: `public/bridge.mjs` ve
+  `public/setup-laya.sh`, kaynakları `scripts/terminal-bridge/bridge.mjs` ve
+  `deploy/oracle/setup-laya.sh` ile BİREBİR aynı olmalı (`publicBridge.test.ts`
+  korur). Köprüyü değiştirdiğinde public kopyayı da güncelle (`cp`), yoksa test kırılır.
 
 ## Stüdyolar, Önizleme ve Modlar
 
@@ -496,8 +559,8 @@ Playwright ile.
   kullanıcı girişinde yerel config sızmaz (temiz `DEFAULT_CONFIG`'e düşer).
 - **Auth + admin:** Supabase (`src/lib/supabase/{client,server,config}.ts`);
   `config.ts` env yoksa sabit fallback'e düşer (login hep çalışır).
-  `src/lib/admin.ts` → `isAdminEmail()`; hassas ayarlar (Hibrit Sunucu,
-  Terminal, WebContainer API anahtarı) yalnız admin'e görünür. `/app` girişsiz
+  `src/lib/admin.ts` → `isAdminEmail()`; Eyl 2026'dan beri Terminal/Hibrit
+  Sunucu/WebContainer ayarları HERKESE açık (bkz. "Coder odaklı yön"). `/app` girişsiz
   açılmaz (auth gate — `src/app/app/page.tsx`).
 - **Ayarlar (GNOME tarzı):** `SettingsModal.tsx` sol dikey sekme çubuğu (ikon +
   başlık) + kenar çubuğunda arama + sağda kaydırılabilir içerik. `ALL_TABS`'ta
@@ -594,6 +657,13 @@ Playwright ile.
   çalışır. Amaç: Pollinations'tan çok daha güçlü bir model, tamamen
   kullanıcının kendi (Oracle Always Free) sunucusunda, üçüncü tarafa veri
   gitmeden.
+  **opencode** (Eyl 2026): `deploy/oracle/setup-opencode.sh` köprü terminaline
+  opencode'u kurar (`opencode` yazınca açılır; Ollama varsa ona bağlanır).
+  Tam ekran TUI'ler için köprü PTY'si `xterm-256color` + `COLORTERM=truecolor`
+  ile açılır (`ptyEnv()`); istemcide `convertEol` açık kalabilir — opencode ile
+  her iki ayarda da doğru çizildiği Playwright'ta doğrulandı. Terminal paneli
+  ve tam ekran düğmesi HERKESE açık (eskiden admin'e özeldi; Eyl 2026 kararı).
+  Tıklanabilir linkler `@xterm/addon-web-links` ile.
 - **Native sarmalayıcı:** Capacitor (`capacitor.config.ts` canlı siteyi
   `server.url` ile yükler); `src/lib/native.ts` web'de no-op.
 

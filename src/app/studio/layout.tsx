@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { StudioGate } from "./StudioGate";
 
 export const metadata: Metadata = {
   title: "Stüdyo — UMAI",
@@ -6,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function StudioLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return <StudioGate>{children}</StudioGate>;
 }
