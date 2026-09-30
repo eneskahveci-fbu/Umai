@@ -45,9 +45,26 @@ export function extractJson(text) {
 }
 
 /* ─── Model çağrısı ─── */
-async function post(url, headers, body, timeoutMs) {
+/* Aynı uca (baseUrl) yapılan çağrılar arasında en az `minIntervalMs` bekle — anahtarsız
+   uçların dakika sınırına (ör. OVH anonim 2 istek/dk) takılmamak için. */
+const lastCall = new Map();
+const chain = new Map();
+function throttle(key, minMs) {
+  if (!minMs) return Promise.resolve();
+  const prev = chain.get(key) ?? Promise.resolve();
+  const next = prev.then(async () => {
+    const wait = (lastCall.get(key) ?? 0) + minMs - Date.now();
+    if (wait > 0) await sleep(wait);
+    lastCall.set(key, Date.now());
+  });
+  chain.set(key, next.catch(() => {}));
+  return next;
+}
+
+async function post(url, headers, body, timeoutMs, minIntervalMs = 0) {
   let last;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await throttle(new URL(url).host, minIntervalMs);
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), timeoutMs);
     try {
@@ -62,7 +79,7 @@ async function post(url, headers, body, timeoutMs) {
     } finally {
       clearTimeout(t);
     }
-    await sleep(1500 * 2 ** attempt);
+    await sleep(/^HTTP 429/.test(last?.message ?? "") ? 30000 : 1500 * 2 ** attempt);
   }
   throw last;
 }
@@ -97,7 +114,7 @@ export async function callModel(m, messages, { tools, timeoutMs = 240000 } = {})
     const { system, messages: msgs } = toAnthropic(messages);
     const body = { model: m.model, max_tokens: m.maxTokens ?? 8192, temperature: 0.2, system, messages: msgs };
     if (tools?.length) body.tools = tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters }));
-    const j = await post(`${m.baseUrl.replace(/\/$/, "")}/messages`, { "x-api-key": key, "anthropic-version": "2023-06-01" }, body, timeoutMs);
+    const j = await post(`${m.baseUrl.replace(/\/$/, "")}/messages`, { "x-api-key": key, "anthropic-version": "2023-06-01" }, body, timeoutMs, m.minIntervalMs);
     const text = (j.content ?? []).filter((b) => b.type === "text").map((b) => b.text).join("");
     const toolCalls = (j.content ?? []).filter((b) => b.type === "tool_use").map((b) => ({ id: b.id, name: b.name, args: b.input ?? {} }));
     return {
@@ -109,7 +126,7 @@ export async function callModel(m, messages, { tools, timeoutMs = 240000 } = {})
   const body = { model: m.model, messages, temperature: 0.2, max_tokens: m.maxTokens ?? 8192 };
   if (tools?.length) { body.tools = tools.map((t) => ({ type: "function", function: t })); body.tool_choice = "auto"; }
   const headers = key ? { authorization: `Bearer ${key}` } : {};
-  const j = await post(`${m.baseUrl.replace(/\/$/, "")}/chat/completions`, headers, body, timeoutMs);
+  const j = await post(`${m.baseUrl.replace(/\/$/, "")}/chat/completions`, headers, body, timeoutMs, m.minIntervalMs);
   const msg = j.choices?.[0]?.message ?? {};
   const toolCalls = (msg.tool_calls ?? []).map((c) => {
     let args = {};
