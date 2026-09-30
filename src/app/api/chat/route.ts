@@ -17,6 +17,7 @@ import { pollinationsImageUrl, stableSeed } from "@/lib/pollinations";
 import { runDeepResearch } from "@/lib/researchPipeline";
 import { cached, repoCacheKey } from "@/lib/repoContextCache";
 import { isSafeRemoteUrl } from "@/lib/urlSafety";
+import { withFailover } from "@/lib/streamFailover";
 import { markProviderDown, markProviderUp, prioritizeHealthyCandidates } from "@/lib/providerHealth";
 import { detectModelCapabilities, JSON_MODE_PROVIDERS, EFFORT_TOKENS, THINKING_BUDGET } from "@/lib/modelCapabilities";
 import { downgradeRequest, isOpenAiReasoningModel, adaptForOpenAiReasoning } from "@/lib/requestDowngrade";
@@ -402,7 +403,7 @@ function buildCandidateHeaders(c: Candidate, req: Request): Record<string, strin
    sonraki isteklerde geri plana atıyor ve gereksiz model değişimlerini
    çoğaltıyordu. Yalnız 5xx/429 ve bağlantı hataları gerçek sağlık sinyalidir. */
 function isProviderFault(status: number): boolean {
-  return status >= 500 || status === 429 || status === 408;
+  return status >= 500 || status === 429 || status === 408 || status === 402;
 }
 
 /** Bir adayın yanıt BAŞLIKLARINI göndermesi için tanınan süre (bkz. openCandidate). */
@@ -1342,11 +1343,20 @@ interface RoundResult {
   usage: { prompt: number; completion: number } | null;
 }
 
+/** İlk veri parçası bu sürede gelmezse tur "takıldı" sayılır (bkz. streamRound). */
+const FIRST_CHUNK_TIMEOUT_MS = 15_000;
+const FIRST_CHUNK_TIMEOUT_EFFORT_MS = 45_000;
+
 async function streamRound(
   upstream: Response,
   controller: { enqueue: (chunk: Uint8Array) => void },
   encoder: TextEncoder,
-): Promise<RoundResult> {
+  /* Verilirse: yanıt BAŞLIKLARI geldi ama hiç veri akmıyorsa (takılan/çok yavaş
+     model) bu süre sonunda akış iptal edilir ve BOŞ sonuç döner — çağıran
+     sıradaki adaya geçer. Yalnız denenmemiş yedek aday varken verilir; tek aday
+     kaldıysa beklemek kesmekten iyidir. */
+  firstChunkTimeoutMs?: number,
+): Promise<RoundResult & { stalled?: boolean }> {
   const reader = upstream.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -1355,9 +1365,25 @@ async function streamRound(
   let finishReason: string | null = null;
   let usage: { prompt: number; completion: number } | null = null;
 
+  let gotChunk = false;
   while (true) {
-    const { done, value } = await reader.read();
+    let next: ReadableStreamReadResult<Uint8Array>;
+    if (!gotChunk && firstChunkTimeoutMs) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<"stalled">((resolve) => { timer = setTimeout(() => resolve("stalled"), firstChunkTimeoutMs); });
+      const r = await Promise.race([reader.read(), timeout]);
+      clearTimeout(timer);
+      if (r === "stalled") {
+        void reader.cancel().catch(() => {});
+        return { content: "", toolCalls: [], finishReason: null, usage: null, stalled: true };
+      }
+      next = r;
+    } else {
+      next = await reader.read();
+    }
+    const { done, value } = next;
     if (done) break;
+    gotChunk = true;
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split("\n");
     buffer = lines.pop() ?? "";
@@ -2149,43 +2175,55 @@ export async function POST(req: Request) {
   if (allTools.length === 0 && !wantsFullTools) {
     const messages = [...systemMessages, ...body.messages];
     let lastStatus = 502, lastDetail = "", lastCand: Candidate = primary;
-    for (const c of tryOrder) {
-      let upstream: Response;
-      try {
-        upstream = await openCandidate(c, messages);
-      } catch (err) {
-        markProviderDown(c.provider, c.baseUrl, c.model);
-        lastStatus = 502; lastDetail = (err as Error).message; lastCand = c;
-        continue; // bağlantı hatası → sıradaki aday
-      }
-      if (upstream.ok && upstream.body) {
-        markProviderUp(c.provider, c.baseUrl, c.model);
-        const headers = { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" };
-        if (!noKeyFallback && c === primary) {
-          return new Response(upstream.body, { headers });
+    const headers = { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" };
+    /* Sıradaki aday akışı (HTTP hatası/bağlantı hatası olanlar atlanır). */
+    let cursor = 0;
+    const openNext = async (): Promise<{ c: Candidate; res: Response } | null> => {
+      while (cursor < tryOrder.length) {
+        const c = tryOrder[cursor++];
+        try {
+          const r = await openCandidate(c, messages);
+          if (r.ok && r.body) { markProviderUp(c.provider, c.baseUrl, c.model); return { c, res: r }; }
+          lastStatus = r.status || 500;
+          if (isProviderFault(lastStatus)) markProviderDown(c.provider, c.baseUrl, c.model);
+          lastDetail = await r.text().catch(() => "");
+          lastCand = c;
+        } catch (err) {
+          markProviderDown(c.provider, c.baseUrl, c.model);
+          lastStatus = 502; lastDetail = (err as Error).message; lastCand = c;
         }
-        /* Şeffaflık olayını akışın başına ekle, sonra upstream'i olduğu gibi ilet. */
-        const reader = upstream.body.getReader();
-        const prefix = encoder.encode(`data: ${JSON.stringify({
-          fallback_event: noKeyFallback
-            ? { provider: c.provider, model: c.model, reason: "no_key", requestedProvider, requestedModel }
-            : { provider: c.provider, model: c.model },
-        })}\n\n`);
-        const combined = new ReadableStream<Uint8Array>({
-          start(controller) { controller.enqueue(prefix); },
-          async pull(controller) {
-            const { done, value } = await reader.read();
-            if (done) { controller.close(); return; }
-            controller.enqueue(value);
-          },
-          cancel(reason) { void reader.cancel(reason).catch(() => {}); },
-        });
-        return new Response(combined, { headers });
       }
-      lastStatus = upstream.status || 500;
-      if (isProviderFault(lastStatus)) markProviderDown(c.provider, c.baseUrl, c.model);
-      lastDetail = await upstream.text().catch(() => "");
-      lastCand = c;
+      return null;
+    };
+    const first = await openNext();
+    if (first) {
+      const { c, res: upstream } = first;
+      const hasNext = () => cursor < tryOrder.length;
+      const switchedPrefix = (cand: Candidate) => encoder.encode(`data: ${JSON.stringify({
+        fallback_event: noKeyFallback && cand === c
+          ? { provider: cand.provider, model: cand.model, reason: "no_key", requestedProvider, requestedModel }
+          : { provider: cand.provider, model: cand.model },
+      })}\n\n`);
+      const needsEvent = noKeyFallback || c !== primary;
+      if (!hasNext()) {
+        /* Tek aday kaldı: bekleyecek yedek yok → saf zero-copy (eski davranış). */
+        if (!needsEvent) return new Response(upstream.body, { headers });
+        return new Response(withFailover({ body: upstream.body!, hasNext: () => false, nextStream: async () => null, firstContentTimeoutMs: 0, prefix: switchedPrefix(c) }), { headers });
+      }
+      const stallMs = body.effort ? FIRST_CHUNK_TIMEOUT_EFFORT_MS : FIRST_CHUNK_TIMEOUT_MS;
+      let current = c;
+      return new Response(withFailover({
+        body: upstream.body!,
+        hasNext,
+        firstContentTimeoutMs: stallMs,
+        prefix: needsEvent ? switchedPrefix(c) : undefined,
+        nextStream: async () => {
+          markProviderDown(current.provider, current.baseUrl, current.model);
+          const n = await openNext();
+          if (n) current = n.c;
+          return n ? { body: n.res.body!, event: switchedPrefix(n.c) } : null;
+        },
+      }), { headers });
     }
     return new Response(friendlyApiError(lastStatus, lastDetail, { model: lastCand.model, provider: lastCand.provider as Provider }), { status: lastStatus });
   }
@@ -2259,6 +2297,8 @@ export async function POST(req: Request) {
       });
       /* ask_user çağrıldığında tool-loop kırılır → kullanıcı yanıtı beklenir. */
       let askUserCalled = false;
+      /* Boş/takılan yanıt verip atlanan adaylar (bu istek içinde tekrar denenmez). */
+      const emptyTried = new Set<Candidate>();
       /* deep_research'ün döndürdüğü atıflı raporun bir SONRAKİ turda modelce
          özetlenip/kısaltılıp atıfların kaybolmaması için: rapor geldikten
          hemen sonraki tur zorla tool_choice:"none" olur (model yalnızca
@@ -2268,6 +2308,7 @@ export async function POST(req: Request) {
         const lastRound = round === MAX_ROUNDS - 1 || forceNoToolsNextRound;
         forceNoToolsNextRound = false;
         let upstream: Response | null = null;
+        let pickedThisRound = false;
 
         if (chosen) {
           /* Sonraki turlar: yalnızca seçili adayı kullan (sohbet ortasında
@@ -2288,6 +2329,7 @@ export async function POST(req: Request) {
           /* İlk tur: henüz hiç byte yazılmadı → adayları sırayla güvenle dene. */
           let lastStatus = 502, lastDetail = "", lastCand = primary;
           for (const c of tryOrder) {
+            if (emptyTried.has(c)) continue;
             let r: Response;
             try {
               const { messages: msgs, extra } = toolBodyFor(c, lastRound);
@@ -2296,7 +2338,7 @@ export async function POST(req: Request) {
               markProviderDown(c.provider, c.baseUrl, c.model);
               lastStatus = 502; lastDetail = (err as Error).message; lastCand = c; continue;
             }
-            if (r.ok && r.body) { markProviderUp(c.provider, c.baseUrl, c.model); chosen = c; upstream = r; break; }
+            if (r.ok && r.body) { markProviderUp(c.provider, c.baseUrl, c.model); chosen = c; upstream = r; pickedThisRound = true; break; }
             lastStatus = r.status || 500;
             if (isProviderFault(lastStatus)) markProviderDown(c.provider, c.baseUrl, c.model);
             lastDetail = await r.text().catch(() => ""); lastCand = c;
@@ -2329,7 +2371,20 @@ export async function POST(req: Request) {
           }
         }
 
-        const { content, toolCalls, finishReason, usage } = await streamRound(upstream, safe, encoder);
+        /* Boş/takılan yanıt koruması: ilk turda seçilen aday HTTP 200 verip hiçbir
+           şey üretmediyse (boş içerik, yalnız muhakeme, ya da ilk veri parçası
+           süresinde gelmedi) kullanıcıya "boş yanıt" göstermek yerine sıradaki
+           adaya sessizce geçilir. Henüz görünür içerik yazılmadı → güvenli. */
+        const untried = pickedThisRound ? tryOrder.filter((x) => x !== chosen && !emptyTried.has(x)) : [];
+        const stallMs = untried.length > 0 ? (body.effort ? FIRST_CHUNK_TIMEOUT_EFFORT_MS : FIRST_CHUNK_TIMEOUT_MS) : undefined;
+        const { content, toolCalls, finishReason, usage } = await streamRound(upstream, safe, encoder, stallMs);
+        if (pickedThisRound && chosen && !content.trim() && toolCalls.length === 0 && untried.length > 0) {
+          emptyTried.add(chosen);
+          markProviderDown(chosen.provider, chosen.baseUrl, chosen.model);
+          chosen = null;
+          round--;
+          continue;
+        }
         fullContent += content;
         if (finishReason) lastFinishReason = finishReason;
         if (usage) {

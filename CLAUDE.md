@@ -151,6 +151,16 @@ Claude Code web; opencode'un TUI görünümü DEĞİL). Yapılanlar:
   Wake Lock ekranı açık tutar. Header açılır panelleri (Efor/Ajan modu) telefonda
   `HeaderPanel` ile alttan sheet; bekleme göstergesi `WaitIndicator` (geçen süreden
   aşama metni); mesaj eylem ikonlarında `.msg-actions`/`.icon-pop` mikro-animasyonları.
+- **Boş/takılan yanıt = otomatik yedek** (Eyl 2026 — "hata/yavaşlık istemiyorum"): canlı
+  testte modeller HTTP 200 verip boş/yalnız-muhakeme döndürdü ve Pollinations 402 verdi;
+  yedek zinciri yalnız HTTP hatasında devreye giriyordu. Şimdi: (a) düz sohbet yolu
+  `lib/streamFailover.ts` `withFailover` ile sarılı — ilk İÇERİK gelmeden akış biterse ya
+  da 15 sn (efor verilmişse 45 sn) içerik gelmezse AYNI akışın içinde sıradaki adaya geçilir
+  (`fallback_event` eklenir; tek aday kaldıysa saf zero-copy, bekleme kesilmez);
+  (b) araç döngüsünde ilk tur için aynı koruma (`emptyTried`, `FIRST_CHUNK_TIMEOUT_MS`);
+  (c) 402 sağlayıcı arızası sayılır (sağlıksız işaretlenir); (d) tarayıcıdan doğrudan
+  Pollinations boş dönerse `skipDirect` ile sunucu zincirinden bir kez daha denenir.
+  `scripts/model-bench/` = 10 işlik model test tezgâhı (`--selftest`, bkz. README).
 - **Platform farkındalığı** (opencode gibi model ortamını bilir): `lib/
   platform-knowledge.ts` rehberi `FEATURES`'tan KURAR (`buildPlatformBrief` /
   `buildPlatformKnowledge`): rafa kalkan yüzeyler anlatılmaz, "Şu an KAPALI"

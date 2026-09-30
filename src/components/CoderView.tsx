@@ -2239,7 +2239,7 @@ export function CoderView() {
 
   const callApi = useCallback(async (
     overrideAgent?: Agent | null,
-    opts?: { continuation?: boolean; depth?: number; noStrongest?: boolean; modelId?: string; danglingRetry?: boolean },
+    opts?: { continuation?: boolean; depth?: number; noStrongest?: boolean; modelId?: string; danglingRetry?: boolean; skipDirect?: boolean },
   ) => {
     const store = useStore.getState();
     let active = store.activeModel();
@@ -2799,7 +2799,8 @@ export function CoderView() {
          kullanıcının kendi IP'si). Araç-kullanımı/web-arama/görsel-üretimi
          TOOL-LOOP gerektirir → bunlar sunucu-proxy'ye gider (yoksa araçlar
          sessizce çalışmaz, model repodan/araçlardan habersiz kalır). */
-      if (active.provider === "pollinations" && !toolsEnabled && !wantWeb && !wantImageGen && !wantMcp) {
+      const directPollinations = active.provider === "pollinations" && !toolsEnabled && !wantWeb && !wantImageGen && !wantMcp && !opts?.skipDirect;
+      if (directPollinations) {
         /* Bağlam blokları sunucu (/api/chat) ile ORTAK tek kaynaktan gelir →
            Pollinations kullanıcıları da aynı, eksiksiz bağlamı alır. Platform
            bilgisi sunucudaki gibi İKİ KADEMELİ: kısa dizin + canlı [Ortam] bloğu
@@ -3125,7 +3126,17 @@ export function CoderView() {
          metni tek seferde yaz. Bundan sonraki updateLastContent çağrıları
          (muhakeme ayıklama vb.) doğrudan store'a gider. */
       reveal.finish();
-      if (!full) useStore.getState().updateLastContent("_(Model boş yanıt döndürdü.)_");
+      if (!full) {
+        /* Tarayıcıdan doğrudan Pollinations boş döndüyse: boş baloncuk göstermek
+           yerine AYNI turu sunucu yedek zinciri üzerinden bir kez daha dene. */
+        if (directPollinations && !opts?.continuation) {
+          useStore.getState().popLastMessage();
+          useStore.getState().addToast("Model boş yanıt verdi — yedek modele geçiliyor…", "info");
+          await callApi(overrideAgent, { ...opts, skipDirect: true });
+          return;
+        }
+        useStore.getState().updateLastContent("_(Model boş yanıt döndürdü.)_");
+      }
       /* Sessiz kopma: sayfa akış sırasında gizlendi, bitiş nedeni gelmedi ve metin
          cümle ortasında bitiyor ⇒ arka plan bağlantıyı öldürdü, yanıt yarım. */
       if (hiddenDuringStream && !sawFinish && !cutAtLength && full.length > priorLen && !/[.!?…`)\]}"'»]\s*$/.test(full.trim())) {
