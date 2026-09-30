@@ -52,6 +52,7 @@ import { WebSocketServer } from "ws";
 import { spawn as ptySpawn } from "node-pty";
 import { spawn as procSpawn } from "node:child_process";
 import http from "node:http";
+import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -380,7 +381,7 @@ const server = http.createServer(async (req, res) => {
 
   /* /health: kimlik doğrulamasız — uygulama bağlantıyı buradan test eder. */
   if (route === "/health" || route === "/")
-    return send(res, 200, { ok: true, root: ROOT, name: "craft-hybrid-bridge", version: "2.0.0", terminal: true });
+    return send(res, 200, { ok: true, root: ROOT, name: "craft-hybrid-bridge", version: "2.2.0", terminal: true });
 
   if (!authedHttp(req)) return send(res, 401, { error: "Geçersiz veya eksik token." });
 
@@ -547,6 +548,27 @@ server.on("upgrade", (req, socket, head) => {
   wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
 });
 
+/* Terminal ortamı:
+   - Kullanıcı-alanı kurulum dizinleri PATH'in BAŞINA eklenir. opencode/bun/pip
+     --user/npm prefix gibi kurucular root gerektirmeden ~/.xxx/bin'e yazar ama
+     .bashrc'ye ekleyemeyebilir (ör. `opencode` kurulup "command not found").
+     Burada baştan eklendiği için reboot/yeniden bağlanma sonrası da çalışır.
+     Var olmayan dizinler PATH'i kirletmesin diye yalnız mevcut olanlar eklenir
+     (her bağlantıda yeniden bakılır → sonradan kurulan araç da görünür).
+   - TERM=xterm-256color + COLORTERM=truecolor: istemci xterm.js tam renk
+     destekler; eski "xterm-color" 8 renge düşürüyordu (opencode gibi TUI'ler
+     soluk/bozuk görünüyordu). */
+function ptyEnv() {
+  const home = process.env.HOME || os.homedir();
+  const extra = [".opencode/bin", ".local/bin", ".bun/bin", ".npm-global/bin", ".cargo/bin", "go/bin"]
+    .map((d) => path.join(home, d))
+    .filter((d) => { try { return fs.statSync(d).isDirectory(); } catch { return false; } });
+  const basePath = process.env.PATH || "/usr/local/bin:/usr/bin:/bin";
+  const parts = basePath.split(path.delimiter);
+  const PATH = [...extra.filter((d) => !parts.includes(d)), ...parts].join(path.delimiter);
+  return { ...process.env, PATH, TERM: "xterm-256color", COLORTERM: "truecolor", LANG: process.env.LANG || "C.UTF-8" };
+}
+
 wss.on("connection", (ws) => {
   /* xterm-256color + truecolor: opencode gibi tam ekran TUI'ler 8 renkli
      "xterm-color"da bozuk/soluk görünür; istemci (xterm.js) 24-bit rengi destekler. */
@@ -555,7 +577,7 @@ wss.on("connection", (ws) => {
     cols: 80,
     rows: 24,
     cwd: process.env.CRAFT_CWD || ROOT,
-    env: { ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor" },
+    env: ptyEnv(), // TERM/COLORTERM + PATH (opencode/bun/cargo…) — GitLab sürümü, benim ayarımın üst kümesi
   });
   pty.onData((data) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ type: "output", data })); });
   pty.onExit(() => { try { ws.close(); } catch { /* yok say */ } });

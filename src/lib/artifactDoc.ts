@@ -9,6 +9,17 @@ function htmlEscape(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/* JSON.stringify TEK BAŞINA `</script>` dizisini KAÇIRMAZ — kullanıcı
+   içeriği (ör. bir SQL yorumunda ya da Python string'inde geçen
+   "</script>") doğrudan bir <script> bloğuna JSON.stringify ile gömülürse
+   iframe'in script etiketini ERKEN KAPATIP ardından gelen HTML'i (kullanıcı
+   girdisinden) yürütür — sql/python artifact'larında GERÇEK bir XSS yolu.
+   safeScript (preview.ts) bunu ham kaynak için yapıyor; burada JSON string
+   LİTERALİ için aynı korumayı uygular. */
+function jsStringLiteral(s: string): string {
+  return JSON.stringify(s).replace(/<\/script/gi, "<\\/script");
+}
+
 /* Bir artifact'ı (html/svg/mermaid/code/markdown) sandbox iframe'de göstermek
    için tam HTML belgesi üretir. ArtifactPanel (canlı önizleme) ve /a/[id]
    (yayınlanan sayfa) AYNI mantığı kullanır → tutarlı render + tek kaynak. */
@@ -27,6 +38,96 @@ export function buildArtifactSrcDoc(type: Artifact["type"], content: string, lan
 <style>body{margin:0;background:#0d1117;} pre{margin:0;padding:1.5rem;overflow:auto;min-height:100vh;box-sizing:border-box;} code{font:13px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace!important;}</style>
 </head><body><pre><code class="language-${lang}">${htmlEscape(content)}</code></pre>
 <script>try{hljs.highlightAll();}catch(e){}<\/script></body></html>`;
+  }
+  if (type === "sql") {
+    /* sql.js (in-memory SQLite, CDN/WASM) — GERÇEKTEN çalıştırır, yalnız
+       vurgulamaz. db.exec() tüm script'i (birden çok ';'-ayrılmış deyim
+       dahil) TEK çağrıda kendi SQL ayrıştırıcısıyla işler — bir string
+       literal içindeki ';' saf split() ile bölünseydi kırılırdı, exec()'te
+       kırılmaz. */
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"><\/script>
+<style>body{font-family:system-ui,sans-serif;margin:1rem;background:#fff}
+table{border-collapse:collapse;width:100%;font-size:13px;margin-bottom:12px;}
+th,td{border:1px solid #ddd;padding:6px 10px;text-align:left;}
+th{background:#f5f5f5;font-weight:600;}
+tr:nth-child(even){background:#fafafa;}
+.error{color:#e53e3e;font-weight:600;margin-top:8px;white-space:pre-wrap;}
+pre{background:#f7f7f7;padding:12px;border-radius:6px;overflow:auto;font-size:12px;}
+</style></head>
+<body><div id="out">Çalıştırılıyor…</div>
+<script>
+initSqlJs({locateFile:function(f){return 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/'+f;}}).then(function(SQL){
+  var out=document.getElementById('out');
+  out.textContent='';
+  var db=new SQL.Database();
+  var sql=${jsStringLiteral(content)};
+  try{
+    var results=db.exec(sql);
+    if(results.length){
+      results.forEach(function(r){
+        var t=document.createElement('table');
+        var hr=t.insertRow();
+        r.columns.forEach(function(c){var th=document.createElement('th');th.textContent=c;hr.appendChild(th);});
+        r.values.forEach(function(row){var tr=t.insertRow();row.forEach(function(v){var td=tr.insertCell();td.textContent=v==null?'NULL':String(v);});});
+        out.appendChild(t);
+      });
+    } else {
+      var p=document.createElement('pre');p.textContent='Çalıştırıldı (sonuç kümesi yok).';out.appendChild(p);
+    }
+  }catch(e){
+    var d=document.createElement('div');d.className='error';d.textContent='Hata: '+e.message;out.appendChild(d);
+  }
+}).catch(function(e){document.getElementById('out').textContent='sql.js yüklenemedi: '+e;});
+<\/script></body></html>`;
+  }
+  if (type === "python") {
+    /* Pyodide (WASM Python, CDN) — GERÇEKTEN çalıştırır. stdout/stderr,
+       __user_code'u Pyodide global'ine YAZIP (py.globals.set) Python
+       tarafında contextlib.redirect_stdout/stderr ile yakalanır — kullanıcı
+       kodu JS string'i içine gömülmez, üç seviyeli tırnak/escape karmaşası
+       (TS şablonu → JS şablonu → Python string'i) baştan önlenir. */
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<script src="https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js"><\/script>
+<style>body{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:1rem;background:#0b0b0d;color:#d6d6d6;font-size:13px;}
+#out{white-space:pre-wrap;}
+.err{color:#fc8181;white-space:pre-wrap;margin-top:8px;}
+.loading{color:#888;font-style:italic;}
+</style></head>
+<body><div id="out" class="loading">Python ortamı yükleniyor (Pyodide)…</div>
+<script>
+(async function(){
+  var out=document.getElementById('out');
+  try{
+    var py=await loadPyodide();
+    out.classList.remove('loading');
+    out.textContent='';
+    py.globals.set('__user_code', ${jsStringLiteral(content)});
+    var PY_RUNNER =
+      "import sys, io, contextlib, traceback\\n" +
+      "_stdout = io.StringIO()\\n" +
+      "_stderr = io.StringIO()\\n" +
+      "_err = None\\n" +
+      "with contextlib.redirect_stdout(_stdout), contextlib.redirect_stderr(_stderr):\\n" +
+      "    try:\\n" +
+      "        exec(__user_code, {'__name__': '__main__'})\\n" +
+      "    except Exception:\\n" +
+      "        _err = traceback.format_exc()\\n" +
+      "(_stdout.getvalue(), _stderr.getvalue(), _err)\\n";
+    var result=py.runPython(PY_RUNNER);
+    var parts=result.toJs();
+    result.destroy();
+    var stdout=parts[0], stderr=parts[1], err=parts[2];
+    var shown=(stdout||'')+(stderr?(stdout?'\\n':'')+stderr:'');
+    if(shown) out.textContent=shown;
+    if(err){var d=document.createElement('div');d.className='err';d.textContent=err;out.appendChild(d);}
+    if(!shown&&!err) out.textContent='(çıktı yok)';
+  }catch(e){
+    out.classList.remove('loading');
+    var d=document.createElement('div');d.className='err';d.textContent='Hata: '+e;out.appendChild(d);
+  }
+})();
+<\/script></body></html>`;
   }
   if (type === "markdown") {
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -138,6 +239,8 @@ export function artifactDownload(type: Artifact["type"], content: string, langua
     type === "svg" ? "svg" :
     type === "mermaid" ? "mmd" :
     type === "markdown" ? "md" :
+    type === "sql" ? "sql" :
+    type === "python" ? "py" :
     type === "code" ? (CODE_EXT[(language || "").toLowerCase()] ?? "txt") :
     "html";
   const body = type === "html" ? buildArtifactSrcDoc(type, content) : content;

@@ -18,6 +18,12 @@ export interface ContextSectionsInput {
   memories?: MemoryItem[];
   skills?: SkillLike[];
   searchContext?: string;
+  /** Yerel Anlamsal Hafıza'nın (bkz. memory.ts, tarayıcı-içi IndexedDB + BM25)
+      önceden getirdiği geçmiş konuşma parçaları — istemcide hazırlanır, çünkü
+      IndexedDB yalnız tarayıcıda vardır; sunucu yalnız hazır metni enjekte eder.
+      `memories` (kullanıcının ELLE eklediği kalıcı notlar) ile KARIŞTIRILMASIN —
+      bu, geçmiş sohbetlerden OTOMATİK ve konuya göre getirilen parçalardır. */
+  memoryContext?: string;
 }
 
 /** K1 — Etkin skill sayısı `max`'ı aşarsa, mesaj metniyle anahtar-kelime
@@ -75,6 +81,10 @@ export function buildContextSections(input: ContextSectionsInput): string {
 
   if (input.searchContext) {
     out += `\n\n[Web arama sonuçları]:\n${input.searchContext}`;
+  }
+
+  if (input.memoryContext) {
+    out += `\n\n[Geçmiş konuşmalardan hatırlanan ilgili parçalar]:\n${input.memoryContext}`;
   }
 
   return out;

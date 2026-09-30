@@ -107,6 +107,11 @@ describe("lintArtifactByType — bilinmeyen türler", () => {
     expect(lintArtifactByType("code", "print('lorem ipsum')")).toEqual([]);
   });
 
+  it("sql ve python'da sessiz kalır (çalıştırılabilir, kalite lint'i yok)", () => {
+    expect(lintArtifactByType("sql", "SELECT * FROM x")).toEqual([]);
+    expect(lintArtifactByType("python", "print('lorem ipsum')")).toEqual([]);
+  });
+
   it("boş içerikte çökmez", () => {
     expect(lintArtifactByType("html", "")).toEqual([]);
     expect(lintArtifactByType("svg", "")).toEqual([]);
