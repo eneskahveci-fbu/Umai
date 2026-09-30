@@ -3,7 +3,7 @@ import { resolveModelAccess } from "@/lib/plan";
 import { isProRequest } from "@/lib/serverPlan";
 import { anthropicUpstream, type OpenAIChatBody } from "@/lib/anthropic";
 import { DEFAULT_SYSTEM_PROMPT } from "@/lib/constants";
-import { PLATFORM_KNOWLEDGE, PLATFORM_KNOWLEDGE_BRIEF, needsPlatformKnowledge } from "@/lib/platform-knowledge";
+import { PLATFORM_KNOWLEDGE, PLATFORM_KNOWLEDGE_BRIEF, buildEnvironmentBlock, needsPlatformKnowledge } from "@/lib/platform-knowledge";
 import { buildContextSections } from "@/lib/prompt";
 import { runReadOnlyAgent } from "@/lib/subagent";
 import { filterByGlob } from "@/lib/glob";
@@ -286,6 +286,8 @@ interface McpServerConfig {
   url: string;
   headers?: Record<string, string>;
   enabled?: boolean;
+  /** Yalnız modele "hangi eklentiler bağlı" demek için ([Ortam] bloğu). */
+  name?: string;
 }
 
 interface ChatRequest {
@@ -1100,7 +1102,8 @@ async function execGetCommitHistory(ctx: RepoCtx, args: { limit?: string; path?:
 
 /* SOUL.md / .craft.md — OpenClaw-inspired project context file */
 async function fetchSoulFile(ctx: RepoCtx): Promise<string | null> {
-  const candidates = ["SOUL.md", ".craft.md", ".craftai.md", "AGENTS.md"];
+  /* opencode/Claude Code ile aynı: AGENTS.md yoksa CLAUDE.md de proje kuralları olarak okunur. */
+  const candidates = ["SOUL.md", ".craft.md", ".craftai.md", "AGENTS.md", "CLAUDE.md"];
   for (const candidate of candidates) {
     try {
       if (ctx.provider === "local") {
@@ -1143,23 +1146,50 @@ function isSafeMcpServerUrl(url: string, ownOrigin: string): boolean {
   return isSafeRemoteUrl(url);
 }
 
-async function fetchMcpTools(server: McpServerConfig, ownOrigin: string): Promise<{ name: string; description: string; parameters: object }[]> {
+/* MCP araç listesi — HER mesajda, ilk token'dan ÖNCE isteniyordu (5 sn zaman
+   aşımıyla). Yavaş/soğuk bir eklenti (ör. Laya modeli yüklenirken) ya da
+   ulaşılamayan bir sunucu her mesajı saniyelerce bekletirdi. Artık:
+   - başarılı liste 60 sn önbellekte (araçlar dakikalar içinde değişmez),
+   - başarısız/boş sonuç 20 sn "negatif önbellekte" (art arda mesajlar tekrar
+     tekrar beklemesin),
+   - zaman aşımı 2,5 sn.
+   Anahtar url + başlıklar: farklı kullanıcının farklı token'ı ayrı girdi olur
+   (yalnız bellekte durur, loglanmaz). */
+const MCP_TOOLS_TTL_MS = 60_000;
+const MCP_TOOLS_FAIL_TTL_MS = 20_000;
+const MCP_LIST_TIMEOUT_MS = 2_500;
+type McpToolDef = { name: string; description: string; parameters: object };
+const mcpToolsCache = new Map<string, { expires: number; tools: McpToolDef[] }>();
+
+async function fetchMcpTools(server: McpServerConfig, ownOrigin: string): Promise<McpToolDef[]> {
   if (!server.url || !isSafeMcpServerUrl(server.url, ownOrigin)) return [];
+  const key = `${server.url}\u0000${JSON.stringify(server.headers ?? {})}`;
+  const hit = mcpToolsCache.get(key);
+  if (hit && hit.expires > Date.now()) return hit.tools;
+  const remember = (tools: McpToolDef[], ttl: number): McpToolDef[] => {
+    if (mcpToolsCache.size > 200) {
+      const now = Date.now();
+      for (const [k, v] of mcpToolsCache) if (v.expires <= now) mcpToolsCache.delete(k);
+    }
+    mcpToolsCache.set(key, { expires: Date.now() + ttl, tools });
+    return tools;
+  };
   try {
     const res = await fetch(`${server.url}/tools/list`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(server.headers ?? {}) },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(MCP_LIST_TIMEOUT_MS),
     });
-    if (!res.ok) return [];
-    const data = await res.json() as { result?: { tools?: { name: string; description: string; inputSchema?: object }[] } };
-    return (data?.result?.tools ?? []).map((t) => ({
+    if (!res.ok) return remember([], MCP_TOOLS_FAIL_TTL_MS);
+    const data = await res.json() as { result?: { tools?: { name: string; description: string; inputSchema?: object }[] }; error?: unknown };
+    const tools = (data?.result?.tools ?? []).map((t) => ({
       name: t.name,
       description: t.description,
       parameters: t.inputSchema ?? { type: "object", properties: {}, required: [] },
     }));
-  } catch { return []; }
+    return remember(tools, tools.length ? MCP_TOOLS_TTL_MS : MCP_TOOLS_FAIL_TTL_MS);
+  } catch { return remember([], MCP_TOOLS_FAIL_TTL_MS); }
 }
 
 async function callMcpTool(server: McpServerConfig, toolName: string, args: Record<string, unknown>, ownOrigin: string): Promise<string> {
@@ -1785,16 +1815,28 @@ export async function POST(req: Request) {
        önler hem de bu metnin ardışık turlarda BAYT-BAYT aynı kalmasını
        garanti eder → Anthropic prompt caching (anthropic.ts) gerçekten
        isabet eder (bkz. repoContextCache.ts). */
-    const soulContent = await cached(repoCacheKey(rc, "soul"), () => fetchSoulFile(rc)).catch(() => null);
+    /* Dört bağımsız çekim (SOUL/AGENTS.md, package.json, .gitignore, dosya ağacı)
+       ARTIK ART ARDA değil AYNI ANDA başlatılır — önbellek soğukken (her 3 dk'da
+       bir ve her yeni depoda) ilk token'dan önceki bekleme dört bekleyişin
+       TOPLAMI yerine en yavaşının süresi olur. Sistem promptuna EKLENME SIRASI
+       değişmez (aşağıda aynı sırayla await edilir) → prompt caching bozulmaz.
+       Ağaç, köprüde depo önce senkronlanacaksa (needsBridgeSync) senkrondan
+       SONRA çekilir; hata vermeyen Promise'a çevrilir ki erken başlayıp geç
+       await edilen bir ret "unhandled rejection" olmasın. */
+    const needsBridgeSync = rc.provider === "local" && !!rc.gitSource && !!rc.bridgeDir;
+    const soulP = cached(repoCacheKey(rc, "soul"), () => fetchSoulFile(rc)).catch(() => null);
+    const pkgP = cached(repoCacheKey(rc, "pkg"), () => getFileRaw(rc, "package.json").then((r) => (r.ok ? r.content : null))).catch(() => null);
+    const gitignoreP = cached(repoCacheKey(rc, "gitignore"), () => getFileRaw(rc, ".gitignore").then((r) => (r.ok ? r.content : null))).catch(() => null);
+    const treeP: Promise<string[] | null> | null = needsBridgeSync
+      ? null
+      : cached(repoCacheKey(rc, "tree"), () => getAllPaths(rc)).then((v) => v, () => null);
+    const soulContent = await soulP;
     if (soulContent) {
       sysPrompt += `\n\n[Proje bağlamı — SOUL.md]:\n${soulContent.slice(0, 6000)}`;
     }
     /* Proje profili: framework algılama (package.json) + .gitignore farkındalığı.
        Tek seferlik, paralel çekim; hata olursa sessiz geçilir. */
-    const [pkgRaw, gitignoreRaw] = await Promise.all([
-      cached(repoCacheKey(rc, "pkg"), () => getFileRaw(rc, "package.json").then((r) => (r.ok ? r.content : null))).catch(() => null),
-      cached(repoCacheKey(rc, "gitignore"), () => getFileRaw(rc, ".gitignore").then((r) => (r.ok ? r.content : null))).catch(() => null),
-    ]);
+    const [pkgRaw, gitignoreRaw] = await Promise.all([pkgP, gitignoreP]);
     const frameworks = pkgRaw ? detectFrameworks({ deps: extractDeps(pkgRaw) }) : [];
     if (frameworks.length || gitignoreRaw) {
       sysPrompt += `\n\n[Proje profili]`;
@@ -1826,8 +1868,8 @@ export async function POST(req: Request) {
       }
     }
     try {
-      const allPaths = await cached(repoCacheKey(rc, "tree"), () => getAllPaths(rc));
-      if (allPaths.length) {
+      const allPaths = treeP ? await treeP : await cached(repoCacheKey(rc, "tree"), () => getAllPaths(rc));
+      if (allPaths && allPaths.length) {
         sysPrompt += `\n\n[Repo dosya haritası — ${allPaths.length} dosya]\n${buildRepoMap(allPaths)}`;
       }
     } catch { /* harita yoksa sessiz geç — araçlar yine çalışır */ }
@@ -1960,6 +2002,22 @@ export async function POST(req: Request) {
      küçük değişken kuyruk her seferinde tam fiyata gider. İkisi de turdan
      turа değişir, bu yüzden AYNI kuyrukta birleştirilir (ayrı bir üçüncü
      mesaj açmak önbellek sınırını erkene çekip bir kazanç sağlamaz). */
+  /* Canlı ortam bloğu (opencode/Claude Code tarzı): tarih, proje/dal, araçlar,
+     terminal, bağlı eklentiler. Model platformdan habersiz kalmasın; ~100 token. */
+  {
+    const rc = body.repoCtx;
+    const mcpInPlay = !!(body.useMcp || (body.tools && rc) || body.webSearch || body.imageGen);
+    sysPrompt += "\n\n" + buildEnvironmentBlock({
+      repo: rc ? { owner: rc.owner, repo: rc.repo, branch: rc.branch, provider: rc.provider } : null,
+      localBridge: rc?.provider === "local",
+      toolsOn: !!(body.tools && rc),
+      terminal: !!body.terminalAvailable,
+      mcpNames: mcpInPlay
+        ? (body.mcpServers ?? []).filter((m) => m.enabled !== false && m.name).map((m) => m.name as string)
+        : [],
+    });
+  }
+
   let volatileTail = "";
   if (body.searchContext) volatileTail += `\n\n[Web arama sonuçları]:\n${body.searchContext}`;
   if (body.memoryContext) volatileTail += `\n\n[Geçmiş konuşmalardan hatırlanan ilgili parçalar]:\n${body.memoryContext}`;
