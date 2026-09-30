@@ -141,6 +141,16 @@ Claude Code web; opencode'un TUI görünümü DEĞİL). Yapılanlar:
   3139→108 ms, tasarım tarifi 1615→122 ms, kısa mesaj ~105 ms (değişmedi). NOT:
   kalite kademesi (`qualityTier`) zaten varsayılan `"off"` — ağır iç-taslak hattı
   varsayılan olarak çalışmaz; `[KALİTE MODU]` istemi yalnız kademe açıksa eklenir.
+- **Yanıt dayanıklılığı + telefon cilası** (Eyl 2026): `lib/replyHealth.ts` —
+  `looksDangling` ("Planı oluşturuyorum:" deyip duran kısa yanıt) `callApi`'de BİR
+  kez otomatik devam ettirilir, yine yarımsa şeritte "Yanıt yarım kaldı" + Devam et.
+  Arka plan: akış sırasında sayfa gizlenirse `hiddenDuringStream` işaretlenir, geçici
+  `finishReason:"interrupted"` yazılır (süreç ölürse yeniden yüklemede şerit çıkar);
+  akış ORTADA koparsa kısmi yanıt "**Hata:**" ile ezilmez, sayfa görünür olunca
+  (`waitUntilVisible`) en çok 3 kez kaldığı yerden sürdürülür. Yanıt sürerken Screen
+  Wake Lock ekranı açık tutar. Header açılır panelleri (Efor/Ajan modu) telefonda
+  `HeaderPanel` ile alttan sheet; bekleme göstergesi `WaitIndicator` (geçen süreden
+  aşama metni); mesaj eylem ikonlarında `.msg-actions`/`.icon-pop` mikro-animasyonları.
 - **Platform farkındalığı** (opencode gibi model ortamını bilir): `lib/
   platform-knowledge.ts` rehberi `FEATURES`'tan KURAR (`buildPlatformBrief` /
   `buildPlatformKnowledge`): rafa kalkan yüzeyler anlatılmaz, "Şu an KAPALI"
