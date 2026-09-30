@@ -138,6 +138,7 @@ import { planRewind, planTouchesFiles } from "@/lib/rewind";
 import { isOfficeFile } from "@/lib/office";
 import { friendlyError } from "@/lib/friendlyError";
 import { autoEffort, autoSwarm, decidePilot, type PilotDecision } from "@/lib/autoPilot";
+import { looksDangling } from "@/lib/replyHealth";
 import { pickDraftModels, buildBoostInstruction, generateDrafts, fillSelfConsistency, judgeDrafts } from "@/lib/boost";
 import { runCompare } from "@/lib/compare";
 import { fetchTextModels } from "@/lib/pollinations";
@@ -419,6 +420,9 @@ function useHeaderDropdown(open: boolean, onClose: () => void) {
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ right: number; top: number } | null>(null);
+  /* Telefonda (sm altı) açılır panel, mesajın üstüne binmesin diye alttan açılan
+     SHEET olur (MoreMenu ile aynı desen). */
+  const [isSheet, setIsSheet] = useState(false);
 
   /* Panel butonun SAĞ kenarına sabitlenir. Eskiden `right` yalnız buton
      dikdörtgeninden hesaplanıyor, viewport'a KIRPILMIYORDU: dar ekranda
@@ -430,6 +434,7 @@ function useHeaderDropdown(open: boolean, onClose: () => void) {
   const update = useCallback(() => {
     const r = btnRef.current?.getBoundingClientRect();
     if (!r) return;
+    setIsSheet(window.matchMedia("(max-width: 639px)").matches);
     const vw = window.innerWidth;
     const menuW = menuRef.current?.offsetWidth ?? 0;
     let right = vw - r.right;
@@ -468,7 +473,49 @@ function useHeaderDropdown(open: boolean, onClose: () => void) {
     };
   }, [open, onClose, update]);
 
-  return { btnRef, menuRef, pos };
+  return { btnRef, menuRef, pos, isSheet };
+}
+
+/* Header açılır panelinin ortak kabuğu: masaüstünde butona sabitli küçük panel,
+   telefonda backdrop + tutamaçlı, safe-area'lı alttan sheet. */
+function HeaderPanel({ menuRef, pos, isSheet, onClose, widthClass, title, children }: {
+  menuRef: React.RefObject<HTMLDivElement | null>;
+  pos: { right: number; top: number };
+  isSheet: boolean;
+  onClose: () => void;
+  widthClass: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  if (isSheet) {
+    return createPortal(
+      <>
+        <div className="fixed inset-0 z-[79] bg-black/40 animate-modal-bg" onClick={onClose} aria-hidden />
+        <div
+          ref={menuRef}
+          role="menu"
+          aria-label={title}
+          className="fixed inset-x-0 bottom-0 z-[80] bg-surface border-t border-line rounded-t-3xl shadow-2xl shadow-black/40 px-2 pt-2 flex flex-col gap-0.5 max-h-[75dvh] overflow-y-auto animate-sheet-up"
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        >
+          <div className="mx-auto w-10 h-1 rounded-full bg-line/80 mb-1 shrink-0" />
+          <p className="px-3 pt-1 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted/70">{title}</p>
+          {children}
+        </div>
+      </>,
+      document.body,
+    );
+  }
+  return createPortal(
+    <div
+      ref={menuRef}
+      style={{ position: "fixed", right: pos.right, top: pos.top }}
+      className={`z-[80] ${widthClass} rounded-2xl border border-line bg-surface/95 backdrop-blur-xl shadow-2xl p-1.5 animate-fade-in`}
+    >
+      {children}
+    </div>,
+    document.body,
+  );
 }
 
 /* Efor seçici — ⋯ menüsünden header'a taşındı (Ağu 2026 kullanıcı kararı):
@@ -480,7 +527,7 @@ function EffortHeaderButton() {
   const setThinkingMode = useStore((s) => s.setThinkingMode);
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
-  const { btnRef, menuRef, pos } = useHeaderDropdown(open, close);
+  const { btnRef, menuRef, pos, isSheet } = useHeaderDropdown(open, close);
   const current = THINKING_LEVELS.find((l) => l.key === thinkingMode) ?? THINKING_LEVELS[0];
 
   return (
@@ -497,26 +544,21 @@ function EffortHeaderButton() {
         <span className="hidden sm:inline">{current.short}</span>
         <ChevronDown size={11} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && pos && createPortal(
-        <div
-          ref={menuRef}
-          style={{ position: "fixed", right: pos.right, top: pos.top }}
-          className="z-[80] w-40 rounded-2xl border border-line bg-surface/95 backdrop-blur-xl shadow-2xl p-1.5 animate-fade-in"
-        >
+      {open && pos && (
+        <HeaderPanel menuRef={menuRef} pos={pos} isSheet={isSheet} onClose={close} widthClass="w-40" title="Düşünme eforu">
           {THINKING_LEVELS.map((l) => (
             <button
               key={l.key}
               onClick={() => { setThinkingMode(l.key); setOpen(false); }}
-              className={`w-full flex items-center justify-between text-left px-2.5 py-1.5 rounded-xl transition-colors text-[12.5px] font-medium ${
+              className={`w-full flex items-center justify-between text-left px-2.5 py-2.5 sm:py-1.5 rounded-xl transition-colors active:scale-[0.98] text-[14px] sm:text-[12.5px] font-medium ${
                 thinkingMode === l.key ? "bg-brand/10 text-brand" : "hover:bg-bgsoft text-ink"
               }`}
             >
               {l.label}
-              {thinkingMode === l.key && <Check size={13} className="shrink-0" />}
+              {thinkingMode === l.key && <Check size={14} className="shrink-0" />}
             </button>
           ))}
-        </div>,
-        document.body,
+        </HeaderPanel>
       )}
     </div>
   );
@@ -542,7 +584,7 @@ function AgentModeButton() {
   const config = useStore((s) => s.config);
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
-  const { btnRef, menuRef, pos } = useHeaderDropdown(open, close);
+  const { btnRef, menuRef, pos, isSheet } = useHeaderDropdown(open, close);
   const mode: AgentMode = config.planApprovalMode ? "plan" : config.requireWriteApproval ? "accept" : "auto";
   const current = AGENT_MODES.find((m) => m.key === mode)!;
 
@@ -570,30 +612,25 @@ function AgentModeButton() {
         <span className="hidden sm:inline">{current.short}</span>
         <ChevronDown size={11} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && pos && createPortal(
-        <div
-          ref={menuRef}
-          style={{ position: "fixed", right: pos.right, top: pos.top }}
-          className="z-[80] w-72 max-w-[85vw] rounded-2xl border border-line bg-surface/95 backdrop-blur-xl shadow-2xl p-1.5 animate-fade-in"
-        >
+      {open && pos && (
+        <HeaderPanel menuRef={menuRef} pos={pos} isSheet={isSheet} onClose={close} widthClass="w-72 max-w-[85vw]" title="Ajan modu">
           {AGENT_MODES.map((m) => (
             <button
               key={m.key}
               onClick={() => choose(m.key)}
-              className={`w-full flex items-start gap-2.5 text-left px-2.5 py-2 rounded-xl transition-colors ${
+              className={`w-full flex items-start gap-3 text-left px-2.5 py-2.5 sm:py-2 rounded-xl transition-colors active:scale-[0.98] ${
                 mode === m.key ? "bg-brand/10" : "hover:bg-bgsoft"
               }`}
             >
               <span className={`shrink-0 mt-0.5 ${mode === m.key ? "text-brand" : "text-muted"}`}>{m.icon}</span>
               <span className="min-w-0 flex-1">
-                <span className={`block text-[12.5px] font-semibold ${mode === m.key ? "text-brand" : "text-ink"}`}>{m.label}</span>
-                <span className="block text-[10.5px] text-muted/60 leading-snug mt-0.5">{m.desc}</span>
+                <span className={`block text-[14px] sm:text-[12.5px] font-semibold ${mode === m.key ? "text-brand" : "text-ink"}`}>{m.label}</span>
+                <span className="block text-[12px] sm:text-[10.5px] text-muted/70 leading-snug mt-0.5">{m.desc}</span>
               </span>
-              {mode === m.key && <Check size={13} className="text-brand shrink-0 mt-0.5" />}
+              {mode === m.key && <Check size={14} className="text-brand shrink-0 mt-0.5" />}
             </button>
           ))}
-        </div>,
-        document.body,
+        </HeaderPanel>
       )}
     </div>
   );
@@ -665,6 +702,19 @@ async function usableApiKey(model: { apiKey?: string; provider: string }): Promi
 
 
 let coderAbort: AbortController | null = null;
+/* Akış sürerken sayfa gizlendi mi (uygulama değişimi/ekran kilidi)? iOS/Android
+   arka planda bağlantıyı sessizce öldürür; dönüşte yanıt yarım kalmış olabilir. */
+let hiddenDuringStream = false;
+/* Sayfa görünür olana kadar bekle (en çok `ms`) — arka planda boşuna yeniden deneme yapma. */
+function waitUntilVisible(ms = 90_000): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof document === "undefined" || !document.hidden) return resolve();
+    const done = () => { clearTimeout(t); document.removeEventListener("visibilitychange", on); resolve(); };
+    const on = () => { if (!document.hidden) done(); };
+    const t = setTimeout(done, ms);
+    document.addEventListener("visibilitychange", on);
+  });
+}
 
 type AttachedFile = { path: string; content: string };
 
@@ -1042,7 +1092,13 @@ export function CoderView() {
      akan yanıt hiç kaydedilmeden kaybolur ("sanki eski cevaba dönüyor" hissi). */
   useEffect(() => {
     const persistIfStreaming = () => {
-      if (useStore.getState().streaming) void useStore.getState().persistCurrent();
+      const st = useStore.getState();
+      if (!st.streaming) return;
+      hiddenDuringStream = true;
+      /* Süreç öldürülüp sayfa yeniden yüklenirse yarım yanıtın altında "Devam et"
+         şeridi çıksın; akış normal biterse aşağıda temizlenir. */
+      st.setFinishReasonOnLast("interrupted");
+      void st.persistCurrent();
     };
     const onVis = () => { if (document.hidden) persistIfStreaming(); };
     document.addEventListener("visibilitychange", onVis);
@@ -1058,6 +1114,30 @@ export function CoderView() {
     const prev = document.title;
     document.title = "● Yanıt yazılıyor… — UMAI";
     return () => { document.title = prev; };
+  }, [streaming]);
+  /* Yanıt yazılırken ekranın kararıp sekmenin dondurulmasını önle (Screen Wake
+     Lock — iOS 16.4+/Android Chrome). Uygulama değişimini engelleyemez; onun
+     için callApi kopan akışı kaldığı yerden sürdürür. Desteklenmiyorsa sessiz. */
+  useEffect(() => {
+    if (!streaming) return;
+    let lock: WakeLockSentinel | null = null;
+    let dead = false;
+    const acquire = async () => {
+      try {
+        if (!("wakeLock" in navigator) || document.hidden) return;
+        const l = await navigator.wakeLock.request("screen");
+        if (dead) { void l.release().catch(() => {}); return; }
+        lock = l;
+      } catch { /* izin yok / pil tasarrufu — önemsiz */ }
+    };
+    void acquire();
+    const onVis = () => { if (!document.hidden) void acquire(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      dead = true;
+      document.removeEventListener("visibilitychange", onVis);
+      void lock?.release().catch(() => {});
+    };
   }, [streaming]);
   /* Escape → akışı durdur (Claude davranışı; menüler açıkken onlara öncelik). */
   useEffect(() => {
@@ -2159,7 +2239,7 @@ export function CoderView() {
 
   const callApi = useCallback(async (
     overrideAgent?: Agent | null,
-    opts?: { continuation?: boolean; depth?: number; noStrongest?: boolean; modelId?: string },
+    opts?: { continuation?: boolean; depth?: number; noStrongest?: boolean; modelId?: string; danglingRetry?: boolean },
   ) => {
     const store = useStore.getState();
     let active = store.activeModel();
@@ -2564,6 +2644,9 @@ export function CoderView() {
        Artık token'lar tampona yazılır, çizim kare hızına bağlanır. */
     let reveal: RevealController | null = null;
     let cutAtLength = false; // finish_event: "length" ⇒ otomatik devam tetiklenebilir
+    let sawFinish = false;   // sağlayıcı/sunucu bitiş nedeni bildirdi mi (arka plan kopması ayrımı)
+    let dropped = false;     // akış yarıda koptu (arka plan/ağ) ⇒ sayfa görünür olunca otomatik devam
+    hiddenDuringStream = false;
     let realUsage: { prompt: number; completion: number } | null = null; // sağlayıcı gerçek token
     /* reasoning delta'ları birikir. Boştan BAŞLAMAZ: Füzyon/Hakem bloğu bu
        turda zaten "•••" panosuna bir durum notu ("✦ Füzyon: N taslak
@@ -2980,6 +3063,7 @@ export function CoderView() {
             /* bitiş nedeni: "length" ⇒ token sınırında kesildi → şerit + oto-devam */
             if (parsed.finish_event) {
               const reason = String(parsed.finish_event.reason ?? "");
+              sawFinish = true;
               if (reason === "length") cutAtLength = true;
               useStore.getState().setFinishReasonOnLast(reason && reason !== "stop" ? reason : undefined);
               continue;
@@ -3042,6 +3126,15 @@ export function CoderView() {
          (muhakeme ayıklama vb.) doğrudan store'a gider. */
       reveal.finish();
       if (!full) useStore.getState().updateLastContent("_(Model boş yanıt döndürdü.)_");
+      /* Sessiz kopma: sayfa akış sırasında gizlendi, bitiş nedeni gelmedi ve metin
+         cümle ortasında bitiyor ⇒ arka plan bağlantıyı öldürdü, yanıt yarım. */
+      if (hiddenDuringStream && !sawFinish && !cutAtLength && full.length > priorLen && !/[.!?…`)\]}"'»]\s*$/.test(full.trim())) {
+        dropped = true;
+        useStore.getState().setFinishReasonOnLast("interrupted");
+      } else if (useStore.getState().current()?.messages.at(-1)?.finishReason === "interrupted") {
+        /* Sayfa gizlenirken konan geçici işaret — yanıt sağlıklı bitti, temizle. */
+        useStore.getState().setFinishReasonOnLast(undefined);
+      }
 
       /* Muhakeme sızıntısını ayır: <think>/<thinking>/<reasoning> etiketleri +
          harmony kanalları (analysis→düşünce, final→içerik) + artık kontrol
@@ -3129,6 +3222,13 @@ export function CoderView() {
       if ((err as Error).name === "AbortError") {
         /* Kullanıcı durdurdu: hiç içerik gelmediyse boş asistan baloncuğunu kaldır. */
         if (!full) useStore.getState().popLastMessage();
+      } else if (full.length > priorLen) {
+        /* Akış ORTADA koptu (arka plana alma, ekran kilidi, ağ): o ana kadarki
+           yanıtı "**Hata:**" ile EZME — koru, "Devam et" şeridini göster ve
+           sayfa görünür olunca kaldığı yerden otomatik sürdür. */
+        reveal?.finish();
+        dropped = true;
+        useStore.getState().setFinishReasonOnLast("interrupted");
       } else if (usedStrongest) {
         /* En güçlü model hata verdi (kredisi/anahtarı yok olabilir) → başarısız
            baloncuğu kaldır, AKTİF modele dön ve aynı turu bir kez daha dene.
@@ -3194,6 +3294,23 @@ export function CoderView() {
     if (cutAtLength && useStore.getState().config.autoContinue !== false && depth < 8 && !abortCtl.signal.aborted) {
       useStore.getState().addToast("Yanıt sınırda kesildi — kaldığı yerden devam ediliyor…", "info");
       await callApi(overrideAgent, { continuation: true, depth: depth + 1 });
+    } else if (dropped && depth < 3 && !abortCtl.signal.aborted && useStore.getState().config.autoContinue !== false) {
+      await waitUntilVisible();
+      useStore.getState().addToast("Bağlantı koptu — yanıt kaldığı yerden sürdürülüyor…", "info");
+      await callApi(overrideAgent, { continuation: true, depth: depth + 1 });
+    } else if (
+      !abortCtl.signal.aborted && !dropped && turnCheckpoints.length === 0 &&
+      useStore.getState().config.autoContinue !== false &&
+      looksDangling(full.slice(priorLen) || full)
+    ) {
+      /* Yarım kalan yanıt: model "Planı oluşturuyorum:" deyip durdu (içerik/araç
+         yok). Bir kez otomatik devam ettir; yine yarımsa şeritte elle devam. */
+      if (!opts?.danglingRetry) {
+        useStore.getState().addToast("Yanıt yarım kaldı — devam ettiriliyor…", "info");
+        await callApi(overrideAgent, { continuation: true, depth: depth + 1, danglingRetry: true });
+      } else {
+        useStore.getState().setFinishReasonOnLast("dangling");
+      }
     } else if (!abortCtl.signal.aborted) {
       /* Tur tamamlandı (sınırda kesilmedi) → olay kancalarını çalıştır. */
       await runHooks(turnCheckpoints.length > 0);

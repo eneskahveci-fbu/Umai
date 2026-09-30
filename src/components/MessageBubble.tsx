@@ -25,6 +25,7 @@ import { playTts, speakableText, stopTts } from "@/lib/pollinations";
 import { toggleChecklistLine } from "@/lib/checklist";
 import { detectLanguage } from "@/lib/editor";
 import { FEATURES } from "@/lib/features";
+import { waitStage } from "@/lib/replyHealth";
 
 /* `<li>` (task-list-item) render'ında bulunan güvenilir satır numarasını,
    içindeki checkbox `<input>`'a taşımak için — bkz. MessageBubbleImpl'deki
@@ -740,6 +741,33 @@ function CompareColumns({ results, onPick }: { results: CompareResult[]; onPick?
 
 /* ── MessageBubble ─────────────────────────────────────────────────── */
 
+/* Bekleme göstergesi: geçen süreye göre aşama metni + zıplayan noktalar.
+   Metin gerçek süreden türetilir (bkz. replyHealth.waitStage), uydurulmaz. */
+function WaitIndicator({ thinking }: { thinking: boolean }) {
+  const [sec, setSec] = useState(0);
+  useEffect(() => {
+    const t0 = Date.now();
+    const id = setInterval(() => setSec(Math.floor((Date.now() - t0) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const stage = waitStage(sec, thinking);
+  return (
+    <span className="inline-flex flex-col gap-0.5 py-1" aria-live="polite" aria-label={stage.label}>
+      <span className="inline-flex items-center gap-2 text-[12.5px] text-muted/70">
+        {thinking
+          ? <Brain size={13} className="text-brand/70 animate-breathe" />
+          : <Sparkles size={12} className="text-brand/60 animate-breathe" />}
+        <span key={stage.label} className="animate-fade-in">{stage.label}</span>
+        <span className="wait-dots" aria-hidden><i /><i /><i /></span>
+        {sec >= 4 && <span className="font-mono text-[11px] text-muted/40 tabular-nums">{sec} sn</span>}
+      </span>
+      {stage.slow && (
+        <span className="text-[11px] text-muted/50 animate-fade-in">Uzun sürüyor — durdurup başka bir model deneyebilirsin.</span>
+      )}
+    </span>
+  );
+}
+
 function MessageBubbleImpl({
   message,
   index,
@@ -966,7 +994,7 @@ function MessageBubbleImpl({
               {/* Hover actions */}
               <div className="flex items-center gap-0.5 mt-1.5 justify-end [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 transition-opacity duration-150">
                 <button onClick={copyMessage} aria-label="Kopyala" className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-2.5 rounded-lg hover:bg-bgsoft transition-colors">
-                  {copied ? <Check size={12} /> : <Copy size={12} />}
+                  {copied ? <Check size={12} className="icon-pop text-green" /> : <Copy size={12} />}
                 </button>
                 {onEdit && (
                   <button onClick={startEdit} aria-label="Düzenle" className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-2.5 rounded-lg hover:bg-bgsoft transition-colors">
@@ -1225,29 +1253,25 @@ function MessageBubbleImpl({
              gerçekten bilinen sinyalden türetilir, uydurulmaz: "•••" panosunda
              içerik varsa (Füzyon durumu / gerçek reasoning) düşünme, yoksa
              yanıt bekleniyor demektir. */
-          <span
-            className="inline-flex items-center gap-2 py-1 text-[12.5px] text-muted/60"
-            aria-live="polite"
-            aria-label={message.thinking ? "Düşünüyor" : "Yanıt bekleniyor"}
-          >
-            {message.thinking
-              ? <Brain size={13} className="text-brand/70 animate-breathe" />
-              : <Sparkles size={12} className="text-brand/60 animate-breathe" />}
-            <span>{message.thinking ? "Düşünüyor…" : "Yanıt hazırlanıyor…"}</span>
-            <span className="typing-shimmer" aria-hidden />
-          </span>
+          <WaitIndicator thinking={!!message.thinking} />
         ) : streamingNow ? (
           <span className="caret" />
         ) : null}
 
-        {/* Token limit cut-off strip */}
-        {!streamingNow && message.finishReason === "length" && onContinue && (
+        {/* Kesilen/yarım yanıt şeridi: token sınırı, koptu (arka plan/ağ) ya da yarım kaldı */}
+        {!streamingNow && onContinue && (message.finishReason === "length" || message.finishReason === "interrupted" || message.finishReason === "dangling") && (
           <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl border border-yellow/20 bg-yellow/5 text-xs animate-fade-in">
             <ChevronRight size={12} className="text-yellow/70 shrink-0" />
-            <span className="text-muted/60 flex-1 min-w-0">Yanıt token sınırında kesildi.</span>
+            <span className="text-muted/70 flex-1 min-w-0">
+              {message.finishReason === "length"
+                ? "Yanıt token sınırında kesildi."
+                : message.finishReason === "interrupted"
+                  ? "Bağlantı koptu (uygulama arka plana alınmış olabilir)."
+                  : "Yanıt yarım kaldı."}
+            </span>
             <button
               onClick={onContinue}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-yellow/10 text-yellow hover:bg-yellow/20 font-semibold transition-colors shrink-0"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-yellow/10 text-yellow hover:bg-yellow/20 active:scale-95 font-semibold transition-all shrink-0"
             >
               <ChevronRight size={11} /> Devam et
             </button>
@@ -1256,7 +1280,7 @@ function MessageBubbleImpl({
 
         {/* Action row */}
         {message.content && (
-          <div className="flex items-center gap-0.5 mt-2 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 transition-opacity duration-150">
+          <div className="msg-actions flex items-center gap-0.5 mt-2 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 transition-opacity duration-150">
             <button onClick={copyMessage} aria-label={copied ? "Kopyalandı" : "Kopyala"} title={copied ? "Kopyalandı" : "Kopyala"} className="flex items-center gap-1 text-[11px] text-muted/50 hover:text-ink p-2.5 rounded-lg hover:bg-bgsoft transition-colors">
               {copied ? <Check size={12} /> : <Copy size={12} />}
             </button>
@@ -1343,7 +1367,7 @@ function MessageBubbleImpl({
                   aria-label="Beğen"
                   title="Beğen"
                 >
-                  <ThumbsUp size={12} />
+                  <ThumbsUp size={12} className={message.rating === "up" ? "icon-pop" : ""} fill={message.rating === "up" ? "currentColor" : "none"} />
                 </button>
                 <button
                   onClick={() => rateMessage(chatId, index, message.rating === "down" ? null : "down")}
@@ -1351,7 +1375,7 @@ function MessageBubbleImpl({
                   aria-label="Beğenme"
                   title="Beğenme"
                 >
-                  <ThumbsDown size={12} />
+                  <ThumbsDown size={12} className={message.rating === "down" ? "icon-pop" : ""} fill={message.rating === "down" ? "currentColor" : "none"} />
                 </button>
                 <div className="w-px h-3 bg-line/50 mx-0.5" />
                 <button
