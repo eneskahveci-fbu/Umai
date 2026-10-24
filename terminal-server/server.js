@@ -18,16 +18,35 @@
  *
  * Ortam değişkenleri:
  *   PORT            Dinleme portu (varsayılan: 7071)
- *   TERMINAL_TOKEN  Zorunlu erişim şifresi — terminal (?token=) ve sunucu (Bearer) ORTAK
+ *   TERMINAL_TOKEN  ZORUNLU erişim şifresi — terminal (?token=) ve sunucu (Bearer) ORTAK
  *   SHELL           Kullanılacak shell (varsayılan: /bin/bash)
  *   WORK_DIR        Kök dizin: terminal cwd + dosya işlemleri (varsayılan: $HOME)
  *   ALLOWED_ORIGIN  CORS izinli origin (varsayılan: * = herkese açık)
  *   MAX_FILE_BYTES  Okuma/yazma üst sınırı (varsayılan: 2_000_000)
+ *   MAX_BODY_BYTES  HTTP gövde üst sınırı (varsayılan: 8_000_000)
+ *   EXEC_TIMEOUT_MS Senkron komut zaman aşımı (varsayılan: 120_000)
+ *   MAX_TASKS       Arka plan görev üst sınırı (varsayılan: 50)
+ *   ALLOW_INSECURE  "1" → TERMINAL_TOKEN olmadan da başlat (yalnız geliştirme!)
+ *
+ * GÜVENLİK NOTU (2026-10 sertleştirme):
+ *   - TERMINAL_TOKEN yoksa sunucu ARTIK BAŞLAMAZ (eskiden uyarı basıp dünyaya
+ *     açık bir root shell olarak devam ediyordu). Geliştirme için ALLOW_INSECURE=1.
+ *   - Yol çözümleme `realpath` tabanlı: workspace içindeki bir symlink ile kök
+ *     dizin dışına çıkılamaz (eski `startsWith` kontrolü bunu kaçırıyordu).
+ *   - WebSocket token karşılaştırması timing-safe; token loglara yazılmıyor.
+ *   - Senkron komutlar EXEC_TIMEOUT_MS sonunda öldürülür; arka plan görevleri
+ *     TTL ile temizlenir (eskiden harita sınırsız büyüyordu).
+ *   - Hatalar doğru HTTP durum koduyla döner (eskiden hepsi 200'dü).
+ *
+ * UYARI: `/exec` ve `/mcp/*` bilinçli olarak keyfi komut çalıştırır — bu sunucu
+ * token'ı bilen herkese tam kabuk erişimi verir. İnternete açıkken token'ı
+ * güçlü tut ve yalnızca güvendiğin istemcilere ver.
  */
 
 const { WebSocketServer } = require("ws");
 const pty = require("node-pty");
 const http = require("http");
+const fs = require("fs");
 const fsp = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
@@ -38,11 +57,31 @@ const TOKEN = process.env.TERMINAL_TOKEN || "";
 const SHELL = process.env.SHELL || "/bin/bash";
 const WORK_DIR = process.env.WORK_DIR || process.env.HOME || "/root";
 const ROOT = path.resolve(WORK_DIR);
+/* Symlink karşılaştırmaları için kökün GERÇEK yolu. */
+const ROOT_REAL = (() => {
+  try { return fs.realpathSync(ROOT); } catch { return ROOT; }
+})();
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
 const MAX_FILE_BYTES = parseInt(process.env.MAX_FILE_BYTES || "2000000", 10);
+const MAX_BODY_BYTES = parseInt(process.env.MAX_BODY_BYTES || "8000000", 10);
+const EXEC_TIMEOUT_MS = parseInt(process.env.EXEC_TIMEOUT_MS || "120000", 10);
+const MAX_TASKS = parseInt(process.env.MAX_TASKS || "50", 10);
+const TASK_TTL_MS = 60 * 60 * 1000;
+const ALLOW_INSECURE = process.env.ALLOW_INSECURE === "1";
 
+/* Token ZORUNLU: yoksa açık bir root shell olarak başlamak yerine dur. */
 if (!TOKEN) {
-  console.warn("⚠️  TERMINAL_TOKEN ayarlanmamış — sunucu herkese açık! Lütfen bir token belirle.");
+  if (ALLOW_INSECURE) {
+    console.warn("⚠️  ALLOW_INSECURE=1 — TERMINAL_TOKEN yok, sunucu KİMLİK DOĞRULAMASIZ çalışıyor (yalnız geliştirme!).");
+  } else {
+    console.error("✖ TERMINAL_TOKEN ayarlanmamış. Sunucu başlatılmadı.");
+    console.error("  Kalıcı bir token üret:  openssl rand -hex 24");
+    console.error("  Sonra: TERMINAL_TOKEN=<token> node server.js");
+    console.error("  (Geliştirme için bilinçli olarak: ALLOW_INSECURE=1)");
+    process.exit(1);
+  }
+} else if (TOKEN.length < 16) {
+  console.warn("⚠️  TERMINAL_TOKEN çok kısa (<16 karakter) — daha uzun bir token önerilir.");
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -53,13 +92,53 @@ const IGNORED_DIRS = new Set([
   ".turbo", ".cache", ".vercel", "out", ".idea", ".DS_Store",
 ]);
 
-/* Yol her zaman ROOT içinde kalmalı (path traversal koruması). */
-function safeResolve(rel) {
-  const p = path.resolve(ROOT, rel || ".");
-  if (p !== ROOT && !p.startsWith(ROOT + path.sep)) {
-    throw new Error("Yol kök dizinin dışında: " + rel);
+/* HTTP durum kodu taşıyan hata — catch bloğu bunu olduğu gibi kullanır. */
+class HttpError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
   }
-  return p;
+}
+
+/* Yol her zaman ROOT içinde kalmalı (path traversal + symlink koruması).
+   Yol adım adım çözülür; her symlink hedefi de denetlenir. Böylece workspace
+   içine yerleştirilmiş bir symlink (`disari -> /etc`) kök dışına çıkamaz.
+   Hedefi henüz var olmayan (dangling) symlink'ler de reddedilir. */
+const MAX_SYMLINK_HOPS = 40;
+async function safeResolve(rel) {
+  const p = path.resolve(ROOT, String(rel ?? "."));
+  if (p !== ROOT && !p.startsWith(ROOT + path.sep)) {
+    throw new HttpError(400, "Yol kök dizinin dışında: " + rel);
+  }
+  let probe = p;
+  let rest = "";
+  let hops = 0;
+  for (;;) {
+    let st = null;
+    try { st = await fsp.lstat(probe); }
+    catch (e) {
+      if (e.code !== "ENOENT" && e.code !== "ENOTDIR") throw e;
+    }
+    if (st && st.isSymbolicLink()) {
+      if (++hops > MAX_SYMLINK_HOPS) throw new HttpError(400, "Çok fazla symlink: " + rel);
+      const target = await fsp.readlink(probe);
+      probe = path.resolve(path.dirname(probe), target);
+      continue;
+    }
+    if (st) {
+      const real = await fsp.realpath(probe);
+      const full = rest ? path.resolve(real, rest) : real;
+      if (full !== ROOT_REAL && !full.startsWith(ROOT_REAL + path.sep)) {
+        throw new HttpError(400, "Yol kök dizinin dışında (symlink): " + rel);
+      }
+      return full;
+    }
+    /* Henüz var olmayan dosya (write): en yakın var olan ataya in. */
+    const parent = path.dirname(probe);
+    if (parent === probe) throw new HttpError(400, "Yol çözülemedi: " + rel);
+    rest = path.join(path.basename(probe), rest);
+    probe = parent;
+  }
 }
 
 function globToRegExp(glob) {
@@ -91,7 +170,19 @@ async function walk(dir, acc) {
 
 const tasks = new Map();
 
+/* Bitmiş ve TTL'i geçmiş görevleri at; harita sınırsız büyümesin. */
+function purgeTasks() {
+  const now = Date.now();
+  for (const [id, rec] of tasks) {
+    if (rec.status !== "running" && now - rec.startedAt > TASK_TTL_MS) tasks.delete(id);
+  }
+}
+
 function runBackground(command, cwd) {
+  purgeTasks();
+  if (tasks.size >= MAX_TASKS) {
+    throw new HttpError(429, `Aynı anda en fazla ${MAX_TASKS} arka plan görevi tutulabilir.`);
+  }
   const id = crypto.randomBytes(8).toString("hex");
   const rec = { status: "running", output: "", exitCode: null, startedAt: Date.now(), command };
   tasks.set(id, rec);
@@ -104,15 +195,34 @@ function runBackground(command, cwd) {
   return id;
 }
 
+/* Senkron komut: EXEC_TIMEOUT_MS sonunda SIGKILL — istek asılı kalmasın. */
 function runForeground(command, cwd) {
   return new Promise((resolve) => {
     const child = spawn(command, { cwd, shell: true });
     let out = "";
+    let timedOut = false;
     const cap = (d) => { out += d.toString(); if (out.length > 500_000) out = out.slice(-500_000); };
     child.stdout.on("data", cap);
     child.stderr.on("data", cap);
-    child.on("close", (code) => resolve({ output: out || "(çıktı yok)", exitCode: code }));
-    child.on("error", (err) => resolve({ output: "Hata: " + err.message, exitCode: -1 }));
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try { child.kill("SIGKILL"); } catch { /* zaten ölmüş */ }
+    }, EXEC_TIMEOUT_MS);
+    const finish = (exitCode) => {
+      clearTimeout(timer);
+      if (timedOut) {
+        resolve({
+          error: `Komut ${EXEC_TIMEOUT_MS} ms içinde bitmedi (zaman aşımı).`,
+          output: out,
+          exitCode,
+          timedOut: true,
+        });
+        return;
+      }
+      resolve({ output: out || "(çıktı yok)", exitCode });
+    };
+    child.on("close", (code) => finish(code));
+    child.on("error", (err) => { clearTimeout(timer); resolve({ error: "Hata: " + err.message, output: out, exitCode: -1 }); });
   });
 }
 
@@ -145,30 +255,65 @@ function mcpRpc(command, args, env, requests) {
 }
 
 function sendJson(res, code, obj) {
-  res.writeHead(code, {
+  if (res.writableEnded || res.destroyed) return;
+  const headers = {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Bridge-Token",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  });
+  };
+  if (ALLOWED_ORIGIN !== "*") headers["Vary"] = "Origin";
+  res.writeHead(code, headers);
   res.end(JSON.stringify(obj));
 }
 
+/* Gövde: boyut sınırı + geçersiz JSON'da 400 (eskiden sessizce {} oluyordu). */
 function readBody(req) {
-  return new Promise((resolve) => {
-    let data = "";
-    req.on("data", (c) => { data += c; if (data.length > 8_000_000) req.destroy(); });
-    req.on("end", () => { try { resolve(data ? JSON.parse(data) : {}); } catch { resolve({}); } });
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    let aborted = false;
+    const chunks = [];
+    req.on("data", (c) => {
+      if (aborted) return;
+      size += c.length;
+      if (size > MAX_BODY_BYTES) {
+        aborted = true;
+        chunks.length = 0;
+        reject(new HttpError(413, `İstek gövdesi çok büyük (üst sınır ${MAX_BODY_BYTES} bayt).`));
+        /* Soketi hemen kapatma: 413 yanıtı ulaşsın; kalan gövdeyi at. */
+        req.resume();
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on("end", () => {
+      if (aborted) return;
+      const data = Buffer.concat(chunks).toString("utf-8");
+      if (!data) return resolve({});
+      try { resolve(JSON.parse(data)); }
+      catch { reject(new HttpError(400, "Geçersiz JSON gövdesi.")); }
+    });
+    req.on("error", () => reject(new HttpError(400, "İstek gövdesi okunamadı.")));
   });
 }
 
+function tokenMatches(given) {
+  if (!TOKEN) return true; // yalnız ALLOW_INSECURE modunda
+  if (typeof given !== "string" || given.length !== TOKEN.length) return false;
+  try { return crypto.timingSafeEqual(Buffer.from(given), Buffer.from(TOKEN)); } catch { return false; }
+}
+
 function authedHttp(req) {
-  if (!TOKEN) return true;
   const h = req.headers["authorization"] || "";
   const bearer = h.startsWith("Bearer ") ? h.slice(7) : "";
-  const given = bearer || req.headers["x-bridge-token"] || "";
-  if (given.length !== TOKEN.length) return false;
-  try { return crypto.timingSafeEqual(Buffer.from(given), Buffer.from(TOKEN)); } catch { return false; }
+  return tokenMatches(bearer || req.headers["x-bridge-token"] || "");
+}
+
+/* Origin kontrolü — ALLOWED_ORIGIN=* değilse tarayıcı isteklerini de süz. */
+function originAllowed(req) {
+  if (ALLOWED_ORIGIN === "*") return true;
+  const o = req.headers.origin;
+  return !o || o === ALLOWED_ORIGIN;
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -180,27 +325,38 @@ const httpServer = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://localhost");
   const route = url.pathname;
 
-  /* Sağlık uçları — kimlik doğrulamasız (mevcut /  davranışı KORUNUR). */
+  /* Sağlık uçları — kimlik doğrulamasız (mevcut /  davranışı KORUNUR) ama
+     artık sunucunun disk yolunu SIZDIRMAZ. */
   if (req.method === "GET" && route === "/") {
     res.writeHead(200, { "Content-Type": "text/plain" });
     res.end("craft.ai terminal server OK");
     return;
   }
   if (route === "/health") {
-    return sendJson(res, 200, { ok: true, name: "craftai-terminal-hybrid", version: "2.0.0", terminal: true, root: ROOT });
+    return sendJson(res, 200, {
+      ok: true,
+      name: "craftai-terminal-hybrid",
+      version: "2.1.0",
+      terminal: true,
+      ...(authedHttp(req) ? { root: ROOT } : {}),
+    });
   }
+
+  if (!originAllowed(req)) return sendJson(res, 403, { error: "Origin izinli değil." });
 
   /* Buradan sonrası SUNUCU katmanı → token zorunlu. */
   if (!authedHttp(req)) return sendJson(res, 401, { error: "Geçersiz veya eksik token." });
 
   try {
-    if (route === "/exec/status" && req.method === "GET") {
+    if (route === "/exec/status") {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "Bu uç yalnız GET kabul eder." });
       const rec = tasks.get(url.searchParams.get("id") || "");
       if (!rec) return sendJson(res, 404, { error: "Görev bulunamadı" });
       return sendJson(res, 200, rec);
     }
 
-    const body = req.method === "POST" ? await readBody(req) : {};
+    if (req.method !== "POST") return sendJson(res, 405, { error: "Bu uç yalnız POST kabul eder." });
+    const body = await readBody(req);
 
     switch (route) {
       case "/fs/list": {
@@ -210,27 +366,35 @@ const httpServer = http.createServer(async (req, res) => {
         return sendJson(res, 200, { paths: paths.slice(0, 5000) });
       }
       case "/fs/read": {
-        const p = safeResolve(body.path);
+        const p = await safeResolve(body.path);
         const st = await fsp.stat(p);
-        if (st.size > MAX_FILE_BYTES) return sendJson(res, 200, { error: `Dosya çok büyük (${st.size} bayt)` });
+        if (!st.isFile()) throw new HttpError(400, "Okunacak yol bir dosya değil.");
+        if (st.size > MAX_FILE_BYTES) throw new HttpError(413, `Dosya çok büyük (${st.size} bayt)`);
         return sendJson(res, 200, { content: await fsp.readFile(p, "utf-8") });
       }
       case "/fs/write": {
-        const p = safeResolve(body.path);
+        const p = await safeResolve(body.path);
+        const content = String(body.content ?? "");
+        const bytes = Buffer.byteLength(content, "utf-8");
+        if (bytes > MAX_FILE_BYTES) {
+          throw new HttpError(413, `Yazılacak içerik çok büyük (${bytes} bayt, üst sınır ${MAX_FILE_BYTES})`);
+        }
         let created = false;
         try { await fsp.access(p); } catch { created = true; }
         await fsp.mkdir(path.dirname(p), { recursive: true });
-        await fsp.writeFile(p, String(body.content ?? ""), "utf-8");
+        await fsp.writeFile(p, content, "utf-8");
         return sendJson(res, 200, { ok: true, created });
       }
       case "/fs/delete": {
-        const p = safeResolve(body.path);
+        const p = await safeResolve(body.path);
+        if (p === ROOT_REAL || p === ROOT) throw new HttpError(400, "Kök dizin silinemez.");
         await fsp.rm(p, { recursive: true, force: true });
         return sendJson(res, 200, { ok: true });
       }
       case "/fs/rename": {
-        const from = safeResolve(body.path);
-        const to = safeResolve(body.newPath);
+        const from = await safeResolve(body.path);
+        const to = await safeResolve(body.newPath);
+        if (to === ROOT_REAL || to === ROOT) throw new HttpError(400, "Kök dizin hedef olamaz.");
         await fsp.mkdir(path.dirname(to), { recursive: true });
         await fsp.rename(from, to);
         return sendJson(res, 200, { ok: true });
@@ -243,7 +407,7 @@ const httpServer = http.createServer(async (req, res) => {
       case "/fs/grep": {
         let re;
         try { re = new RegExp(body.pattern, body.ignoreCase ? "i" : ""); }
-        catch (e) { return sendJson(res, 200, { error: "Geçersiz regex: " + e.message }); }
+        catch (e) { throw new HttpError(400, "Geçersiz regex: " + e.message); }
         let paths = await walk(ROOT, []);
         if (body.glob) { const g = globToRegExp(body.glob); paths = paths.filter((p) => g.test(p)); }
         const matches = [];
@@ -263,38 +427,44 @@ const httpServer = http.createServer(async (req, res) => {
       }
       case "/exec": {
         const command = String(body.command || "").trim();
-        if (!command) return sendJson(res, 200, { error: "command zorunlu" });
-        const cwd = body.cwd ? safeResolve(body.cwd) : ROOT;
+        if (!command) throw new HttpError(400, "command zorunlu");
+        const cwd = body.cwd ? await safeResolve(body.cwd) : ROOT;
         if (body.background) return sendJson(res, 200, { taskId: runBackground(command, cwd) });
-        return sendJson(res, 200, await runForeground(command, cwd));
+        const result = await runForeground(command, cwd);
+        if (result.timedOut) return sendJson(res, 504, result);
+        return sendJson(res, 200, result);
       }
       case "/mcp/list": {
         const reqs = [
-          { jsonrpc: "2.0", id: 0, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "craftai-terminal-hybrid", version: "2.0.0" } } },
+          { jsonrpc: "2.0", id: 0, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "craftai-terminal-hybrid", version: "2.1.0" } } },
           { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} },
         ];
         const r = await mcpRpc(body.command, body.args, body.env, reqs);
+        if (r.error) throw new HttpError(502, r.error);
         const tools = r[1] && r[1].result && r[1].result.tools ? r[1].result.tools : [];
         return sendJson(res, 200, { tools });
       }
       case "/mcp/call": {
         const reqs = [
-          { jsonrpc: "2.0", id: 0, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "craftai-terminal-hybrid", version: "2.0.0" } } },
+          { jsonrpc: "2.0", id: 0, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "craftai-terminal-hybrid", version: "2.1.0" } } },
           { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: body.tool, arguments: body.arguments || {} } },
         ];
         const r = await mcpRpc(body.command, body.args, body.env, reqs);
+        if (r.error) throw new HttpError(502, r.error);
         return sendJson(res, 200, { result: r[1] && r[1].result ? r[1].result : { error: "yanıt yok" } });
       }
       default:
         return sendJson(res, 404, { error: "Bilinmeyen uç: " + route });
     }
   } catch (e) {
-    return sendJson(res, 200, { error: e.message });
+    const status = e instanceof HttpError ? e.status : 500;
+    if (status >= 500) console.error(`[HATA] ${req.method} ${route}:`, e && e.message ? e.message : e);
+    return sendJson(res, status, { error: e && e.message ? e.message : "Bilinmeyen hata" });
   }
 });
 
 /* ════════════════════════════════════════════════════════════════════════
-   WebSocket: TERMİNAL katmanı (birebir eski davranış — DEĞİŞMEDİ)
+   WebSocket: TERMİNAL katmanı (davranış aynı; auth timing-safe)
    ════════════════════════════════════════════════════════════════════════ */
 const wss = new WebSocketServer({ server: httpServer });
 
@@ -302,7 +472,7 @@ wss.on("connection", (ws, req) => {
   const reqUrl = new URL(req.url ?? "/", `http://localhost`);
   const token = reqUrl.searchParams.get("token") || "";
 
-  if (TOKEN && token !== TOKEN) {
+  if (!tokenMatches(token)) {
     ws.close(4403, "Unauthorized");
     console.log(`[AUTH] Reddedilen bağlantı: ${req.socket.remoteAddress}`);
     return;
@@ -367,7 +537,9 @@ httpServer.listen(PORT, () => {
   console.log(`   Port      : ${PORT}`);
   console.log(`   Shell     : ${SHELL}`);
   console.log(`   Workspace : ${ROOT}`);
-  console.log(`   Auth      : ${TOKEN ? "✓ Token aktif" : "⚠ Token YOK"}`);
+  console.log(`   Auth      : ${TOKEN ? "✓ Token aktif" : "⚠ TOKEN YOK (ALLOW_INSECURE)"}`);
+  console.log(`   Komut zaman aşımı: ${EXEC_TIMEOUT_MS} ms`);
   console.log(`\n   Ayarlar → 🔗 Hibrit Sunucu:`);
-  console.log(`   wss://<alan>${TOKEN ? `?token=${TOKEN}` : ""}   (terminal + Yerel Mod otomatik)\n`);
+  /* Token'ı loglara YAZMA — journald/proxy loglarına sızmasın. */
+  console.log(`   wss://<alan>?token=<TERMINAL_TOKEN>   (terminal + Yerel Mod otomatik)\n`);
 });

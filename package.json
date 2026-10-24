@@ -12,6 +12,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:bridge": "node --test \"local-bridge/test/*.test.js\"",
     "cap:sync": "cap sync",
     "cap:add:ios": "cap add ios",
     "cap:add:android": "cap add android",
