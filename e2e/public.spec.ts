@@ -11,14 +11,19 @@ test.describe("Public yüzeyler", () => {
     expect(typeof j.version).toBe("string");
   });
 
-  test("girişsiz /studio → /login yönlendirmesi", async ({ page }) => {
+  test("girişsiz /studio erişilebilir (login'e atmaz)", async ({ page }) => {
     await page.goto("/studio");
-    await page.waitForURL(/\/login/, { timeout: 20_000 });
+    /* Stüdyo özellik bayrağı kapalıysa /app'e yönlenir; açıksa stüdyo kabuğu
+       çizilir. İki durumda da oturumsuz kullanıcı login'e atılmamalı. */
+    await page.waitForURL(/\/(app|studio)/, { timeout: 20_000 });
+    await expect(page).not.toHaveURL(/\/login/);
+    await expect(page.getByRole("main")).toBeVisible({ timeout: 20_000 });
   });
 
-  test("girişsiz /settings → /login yönlendirmesi", async ({ page }) => {
+  test("girişsiz /settings misafir olarak açılır", async ({ page }) => {
     await page.goto("/settings");
-    await page.waitForURL(/\/login/, { timeout: 20_000 });
+    await expect(page).toHaveURL(/\/settings/);
+    await expect(page.getByRole("heading", { name: "Ayarlar" })).toBeVisible({ timeout: 20_000 });
   });
 
   test("sitemap /pricing içeriyor", async ({ request }) => {

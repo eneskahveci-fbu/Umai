@@ -3,24 +3,20 @@ import { test, expect } from "@playwright/test";
 test.describe("Landing", () => {
   test("açılış sayfası yüklenir ve başlık doğru", async ({ page }) => {
     await page.goto("/");
-    await expect(page).toHaveTitle(/Umai/i);
-    await expect(page.getByRole("heading", { name: /gerisini yapay zeka/i })).toBeVisible();
-  });
-
-  test("iki yol kartı görünür ve doğru yönlendirir", async ({ page }) => {
-    await page.goto("/");
-    const creative = page.getByRole("link", { name: /Yaratmaya başla/i });
-    const code = page.getByRole("link", { name: /Kodlamaya başla/i });
-    await expect(creative).toBeVisible();
-    await expect(code).toBeVisible();
-    await expect(creative).toHaveAttribute("href", "/studio");
-    await expect(code).toHaveAttribute("href", "/app");
+    await expect(page).toHaveTitle(/UMAI/i);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(/kod yaz/i);
   });
 
   test("ana CTA /app'e götürür", async ({ page }) => {
     await page.goto("/");
-    const cta = page.getByRole("link", { name: /Ücretsiz başla/i });
+    const cta = page.getByRole("link", { name: /Sohbete başla/i }).first();
     await expect(cta).toBeVisible();
     await expect(cta).toHaveAttribute("href", "/app");
+  });
+
+  test("Ajan İzi vitrini görünür", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: /Kutunun içini gör/i })).toBeVisible();
+    await expect(page.getByText(/Salt okunur kayıt/i)).toBeVisible();
   });
 });

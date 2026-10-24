@@ -1,13 +1,14 @@
 import { test, expect } from "@playwright/test";
 
-/* Uygulama kabuğu "smoke" testleri — /app bilinçli olarak auth kapılıdır
-   (girişsiz açılmaz, bkz. src/lib/authGate.ts). Girişsiz senaryoda doğru
-   davranış /login yönlendirmesi + çalışan bir giriş formudur. LLM çağrısı
-   YAPILMAZ (deterministik kalsın). */
+/* Uygulama kabuğu "smoke" testleri — /app misafir erişimine açıktır
+   (bkz. src/lib/authGate.ts): oturumsuz kullanıcı da yerel modda çalışır.
+   Girişsiz senaryoda doğru davranış /app'in açılması + sohbet kabuğunun
+   görünmesidir. LLM çağrısı YAPILMAZ (deterministik kalsın). */
 test.describe("Uygulama", () => {
-  test("girişsiz /app → /login yönlendirmesi", async ({ page }) => {
+  test("girişsiz /app misafir olarak açılır", async ({ page }) => {
     await page.goto("/app");
-    await page.waitForURL(/\/login/, { timeout: 20_000 });
+    await expect(page).toHaveURL(/\/app/);
+    await expect(page.getByRole("button", { name: "Yeni sohbet" }).first()).toBeVisible({ timeout: 20_000 });
   });
 
   test("/login formu hazır: e-posta alanı doldurulabiliyor", async ({ page }) => {

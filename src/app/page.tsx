@@ -368,17 +368,17 @@ export default function Home() {
                 </ol>
               </div>
 
-              <div className="flex items-center justify-between gap-3 border-t border-line/60 px-4 py-2 text-[10px] text-muted/60">
+              <div className="flex items-center justify-between gap-3 border-t border-line/60 px-4 py-2 text-[10px] text-muted">
                 <span className="inline-flex items-center gap-1.5">
                   <ShieldCheck size={10} /> Salt okunur kayıt
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <kbd className="rounded border border-line/80 bg-bgsoft px-1 py-0.5 font-mono text-[9.5px]">Esc</kbd>
+                  <kbd className="rounded border border-line/80 bg-bgsoft px-1 py-0.5 font-mono text-[9.5px] text-muted">Esc</kbd>
                   kapat
                 </span>
               </div>
             </div>
-            <p className="text-center text-[11px] text-muted/60 mt-3">Örnek iz · gerçek panelde filtrelenebilir</p>
+            <p className="text-center text-[11px] text-muted mt-3">Örnek iz · gerçek panelde filtrelenebilir</p>
           </div>
         </div>
       </section>

@@ -1,18 +1,18 @@
 name: CI
 
-# GitLab CI şu an tamamen kapalı (paylaşımlı runner dakika kotası tükendi —
-# bkz. .gitlab-ci.yml'in kendi "workflow: rules: when: never" bloğu). Bu
-# GitHub aynası dalları hiçbir zaman "main" olmadığından (her oturumun kendi
-# claude/* dalı vardır, harness tarafından atanır) branches deseni bunu
-# yansıtır — sabit bir oturum dalı adı yazmak bir sonraki oturumda bayatlar.
+# `main` artık herkese açık birincil dal. GitHub aynası eskiden yalnız
+# `claude/**` dallarını çalıştırıyordu; açık kaynak katkılarında PR'lar da
+# `main` hedefleneceği için her iki desen de tetiklenir.
 on:
   push:
     branches:
+      - main
       - "claude/**"
   pull_request:
     branches:
+      - main
       - "claude/**"
-      - "main"
+  workflow_dispatch:
 
 permissions:
   contents: read
