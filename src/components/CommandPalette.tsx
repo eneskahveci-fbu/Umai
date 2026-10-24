@@ -269,13 +269,13 @@ export function CommandPalette() {
     },
     {
       id: "activity-log",
-      label: "Etkinlik günlüğü",
+      label: "Ajan izi (ne yaptı?)",
       icon: <Activity size={16} />,
       action: () => {
         useStore.getState().setActivityOpen(true);
         setOpen(false);
       },
-      keywords: ["etkinlik", "gunluk", "activity", "log", "denetim", "audit", "gecmis"],
+      keywords: ["ajan", "iz", "etkinlik", "gunluk", "activity", "log", "denetim", "audit", "gecmis", "trace"],
     },
     {
       id: "prompt-library",

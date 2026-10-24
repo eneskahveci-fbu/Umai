@@ -51,6 +51,8 @@ test.before(async () => {
   await fsp.symlink(path.join(outside, "yeni-dosya.txt"), path.join(root, "kacis"));
   /* Kendine işaret eden symlink döngüsü. */
   await fsp.symlink("dongu", path.join(root, "dongu"));
+  /* Salt-okunur mod testi için sabit dosya. */
+  await fsp.writeFile(path.join(root, "salt-okunur.txt"), "sadece okunur", "utf-8");
 
   const port = 44000 + Math.floor(Math.random() * 1000);
   base = `http://127.0.0.1:${port}`;
@@ -206,8 +208,54 @@ test("yanlış metot 405 döner", async () => {
   assert.equal(r.status, 405);
 });
 
+test("SANDBOX_MODE=read-only yazma, komut ve MCP'yi kapatır", async () => {
+  const port = 46000 + Math.floor(Math.random() * 1000);
+  const url = `http://127.0.0.1:${port}`;
+  const c = spawn(process.execPath, [SERVER], {
+    env: {
+      ...process.env,
+      PORT: String(port),
+      HOST: "127.0.0.1",
+      WORK_DIR: root,
+      BRIDGE_TOKEN: TOKEN,
+      SANDBOX_MODE: "read-only",
+    },
+    stdio: "ignore",
+  });
+  const call = (endpoint, body) => fetch(`${url}${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` },
+    body: JSON.stringify(body ?? {}),
+  });
+  try {
+    await waitForHealth(url);
+
+    /* Okuma serbest. */
+    const read = await call("/fs/read", { path: "salt-okunur.txt" });
+    assert.equal(read.status, 200);
+    assert.equal((await read.json()).content, "sadece okunur");
+    assert.equal((await call("/fs/list", {})).status, 200);
+
+    /* Yazma/silme/taşıma/komut/MCP kapalı. */
+    for (const [endpoint, body] of [
+      ["/fs/write", { path: "yeni.txt", content: "x" }],
+      ["/fs/delete", { path: "salt-okunur.txt" }],
+      ["/fs/rename", { path: "salt-okunur.txt", newPath: "baska.txt" }],
+      ["/exec", { command: "echo selam" }],
+      ["/mcp/list", { command: "echo" }],
+      ["/mcp/call", { command: "echo", tool: "x" }],
+    ]) {
+      const r = await call(endpoint, body);
+      assert.equal(r.status, 403, `${endpoint} salt-okunur modda 403 dönmeli`);
+    }
+    /* Dosya gerçekten yerinde mi? */
+    assert.equal(await fsp.readFile(path.join(root, "salt-okunur.txt"), "utf-8"), "sadece okunur");
+  } finally {
+    c.kill("SIGKILL");
+  }
+});
+
 test("ALLOWED_ORIGIN ayarlıysa yabancı origin 403 alır", async () => {
-  /* Ayrı süreç: origin süzgeci başlangıçta okunuyor. */
   const port = 45000 + Math.floor(Math.random() * 1000);
   const url = `http://127.0.0.1:${port}`;
   const c = spawn(process.execPath, [SERVER], {

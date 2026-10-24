@@ -24,7 +24,8 @@ gerçek komutları çalıştırır.
 > Güvenlik: Sunucu yalnızca `127.0.0.1` (localhost) dinler ve **token zorunludur**.
 > Token vermezsen rastgele üretilip ekrana yazılır (asla açık çalışmaz). Tüm dosya
 > işlemleri `WORK_DIR` kök dizinine hapsedilir; `..` **ve** symlink ile kök dışına
-> çıkılamaz. Kök dizinin kendisi silinemez.
+> çıkılamaz. Kök dizinin kendisi silinemez. Sadece okuma yeterliyse
+> `SANDBOX_MODE=read-only` ile yazma, komut ve MCP tamamen kapatılabilir.
 
 ## Ortam değişkenleri
 | Değişken | Varsayılan | Açıklama |
@@ -33,6 +34,7 @@ gerçek komutları çalıştırır.
 | `HOST` | `127.0.0.1` | Dinleme adresi (loopback önerilir) |
 | `BRIDGE_TOKEN` | rastgele | Erişim token'ı (16+ karakter önerilir) |
 | `WORK_DIR` | çalışılan dizin | Kök dizin; tüm yollar bunun içinde kalmalı |
+| `SANDBOX_MODE` | `workspace-write` | `read-only` → yazma/silme/taşıma, `/exec` ve MCP kapalı |
 | `ALLOWED_ORIGIN` | `*` | CORS izinli origin; `*` dışındaysa yabancı origin 403 alır |
 | `MAX_FILE_BYTES` | `2000000` | Okuma **ve** yazma boyutu üst sınırı |
 | `MAX_BODY_BYTES` | `8000000` | HTTP gövde üst sınırı |

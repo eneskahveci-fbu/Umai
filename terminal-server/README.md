@@ -57,6 +57,9 @@ docker run -d --restart=always -p 7071:7071 -e TERMINAL_TOKEN=gizli_sifre crafta
 - Senkron komutlar `EXEC_TIMEOUT_MS` sonunda öldürülür; arka plan görevleri
   TTL ile temizlenir ve `MAX_TASKS` ile sınırlıdır.
 - İşin bitince servisi durdur: `sudo systemctl disable --now craftai-terminal`.
+- Yalnızca inceleme/okuma gerekiyorsa `SANDBOX_MODE=read-only` kullan: dosya
+  yazma, komut, MCP ve terminal bağlantıları kapanır (tam OS sandbox değil,
+  ikinci bir kilittir).
 
 ## Ortam değişkenleri
 
@@ -66,6 +69,7 @@ docker run -d --restart=always -p 7071:7071 -e TERMINAL_TOKEN=gizli_sifre crafta
 | `TERMINAL_TOKEN` | — | **Zorunlu** terminal + HTTP token'ı |
 | `SHELL` | `/bin/bash` | PTY shell |
 | `WORK_DIR` | `$HOME` | Terminal cwd + dosya işlemleri kökü |
+| `SANDBOX_MODE` | `workspace-write` | `read-only` → yazma/komut/MCP **ve terminal** kapalı |
 | `ALLOWED_ORIGIN` | `*` | CORS/WS izinli origin |
 | `MAX_FILE_BYTES` | `2000000` | Okuma **ve** yazma boyutu üst sınırı |
 | `MAX_BODY_BYTES` | `8000000` | HTTP gövde üst sınırı |
