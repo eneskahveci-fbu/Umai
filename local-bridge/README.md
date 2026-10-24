@@ -23,12 +23,35 @@ gerçek komutları çalıştırır.
 
 > Güvenlik: Sunucu yalnızca `127.0.0.1` (localhost) dinler ve **token zorunludur**.
 > Token vermezsen rastgele üretilip ekrana yazılır (asla açık çalışmaz). Tüm dosya
-> işlemleri `WORK_DIR` kök dizinine hapsedilir (path traversal koruması).
+> işlemleri `WORK_DIR` kök dizinine hapsedilir; `..` **ve** symlink ile kök dışına
+> çıkılamaz. Kök dizinin kendisi silinemez.
+
+## Ortam değişkenleri
+| Değişken | Varsayılan | Açıklama |
+|---|---|---|
+| `PORT` | `4319` | Dinleme portu |
+| `HOST` | `127.0.0.1` | Dinleme adresi (loopback önerilir) |
+| `BRIDGE_TOKEN` | rastgele | Erişim token'ı (16+ karakter önerilir) |
+| `WORK_DIR` | çalışılan dizin | Kök dizin; tüm yollar bunun içinde kalmalı |
+| `ALLOWED_ORIGIN` | `*` | CORS izinli origin; `*` dışındaysa yabancı origin 403 alır |
+| `MAX_FILE_BYTES` | `2000000` | Okuma **ve** yazma boyutu üst sınırı |
+| `MAX_BODY_BYTES` | `8000000` | HTTP gövde üst sınırı |
+| `EXEC_TIMEOUT_MS` | `120000` | Senkron komut zaman aşımı (sonunda SIGKILL) |
+| `MAX_TASKS` | `50` | Aynı anda tutulan arka plan görevi |
+
+Hatalar artık doğru HTTP durum koduyla döner (`400` geçersiz istek/yol, `401` token,
+`403` origin, `404` bilinmeyen uç, `405` yanlış metot, `413` boyut, `429` görev
+sınırı, `504` zaman aşımı). Gövde şekli değişmedi: `{ error }`.
+
+## Testler
+```bash
+npm run test:bridge     # node --test (ek bağımlılık yok)
+```
 
 ## Uçlar (HTTP, token'lı)
 | Uç | Açıklama |
 |---|---|
-| `GET /health` | Sağlık + kök dizin (token gerekmez) |
+| `GET /health` | Sağlık; kök dizin yalnız token'lıysa döner |
 | `POST /fs/list` `{filter?}` | Dosya yollarını listele |
 | `POST /fs/read` `{path}` | Dosya oku |
 | `POST /fs/write` `{path, content}` | Dosya yaz/oluştur |

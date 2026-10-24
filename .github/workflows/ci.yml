@@ -12,6 +12,7 @@ on:
   pull_request:
     branches:
       - "claude/**"
+      - "main"
 
 permissions:
   contents: read
@@ -46,6 +47,9 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Test (local-bridge)
+        run: npm run test:bridge
 
       - name: Build
         run: npm run build
