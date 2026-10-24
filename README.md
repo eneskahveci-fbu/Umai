@@ -1,6 +1,12 @@
-# 🎨 craft.ai — Web
+# 🎨 UMAI (craft.ai) — Web
+
+[![Lisans: MIT](https://img.shields.io/badge/lisans-MIT-00e39a.svg)](LICENSE)
+[![Testler](https://img.shields.io/badge/testler-1355-3ddc84.svg)](#-testler)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000.svg)](https://nextjs.org)
 
 Qwen Studio'dan ilham alan, terminal asistanının web sürümü. Birden fazla LLM modeliyle etkileşim kurabilen, GitHub entegrasyonlu modern web uygulaması.
+
+**Açık kaynak (MIT).** Hata bildirimi, özellik önerisi ve pull request'ler memnuniyetle karşılanır — bkz. [CONTRIBUTING.md](CONTRIBUTING.md) ve [SECURITY.md](SECURITY.md).
 
 **Teknoloji Stack:** Next.js 16 + React 19 + TypeScript + Tailwind CSS v4 + Supabase + Vercel
 
@@ -92,6 +98,10 @@ LLM_BASE_URL=https://router.huggingface.co/v1
 LLM_MODEL=meta-llama/Llama-3.1-8B-Instruct
 LLM_API_KEY=hf_...
 ```
+
+> **Not:** `NEXT_PUBLIC_SUPABASE_ANON_KEY` istemciye gömülen **public** bir anahtardır;
+> güvenliği Supabase **RLS** politikalarına bağlıdır. `SUPABASE_SERVICE_ROLE_KEY`
+> yalnızca sunucuda kullanılmalı, asla istemciye veya repoya konmamalıdır.
 
 ### 4. Geliştirme Sunucusunu Başlat
 
@@ -255,9 +265,26 @@ Uygulamada desteklenen LLM sağlayıcıları:
 
 ---
 
+## 🧪 Testler
+
+```bash
+npx tsc --noEmit          # tip kontrolü
+npm run lint              # ESLint
+npx vitest run            # birim testleri
+npm run test:bridge       # köprü/terminal sunucusu testleri
+npm run build             # üretim derlemesi
+```
+
+---
+
 ## 🤝 Katkıda Bulunma
 
-Bu proje açık kaynak değil, ancak iyileştirme ve hata bildirimi için iletişime geçebilirsin.
+Bu proje **MIT lisansıyla açık kaynak**. Hata bildirimi, özellik önerisi ve
+pull request'ler memnuniyetle karşılanır.
+
+- Katkı rehberi: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Güvenlik açığı bildirimi: [SECURITY.md](SECURITY.md) (lütfen public issue açma)
+- Issue ve PR'lar: [GitHub](https://github.com/eneskahveci-fbu/Umai)
 
 ---
 
@@ -265,13 +292,14 @@ Bu proje açık kaynak değil, ancak iyileştirme ve hata bildirimi için ileti�
 
 **Geliştirici:** Enes Kahveci  
 **Email:** eneskahveci.bs@gmail.com  
-**GitHub:** [@eneskahveci-sdo](https://github.com/eneskahveci-sdo)
+**GitHub:** [@eneskahveci-fbu](https://github.com/eneskahveci-fbu)
 
 ---
 
 ## 📝 Lisans
 
-Bu proje kişisel kullanım amaçlıdır. Kullanım şartları için geliştiriciyle iletişime geç.
+[MIT](LICENSE) © 2026 Enes Kahveci. Ticari kullanım dahil her türlü kullanıma
+açıktır; tek koşul telif ve lisans bildirimini korumaktır.
 
 ---
 
@@ -284,4 +312,4 @@ Bu proje kişisel kullanım amaçlıdır. Kullanım şartları için geliştiric
 
 ---
 
-**Son Güncelleme:** 2026 Mayıs
+**Son Güncelleme:** 2026 Ekim

@@ -2,6 +2,13 @@
   "name": "craft-ai-web",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "description": "UMAI — ücretsiz modellerle çalışan, GitHub/GitLab entegrasyonlu açık kaynak yapay zekâ kodlama asistanı.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eneskahveci-fbu/Umai.git"
+  },
+  "homepage": "https://github.com/eneskahveci-fbu/Umai#readme",
   "scripts": {
     "predev": "node scripts/copy-treesitter-wasm.mjs",
     "dev": "next dev",
