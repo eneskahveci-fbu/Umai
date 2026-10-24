@@ -3,12 +3,18 @@ import { ReferralCapture } from "@/components/ReferralCapture";
 import { BrandMark } from "@/components/BrandMark";
 import { MarketingHeader, OpenAppCta } from "@/components/MarketingHeader";
 import {
+  Activity,
   ArrowRight,
+  Check,
   ChevronDown,
+  FileEdit,
   GitBranch,
   KeyRound,
   Repeat,
+  Search,
+  ShieldCheck,
   TerminalSquare,
+  Wrench,
 } from "lucide-react";
 
 /* Dört somut gerçek — "ne yapabilirsin" değil "neden sınırsız". */
@@ -42,6 +48,29 @@ const CHAIN = [
   { name: "Gemini", note: "ücretsiz katman", free: true },
   { name: "Kendi anahtarın", note: "istersen", free: false },
 ];
+
+/* Ajan İzi vitrini — panelin gerçek görünümünü temsil eden örnek kayıtlar. */
+const TRACE_POINTS = [
+  {
+    title: "Adım adım zaman çizelgesi",
+    desc: "Hangi araç ne zaman çalıştı, ne kadar sürdü; tek bakışta görünür.",
+  },
+  {
+    title: "Araç, komut ve dosya filtreleri",
+    desc: "Gürültüyü ayıkla; yalnızca değişen dosyalara ya da hata alan adımlara bak.",
+  },
+  {
+    title: "Girdi ve çıktı detayı",
+    desc: "Her adımı aç, ham girdiyi ve sonucu oku, tek tıkla kopyala.",
+  },
+];
+
+const MOCK_TRACE = [
+  { kind: "tool", label: "read_file", detail: "src/app/reset-password/page.tsx", time: "120ms" },
+  { kind: "tool", label: "grep", detail: "email · src/lib", time: "80ms" },
+  { kind: "write", label: "değiştirildi", detail: "src/lib/validate.ts", time: "1.2s" },
+  { kind: "command", label: "npm test", detail: "3 test geçti", time: "2.0s" },
+] as const;
 
 const FAQS = [
   {
@@ -224,6 +253,132 @@ export default function Home() {
                 </li>
               ))}
             </ol>
+          </div>
+        </div>
+      </section>
+
+      {/* AJAN İZİ — "kutunun içini gör" vitrini */}
+      <section className="max-w-6xl mx-auto px-5 sm:px-6 py-10 w-full">
+        <div className="grid lg:grid-cols-[0.95fr_1.05fr] gap-10 lg:gap-16 items-center">
+          <div>
+            <p className="inline-flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.16em] text-brand/90 border border-brand/20 bg-brand/[0.06] rounded-full px-2.5 py-1 mb-5">
+              <Activity size={12} /> Ajan izi
+            </p>
+            <h2 className="font-serif text-3xl sm:text-4xl font-semibold tracking-tight text-balance">
+              Kutunun içini gör.
+            </h2>
+            <p className="text-muted mt-3 leading-relaxed">
+              Ajan ne okudu, neyi değiştirdi, hangi komutu çalıştırdı — hepsi süresiyle birlikte
+              tek bir zaman çizelgesinde. Körlemesine güvenmek zorunda değilsin.
+            </p>
+            <ul className="mt-6 space-y-3.5">
+              {TRACE_POINTS.map((point) => (
+                <li key={point.title} className="flex gap-3">
+                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border border-brand/25 bg-brand/10 text-brand">
+                    <Check size={11} />
+                  </span>
+                  <div>
+                    <p className="text-[13.5px] font-semibold text-ink">{point.title}</p>
+                    <p className="text-[12.5px] text-muted leading-relaxed">{point.desc}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-6 flex items-start gap-2.5 rounded-xl border border-line/70 bg-bgsoft/50 px-3.5 py-3 text-[12px] leading-relaxed text-muted">
+              <ShieldCheck size={15} className="mt-0.5 shrink-0 text-brand" />
+              <span>
+                Yalnızca inceleme yapacaksan köprüyü{" "}
+                <code className="rounded bg-codebg/70 px-1 py-0.5 font-mono text-[11px] text-ink/80">SANDBOX_MODE=read-only</code>{" "}
+                ile aç: yazma, komut ve terminal tamamen kapanır.
+              </span>
+            </p>
+          </div>
+
+          <div className="relative" aria-hidden="true">
+            <div
+              className="pointer-events-none absolute -inset-8 rounded-[2rem]"
+              style={{
+                background:
+                  "radial-gradient(60% 60% at 50% 40%, color-mix(in srgb, var(--color-brand) 10%, transparent), transparent 70%)",
+              }}
+            />
+            <div className="relative premium-card rounded-2xl overflow-hidden">
+              <div className="flex items-center gap-2.5 border-b border-line/60 px-4 py-3">
+                <span className="grid h-7 w-7 place-items-center rounded-lg border border-brand/25 bg-brand/10 text-brand">
+                  <Activity size={13} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12.5px] font-bold tracking-tight">Ajan İzi</p>
+                  <p className="text-[10.5px] text-muted/70">Bu sohbette ne oldu, adım adım</p>
+                </div>
+                <span className="rounded-full bg-brand/10 px-2 py-0.5 font-mono text-[10px] tabular-nums text-brand">
+                  3.4s
+                </span>
+              </div>
+
+              <div className="grid grid-cols-4 gap-1.5 border-b border-line/60 px-4 py-2.5">
+                {[
+                  ["Adım", "4"],
+                  ["Araç", "2"],
+                  ["Komut", "1"],
+                  ["Dosya", "1"],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg border border-line/50 bg-bgsoft/40 px-2 py-1.5">
+                    <p className="text-[9px] uppercase tracking-wider text-muted/50">{label}</p>
+                    <p className="text-[13px] font-semibold tabular-nums text-ink">{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="px-4 py-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.14em] text-muted/50">
+                    Tur 2
+                  </span>
+                  <span className="h-px flex-1 bg-line/50" />
+                  <span className="text-[9.5px] tabular-nums text-muted/40">4 adım</span>
+                </div>
+                <ol className="relative ml-[5px] border-l border-line/60 pl-4 space-y-1.5">
+                  {MOCK_TRACE.map((row) => (
+                    <li key={row.label + row.detail} className="relative">
+                      <span className="absolute -left-[21px] top-[11px] h-2 w-2 rounded-full bg-brand/80 ring-4 ring-[var(--color-surface)]" />
+                      <div className="flex items-center gap-2 rounded-lg border border-line/50 bg-bgsoft/40 px-2.5 py-2">
+                        <span className="shrink-0">
+                          {row.kind === "command" ? (
+                            <TerminalSquare size={12} className="text-cyan/80" />
+                          ) : row.kind === "write" ? (
+                            <FileEdit size={12} className="text-yellow/80" />
+                          ) : row.label === "grep" ? (
+                            <Search size={12} className="text-brand/80" />
+                          ) : (
+                            <Wrench size={12} className="text-brand/80" />
+                          )}
+                        </span>
+                        <span className="shrink-0 text-[11.5px] font-semibold text-ink">{row.label}</span>
+                        <span className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-muted/70">
+                          {row.detail}
+                        </span>
+                        <span className="shrink-0 font-mono text-[9.5px] tabular-nums text-muted/50">
+                          {row.time}
+                        </span>
+                        <Check size={10} className="shrink-0 text-green/80" />
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 border-t border-line/60 px-4 py-2 text-[10px] text-muted/60">
+                <span className="inline-flex items-center gap-1.5">
+                  <ShieldCheck size={10} /> Salt okunur kayıt
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <kbd className="rounded border border-line/80 bg-bgsoft px-1 py-0.5 font-mono text-[9.5px]">Esc</kbd>
+                  kapat
+                </span>
+              </div>
+            </div>
+            <p className="text-center text-[11px] text-muted/60 mt-3">Örnek iz · gerçek panelde filtrelenebilir</p>
           </div>
         </div>
       </section>

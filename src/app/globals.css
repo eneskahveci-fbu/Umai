@@ -1012,6 +1012,11 @@ html.light .hero-window { box-shadow: 0 1px 0 #fff inset, 0 30px 60px -25px rgba
 @keyframes sheet-up { from { transform: translateY(100%); opacity: .6; } to { transform: translateY(0); opacity: 1; } }
 .animate-sheet-up { animation: sheet-up var(--dur-4) var(--ease-out) both; }
 
+/* ─── Ajan İzi: sağdan açılan iz paneli ─── */
+@keyframes trace-in { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.trace-drawer { animation: trace-in var(--dur-3) var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) { .trace-drawer { animation: none; } }
+
 /* ─── Bekleme noktaları + mesaj eylem ikonları (mikro-etkileşim) ─── */
 .wait-dots { display: inline-flex; gap: 3px; align-items: center; }
 .wait-dots i {

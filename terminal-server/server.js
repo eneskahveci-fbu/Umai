@@ -62,6 +62,14 @@ const ROOT_REAL = (() => {
   try { return fs.realpathSync(ROOT); } catch { return ROOT; }
 })();
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
+/* Salt-okunur mod: yazma/silme/taşıma, komut ve terminal kapalı. */
+const SANDBOX_MODE = (process.env.SANDBOX_MODE || "workspace-write").toLowerCase();
+if (!["read-only", "workspace-write"].includes(SANDBOX_MODE)) {
+  console.error(`✖ SANDBOX_MODE geçersiz: ${SANDBOX_MODE} (read-only | workspace-write)`);
+  process.exit(1);
+}
+const READ_ONLY = SANDBOX_MODE === "read-only";
+const MUTATING_ROUTES = new Set(["/fs/write", "/fs/delete", "/fs/rename", "/exec", "/mcp/list", "/mcp/call"]);
 const MAX_FILE_BYTES = parseInt(process.env.MAX_FILE_BYTES || "2000000", 10);
 const MAX_BODY_BYTES = parseInt(process.env.MAX_BODY_BYTES || "8000000", 10);
 const EXEC_TIMEOUT_MS = parseInt(process.env.EXEC_TIMEOUT_MS || "120000", 10);
@@ -347,6 +355,10 @@ const httpServer = http.createServer(async (req, res) => {
   /* Buradan sonrası SUNUCU katmanı → token zorunlu. */
   if (!authedHttp(req)) return sendJson(res, 401, { error: "Geçersiz veya eksik token." });
 
+  if (READ_ONLY && MUTATING_ROUTES.has(route)) {
+    return sendJson(res, 403, { error: "Sunucu salt-okunur modda (SANDBOX_MODE=read-only); yazma/komut işlemleri kapalı." });
+  }
+
   try {
     if (route === "/exec/status") {
       if (req.method !== "GET") return sendJson(res, 405, { error: "Bu uç yalnız GET kabul eder." });
@@ -478,6 +490,13 @@ wss.on("connection", (ws, req) => {
     return;
   }
 
+  /* Salt-okunur modda PTY açmak tam kabuk demek → terminal bağlantısını reddet. */
+  if (READ_ONLY) {
+    ws.close(4403, "Read-only mode");
+    console.log(`[AUTH] Salt-okunur modda terminal reddedildi: ${req.socket.remoteAddress}`);
+    return;
+  }
+
   const origin = req.headers.origin || "";
   if (ALLOWED_ORIGIN !== "*" && origin && origin !== ALLOWED_ORIGIN) {
     ws.close(4403, "Origin not allowed");
@@ -538,6 +557,7 @@ httpServer.listen(PORT, () => {
   console.log(`   Shell     : ${SHELL}`);
   console.log(`   Workspace : ${ROOT}`);
   console.log(`   Auth      : ${TOKEN ? "✓ Token aktif" : "⚠ TOKEN YOK (ALLOW_INSECURE)"}`);
+  console.log(`   Mod       : ${SANDBOX_MODE}${READ_ONLY ? " (yazma/komut/terminal kapalı)" : ""}`);
   console.log(`   Komut zaman aşımı: ${EXEC_TIMEOUT_MS} ms`);
   console.log(`\n   Ayarlar → 🔗 Hibrit Sunucu:`);
   /* Token'ı loglara YAZMA — journald/proxy loglarına sızmasın. */

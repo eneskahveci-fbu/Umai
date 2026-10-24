@@ -57,6 +57,15 @@ const ROOT_REAL = (() => {
   try { return fs.realpathSync(ROOT); } catch { return ROOT; }
 })();
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
+/* Salt-okunur mod: yazma/silme/taşıma, komut çalıştırma ve MCP çağrıları kapalı.
+   Tam OS sandbox değil; "yanlışlıkla bir şey bozulmasın" için ikinci bir kilit. */
+const SANDBOX_MODE = (process.env.SANDBOX_MODE || "workspace-write").toLowerCase();
+if (!["read-only", "workspace-write"].includes(SANDBOX_MODE)) {
+  console.error(`✖ SANDBOX_MODE geçersiz: ${SANDBOX_MODE} (read-only | workspace-write)`);
+  process.exit(1);
+}
+const READ_ONLY = SANDBOX_MODE === "read-only";
+const MUTATING_ROUTES = new Set(["/fs/write", "/fs/delete", "/fs/rename", "/exec", "/mcp/list", "/mcp/call"]);
 const MAX_FILE_BYTES = parseInt(process.env.MAX_FILE_BYTES || "2000000", 10);
 const MAX_BODY_BYTES = parseInt(process.env.MAX_BODY_BYTES || "8000000", 10);
 const EXEC_TIMEOUT_MS = parseInt(process.env.EXEC_TIMEOUT_MS || "120000", 10);
@@ -337,6 +346,10 @@ const server = http.createServer(async (req, res) => {
 
   if (!isAuthed) return send(res, 401, { error: "Geçersiz veya eksik token." });
 
+  if (READ_ONLY && MUTATING_ROUTES.has(route)) {
+    return send(res, 403, { error: "Sunucu salt-okunur modda (SANDBOX_MODE=read-only); yazma/komut işlemleri kapalı." });
+  }
+
   try {
     if (route === "/exec/status") {
       if (req.method !== "GET") return send(res, 405, { error: "Bu uç yalnız GET kabul eder." });
@@ -460,6 +473,7 @@ server.listen(PORT, HOST, () => {
   console.log(`   Adres : http://${HOST}:${PORT}`);
   console.log(`   Kök   : ${ROOT}`);
   console.log(`   Token : ${TOKEN.slice(0, 4)}…(${TOKEN.length} karakter)`);
+  console.log(`   Mod   : ${SANDBOX_MODE}${READ_ONLY ? " (yazma/komut kapalı)" : ""}`);
   console.log(`   Komut zaman aşımı: ${EXEC_TIMEOUT_MS} ms`);
   console.log(`   Uygulamada: Ayarlar → Yerel Mod → bu adres + token`);
 });
