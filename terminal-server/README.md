@@ -46,6 +46,32 @@ docker run -d --restart=always -p 7071:7071 -e TERMINAL_TOKEN=gizli_sifre crafta
 
 ## Güvenlik
 
-- `TERMINAL_TOKEN` **zorunlu** — bu sunucu bağlanan herkese shell verir.
-- Yalnızca güvendiğin makinede çalıştır; `ALLOWED_ORIGIN` ile origin'i kısıtlayabilirsin.
+- `TERMINAL_TOKEN` **zorunlu** — token yoksa sunucu artık **başlamaz** (eskiden
+  uyarı basıp dünyaya açık bir shell olarak devam ediyordu). Yalnızca yerel
+  geliştirme için `ALLOW_INSECURE=1` kaçış kapısı var.
+- Bu sunucu `/exec` ve `/mcp/*` uçlarıyla bağlanan herkese **tam kabuk** verir.
+  Yalnızca güvendiğin makinede çalıştır; `ALLOWED_ORIGIN` ile origin'i kısıtla.
+- Token 16+ karakter olsun (`openssl rand -hex 24`) ve loglara yazılmaz.
+- Dosya yolları `realpath` ile çözülür: `..` veya symlink ile `WORK_DIR` dışına
+  çıkılamaz; kök dizin silinemez.
+- Senkron komutlar `EXEC_TIMEOUT_MS` sonunda öldürülür; arka plan görevleri
+  TTL ile temizlenir ve `MAX_TASKS` ile sınırlıdır.
 - İşin bitince servisi durdur: `sudo systemctl disable --now craftai-terminal`.
+
+## Ortam değişkenleri
+
+| Değişken | Varsayılan | Açıklama |
+|---|---|---|
+| `PORT` | `7071` | Dinleme portu |
+| `TERMINAL_TOKEN` | — | **Zorunlu** terminal + HTTP token'ı |
+| `SHELL` | `/bin/bash` | PTY shell |
+| `WORK_DIR` | `$HOME` | Terminal cwd + dosya işlemleri kökü |
+| `ALLOWED_ORIGIN` | `*` | CORS/WS izinli origin |
+| `MAX_FILE_BYTES` | `2000000` | Okuma **ve** yazma boyutu üst sınırı |
+| `MAX_BODY_BYTES` | `8000000` | HTTP gövde üst sınırı |
+| `EXEC_TIMEOUT_MS` | `120000` | Senkron komut zaman aşımı |
+| `MAX_TASKS` | `50` | Arka plan görev üst sınırı |
+| `ALLOW_INSECURE` | — | `1` → token'sız başlat (yalnız geliştirme) |
+
+Hata yanıtları doğru HTTP durum kodlarını kullanır (`400/401/403/404/405/413/429/504`),
+gövde şekli aynıdır: `{ error }`.
