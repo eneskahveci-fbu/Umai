@@ -30,6 +30,8 @@ import {
   TERMINAL_FONT_MAX,
   TERMINAL_FONT_MIN,
 } from "@/lib/terminalKeys";
+import { isAdminEmail } from "@/lib/admin";
+import { isLoopbackWsUrl, resolveTerminalWsUrl } from "@/lib/terminalAccess";
 
 /* Toolbar'daki Kopyala/Yapıştır düğmelerinin çağırdığı, terminale bağlı arayüz.
    Klavye kısayolu (Ctrl/Cmd+C/V) MOBİLDE anlamsız — fiziksel klavye/Ctrl tuşu
@@ -174,7 +176,7 @@ async function bootWsTerminal(containerEl: HTMLDivElement, o: WsBootOpts): Promi
   const pageIsHttps = typeof window !== "undefined" && window.location.protocol === "https:";
   if (pageIsHttps && /^ws:\/\//i.test(url)) url = url.replace(/^ws:/i, "wss:");
   if (!/^wss?:\/\//i.test(url)) {
-    o.onError("Geçersiz terminal adresi. wss://sunucu/?token=… biçiminde olmalı (Oracle kurulumunun verdiği adresi yapıştır).");
+    o.onError("Geçersiz terminal adresi. ws://sunucu:port/?token=… biçiminde olmalı.");
     return () => { term.dispose(); };
   }
   const healthUrl = healthUrlFromWs(url);
@@ -235,7 +237,7 @@ async function bootWsTerminal(containerEl: HTMLDivElement, o: WsBootOpts): Promi
     if (everOpened) {
       if (attempt >= MAX_RECONNECT_ATTEMPTS) {
         term.writeln("\r\n\x1b[31m[Bağlantı geri gelmedi — yeniden başlat düğmesiyle tekrar dene]\x1b[0m");
-        o.onError("Bağlantı koptu ve birkaç denemede geri gelmedi. Oracle sunucusu çalışıyor mu kontrol et, sonra “Tekrar dene”ye bas.");
+        o.onError("Bağlantı koptu ve birkaç denemede geri gelmedi. Terminal sunucusu çalışıyor mu kontrol et, sonra “Tekrar dene”ye bas.");
         return;
       }
       const delay = reconnectDelay(attempt);
@@ -250,13 +252,13 @@ async function bootWsTerminal(containerEl: HTMLDivElement, o: WsBootOpts): Promi
     const health = await fetchHealth();
     if (disposed || ws !== sock) return;
     if (health) {
-      o.onError("Köprü çalışıyor ama terminal bağlantısını reddetti — adres doğru, büyük ihtimalle token yanlış. Ayarlar → Terminal'deki adresi Oracle kurulumunun verdiğiyle karşılaştır.");
+      o.onError("Terminal sunucusu çalışıyor ama bağlantıyı reddetti — adres doğru, büyük ihtimalle token yanlış. Ayarlar → Terminal & Sunucu'daki adresi kontrol et.");
       return;
     }
     o.onError(
       pageIsHttps
-        ? "Köprüye ulaşılamıyor — sunucu kapalı ya da yeniden başlıyor olabilir. Oracle konsolundan instance'ı kontrol et (gerekirse Reboot). 15 sn'de bir kendim tekrar deniyorum."
-        : "Köprüye ulaşılamıyor — adres/port açık mı ve köprü çalışıyor mu kontrol et. 15 sn'de bir kendim tekrar deniyorum.",
+        ? "Terminal sunucusuna ulaşılamıyor — kapalı ya da yeniden başlıyor olabilir. 15 sn'de bir kendim tekrar deniyorum."
+        : "Terminal sunucusuna ulaşılamıyor — adres/port açık mı ve sunucu çalışıyor mu kontrol et. 15 sn'de bir kendim tekrar deniyorum.",
     );
     scheduleRetry(15_000);
   };
@@ -557,7 +559,13 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
      olunca doldurur (bkz. onApi), terminal yeniden başlayınca/kapanınca null. */
   const [termApi, setTermApi] = useState<TermApi | null>(null);
   const apiKey = useStore((s) => s.config.webcontainerApiKey);
-  const wsUrl = useStore((s) => s.config.terminalWsUrl ?? "");
+  /* Terminal IDE mantığında KİŞİNİN KENDİ bilgisayarında çalışır. Admin
+     ayarlarda uzak (Oracle/VPS) adres tanımlayabilir; admin dışı kullanıcıda
+     uzak adres yok sayılır → localhost. Bkz. lib/terminalAccess.ts. */
+  const configuredWsUrl = useStore((s) => s.config.terminalWsUrl ?? "");
+  const isAdmin = isAdminEmail(useStore((s) => s.userEmail));
+  const wsUrl = resolveTerminalWsUrl(configuredWsUrl, isAdmin);
+  const localTerminal = isLoopbackWsUrl(wsUrl);
   const appTheme = useStore((s) => s.config.theme);
   const appThemeRef = useRef(appTheme);
   useEffect(() => { appThemeRef.current = appTheme; }, [appTheme]);
@@ -565,7 +573,11 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
   const addToast = useStore((s) => s.addToast);
   const repo = useStore((s) => s.repo);
   const codespaceHref = repo ? codespaceUrl(repo.owner, repo.repo, repo.branch) : null;
-  const useWs = wsUrl.trim().length > 0;
+  /* WebContainer yalnız AÇIK istekle: bağlantı hatasında "Tarayıcıda dene".
+     Varsayılan yol her zaman gerçek terminal (kendi bilgisayar / admin uzak). */
+  const [sandboxFallback, setSandboxFallback] = useState(false);
+  const sandboxFallbackRef = useRef(false);
+  const useWs = !sandboxFallback;
   /* Tam ekran: herkese açık (Eyl 2026 kullanıcı kararı — terminal artık admin'e
      özel değil, "Coder odaklı yön"; eskiden yalnız admin'di). */
   const [fullscreen, setFullscreen] = useState(false);
@@ -657,7 +669,8 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
         transformInput,
       };
       const onError = (msg: string) => { setStatus("error"); setErrMsg(msg); };
-      const cleanup = useWs
+      const wsMode = !sandboxFallbackRef.current;
+      const cleanup = wsMode
         ? await bootWsTerminal(containerRef.current, {
             ...common,
             wsUrl,
@@ -705,6 +718,29 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
     boot();
   };
 
+  /* Yerel terminal sunucusu kurulumu — hata ekranında kopyalanabilir. */
+  const LOCAL_TERMINAL_SETUP = [
+    "git clone https://github.com/eneskahveci-fbu/Umai.git",
+    "cd Umai/terminal-server && npm install",
+    "TERMINAL_TOKEN=gizli_sifre node server.js",
+  ].join("\n");
+  const copyLocalSetup = async () => {
+    try {
+      await navigator.clipboard.writeText(LOCAL_TERMINAL_SETUP);
+      addToast("Kurulum komutu kopyalandı", "success");
+    } catch {
+      addToast("Kopyalanamadı — metni elle seçebilirsin", "error");
+    }
+  };
+  /* WebContainer'a düş: tarayıcı sandbox'ı, kullanıcının makinesine erişmez. */
+  const useBrowserSandbox = () => {
+    sandboxFallbackRef.current = true;
+    setSandboxFallback(true);
+    cleanupRef.current?.();
+    cleanupRef.current = null;
+    boot();
+  };
+
   const mountFolder = async () => {
     if (!isLocalFsSupported()) {
       addToast("Tarayıcın yerel klasör seçimini desteklemiyor (Chrome/Edge gerekli)", "error");
@@ -730,9 +766,11 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
     restart();
   };
 
-  const modeLabel = useWs
-    ? `Uzak (${(() => { try { return new URL(wsUrl).hostname; } catch { return "ws"; } })()})`
-    : "WebContainer";
+  const modeLabel = !useWs
+    ? "WebContainer"
+    : localTerminal
+      ? "Bu bilgisayar"
+      : `Uzak (${(() => { try { return new URL(wsUrl).hostname; } catch { return "ws"; } })()})`;
 
   return (
     <div
@@ -869,10 +907,28 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
       )}
 
       {status === "error" && (
-        <div className="flex-1 grid place-items-center px-6">
-          <div className="text-center max-w-md">
+        <div className="flex-1 grid place-items-center px-6 py-4 overflow-y-auto">
+          <div className="text-center max-w-lg">
             <p className="text-xs text-red mb-1.5">Terminal başlatılamadı</p>
             <p className="text-[11px] text-white/40 leading-relaxed mb-3">{errMsg}</p>
+
+            {/* Yerel terminal: tarayıcı kullanıcının makinesine doğrudan erişemez —
+                küçük sunucuyu kendi bilgisayarında başlatması gerekir. */}
+            {useWs && localTerminal && (
+              <div className="text-left bg-black/25 border border-white/10 rounded-lg p-3 mb-3">
+                <p className="text-[11px] text-white/60 mb-1.5">
+                  Terminal <strong className="text-white/85">senin bilgisayarında</strong> çalışır. Küçük sunucuyu bir kez başlat:
+                </p>
+                <pre className="text-[10.5px] leading-relaxed font-mono text-white/70 whitespace-pre-wrap break-all select-all">{LOCAL_TERMINAL_SETUP}</pre>
+                <button
+                  onClick={copyLocalSetup}
+                  className="mt-2 inline-flex items-center gap-1 text-[10.5px] px-2 py-1 rounded border border-white/15 hover:border-white/30 text-white/60 hover:text-white/85 transition-colors"
+                >
+                  <Copy size={10} /> Komutu kopyala
+                </button>
+              </div>
+            )}
+
             <div className="flex items-center justify-center gap-2 flex-wrap">
               {useWs ? (
                 <button onClick={() => setSettingsOpen(true)} className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg bg-brand text-[#111110] hover:bg-branddim transition-colors font-semibold">
@@ -890,6 +946,11 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
               <button onClick={restart} className="text-[11px] px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white/60 transition-colors">
                 Tekrar dene
               </button>
+              {useWs && (
+                <button onClick={useBrowserSandbox} className="text-[11px] px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white/60 transition-colors">
+                  Tarayıcıda dene
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -899,7 +960,11 @@ export function RealTerminal({ onClose }: { onClose: () => void }) {
         <div className="flex-1 grid place-items-center">
           <div className="flex items-center gap-2 text-xs text-white/40">
             <Loader2 size={13} className="animate-spin" />
-            {useWs ? "Uzak sunucuya bağlanılıyor…" : "WebContainer başlatılıyor (5-10 sn sürebilir)…"}
+            {useWs
+              ? localTerminal
+                ? "Kendi bilgisayarındaki terminal sunucusuna bağlanılıyor…"
+                : "Uzak sunucuya bağlanılıyor…"
+              : "WebContainer başlatılıyor (5-10 sn sürebilir)…"}
           </div>
         </div>
       )}

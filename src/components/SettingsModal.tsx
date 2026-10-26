@@ -12,6 +12,7 @@ import {
   Check,
   ChevronRight,
   ChevronLeft,
+  Copy,
   Layers,
   ExternalLink,
   Download,
@@ -51,6 +52,7 @@ import { isGuestMode, setGuestMode, useStore } from "@/lib/store";
 import { detectModelCapabilities } from "@/lib/modelCapabilities";
 import { DEFAULT_QUICK_COMMANDS, MAX_QUICK_COMMANDS, parseQuickCommands } from "@/lib/terminalKeys";
 import { isAdminEmail } from "@/lib/admin";
+import { isLoopbackWsUrl, LOCAL_TERMINAL_WS, resolveTerminalWsUrl } from "@/lib/terminalAccess";
 import { readErrors, clearErrors } from "@/lib/errorLog";
 import { AccountSettings } from "@/components/AccountSettings";
 import { ExtensionsSettings } from "@/components/ExtensionsSettings";
@@ -171,7 +173,11 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
   /* Hibrit köprüyü test et: terminalWsUrl/localBridgeUrl'den HTTP tabanı türetip
      /health ucuna vurur (tarayıcıdan doğrudan; ucu token istemez, CORS açık). */
   const testBridge = async () => {
-    const raw = (config.terminalWsUrl || config.localBridgeUrl || "").trim();
+    /* Admin uzak sunucuyu, normal kullanıcı YALNIZ kendi bilgisayarını test eder
+       (uzak adres istemcide yok sayılır — bkz. lib/terminalAccess.ts). */
+    const raw = (isAdmin
+      ? (config.terminalWsUrl || config.localBridgeUrl || "")
+      : resolveTerminalWsUrl(config.terminalWsUrl, false)).trim();
     if (!raw) { setBridgeTest({ status: "fail", message: "Önce bir adres gir." }); return; }
     let base: string;
     try {
@@ -2295,7 +2301,9 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
 
             {/* Sunucu/terminal ayarları — Eyl 2026: herkese açık (coder odaklı ürün) */}
             <>
-            {/* Hibrit Sunucu — tek adres hem terminal hem dosya sistemi kurar */}
+            {/* Hibrit Sunucu (Oracle/VPS) — YALNIZ admin. Normal kullanıcının
+                terminali kendi bilgisayarında çalışır (aşağıdaki bölüm). */}
+            {isAdmin && (
             <div>
               <h4 className="text-sm font-bold mb-1 flex items-center gap-1.5"><Link2 size={14} className="text-brand shrink-0" /> Hibrit Sunucu <span className="text-[10px] font-normal text-brand/80 bg-brand/10 px-1.5 py-0.5 rounded">tek adres</span></h4>
               <p className="text-xs text-muted/70 mb-2 leading-relaxed">
@@ -2376,32 +2384,97 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
                 </p>
               </div>
             </div>
+            )}
 
-            {/* Terminal WebSocket URL */}
+            {/* Terminal — normal kullanıcı: KENDİ bilgisayarı; admin: uzak sunucu.
+                Uzak adres admin dışında yok sayılır (lib/terminalAccess.ts). */}
             <div>
-              <h4 className="text-sm font-bold mb-1">Terminal Sunucusu (WebSocket)</h4>
-              <p className="text-xs text-muted/70 mb-2 leading-relaxed">
-                Kendi Linux sunucunu veya Oracle Cloud ücretsiz VM&apos;ini bağla.{" "}
-                <strong className="text-muted">Boş bırakırsan</strong> WebContainer sandbox kullanılır.
-                <br />
-                Örnek:{" "}
-                <code className="text-brand/80 bg-bgsoft px-1 rounded text-[11px]">wss://sunucu-ip:7071?token=SIFRE</code>
-                <br />
-                <span className="text-muted/50 text-[11px]">
-                  Kendi bilgisayarın için hazır ücretsiz köprü:{" "}
-                  <code className="bg-bgsoft px-1 rounded">scripts/terminal-bridge/</code> (README&apos;ye bak) →{" "}
-                  <code className="bg-bgsoft px-1 rounded text-[11px]">ws://localhost:7777/?token=...</code>
-                </span>
-              </p>
-              <input
-                type="text"
-                value={config.terminalWsUrl ?? ""}
-                onChange={(e) => saveConfig({ ...config, terminalWsUrl: e.target.value.trim() })}
-                placeholder="ws://localhost:7777/?token=..."
-                className="input-mono w-full"
-                autoComplete="off"
-                spellCheck={false}
-              />
+              {isAdmin ? (
+                <>
+                  <h4 className="text-sm font-bold mb-1 flex items-center gap-1.5">
+                    Uzak Terminal Sunucusu
+                    <span className="text-[10px] font-normal text-yellow/90 bg-yellow/10 px-1.5 py-0.5 rounded">yalnız yönetici</span>
+                  </h4>
+                  <p className="text-xs text-muted/70 mb-2 leading-relaxed">
+                    Oracle/VPS kurulumunun verdiği{" "}
+                    <code className="text-brand/80 bg-bgsoft px-1 rounded text-[11px]">wss://…/?token=…</code>{" "}
+                    adresi. <strong className="text-muted">Boş bırakırsan</strong> senin bilgisayarın
+                    (<code className="bg-bgsoft px-1 rounded text-[11px]">ws://127.0.0.1:7071</code>) kullanılır.
+                  </p>
+                  <input
+                    type="text"
+                    value={config.terminalWsUrl ?? ""}
+                    onChange={(e) => saveConfig({ ...config, terminalWsUrl: e.target.value.trim() })}
+                    placeholder="wss://sunucu-ip:7071/?token=..."
+                    className="input-mono w-full"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </>
+              ) : (
+                <>
+                  <h4 className="text-sm font-bold mb-1 flex items-center gap-1.5">
+                    Kendi bilgisayarın
+                    <span className="text-[10px] font-normal text-brand/80 bg-brand/10 px-1.5 py-0.5 rounded">yerel</span>
+                  </h4>
+                  <p className="text-xs text-muted/70 mb-2 leading-relaxed">
+                    Terminal <strong className="text-muted">senin makinende</strong> çalışır — IDE terminali gibi.
+                    Küçük sunucuyu bir kez başlat (Node.js gerekir):
+                  </p>
+                  <div className="bg-bgsoft border border-line/60 rounded-lg p-2.5 mb-2">
+                    <pre className="text-[10.5px] leading-relaxed font-mono text-muted whitespace-pre-wrap break-all select-all">{"cd terminal-server && npm install\nTERMINAL_TOKEN=gizli_sifre node server.js"}</pre>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText("cd terminal-server && npm install\nTERMINAL_TOKEN=gizli_sifre node server.js");
+                          addToast("Kurulum komutu kopyalandı", "success");
+                        } catch { addToast("Kopyalanamadı — metni elle seç", "error"); }
+                      }}
+                      className="mt-2 inline-flex items-center gap-1 text-[10.5px] px-2 py-1 rounded border border-line hover:border-brand text-muted hover:text-ink transition-colors"
+                    >
+                      <Copy size={10} /> Komutu kopyala
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-muted/50 mb-1.5 leading-relaxed">
+                    Sunucu adresi (token&apos;ı URL&apos;ye ekle). Boşsa{" "}
+                    <code className="bg-bgsoft px-1 rounded">{LOCAL_TERMINAL_WS}</code> kullanılır.
+                  </p>
+                  <input
+                    type="text"
+                    value={isLoopbackWsUrl(config.terminalWsUrl ?? "") ? (config.terminalWsUrl ?? "") : ""}
+                    onChange={(e) => saveConfig({ ...config, terminalWsUrl: e.target.value.trim() })}
+                    placeholder="ws://127.0.0.1:7071/?token=..."
+                    className="input-mono w-full"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <div className="mt-2 flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={testBridge}
+                      disabled={bridgeTest.status === "testing"}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line hover:border-brand text-xs font-semibold transition-colors disabled:opacity-50"
+                    >
+                      {bridgeTest.status === "testing"
+                        ? <><Loader2 size={12} className="animate-spin" /> Test ediliyor…</>
+                        : <><Play size={12} /> Bağlantıyı test et</>}
+                    </button>
+                    {bridgeTest.status === "ok" && (
+                      <span className="flex items-center gap-1.5 text-xs text-green">
+                        <Check size={13} /> Bağlı{bridgeTest.terminal ? " — terminal hazır" : ""}
+                        {bridgeTest.root && <code className="text-[10px] text-muted/60 bg-bgsoft px-1 rounded">{bridgeTest.root}</code>}
+                      </span>
+                    )}
+                    {bridgeTest.status === "fail" && (
+                      <span className="flex items-center gap-1.5 text-xs text-red">
+                        <X size={13} /> {bridgeTest.message}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted/50 mt-2 leading-relaxed">
+                    Uzak (Oracle/VPS) terminal yalnızca yöneticiye açıktır.
+                  </p>
+                </>
+              )}
 
               {/* Otomasyon: bağlanınca çalışacak kurulum komutu (SessionStart) */}
               <h4 className="text-sm font-bold mt-4 mb-1">Bağlanınca kurulum komutu</h4>
@@ -2505,10 +2578,14 @@ export function SettingsModal({ routeMode = false, initialTab, onTabChange }: {
               <p className="text-xs text-muted/70 mb-2 leading-relaxed">
                 Açıkken ajan GitHub/GitLab API yerine{" "}
                 <strong className="text-muted">gerçek dosya sistemine ve kabuğa</strong>{" "}
-                erişir (Claude Code gibi). İki yol:
+                erişir (Claude Code gibi). Yollar:
                 <br />
-                • <strong className="text-muted">Hibrit sunucu</strong> (Oracle/VPS): yukarıdaki tek adresi yapıştırınca otomatik dolar — mobil dahil her yerden çalışır.
-                <br />
+                {isAdmin && (
+                  <>
+                    • <strong className="text-muted">Hibrit sunucu</strong> (Oracle/VPS): yukarıdaki tek adresi yapıştırınca otomatik dolar — mobil dahil her yerden çalışır.
+                    <br />
+                  </>
+                )}
                 • <strong className="text-muted">Kendi bilgisayarın</strong> (yerelde):{" "}
                 <code className="text-brand/80 bg-bgsoft px-1 rounded text-[11px]">cd local-bridge &amp;&amp; BRIDGE_TOKEN=gizli WORK_DIR=/proje node server.js</code>
                 <br />

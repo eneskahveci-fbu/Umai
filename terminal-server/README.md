@@ -7,7 +7,29 @@ gerçek terminaline benzer). WebSocket üzerinden PTY açar; token ile korunur.
 - `deploy-oracle.sh` — Oracle Cloud (Ubuntu ARM) için **tek komutluk kalıcı kurulum**
 - `Dockerfile` — konteyner ile çalıştırmak için
 
-## En kolay yol: Oracle Cloud Free Tier (7/24, ücretsiz)
+## Kendi bilgisayarında çalıştır (varsayılan)
+
+Uygulamadaki terminal artık **IDE mantığında** çalışır: web sitesi senin
+bilgisayarındaki bu sunucuya bağlanır (`ws://127.0.0.1:7071`). Uzak/Oracle
+sunucu yalnızca yönetici (admin) hesaplarına açıktır.
+
+```bash
+cd terminal-server
+npm install
+TERMINAL_TOKEN=$(openssl rand -hex 24) node server.js
+```
+
+Çıktıdaki adresi uygulamada **Ayarlar → Terminal & Sunucu → Kendi bilgisayarın**
+alanına yapıştır:
+
+```
+ws://127.0.0.1:7071/?token=<ürettiğin-token>
+```
+
+> Tarayıcı tek başına bilgisayarına erişemez; bu küçük sunucu o köprüdür.
+> Yalnız `127.0.0.1` üzerinde dinler, token zorunludur.
+
+## Oracle Cloud Free Tier (yalnız yönetici)
 
 1. **VM oluştur:** cloud.oracle.com → ARM VM (Shape `VM.Standard.A1.Flex`,
    1 OCPU / 6 GB — Always Free).
